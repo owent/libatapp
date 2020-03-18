@@ -58,8 +58,8 @@ namespace atapp {
 
         class flag_guard_t {
         public:
-            flag_guard_t(app &owner, flag_t::type f);
-            ~flag_guard_t();
+            LIBATAPP_MACRO_API flag_guard_t(app &owner, flag_t::type f);
+            LIBATAPP_MACRO_API ~flag_guard_t();
 
         private:
             flag_guard_t(const flag_guard_t &);
@@ -112,8 +112,8 @@ namespace atapp {
         typedef std::function<int(app &)> callback_fn_on_all_module_inited_t;
 
     public:
-        app();
-        ~app();
+        LIBATAPP_MACRO_API app();
+        LIBATAPP_MACRO_API ~app();
 
         /**
          * @brief run atapp loop until stop
@@ -124,7 +124,7 @@ namespace atapp {
          * @note you can call init(ev_loop, argc, argv, priv_data), and then call run(NULL, 0, NULL).
          * @return 0 or error code
          */
-        int run(uv_loop_t *ev_loop, int argc, const char **argv, void *priv_data = NULL);
+        LIBATAPP_MACRO_API int run(uv_loop_t *ev_loop, int argc, const char **argv, void *priv_data = NULL);
 
         /**
          * @brief initialize atapp
@@ -134,7 +134,7 @@ namespace atapp {
          * @param priv_data private data for custom option callbacks
          * @return 0 or error code
          */
-        int init(uv_loop_t *ev_loop, int argc, const char **argv, void *priv_data = NULL);
+        LIBATAPP_MACRO_API int init(uv_loop_t *ev_loop, int argc, const char **argv, void *priv_data = NULL);
 
         /**
          * @brief run atapp loop but noblock if there is no event
@@ -142,86 +142,86 @@ namespace atapp {
          * @param max_event_count max event in once call
          * @return 0 for no more actions or error code < 0 or 1 for there is pending actions
          */
-        int run_noblock(uint64_t max_event_count = 20000);
+        LIBATAPP_MACRO_API int run_noblock(uint64_t max_event_count = 20000);
 
-        bool is_inited() const UTIL_CONFIG_NOEXCEPT;
+        LIBATAPP_MACRO_API bool is_inited() const UTIL_CONFIG_NOEXCEPT;
 
-        bool is_running() const UTIL_CONFIG_NOEXCEPT;
+        LIBATAPP_MACRO_API bool is_running() const UTIL_CONFIG_NOEXCEPT;
 
-        bool is_closing() const UTIL_CONFIG_NOEXCEPT;
+        LIBATAPP_MACRO_API bool is_closing() const UTIL_CONFIG_NOEXCEPT;
 
-        bool is_closed() const UTIL_CONFIG_NOEXCEPT;
+        LIBATAPP_MACRO_API bool is_closed() const UTIL_CONFIG_NOEXCEPT;
 
-        int reload();
+        LIBATAPP_MACRO_API int reload();
 
-        int stop();
+        LIBATAPP_MACRO_API int stop();
 
-        int tick();
+        LIBATAPP_MACRO_API int tick();
 
-        app_id_t get_id() const;
+        LIBATAPP_MACRO_API app_id_t get_id() const;
 
-        app_id_t convert_app_id_by_string(const char* id_in) const;
+        LIBATAPP_MACRO_API app_id_t convert_app_id_by_string(const char* id_in) const;
 
-        bool check_flag(flag_t::type f) const;
+        LIBATAPP_MACRO_API bool check_flag(flag_t::type f) const;
 
         /**
          * @brief add a new module
          */
-        void add_module(module_ptr_t module);
+        LIBATAPP_MACRO_API void add_module(module_ptr_t module);
 
         /**
          * @brief convert module type and add a new module
          */
         template <typename TModPtr>
-        void add_module(TModPtr module) {
+        LIBATAPP_MACRO_API_HEAD_ONLY void add_module(TModPtr module) {
             add_module(std::dynamic_pointer_cast<module_impl>(module));
         }
 
         // api: add custom log type
         // api: add custom module
         // api: add custom command callback
-        util::cli::cmd_option_ci::ptr_type get_command_manager();
+        LIBATAPP_MACRO_API util::cli::cmd_option_ci::ptr_type get_command_manager();
 
         // api: add custem program options
-        util::cli::cmd_option::ptr_type get_option_manager();
+        LIBATAPP_MACRO_API util::cli::cmd_option::ptr_type get_option_manager();
 
-        void set_app_version(const std::string &ver);
+        LIBATAPP_MACRO_API void set_app_version(const std::string &ver);
 
-        const std::string &get_app_version() const;
+        LIBATAPP_MACRO_API const std::string &get_app_version() const;
 
-        void set_build_version(const std::string &ver);
+        LIBATAPP_MACRO_API void set_build_version(const std::string &ver);
 
-        const std::string &get_build_version() const;
+        LIBATAPP_MACRO_API const std::string &get_build_version() const;
 
-        const std::string &get_app_name() const;
+        LIBATAPP_MACRO_API const std::string &get_app_name() const;
 
-        const std::string &get_type_name() const;
+        LIBATAPP_MACRO_API const std::string &get_type_name() const;
 
-        app_id_t get_type_id() const;
+        LIBATAPP_MACRO_API app_id_t get_type_id() const;
 
-        const std::string &get_hash_code() const;
+        LIBATAPP_MACRO_API const std::string &get_hash_code() const;
 
-        std::shared_ptr<atbus::node> get_bus_node();
-        const std::shared_ptr<atbus::node> get_bus_node() const;
+        LIBATAPP_MACRO_API std::shared_ptr<atbus::node> get_bus_node();
+        LIBATAPP_MACRO_API const std::shared_ptr<atbus::node> get_bus_node() const;
 
-        bool is_remote_address_available(const std::string &hostname, const std::string &address) const;
+        LIBATAPP_MACRO_API bool is_remote_address_available(const std::string &hostname, const std::string &address) const;
 
-        util::config::ini_loader &get_configure();
-        const util::config::ini_loader &get_configure() const;
+        LIBATAPP_MACRO_API util::config::ini_loader &get_configure();
+        LIBATAPP_MACRO_API const util::config::ini_loader &get_configure() const;
 
-        bool add_log_sink_maker(const std::string &name, log_sink_maker::log_reg_t fn);
+        LIBATAPP_MACRO_API bool add_log_sink_maker(const std::string &name, log_sink_maker::log_reg_t fn);
 
-        void set_evt_on_recv_msg(callback_fn_on_msg_t fn);
-        void set_evt_on_send_fail(callback_fn_on_send_fail_t fn);
-        void set_evt_on_app_connected(callback_fn_on_connected_t fn);
-        void set_evt_on_app_disconnected(callback_fn_on_disconnected_t fn);
-        void set_evt_on_all_module_inited(callback_fn_on_all_module_inited_t fn);
+        LIBATAPP_MACRO_API void set_evt_on_recv_msg(callback_fn_on_msg_t fn);
+        LIBATAPP_MACRO_API void set_evt_on_send_fail(callback_fn_on_send_fail_t fn);
+        LIBATAPP_MACRO_API void set_evt_on_app_connected(callback_fn_on_connected_t fn);
+        LIBATAPP_MACRO_API void set_evt_on_app_disconnected(callback_fn_on_disconnected_t fn);
+        LIBATAPP_MACRO_API void set_evt_on_all_module_inited(callback_fn_on_all_module_inited_t fn);
 
-        const callback_fn_on_msg_t &get_evt_on_recv_msg() const;
-        const callback_fn_on_send_fail_t &get_evt_on_send_fail() const;
-        const callback_fn_on_connected_t &get_evt_on_app_connected() const;
-        const callback_fn_on_disconnected_t &get_evt_on_app_disconnected() const;
-        const callback_fn_on_all_module_inited_t &get_evt_on_all_module_inited() const;
+        LIBATAPP_MACRO_API const callback_fn_on_msg_t &get_evt_on_recv_msg() const;
+        LIBATAPP_MACRO_API const callback_fn_on_send_fail_t &get_evt_on_send_fail() const;
+        LIBATAPP_MACRO_API const callback_fn_on_connected_t &get_evt_on_app_connected() const;
+        LIBATAPP_MACRO_API const callback_fn_on_disconnected_t &get_evt_on_app_disconnected() const;
+        LIBATAPP_MACRO_API const callback_fn_on_all_module_inited_t &get_evt_on_all_module_inited() const;
 
     private:
         static void ev_stop_timeout(uv_timer_t *handle);
@@ -257,11 +257,11 @@ namespace atapp {
         // ============ inner functional handlers ============
 
     public:
-        static custom_command_sender_t get_custom_command_sender(util::cli::callback_param);
-        static bool add_custom_command_rsp(util::cli::callback_param, const std::string &rsp_text);
-        static void split_ids_by_string(const char* in, std::vector<app_id_t>& out);
-        static app_id_t convert_app_id_by_string(const char* id_in, const std::vector<app_id_t>& mask_in);
-        static app_id_t convert_app_id_by_string(const char* id_in, const char* mask_in);
+        static LIBATAPP_MACRO_API custom_command_sender_t get_custom_command_sender(util::cli::callback_param);
+        static LIBATAPP_MACRO_API bool add_custom_command_rsp(util::cli::callback_param, const std::string &rsp_text);
+        static LIBATAPP_MACRO_API void split_ids_by_string(const char* in, std::vector<app_id_t>& out);
+        static LIBATAPP_MACRO_API app_id_t convert_app_id_by_string(const char* id_in, const std::vector<app_id_t>& mask_in);
+        static LIBATAPP_MACRO_API app_id_t convert_app_id_by_string(const char* id_in, const char* mask_in);
 
     private:
         int prog_option_handler_help(util::cli::callback_param params, util::cli::cmd_option *opt_mgr, util::cli::cmd_option_ci *cmd_mgr);

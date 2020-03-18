@@ -25,7 +25,7 @@
 namespace atapp {
     app *app::last_instance_;
 
-    app::flag_guard_t::flag_guard_t(app &owner, flag_t::type f) : owner_(&owner), flag_(f) {
+    LIBATAPP_MACRO_API app::flag_guard_t::flag_guard_t(app &owner, flag_t::type f) : owner_(&owner), flag_(f) {
         if (owner_->check_flag(flag_)) {
             owner_ = NULL;
             return;
@@ -34,7 +34,7 @@ namespace atapp {
         owner_->set_flag(flag_, true);
     }
 
-    app::flag_guard_t::~flag_guard_t() {
+    LIBATAPP_MACRO_API app::flag_guard_t::~flag_guard_t() {
         if (NULL == owner_) {
             return;
         }
@@ -62,7 +62,7 @@ namespace atapp {
         return std::pair<uint64_t, const char *>(sz, unit);
     }
 
-    app::app() : setup_result_(0), last_proc_event_count_(0), mode_(mode_t::CUSTOM) {
+    LIBATAPP_MACRO_API app::app() : setup_result_(0), last_proc_event_count_(0), mode_(mode_t::CUSTOM) {
         last_instance_ = this;
         conf_.id = 0;
         conf_.type_id = 0;
@@ -82,7 +82,7 @@ namespace atapp {
         stat_.last_checkpoint_min = 0;
     }
 
-    app::~app() {
+    LIBATAPP_MACRO_API app::~app() {
         if (this == last_instance_) {
             last_instance_ = NULL;
         }
@@ -105,7 +105,7 @@ namespace atapp {
         assert(!tick_timer_.timeout_timer.is_activited);
     }
 
-    int app::run(uv_loop_t *ev_loop, int argc, const char **argv, void *priv_data) {
+    LIBATAPP_MACRO_API int app::run(uv_loop_t *ev_loop, int argc, const char **argv, void *priv_data) {
         if (0 != setup_result_) {
             return setup_result_;
         }
@@ -137,7 +137,7 @@ namespace atapp {
 
     } // namespace atapp
 
-    int app::init(uv_loop_t *ev_loop, int argc, const char **argv, void *priv_data) {
+    LIBATAPP_MACRO_API int app::init(uv_loop_t *ev_loop, int argc, const char **argv, void *priv_data) {
         if (check_flag(flag_t::INITIALIZED)) {
             return EN_ATAPP_ERR_ALREADY_INITED;
         }
@@ -273,7 +273,7 @@ namespace atapp {
         return EN_ATAPP_ERR_SUCCESS;
     } // namespace atapp
 
-    int app::run_noblock(uint64_t max_event_count) {
+    LIBATAPP_MACRO_API int app::run_noblock(uint64_t max_event_count) {
         uint64_t evt_count = 0;
         int ret = 0;
         do {
@@ -292,15 +292,15 @@ namespace atapp {
         return ret;
     }
 
-    bool app::is_inited() const UTIL_CONFIG_NOEXCEPT { return check_flag(flag_t::INITIALIZED); }
+    LIBATAPP_MACRO_API bool app::is_inited() const UTIL_CONFIG_NOEXCEPT { return check_flag(flag_t::INITIALIZED); }
 
-    bool app::is_running() const UTIL_CONFIG_NOEXCEPT { return check_flag(flag_t::RUNNING); }
+    LIBATAPP_MACRO_API bool app::is_running() const UTIL_CONFIG_NOEXCEPT { return check_flag(flag_t::RUNNING); }
 
-    bool app::is_closing() const UTIL_CONFIG_NOEXCEPT { return check_flag(flag_t::STOPING); }
+    LIBATAPP_MACRO_API bool app::is_closing() const UTIL_CONFIG_NOEXCEPT { return check_flag(flag_t::STOPING); }
 
-    bool app::is_closed() const UTIL_CONFIG_NOEXCEPT { return check_flag(flag_t::STOPPED); }
+    LIBATAPP_MACRO_API bool app::is_closed() const UTIL_CONFIG_NOEXCEPT { return check_flag(flag_t::STOPPED); }
 
-    int app::reload() {
+    LIBATAPP_MACRO_API int app::reload() {
         app_conf old_conf = conf_;
         util::cli::shell_stream ss(std::cerr);
 
@@ -376,7 +376,7 @@ namespace atapp {
         return 0;
     }
 
-    int app::stop() {
+    LIBATAPP_MACRO_API int app::stop() {
         WLOGINFO("============ receive stop signal and ready to stop all modules ============");
         // step 1. set stop flag.
         // bool is_stoping = set_flag(flag_t::STOPING, true);
@@ -396,7 +396,7 @@ namespace atapp {
         return 0;
     }
 
-    int app::tick() {
+    LIBATAPP_MACRO_API int app::tick() {
         int active_count;
         util::time::time_utility::update();
         // record start time point
@@ -500,11 +500,11 @@ namespace atapp {
         return 0;
     }
 
-    app::app_id_t app::get_id() const { return conf_.id; }
+    LIBATAPP_MACRO_API app::app_id_t app::get_id() const { return conf_.id; }
 
-    app::app_id_t app::convert_app_id_by_string(const char *id_in) const { return convert_app_id_by_string(id_in, conf_.id_mask); }
+    LIBATAPP_MACRO_API app::app_id_t app::convert_app_id_by_string(const char *id_in) const { return convert_app_id_by_string(id_in, conf_.id_mask); }
 
-    void app::add_module(module_ptr_t module) {
+    LIBATAPP_MACRO_API void app::add_module(module_ptr_t module) {
         if (this == module->owner_) {
             return;
         }
@@ -515,7 +515,7 @@ namespace atapp {
         module->owner_ = this;
     }
 
-    util::cli::cmd_option_ci::ptr_type app::get_command_manager() {
+    LIBATAPP_MACRO_API util::cli::cmd_option_ci::ptr_type app::get_command_manager() {
         if (!cmd_handler_) {
             return cmd_handler_ = util::cli::cmd_option_ci::create();
         }
@@ -523,7 +523,7 @@ namespace atapp {
         return cmd_handler_;
     }
 
-    util::cli::cmd_option::ptr_type app::get_option_manager() {
+    LIBATAPP_MACRO_API util::cli::cmd_option::ptr_type app::get_option_manager() {
         if (!app_option_) {
             return app_option_ = util::cli::cmd_option::create();
         }
@@ -531,22 +531,101 @@ namespace atapp {
         return app_option_;
     }
 
-    void app::set_app_version(const std::string &ver) { conf_.app_version = ver; }
+    LIBATAPP_MACRO_API void app::set_app_version(const std::string &ver) { conf_.app_version = ver; }
 
-    const std::string &app::get_app_version() const { return conf_.app_version; }
+    LIBATAPP_MACRO_API const std::string &app::get_app_version() const { return conf_.app_version; }
 
-    const std::string &app::get_app_name() const { return conf_.name; }
+    LIBATAPP_MACRO_API void app::set_build_version(const std::string &ver) { build_version_ = ver; }
 
-    const std::string &app::get_type_name() const { return conf_.type_name; }
+    LIBATAPP_MACRO_API const std::string &app::get_build_version() const {
+        if (build_version_.empty()) {
+            std::stringstream ss;
+            if (get_app_version().empty()) {
+                ss << "1.0.0.0 - based on libatapp " << LIBATAPP_VERSION << std::endl;
+            } else {
+                ss << get_app_version() << " - based on libatapp " << LIBATAPP_VERSION << std::endl;
+            }
 
-    app::app_id_t app::get_type_id() const { return conf_.type_id; }
+            const size_t key_padding = 20;
 
-    const std::string &app::get_hash_code() const { return conf_.hash_code; }
+#ifdef __DATE__
+            ss << std::setw(key_padding) << "Build Time: " << __DATE__;
+#ifdef __TIME__
+            ss << " " << __TIME__;
+#endif
+            ss << std::endl;
+#endif
 
-    std::shared_ptr<atbus::node> app::get_bus_node() { return bus_node_; }
-    const std::shared_ptr<atbus::node> app::get_bus_node() const { return bus_node_; }
 
-    bool app::is_remote_address_available(const std::string & /*hostname*/, const std::string &address) const {
+#if defined(PROJECT_SCM_VERSION) || defined(PROJECT_SCM_NAME) || defined(PROJECT_SCM_BRANCH)
+            ss << std::setw(key_padding) << "Build SCM:";
+#ifdef PROJECT_SCM_NAME
+            ss << " " << PROJECT_SCM_NAME;
+#endif
+#ifdef PROJECT_SCM_BRANCH
+            ss << " branch " << PROJECT_SCM_BRANCH;
+#endif
+#ifdef PROJECT_SCM_VERSION
+            ss << " commit " << PROJECT_SCM_VERSION;
+#endif
+#endif
+
+#if defined(_MSC_VER)
+            ss << std::setw(key_padding) << "Build Compiler: MSVC ";
+#ifdef _MSC_FULL_VER
+            ss << _MSC_FULL_VER;
+#else
+            ss << _MSC_VER;
+#endif
+
+#ifdef _MSVC_LANG
+            ss << " with standard " << _MSVC_LANG;
+#endif
+            ss << std::endl;
+
+#elif defined(__clang__) || defined(__GNUC__) || defined(__GNUG__)
+            ss << std::setw(key_padding) << "Build Compiler: ";
+#if defined(__clang__)
+            ss << "clang ";
+#else
+            ss << "gcc ";
+#endif
+
+#if defined(__clang_version__)
+            ss << __clang_version__;
+#elif defined(__VERSION__)
+            ss << __VERSION__;
+#endif
+#if defined(__OPTIMIZE__)
+            ss << " optimize level " << __OPTIMIZE__;
+#endif
+#if defined(__STDC_VERSION__)
+            ss << " C standard " << __STDC_VERSION__;
+#endif
+#if defined(__cplusplus) && __cplusplus > 1
+            ss << " C++ standard " << __cplusplus;
+#endif
+            ss << std::endl;
+#endif
+
+            build_version_ = ss.str();
+        }
+
+        return build_version_;
+    }
+
+    LIBATAPP_MACRO_API const std::string &app::get_app_name() const { return conf_.name; }
+
+    LIBATAPP_MACRO_API const std::string &app::get_type_name() const { return conf_.type_name; }
+
+    LIBATAPP_MACRO_API app::app_id_t app::get_type_id() const { return conf_.type_id; }
+
+    LIBATAPP_MACRO_API const std::string &app::get_hash_code() const { return conf_.hash_code; }
+
+    LIBATAPP_MACRO_API std::shared_ptr<atbus::node> app::get_bus_node() { return bus_node_; }
+    LIBATAPP_MACRO_API const std::shared_ptr<atbus::node> app::get_bus_node() const { return bus_node_; }
+
+    LIBATAPP_MACRO_API bool app::is_remote_address_available(const std::string & /*hostname*/, const std::string &address) const {
         if (0 == UTIL_STRFUNC_STRNCASE_CMP("mem:", address.c_str(), 4)) {
             return false;
         }
@@ -560,10 +639,10 @@ namespace atapp {
         return true;
     }
 
-    util::config::ini_loader &app::get_configure() { return cfg_loader_; }
-    const util::config::ini_loader &app::get_configure() const { return cfg_loader_; }
+    LIBATAPP_MACRO_API util::config::ini_loader &app::get_configure() { return cfg_loader_; }
+    LIBATAPP_MACRO_API const util::config::ini_loader &app::get_configure() const { return cfg_loader_; }
 
-    bool app::add_log_sink_maker(const std::string &name, log_sink_maker::log_reg_t fn) {
+    LIBATAPP_MACRO_API bool app::add_log_sink_maker(const std::string &name, log_sink_maker::log_reg_t fn) {
         if (log_reg_.end() != log_reg_.find(name)) {
             return false;
         }
@@ -572,17 +651,17 @@ namespace atapp {
         return true;
     }
 
-    void app::set_evt_on_recv_msg(callback_fn_on_msg_t fn) { evt_on_recv_msg_ = fn; }
-    void app::set_evt_on_send_fail(callback_fn_on_send_fail_t fn) { evt_on_send_fail_ = fn; }
-    void app::set_evt_on_app_connected(callback_fn_on_connected_t fn) { evt_on_app_connected_ = fn; }
-    void app::set_evt_on_app_disconnected(callback_fn_on_disconnected_t fn) { evt_on_app_disconnected_ = fn; }
-    void app::set_evt_on_all_module_inited(callback_fn_on_all_module_inited_t fn) { evt_on_all_module_inited_ = fn; }
+    LIBATAPP_MACRO_API void app::set_evt_on_recv_msg(callback_fn_on_msg_t fn) { evt_on_recv_msg_ = fn; }
+    LIBATAPP_MACRO_API void app::set_evt_on_send_fail(callback_fn_on_send_fail_t fn) { evt_on_send_fail_ = fn; }
+    LIBATAPP_MACRO_API void app::set_evt_on_app_connected(callback_fn_on_connected_t fn) { evt_on_app_connected_ = fn; }
+    LIBATAPP_MACRO_API void app::set_evt_on_app_disconnected(callback_fn_on_disconnected_t fn) { evt_on_app_disconnected_ = fn; }
+    LIBATAPP_MACRO_API void app::set_evt_on_all_module_inited(callback_fn_on_all_module_inited_t fn) { evt_on_all_module_inited_ = fn; }
 
-    const app::callback_fn_on_msg_t &app::get_evt_on_recv_msg() const { return evt_on_recv_msg_; }
-    const app::callback_fn_on_send_fail_t &app::get_evt_on_send_fail() const { return evt_on_send_fail_; }
-    const app::callback_fn_on_connected_t &app::get_evt_on_app_connected() const { return evt_on_app_connected_; }
-    const app::callback_fn_on_disconnected_t &app::get_evt_on_app_disconnected() const { return evt_on_app_disconnected_; }
-    const app::callback_fn_on_all_module_inited_t &app::get_evt_on_all_module_inited() const { return evt_on_all_module_inited_; }
+    LIBATAPP_MACRO_API const app::callback_fn_on_msg_t &app::get_evt_on_recv_msg() const { return evt_on_recv_msg_; }
+    LIBATAPP_MACRO_API const app::callback_fn_on_send_fail_t &app::get_evt_on_send_fail() const { return evt_on_send_fail_; }
+    LIBATAPP_MACRO_API const app::callback_fn_on_connected_t &app::get_evt_on_app_connected() const { return evt_on_app_connected_; }
+    LIBATAPP_MACRO_API const app::callback_fn_on_disconnected_t &app::get_evt_on_app_disconnected() const { return evt_on_app_disconnected_; }
+    LIBATAPP_MACRO_API const app::callback_fn_on_all_module_inited_t &app::get_evt_on_all_module_inited() const { return evt_on_all_module_inited_; }
 
     void app::ev_stop_timeout(uv_timer_t *handle) {
         assert(handle && handle->data);
@@ -607,7 +686,7 @@ namespace atapp {
         return ret;
     }
 
-    bool app::check_flag(flag_t::type f) const {
+    LIBATAPP_MACRO_API bool app::check_flag(flag_t::type f) const {
         if (f < 0 || f >= flag_t::FLAG_MAX) {
             return false;
         }
@@ -1218,86 +1297,7 @@ namespace atapp {
         }
     }
 
-    void app::set_build_version(const std::string &ver) { build_version_ = ver; }
-
-    const std::string &app::get_build_version() const {
-        if (build_version_.empty()) {
-            std::stringstream ss;
-            if (get_app_version().empty()) {
-                ss << "1.0.0.0 - based on libatapp " << LIBATAPP_VERSION << std::endl;
-            } else {
-                ss << get_app_version() << " - based on libatapp " << LIBATAPP_VERSION << std::endl;
-            }
-
-            const size_t key_padding = 20;
-
-#ifdef __DATE__
-            ss << std::setw(key_padding) << "Build Time: " << __DATE__;
-#ifdef __TIME__
-            ss << " " << __TIME__;
-#endif
-            ss << std::endl;
-#endif
-
-
-#if defined(PROJECT_SCM_VERSION) || defined(PROJECT_SCM_NAME) || defined(PROJECT_SCM_BRANCH)
-            ss << std::setw(key_padding) << "Build SCM:";
-#ifdef PROJECT_SCM_NAME
-            ss << " " << PROJECT_SCM_NAME;
-#endif
-#ifdef PROJECT_SCM_BRANCH
-            ss << " branch " << PROJECT_SCM_BRANCH;
-#endif
-#ifdef PROJECT_SCM_VERSION
-            ss << " commit " << PROJECT_SCM_VERSION;
-#endif
-#endif
-
-#if defined(_MSC_VER)
-            ss << std::setw(key_padding) << "Build Compiler: MSVC ";
-#ifdef _MSC_FULL_VER
-            ss << _MSC_FULL_VER;
-#else
-            ss << _MSC_VER;
-#endif
-
-#ifdef _MSVC_LANG
-            ss << " with standard " << _MSVC_LANG;
-#endif
-            ss << std::endl;
-
-#elif defined(__clang__) || defined(__GNUC__) || defined(__GNUG__)
-            ss << std::setw(key_padding) << "Build Compiler: ";
-#if defined(__clang__)
-            ss << "clang ";
-#else
-            ss << "gcc ";
-#endif
-
-#if defined(__clang_version__)
-            ss << __clang_version__;
-#elif defined(__VERSION__)
-            ss << __VERSION__;
-#endif
-#if defined(__OPTIMIZE__)
-            ss << " optimize level " << __OPTIMIZE__;
-#endif
-#if defined(__STDC_VERSION__)
-            ss << " C standard " << __STDC_VERSION__;
-#endif
-#if defined(__cplusplus) && __cplusplus > 1
-            ss << " C++ standard " << __cplusplus;
-#endif
-            ss << std::endl;
-#endif
-
-            build_version_ = ss.str();
-        }
-
-        return build_version_;
-    }
-
-    app::custom_command_sender_t app::get_custom_command_sender(util::cli::callback_param params) {
+    LIBATAPP_MACRO_API app::custom_command_sender_t app::get_custom_command_sender(util::cli::callback_param params) {
         custom_command_sender_t ret;
         ret.self = NULL;
         ret.response = NULL;
@@ -1308,7 +1308,7 @@ namespace atapp {
         return ret;
     }
 
-    bool app::add_custom_command_rsp(util::cli::callback_param params, const std::string &rsp_text) {
+    LIBATAPP_MACRO_API bool app::add_custom_command_rsp(util::cli::callback_param params, const std::string &rsp_text) {
         custom_command_sender_t sender = get_custom_command_sender(params);
         if (NULL == sender.response) {
             return false;
@@ -1318,7 +1318,7 @@ namespace atapp {
         return true;
     }
 
-    void app::split_ids_by_string(const char *in, std::vector<app_id_t> &out) {
+    LIBATAPP_MACRO_API void app::split_ids_by_string(const char *in, std::vector<app_id_t> &out) {
         if (NULL == in) {
             return;
         }
@@ -1343,7 +1343,7 @@ namespace atapp {
         }
     }
 
-    app::app_id_t app::convert_app_id_by_string(const char *id_in, const std::vector<app_id_t> &mask_in) {
+    LIBATAPP_MACRO_API app::app_id_t app::convert_app_id_by_string(const char *id_in, const std::vector<app_id_t> &mask_in) {
         if (NULL == id_in || 0 == *id_in) {
             return 0;
         }
@@ -1372,7 +1372,7 @@ namespace atapp {
         return ret;
     }
 
-    app::app_id_t app::convert_app_id_by_string(const char *id_in, const char *mask_in) {
+    LIBATAPP_MACRO_API app::app_id_t app::convert_app_id_by_string(const char *id_in, const char *mask_in) {
         if (NULL == id_in || 0 == *id_in) {
             return 0;
         }

@@ -35,42 +35,16 @@ include("${PROJECT_CMAKE_MODULE_DIR}/CompilerOption.cmake")
 include("${PROJECT_CMAKE_MODULE_DIR}/TargetOption.cmake")
 EchoWithColor(COLOR GREEN "-- Build Type: ${CMAKE_BUILD_TYPE}")
 
+unset(PROJECT_LIBATAPP_PRIVATE_COMPILE_OPTIONS)
+unset(PROJECT_LIBATAPP_PUBLIC_INCLUDE_DIRS)
+unset(PROJECT_LIBATAPP_PUBLIC_LINK_NAMES)
+unset(PROJECT_LIBATAPP_INTERFACE_LINK_NAMES)
+unset(PROJECT_LIBATAPP_EXPORT_TARGETS)
 ########################################################################
 # 导入项目配置
 ## 导入所有 macro 定义
 include("${CMAKE_CURRENT_LIST_DIR}/3rd_party/3rd_party.macro.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/include/include.macro.cmake")
-
-# ================ multi thread ================
-find_package(Threads)
-if (CMAKE_USE_PTHREADS_INIT)
-    add_definitions(-D_POSIX_MT_)
-    if(NOT ANDROID)
-        list(APPEND COMPILER_OPTION_EXTERN_CXX_LIBS pthread)
-    endif()
-    if (THREADS_PREFER_PTHREAD_FLAG)
-        add_definitions(${THREADS_PREFER_PTHREAD_FLAG})
-    endif ()
-endif ()
-
-## 导入工程项目
-if(TARGET ${3RD_PARTY_ATFRAME_UTILS_LINK_NAME})
-    message(STATUS "${3RD_PARTY_ATFRAME_UTILS_LINK_NAME} already exist, use it directly.")
-else()
-    if (NOT EXISTS "${CMAKE_BINARY_DIR}/deps/${3RD_PARTY_ATFRAME_UTILS_LINK_NAME}")
-        file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/deps/${3RD_PARTY_ATFRAME_UTILS_LINK_NAME}")
-    endif ()
-    add_subdirectory(${3RD_PARTY_ATFRAME_UTILS_PKG_DIR} "${CMAKE_BINARY_DIR}/deps/${3RD_PARTY_ATFRAME_UTILS_LINK_NAME}")
-endif()
-
-if(TARGET ${3RD_PARTY_LIBATBUS_LINK_NAME})
-    message(STATUS "${3RD_PARTY_LIBATBUS_LINK_NAME} already exist, use it directly.")
-else()
-    if (NOT EXISTS "${CMAKE_BINARY_DIR}/deps/${3RD_PARTY_LIBATBUS_LINK_NAME}")
-        file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/deps/${3RD_PARTY_LIBATBUS_LINK_NAME}")
-    endif ()
-    add_subdirectory(${3RD_PARTY_LIBATBUS_PKG_DIR} "${CMAKE_BINARY_DIR}/deps/${3RD_PARTY_LIBATBUS_LINK_NAME}")
-endif()
 
 if (COMPILER_STRICT_EXTRA_CFLAGS)
     add_definitions(${COMPILER_STRICT_EXTRA_CFLAGS})
@@ -80,22 +54,14 @@ if (COMPILER_STRICT_CFLAGS)
     add_definitions(${COMPILER_STRICT_CFLAGS})
 endif ()
 
+include(GNUInstallDirs)
+
 set (LIBATAPP_MACRO_BUSID_TYPE ${ATBUS_MACRO_BUSID_TYPE})
 configure_file(
-    "${CMAKE_CURRENT_LIST_DIR}/include/atframe/atapp_version.h.in"
-    "${CMAKE_CURRENT_LIST_DIR}/include/atframe/atapp_version.h"
+    "${CMAKE_CURRENT_LIST_DIR}/include/atframe/atapp_config.h.in"
+    "${CMAKE_CURRENT_LIST_DIR}/include/atframe/atapp_config.h"
     @ONLY
 )
-
-# mingw
-unset(ATAPP_PACKED_ADDTIONAL_LIBS)
-if (MINGW)
-    EchoWithColor(COLOR GREEN "-- MinGW: custom add lib advapi32 iphlpapi psapi shell32 user32 userenv ws2_32.")
-    list(APPEND ATAPP_PACKED_ADDTIONAL_LIBS advapi32 iphlpapi psapi shell32 user32 userenv ws2_32)
-elseif (WIN32)
-    EchoWithColor(COLOR GREEN "-- Win32: custom add lib advapi32 iphlpapi psapi shell32 user32 userenv ws2_32")
-    list(APPEND ATAPP_PACKED_ADDTIONAL_LIBS advapi32 iphlpapi psapi shell32 user32 userenv ws2_32)
-endif()
 
 add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/src")
 add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/binding/c")
@@ -119,7 +85,6 @@ endif()
 set(CMAKE_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake" CACHE STRING "Directory relative to CMAKE_INSTALL to install the cmake configuration files")
 
 include(CMakePackageConfigHelpers)
-set(INCLUDE_INSTALL_DIR include)
 
 file(MAKE_DIRECTORY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/cmake")
 
@@ -127,7 +92,7 @@ configure_package_config_file(
     "${CMAKE_CURRENT_LIST_DIR}/libatapp-config.cmake.in"
     "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/cmake/libatapp-config.cmake"
     INSTALL_DESTINATION ${CMAKE_INSTALL_CMAKEDIR}
-    PATH_VARS LIBATAPP_VERSION INCLUDE_INSTALL_DIR CMAKE_INSTALL_LIBDIR PROJECT_SOURCE_DIR
+    PATH_VARS LIBATAPP_VERSION CMAKE_INSTALL_LIBDIR PROJECT_SOURCE_DIR
     NO_CHECK_REQUIRED_COMPONENTS_MACRO
 )
 
@@ -140,4 +105,16 @@ write_basic_package_version_file(
 install(
     FILES "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/cmake/libatapp-config.cmake" "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/cmake/libatapp-config-version.cmake"
     DESTINATION ${CMAKE_INSTALL_CMAKEDIR}
+)
+
+export(TARGETS ${PROJECT_LIBATAPP_EXPORT_TARGETS}
+    FILE "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/cmake/${PROJECT_LIBATAPP_EXPORT_NAME}.cmake"
+    NAMESPACE atframework::
+    # EXPORT_LINK_INTERFACE_LIBRARIES
+)
+
+install(
+    EXPORT ${PROJECT_LIBATAPP_EXPORT_NAME}
+    NAMESPACE "atframework::"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake"
 )

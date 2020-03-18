@@ -8,3 +8,5 @@ set(LIBUV_ROOT "" CACHE STRING "libuv root directory")
 set(GTEST_ROOT "" CACHE STRING "GTest root directory")
 set(BOOST_ROOT "" CACHE STRING "Boost root directory")
 option(PROJECT_TEST_ENABLE_BOOST_UNIT_TEST "Enable boost unit test." OFF)
+
+option(PROJECT_RESET_DENPEND_REPOSITORIES "Reset depended repositories if it's already exists." OFF)

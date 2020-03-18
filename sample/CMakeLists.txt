@@ -19,13 +19,5 @@ foreach(SAMPLE_SRC_FILE IN LISTS SAMPLE_SRC_LIST)
     get_filename_component(SAMPLE_SRC_BIN_NAME "${SAMPLE_SRC_FILE}" NAME_WE)
 
     add_executable("${SAMPLE_SRC_BIN_NAME}" ${SAMPLE_SRC_FILE} ${PROJECT_3RD_PARTY_SRC_LIST})
-    target_link_libraries("${SAMPLE_SRC_BIN_NAME}"
-	    ${PROJECT_LIB_LINK}
-        atapp
-        ${3RD_PARTY_LIBATBUS_LINK_NAME}
-        ${3RD_PARTY_ATFRAME_UTILS_LINK_NAME}
-		${3RD_PARTY_LIBUV_LINK_NAME}
-        ${ATAPP_PACKED_ADDTIONAL_LIBS}
-        ${COMPILER_OPTION_EXTERN_CXX_LIBS}
-    )
+    target_link_libraries(${SAMPLE_SRC_BIN_NAME} atapp)
 endforeach()

@@ -12,12 +12,13 @@
 #
 # ::
 #
-#   Libatapp_INCLUDE_DIRS   - where to find atframe/atapp_version.h , etc.
-#   Libatapp_LIBRARY_DIRS   - where to find (lib)atapp.(a/so/lib/dll/dylib), etc.
-#   Libatapp_LIBRARIES      - List of libraries when using libatapp.
-#   Libatapp_C_LIBRARIES    - List of libraries when using libatapp_c (C binding).
-#   Libatapp_FOUND          - True if libatapp found.
-#   Libatapp_VERSION        - Full version of libatapp
+#   Libatapp_INCLUDE_DIRS       - where to find atframe/atapp_config.h , etc.
+#   Libatapp_LIBRARY_DIRS       - where to find (lib)atapp.(a/so/lib/dll/dylib), etc.
+#   Libatapp_LIBRARIES          - List of libraries when using libatapp.
+#   Libatapp_PACKED_LIBRARIES   - List of libraries when using libatapp with ini_loader.cpp.
+#   Libatapp_C_LIBRARIES        - List of libraries when using libatapp_c (C binding).
+#   Libatapp_FOUND              - True if libatapp found.
+#   Libatapp_VERSION            - Full version of libatapp
 #
 # ::
 #
@@ -46,16 +47,14 @@ set(Libatapp_SOURCE_DIR "@PROJECT_SOURCE_DIR@")
 set_and_check(Libatapp_INCLUDE_DIRS "@PACKAGE_INCLUDE_INSTALL_DIR@")
 set_and_check(Libatapp_LIBRARY_DIRS "@PACKAGE_CMAKE_INSTALL_LIBDIR@")
 
-
+include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_LIBATAPP_EXPORT_NAME@.cmake")
+if (EXISTS "${CMAKE_CURRENT_LIST_DIR}/@PROJECT_LIBATAPP_EXPORT_NAME@.cmake")
+    include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_LIBATAPP_EXPORT_NAME@.cmake")
+endif ()
 # Normal search.
-set(Libatapp_NAMES atapp libatapp)
-set(Libatapp_C_NAMES atapp_c libatapp_c)
-
-# Try each search configuration.
-find_library(Libatapp_LIBRARIES    NAMES ${Libatapp_NAMES}    PATHS ${Libatapp_LIBRARY_DIRS} NO_DEFAULT_PATH)
-find_library(Libatapp_C_LIBRARIES  NAMES ${Libatapp_C_NAMES}  PATHS ${Libatapp_LIBRARY_DIRS} NO_DEFAULT_PATH)
-
-mark_as_advanced(Libatapp_INCLUDE_DIRS Libatapp_LIBRARY_DIRS Libatapp_C_NAMES Libatapp_LIBRARIES Libcotask_LIBRARIES)
+set(Libatapp_LIBRARIES atframework::atapp)
+set(Libatapp_PACKED_LIBRARIES atframework::atapp_packed)
+set(Libatapp_C_LIBRARIES atframework::atapp_c)
 
 # handle the QUIETLY and REQUIRED arguments and set LIBATAPP_FOUND to TRUE if
 # all listed variables are TRUE

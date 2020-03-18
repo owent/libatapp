@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-#include "atapp_version.h"
+#include "atapp_config.h"
 
 namespace atapp {
     struct app_conf {

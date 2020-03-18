@@ -28,4 +28,4 @@
 *.app
 
 
-/include/atframe/atapp_version.h
+/include/atframe/atapp_config.h

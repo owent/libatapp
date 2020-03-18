@@ -14,6 +14,8 @@
 #include "ini_loader.h"
 #include "log/log_wrapper.h"
 
+#include "atapp_config.h"
+
 namespace atapp {
     class log_sink_maker {
     public:
@@ -26,17 +28,17 @@ namespace atapp {
         ~log_sink_maker();
 
     public:
-        static const std::string &get_file_sink_name();
+        static LIBATAPP_MACRO_API const std::string &get_file_sink_name();
 
-        static log_reg_t get_file_sink_reg();
+        static LIBATAPP_MACRO_API log_reg_t get_file_sink_reg();
 
-        static const std::string &get_stdout_sink_name();
+        static LIBATAPP_MACRO_API const std::string &get_stdout_sink_name();
 
-        static log_reg_t get_stdout_sink_reg();
+        static LIBATAPP_MACRO_API log_reg_t get_stdout_sink_reg();
 
-        static const std::string &get_stderr_sink_name();
+        static LIBATAPP_MACRO_API const std::string &get_stderr_sink_name();
 
-        static log_reg_t get_stderr_sink_reg();
+        static LIBATAPP_MACRO_API log_reg_t get_stderr_sink_reg();
     };
 }
 

@@ -13,6 +13,8 @@
 #include "std/explicit_declare.h"
 #include "std/smart_ptr.h"
 
+#include "atapp_config.h"
+
 namespace atapp {
     class app;
 

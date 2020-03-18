@@ -3,7 +3,6 @@
 EchoWithColor(COLOR GREEN "-- Configure Tools ${CMAKE_CURRENT_LIST_DIR}")
 
 # ============ TOOLS - [...] ============
-include_directories(${CMAKE_CURRENT_LIST_DIR})
 
 file(GLOB TOOLS_SRC_LIST
     ${CMAKE_CURRENT_LIST_DIR}/*.cpp
@@ -17,16 +16,14 @@ file(GLOB TOOLS_SRC_LIST
 foreach(TOOLS_SRC_FILE IN LISTS TOOLS_SRC_LIST)
     get_filename_component(TOOLS_SRC_BIN_NAME "${TOOLS_SRC_FILE}" NAME_WE)
 
-    add_executable("${TOOLS_SRC_BIN_NAME}" ${TOOLS_SRC_FILE})
-    target_link_libraries("${TOOLS_SRC_BIN_NAME}"
-        ${PROJECT_LIB_LINK}
-        atapp_packed
-        ${3RD_PARTY_LIBATBUS_LINK_NAME}
-        ${3RD_PARTY_ATFRAME_UTILS_LINK_NAME}
-        ${3RD_PARTY_LIBUV_LINK_NAME}
-        ${ATAPP_PACKED_ADDTIONAL_LIBS}
-        ${COMPILER_OPTION_EXTERN_CXX_LIBS}
-	)
+    add_executable(${TOOLS_SRC_BIN_NAME} ${TOOLS_SRC_FILE})
+
+    target_include_directories(${TOOLS_SRC_BIN_NAME} 
+        PRIVATE 
+            "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>"
+    )
+
+    target_link_libraries(${TOOLS_SRC_BIN_NAME} atapp_packed)
 
 	install(TARGETS "${TOOLS_SRC_BIN_NAME}"
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
