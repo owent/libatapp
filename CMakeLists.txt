@@ -47,11 +47,11 @@ include("${CMAKE_CURRENT_LIST_DIR}/3rd_party/3rd_party.macro.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/include/include.macro.cmake")
 
 if (COMPILER_STRICT_EXTRA_CFLAGS)
-    add_definitions(${COMPILER_STRICT_EXTRA_CFLAGS})
+    list(APPEND PROJECT_LIBATAPP_PRIVATE_COMPILE_OPTIONS ${COMPILER_STRICT_EXTRA_CFLAGS})
 endif ()
 
 if (COMPILER_STRICT_CFLAGS)
-    add_definitions(${COMPILER_STRICT_CFLAGS})
+    list(APPEND PROJECT_LIBATAPP_PRIVATE_COMPILE_OPTIONS ${COMPILER_STRICT_CFLAGS})
 endif ()
 
 include(GNUInstallDirs)
