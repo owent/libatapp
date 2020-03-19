@@ -1643,16 +1643,16 @@ namespace atapp {
             return EN_ATAPP_ERR_SEND_FAILED;
         }
 
-        WLOGERROR("app 0x%llx receive a send failure from 0x%llx, message cmd: %d, type: %d, ret: %d, sequence: %llu",
-                  static_cast<unsigned long long>(get_id()), static_cast<unsigned long long>(m->head().src_bus_id()), 
-                  atbus::msg_handler::get_body_name(m->msg_body_case()), m->head().type(),
-                  m->head().ret(), static_cast<unsigned long long>(m->head().sequence()));
+        if (m->head().ret() < 0) {
+            WLOGERROR("app 0x%llx receive a send failure from 0x%llx, message cmd: %d, type: %d, ret: %d, sequence: %llu",
+                    static_cast<unsigned long long>(get_id()), static_cast<unsigned long long>(m->head().src_bus_id()), 
+                    atbus::msg_handler::get_body_name(m->msg_body_case()), m->head().type(),
+                    m->head().ret(), static_cast<unsigned long long>(m->head().sequence()));
+        }
 
         if (evt_on_forward_response_) {
             const atbus::protocol::forward_data* fwd_data = NULL;
-            if (atbus::protocol::msg::kDataTransformReq == m->msg_body_case()) {
-                fwd_data = &m->data_transform_req();
-            } else if (atbus::protocol::msg::kDataTransformRsp == m->msg_body_case()) {
+            if (atbus::protocol::msg::kDataTransformRsp == m->msg_body_case()) {
                 fwd_data = &m->data_transform_rsp();
             }
             if (NULL != fwd_data) {
