@@ -49,7 +49,7 @@ typedef int32_t (*libatapp_c_on_cmd_option_fn_t)(libatapp_c_context, libatapp_c_
                                                  void *priv_data);
 
 LIBATAPP_MACRO_API void __cdecl libatapp_c_set_on_msg_fn(libatapp_c_context context, libatapp_c_on_msg_fn_t fn, void *priv_data);
-LIBATAPP_MACRO_API void __cdecl libatapp_c_set_on_send_fail_fn(libatapp_c_context context, libatapp_c_on_send_fail_fn_t fn, void *priv_data);
+LIBATAPP_MACRO_API void __cdecl libatapp_c_set_on_forward_response_fn(libatapp_c_context context, libatapp_c_on_send_fail_fn_t fn, void *priv_data);
 LIBATAPP_MACRO_API void __cdecl libatapp_c_set_on_connected_fn(libatapp_c_context context, libatapp_c_on_connected_fn_t fn, void *priv_data);
 LIBATAPP_MACRO_API void __cdecl libatapp_c_set_on_disconnected_fn(libatapp_c_context context, libatapp_c_on_disconnected_fn_t fn, void *priv_data);
 LIBATAPP_MACRO_API void __cdecl libatapp_c_set_on_all_module_inited_fn(libatapp_c_context context, libatapp_c_on_all_module_inited_fn_t fn, void *priv_data);

@@ -252,12 +252,12 @@ LIBATAPP_MACRO_API void __cdecl libatapp_c_set_on_msg_fn(libatapp_c_context cont
     ATAPP_CONTEXT(context)->set_evt_on_recv_msg(::detail::libatapp_c_on_msg_functor(fn, priv_data));
 }
 
-LIBATAPP_MACRO_API void __cdecl libatapp_c_set_on_send_fail_fn(libatapp_c_context context, libatapp_c_on_send_fail_fn_t fn, void *priv_data) {
+LIBATAPP_MACRO_API void __cdecl libatapp_c_set_on_forward_response_fn(libatapp_c_context context, libatapp_c_on_send_fail_fn_t fn, void *priv_data) {
     if (ATAPP_CONTEXT_IS_NULL(context)) {
         return;
     }
 
-    ATAPP_CONTEXT(context)->set_evt_on_send_fail(::detail::libatapp_c_on_send_fail_functor(fn, priv_data));
+    ATAPP_CONTEXT(context)->set_evt_on_forward_response(::detail::libatapp_c_on_send_fail_functor(fn, priv_data));
 }
 
 LIBATAPP_MACRO_API void __cdecl libatapp_c_set_on_connected_fn(libatapp_c_context context, libatapp_c_on_connected_fn_t fn, void *priv_data) {

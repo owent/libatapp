@@ -72,7 +72,7 @@ int main(int argc, char *argv[]) {
 
     // setup handle
     app.set_evt_on_recv_msg(app_handle_on_msg);         // 注册接收到数据后的回掉
-    app.set_evt_on_send_fail(app_handle_on_send_fail);  // 注册发送消息失败的回掉
+    app.set_evt_on_forward_response(app_handle_on_send_fail);  // 注册发送消息失败的回掉
 
     // run with default loop in libuv
     return app.run(uv_default_loop(), argc, (const char **)argv, NULL);

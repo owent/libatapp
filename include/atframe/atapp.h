@@ -212,7 +212,7 @@ namespace atapp {
         LIBATAPP_MACRO_API bool add_log_sink_maker(const std::string &name, log_sink_maker::log_reg_t fn);
 
         LIBATAPP_MACRO_API void set_evt_on_recv_msg(callback_fn_on_msg_t fn);
-        LIBATAPP_MACRO_API void set_evt_on_send_fail(callback_fn_on_forward_response_t fn);
+        LIBATAPP_MACRO_API void set_evt_on_forward_response(callback_fn_on_forward_response_t fn);
         LIBATAPP_MACRO_API void set_evt_on_app_connected(callback_fn_on_connected_t fn);
         LIBATAPP_MACRO_API void set_evt_on_app_disconnected(callback_fn_on_disconnected_t fn);
         LIBATAPP_MACRO_API void set_evt_on_all_module_inited(callback_fn_on_all_module_inited_t fn);
