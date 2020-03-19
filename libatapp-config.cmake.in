@@ -15,7 +15,6 @@
 #   Libatapp_INCLUDE_DIRS       - where to find atframe/atapp_config.h , etc.
 #   Libatapp_LIBRARY_DIRS       - where to find (lib)atapp.(a/so/lib/dll/dylib), etc.
 #   Libatapp_LIBRARIES          - List of libraries when using libatapp.
-#   Libatapp_PACKED_LIBRARIES   - List of libraries when using libatapp with ini_loader.cpp.
 #   Libatapp_C_LIBRARIES        - List of libraries when using libatapp_c (C binding).
 #   Libatapp_FOUND              - True if libatapp found.
 #   Libatapp_VERSION            - Full version of libatapp
@@ -53,7 +52,6 @@ if (EXISTS "${CMAKE_CURRENT_LIST_DIR}/@PROJECT_LIBATAPP_EXPORT_NAME@.cmake")
 endif ()
 # Normal search.
 set(Libatapp_LIBRARIES atframework::atapp)
-set(Libatapp_PACKED_LIBRARIES atframework::atapp_packed)
 set(Libatapp_C_LIBRARIES atframework::atapp_c)
 
 # handle the QUIETLY and REQUIRED arguments and set LIBATAPP_FOUND to TRUE if

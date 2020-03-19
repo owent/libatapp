@@ -472,8 +472,8 @@ namespace atapp {
                     std::pair<uint64_t, const char *> max_rss = make_size_showup(last_usage.ru_maxrss);
 #ifdef WIN32
                     WLOGINFO("[STAT]: %s CPU usage: user %02.03f%%, sys %02.03f%%, max rss: %llu%s, page faults: %llu", get_app_name().c_str(),
-                             offset_usr / (util::time::time_utility::MINITE_SECONDS * 10000.0f), // usec and add %
-                             offset_sys / (util::time::time_utility::MINITE_SECONDS * 10000.0f), // usec and add %
+                             offset_usr / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f), // usec and add %
+                             offset_sys / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f), // usec and add %
                              static_cast<unsigned long long>(max_rss.first), max_rss.second, static_cast<unsigned long long>(last_usage.ru_majflt));
 #else
                     std::pair<uint64_t, const char *> ru_ixrss = make_size_showup(last_usage.ru_ixrss);
@@ -482,8 +482,8 @@ namespace atapp {
                     WLOGINFO("[STAT]: %s CPU usage: user %02.03f%%, sys %02.03f%%, max rss: %llu%s, shared size: %llu%s, unshared data size: %llu%s, unshared "
                              "stack size: %llu%s, page faults: %llu",
                              get_app_name().c_str(),
-                             offset_usr / (util::time::time_utility::MINITE_SECONDS * 10000.0f), // usec and add %
-                             offset_sys / (util::time::time_utility::MINITE_SECONDS * 10000.0f), // usec and add %
+                             offset_usr / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f), // usec and add %
+                             offset_sys / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f), // usec and add %
                              static_cast<unsigned long long>(max_rss.first), max_rss.second, static_cast<unsigned long long>(ru_ixrss.first), ru_ixrss.second,
                              static_cast<unsigned long long>(ru_idrss.first), ru_idrss.second, static_cast<unsigned long long>(ru_isrss.first), ru_isrss.second,
                              static_cast<unsigned long long>(last_usage.ru_majflt));
@@ -652,13 +652,13 @@ namespace atapp {
     }
 
     LIBATAPP_MACRO_API void app::set_evt_on_recv_msg(callback_fn_on_msg_t fn) { evt_on_recv_msg_ = fn; }
-    LIBATAPP_MACRO_API void app::set_evt_on_send_fail(callback_fn_on_send_fail_t fn) { evt_on_send_fail_ = fn; }
+    LIBATAPP_MACRO_API void app::set_evt_on_send_fail(callback_fn_on_forward_response_t fn) { evt_on_forward_response_ = fn; }
     LIBATAPP_MACRO_API void app::set_evt_on_app_connected(callback_fn_on_connected_t fn) { evt_on_app_connected_ = fn; }
     LIBATAPP_MACRO_API void app::set_evt_on_app_disconnected(callback_fn_on_disconnected_t fn) { evt_on_app_disconnected_ = fn; }
     LIBATAPP_MACRO_API void app::set_evt_on_all_module_inited(callback_fn_on_all_module_inited_t fn) { evt_on_all_module_inited_ = fn; }
 
     LIBATAPP_MACRO_API const app::callback_fn_on_msg_t &app::get_evt_on_recv_msg() const { return evt_on_recv_msg_; }
-    LIBATAPP_MACRO_API const app::callback_fn_on_send_fail_t &app::get_evt_on_send_fail() const { return evt_on_send_fail_; }
+    LIBATAPP_MACRO_API const app::callback_fn_on_forward_response_t &app::get_evt_on_send_fail() const { return evt_on_forward_response_; }
     LIBATAPP_MACRO_API const app::callback_fn_on_connected_t &app::get_evt_on_app_connected() const { return evt_on_app_connected_; }
     LIBATAPP_MACRO_API const app::callback_fn_on_disconnected_t &app::get_evt_on_app_disconnected() const { return evt_on_app_disconnected_; }
     LIBATAPP_MACRO_API const app::callback_fn_on_all_module_inited_t &app::get_evt_on_all_module_inited() const { return evt_on_all_module_inited_; }
@@ -744,28 +744,74 @@ namespace atapp {
         cfg_loader_.dump_to("atapp.bus.listen", conf_.bus_listen);
 
         // conf_.stop_timeout = 30000; // use last available value
-        cfg_loader_.dump_to("atapp.timer.stop_timeout", conf_.stop_timeout);
+        {
+            util::config::duration_value duration;
+            cfg_loader_.dump_to("atapp.timer.stop_timeout", duration);
+            conf_.stop_timeout = duration.sec;
+        }
 
         // conf_.tick_interval = 32; // use last available value
-        cfg_loader_.dump_to("atapp.timer.tick_interval", conf_.tick_interval);
+        {
+            util::config::duration_value duration;
+            cfg_loader_.dump_to("atapp.timer.tick_interval", duration);
+            conf_.tick_interval = duration.sec;
+        }
 
         // atbus configure
         atbus::node::default_conf(&conf_.bus_conf);
 
-        cfg_loader_.dump_to("atapp.bus.children_mask", conf_.bus_conf.children_mask);
         {
-            bool optv = false;
-            cfg_loader_.dump_to("atapp.bus.options.global_router", optv);
-            conf_.bus_conf.flags.set(atbus::node::conf_flag_t::EN_CONF_GLOBAL_ROUTER, optv);
+            std::vector<std::string> subnets_conf;
+            cfg_loader_.dump_to("atapp.bus.subnets", subnets_conf);
+            conf_.bus_conf.subnets.reserve(subnets_conf.size());
+            for (size_t i = 0; i < subnets_conf.size(); ++ i) {
+                std::string::size_type sep_pos = subnets_conf[i].find('/');
+                if (std::string::npos == sep_pos) {
+                    conf_.bus_conf.subnets.push_back(atbus::endpoint_subnet_conf(
+                        0, util::string::to_int<uint32_t>(subnets_conf[i].c_str())
+                    ));
+                } else {
+                    conf_.bus_conf.subnets.push_back(atbus::endpoint_subnet_conf(
+                        convert_app_id_by_string(subnets_conf[i].c_str()), 
+                        util::string::to_int<uint32_t>(subnets_conf[i].c_str() + sep_pos + 1)
+                    ));
+                }
+            }
         }
-
-        cfg_loader_.dump_to("atapp.bus.proxy", conf_.bus_conf.father_address);
+        cfg_loader_.dump_to("atapp.bus.proxy", conf_.bus_conf.parent_address);
         cfg_loader_.dump_to("atapp.bus.loop_times", conf_.bus_conf.loop_times);
         cfg_loader_.dump_to("atapp.bus.ttl", conf_.bus_conf.ttl);
         cfg_loader_.dump_to("atapp.bus.backlog", conf_.bus_conf.backlog);
-        cfg_loader_.dump_to("atapp.bus.first_idle_timeout", conf_.bus_conf.first_idle_timeout);
-        cfg_loader_.dump_to("atapp.bus.ping_interval", conf_.bus_conf.ping_interval);
-        cfg_loader_.dump_to("atapp.bus.retry_interval", conf_.bus_conf.retry_interval);
+        cfg_loader_.dump_to("atapp.bus.access_token_max_number", conf_.bus_conf.access_token_max_number);
+        {
+            std::vector<std::string> access_tokens;
+            cfg_loader_.dump_to("atapp.bus.access_tokens", access_tokens);
+            conf_.bus_conf.access_tokens.reserve(access_tokens.size());
+            for (size_t i = 0; i < access_tokens.size(); ++ i) {
+                conf_.bus_conf.access_tokens.push_back(std::vector<unsigned char>());
+                conf_.bus_conf.access_tokens.back().assign(
+                    reinterpret_cast<const unsigned char*>(access_tokens[i].data()), 
+                    reinterpret_cast<const unsigned char*>(access_tokens[i].data()) + access_tokens[i].size()
+                );
+            }
+        }
+
+        {
+            util::config::duration_value duration;
+            cfg_loader_.dump_to("atapp.bus.first_idle_timeout", duration);
+            conf_.bus_conf.first_idle_timeout = duration.sec;
+        }
+        {
+            util::config::duration_value duration;
+            cfg_loader_.dump_to("atapp.bus.ping_interval", duration);
+            conf_.bus_conf.ping_interval = duration.sec;
+        }
+        {
+            util::config::duration_value duration;
+            cfg_loader_.dump_to("atapp.bus.retry_interval", duration);
+            conf_.bus_conf.retry_interval = duration.sec;
+        }
+        
         cfg_loader_.dump_to("atapp.bus.fault_tolerant", conf_.bus_conf.fault_tolerant);
         cfg_loader_.dump_to("atapp.bus.msg_size", conf_.bus_conf.msg_size);
         cfg_loader_.dump_to("atapp.bus.recv_buffer_size", conf_.bus_conf.recv_buffer_size);
@@ -1075,8 +1121,8 @@ namespace atapp {
         connection_node->set_on_recv_handle(std::bind(&app::bus_evt_callback_on_recv_msg, this, std::placeholders::_1, std::placeholders::_2,
                                                       std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6));
 
-        connection_node->set_on_send_data_failed_handle(
-            std::bind(&app::bus_evt_callback_on_send_failed, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
+        connection_node->set_on_forward_response_handle(
+            std::bind(&app::bus_evt_callback_on_forward_response, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 
         connection_node->set_on_error_handle(std::bind(&app::bus_evt_callback_on_error, this, std::placeholders::_1, std::placeholders::_2,
                                                        std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
@@ -1164,7 +1210,7 @@ namespace atapp {
 
                 while (NULL == connection_node->get_parent_endpoint()) {
                     if (check_flag(flag_t::TIMEOUT)) {
-                        WLOGERROR("connection to parent node %s timeout", conf_.bus_conf.father_address.c_str());
+                        WLOGERROR("connection to parent node %s timeout", conf_.bus_conf.parent_address.c_str());
                         ret = -1;
                         break;
                     }
@@ -1588,7 +1634,7 @@ namespace atapp {
         return 0;
     }
 
-    int app::bus_evt_callback_on_send_failed(const atbus::node &, const atbus::endpoint *, const atbus::connection *, const atbus::protocol::msg *m) {
+    int app::bus_evt_callback_on_forward_response(const atbus::node &, const atbus::endpoint *, const atbus::connection *, const atbus::protocol::msg *m) {
         ++last_proc_event_count_;
 
         // call failed callback if it's message transfer
@@ -1598,13 +1644,22 @@ namespace atapp {
         }
 
         WLOGERROR("app 0x%llx receive a send failure from 0x%llx, message cmd: %d, type: %d, ret: %d, sequence: %llu",
-                  static_cast<unsigned long long>(get_id()), static_cast<unsigned long long>(m->head.src_bus_id), static_cast<int>(m->head.cmd), m->head.type,
-                  m->head.ret, static_cast<unsigned long long>(m->head.sequence));
+                  static_cast<unsigned long long>(get_id()), static_cast<unsigned long long>(m->head().src_bus_id()), 
+                  atbus::msg_handler::get_body_name(m->msg_body_case()), m->head().type(),
+                  m->head().ret(), static_cast<unsigned long long>(m->head().sequence()));
 
-        if ((ATBUS_CMD_DATA_TRANSFORM_REQ == m->head.cmd || ATBUS_CMD_DATA_TRANSFORM_RSP == m->head.cmd) && evt_on_send_fail_) {
-            app_id_t origin_from = m->body.forward->to;
-            app_id_t origin_to = m->body.forward->from;
-            return evt_on_send_fail_(std::ref(*this), origin_from, origin_to, std::cref(*m));
+        if (evt_on_forward_response_) {
+            const atbus::protocol::forward_data* fwd_data = NULL;
+            if (atbus::protocol::msg::kDataTransformReq == m->msg_body_case()) {
+                fwd_data = &m->data_transform_req();
+            } else if (atbus::protocol::msg::kDataTransformRsp == m->msg_body_case()) {
+                fwd_data = &m->data_transform_rsp();
+            }
+            if (NULL != fwd_data) {
+                app_id_t origin_from = fwd_data->to();
+                app_id_t origin_to = fwd_data->from();
+                return evt_on_forward_response_(std::ref(*this), origin_from, origin_to, std::cref(*m));
+            }
         }
 
         return 0;
@@ -1856,7 +1911,7 @@ namespace atapp {
         }
 
         // no need to connect to parent node
-        conf_.bus_conf.father_address.clear();
+        conf_.bus_conf.parent_address.clear();
 
         // using 0 for command sender
         int ret = bus_node_->init(0, &conf_.bus_conf);
@@ -1875,8 +1930,9 @@ namespace atapp {
         atbus::endpoint *ep = NULL;
         if (is_sync_channel) {
             // preallocate endpoint when using shared memory channel, because this channel can not be connected without endpoint
+            std::vector<atbus::endpoint_subnet_conf> subnets;
             atbus::endpoint::ptr_t new_ep =
-                atbus::endpoint::create(bus_node_.get(), conf_.id, conf_.bus_conf.children_mask, bus_node_->get_pid(), bus_node_->get_hostname());
+                atbus::endpoint::create(bus_node_.get(), conf_.id, subnets, bus_node_->get_pid(), bus_node_->get_hostname());
             ret = bus_node_->add_endpoint(new_ep);
             if (ret < 0) {
                 ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "connect to " << use_addr.address << " failed. ret: " << ret << std::endl;

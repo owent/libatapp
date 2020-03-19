@@ -45,7 +45,7 @@ public:
 static int app_handle_on_msg(atapp::app &, const atapp::app::msg_t &msg, const void *buffer, size_t len) {
     std::string data;
     data.assign(reinterpret_cast<const char *>(buffer), len);
-    WLOGINFO("receive a message(from 0x%llx, type=%d) %s", static_cast<unsigned long long>(msg.head.src_bus_id), msg.head.type, data.c_str());
+    WLOGINFO("receive a message(from 0x%llx, type=%d) %s", static_cast<unsigned long long>(msg.head().src_bus_id()), msg.head().type(), data.c_str());
     return 0;
 }
 

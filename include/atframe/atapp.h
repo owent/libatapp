@@ -29,7 +29,7 @@
 
 namespace atbus {
     namespace protocol {
-        struct msg;
+        class msg;
     }
     class node;
     class endpoint;
@@ -106,7 +106,7 @@ namespace atapp {
 
 
         typedef std::function<int(app &, const msg_t &, const void *, size_t)> callback_fn_on_msg_t;
-        typedef std::function<int(app &, app_id_t src_pd, app_id_t dst_pd, const atbus::protocol::msg &m)> callback_fn_on_send_fail_t;
+        typedef std::function<int(app &, app_id_t src_pd, app_id_t dst_pd, const atbus::protocol::msg &m)> callback_fn_on_forward_response_t;
         typedef std::function<int(app &, atbus::endpoint &, int)> callback_fn_on_connected_t;
         typedef std::function<int(app &, atbus::endpoint &, int)> callback_fn_on_disconnected_t;
         typedef std::function<int(app &)> callback_fn_on_all_module_inited_t;
@@ -212,13 +212,13 @@ namespace atapp {
         LIBATAPP_MACRO_API bool add_log_sink_maker(const std::string &name, log_sink_maker::log_reg_t fn);
 
         LIBATAPP_MACRO_API void set_evt_on_recv_msg(callback_fn_on_msg_t fn);
-        LIBATAPP_MACRO_API void set_evt_on_send_fail(callback_fn_on_send_fail_t fn);
+        LIBATAPP_MACRO_API void set_evt_on_send_fail(callback_fn_on_forward_response_t fn);
         LIBATAPP_MACRO_API void set_evt_on_app_connected(callback_fn_on_connected_t fn);
         LIBATAPP_MACRO_API void set_evt_on_app_disconnected(callback_fn_on_disconnected_t fn);
         LIBATAPP_MACRO_API void set_evt_on_all_module_inited(callback_fn_on_all_module_inited_t fn);
 
         LIBATAPP_MACRO_API const callback_fn_on_msg_t &get_evt_on_recv_msg() const;
-        LIBATAPP_MACRO_API const callback_fn_on_send_fail_t &get_evt_on_send_fail() const;
+        LIBATAPP_MACRO_API const callback_fn_on_forward_response_t &get_evt_on_send_fail() const;
         LIBATAPP_MACRO_API const callback_fn_on_connected_t &get_evt_on_app_connected() const;
         LIBATAPP_MACRO_API const callback_fn_on_disconnected_t &get_evt_on_app_disconnected() const;
         LIBATAPP_MACRO_API const callback_fn_on_all_module_inited_t &get_evt_on_all_module_inited() const;
@@ -283,7 +283,7 @@ namespace atapp {
 
     private:
         int bus_evt_callback_on_recv_msg(const atbus::node &, const atbus::endpoint *, const atbus::connection *, const msg_t &, const void *, size_t);
-        int bus_evt_callback_on_send_failed(const atbus::node &, const atbus::endpoint *, const atbus::connection *, const atbus::protocol::msg *m);
+        int bus_evt_callback_on_forward_response(const atbus::node &, const atbus::endpoint *, const atbus::connection *, const atbus::protocol::msg *m);
         int bus_evt_callback_on_error(const atbus::node &, const atbus::endpoint *, const atbus::connection *, int, int);
         int bus_evt_callback_on_reg(const atbus::node &, const atbus::endpoint *, const atbus::connection *, int);
         int bus_evt_callback_on_shutdown(const atbus::node &, int);
@@ -322,7 +322,7 @@ namespace atapp {
 
         // callbacks
         callback_fn_on_msg_t evt_on_recv_msg_;
-        callback_fn_on_send_fail_t evt_on_send_fail_;
+        callback_fn_on_forward_response_t evt_on_forward_response_;
         callback_fn_on_connected_t evt_on_app_connected_;
         callback_fn_on_disconnected_t evt_on_app_disconnected_;
         callback_fn_on_all_module_inited_t evt_on_all_module_inited_;

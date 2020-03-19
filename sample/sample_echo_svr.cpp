@@ -124,10 +124,17 @@ static int app_option_handler_echo(util::cli::callback_param params) {
 static int app_handle_on_msg(atapp::app &app, const atapp::app::msg_t &msg, const void *buffer, size_t len) {
     std::string data;
     data.assign(reinterpret_cast<const char *>(buffer), len);
-    WLOGINFO("receive a message(from 0x%llx, type=%d) %s", static_cast<unsigned long long>(msg.head.src_bus_id), msg.head.type, data.c_str());
+    WLOGINFO("receive a message(from 0x%llx, type=%d) %s", static_cast<unsigned long long>(msg.head().src_bus_id()), msg.head().type(), data.c_str());
 
-    if (NULL != msg.body.forward && 0 != msg.body.forward->from) {
-        return app.get_bus_node()->send_data(msg.body.forward->from, msg.head.type, buffer, len);
+    const atbus::protocol::forward_data* fwd_data = NULL;
+    if (atbus::protocol::msg::kDataTransformReq == msg.msg_body_case()) {
+        fwd_data = &msg.data_transform_req();
+    } else if (atbus::protocol::msg::kDataTransformRsp == msg.msg_body_case()) {
+        fwd_data = &msg.data_transform_rsp();
+    }
+
+    if (NULL != fwd_data) {
+        return app.get_bus_node()->send_data(fwd_data->from(), msg.head().type(), buffer, len);
     }
 
     return 0;

@@ -532,7 +532,7 @@ LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_msg_get_cmd(libatapp_c_message msg
         return 0;
     }
 
-    return ATAPP_MESSAGE(msg)->head.cmd;
+    return ATAPP_MESSAGE(msg)->msg_body_case();
 }
 
 LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_msg_get_type(libatapp_c_message msg) {
@@ -540,7 +540,7 @@ LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_msg_get_type(libatapp_c_message ms
         return 0;
     }
 
-    return ATAPP_MESSAGE(msg)->head.type;
+    return ATAPP_MESSAGE(msg)->head().type();
 }
 
 LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_msg_get_ret(libatapp_c_message msg) {
@@ -548,7 +548,7 @@ LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_msg_get_ret(libatapp_c_message msg
         return 0;
     }
 
-    return ATAPP_MESSAGE(msg)->head.ret;
+    return ATAPP_MESSAGE(msg)->head().ret();
 }
 
 LIBATAPP_MACRO_API uint32_t __cdecl libatapp_c_msg_get_sequence(libatapp_c_message msg) {
@@ -556,7 +556,7 @@ LIBATAPP_MACRO_API uint32_t __cdecl libatapp_c_msg_get_sequence(libatapp_c_messa
         return 0;
     }
 
-    return static_cast<uint32_t>(ATAPP_MESSAGE(msg)->head.sequence);
+    return static_cast<uint32_t>(ATAPP_MESSAGE(msg)->head().sequence());
 }
 
 LIBATAPP_MACRO_API uint64_t __cdecl libatapp_c_msg_get_src_bus_id(libatapp_c_message msg) {
@@ -564,7 +564,7 @@ LIBATAPP_MACRO_API uint64_t __cdecl libatapp_c_msg_get_src_bus_id(libatapp_c_mes
         return 0;
     }
 
-    return ATAPP_MESSAGE(msg)->head.src_bus_id;
+    return ATAPP_MESSAGE(msg)->head().src_bus_id();
 }
 
 LIBATAPP_MACRO_API uint64_t __cdecl libatapp_c_msg_get_forward_from(libatapp_c_message msg) {
@@ -572,11 +572,18 @@ LIBATAPP_MACRO_API uint64_t __cdecl libatapp_c_msg_get_forward_from(libatapp_c_m
         return 0;
     }
 
-    if (NULL == ATAPP_MESSAGE(msg)->body.forward) {
+    const atbus::protocol::forward_data* fwd_data = NULL;
+    if (atbus::protocol::msg::kDataTransformReq == ATAPP_MESSAGE(msg)->msg_body_case()) {
+        fwd_data = &ATAPP_MESSAGE(msg)->data_transform_req();
+    } else if (atbus::protocol::msg::kDataTransformRsp == ATAPP_MESSAGE(msg)->msg_body_case()) {
+        fwd_data = &ATAPP_MESSAGE(msg)->data_transform_rsp();
+    }
+
+    if (NULL == fwd_data) {
         return 0;
     }
 
-    return ATAPP_MESSAGE(msg)->body.forward->from;
+    return fwd_data->from();
 }
 
 LIBATAPP_MACRO_API uint64_t __cdecl libatapp_c_msg_get_forward_to(libatapp_c_message msg) {
@@ -584,11 +591,18 @@ LIBATAPP_MACRO_API uint64_t __cdecl libatapp_c_msg_get_forward_to(libatapp_c_mes
         return 0;
     }
 
-    if (NULL == ATAPP_MESSAGE(msg)->body.forward) {
+    const atbus::protocol::forward_data* fwd_data = NULL;
+    if (atbus::protocol::msg::kDataTransformReq == ATAPP_MESSAGE(msg)->msg_body_case()) {
+        fwd_data = &ATAPP_MESSAGE(msg)->data_transform_req();
+    } else if (atbus::protocol::msg::kDataTransformRsp == ATAPP_MESSAGE(msg)->msg_body_case()) {
+        fwd_data = &ATAPP_MESSAGE(msg)->data_transform_rsp();
+    }
+
+    if (NULL == fwd_data) {
         return 0;
     }
 
-    return ATAPP_MESSAGE(msg)->body.forward->to;
+    return fwd_data->to();
 }
 
 

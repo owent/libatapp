@@ -23,7 +23,7 @@ foreach(TOOLS_SRC_FILE IN LISTS TOOLS_SRC_LIST)
             "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>"
     )
 
-    target_link_libraries(${TOOLS_SRC_BIN_NAME} atapp_packed)
+    target_link_libraries(${TOOLS_SRC_BIN_NAME} atapp)
 
 	install(TARGETS "${TOOLS_SRC_BIN_NAME}"
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
