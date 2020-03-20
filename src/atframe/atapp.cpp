@@ -1781,9 +1781,11 @@ namespace atapp {
 
         size_t max_size   = n.get_conf().msg_size;
         size_t use_size   = 0;
+        size_t sum_size   = 0;
         bool is_truncated = false;
         for (std::list<std::string>::iterator iter = rsp.begin(); iter != rsp.end();) {
             std::list<std::string>::iterator cur = iter ++;
+            sum_size += (*cur).size();
             if (is_truncated) {
                 rsp.erase(cur);
                 continue;
@@ -1792,7 +1794,15 @@ namespace atapp {
                 cur->resize(max_size - use_size);
                 use_size = max_size;
                 is_truncated = true;
+            } else {
+                use_size += (*cur).size();
             }
+        }
+
+        if (is_truncated) {
+            std::stringstream ss;
+            ss<< "Response message size "<< sum_size<< " is greater than size limit "<< max_size<< ", some data will be truncated.";
+            rsp.push_back(ss.str());
         }
         return 0;
     }
