@@ -1644,7 +1644,7 @@ namespace atapp {
         }
 
         if (m->head().ret() < 0) {
-            WLOGERROR("app 0x%llx receive a send failure from 0x%llx, message cmd: %d, type: %d, ret: %d, sequence: %llu",
+            WLOGERROR("app 0x%llx receive a send failure from 0x%llx, message cmd: %s, type: %d, ret: %d, sequence: %llu",
                     static_cast<unsigned long long>(get_id()), static_cast<unsigned long long>(m->head().src_bus_id()), 
                     atbus::msg_handler::get_body_name(m->msg_body_case()), m->head().type(),
                     m->head().ret(), static_cast<unsigned long long>(m->head().sequence()));
@@ -1759,7 +1759,7 @@ namespace atapp {
         return 0;
     }
 
-    int app::bus_evt_callback_on_custom_cmd(const atbus::node &, const atbus::endpoint *, const atbus::connection *, app_id_t /*src_id*/,
+    int app::bus_evt_callback_on_custom_cmd(const atbus::node & n, const atbus::endpoint *, const atbus::connection *, app_id_t /*src_id*/,
                                             const std::vector<std::pair<const void *, size_t> > &args, std::list<std::string> &rsp) {
         ++last_proc_event_count_;
         if (args.empty()) {
@@ -1778,6 +1778,22 @@ namespace atapp {
         sender.self = this;
         sender.response = &rsp;
         cmd_mgr->start(args_str, true, &sender);
+
+        size_t max_size   = n.get_conf().msg_size;
+        size_t use_size   = 0;
+        bool is_truncated = false;
+        for (std::list<std::string>::iterator iter = rsp.begin(); iter != rsp.end();) {
+            std::list<std::string>::iterator cur = iter ++;
+            if (is_truncated) {
+                rsp.erase(cur);
+                continue;
+            }
+            if (use_size + cur->size() > max_size) {
+                cur->resize(max_size - use_size);
+                use_size = max_size;
+                is_truncated = true;
+            }
+        }
         return 0;
     }
 

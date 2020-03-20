@@ -328,10 +328,10 @@ namespace atapp {
         callback_fn_on_all_module_inited_t evt_on_all_module_inited_;
 
         // stat
-        typedef struct {
+        struct stat_data_t {
             uv_rusage_t last_checkpoint_usage;
             time_t last_checkpoint_min;
-        } stat_data_t;
+        };
         stat_data_t stat_;
     };
 } // namespace atapp

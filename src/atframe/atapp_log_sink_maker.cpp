@@ -25,7 +25,7 @@ namespace atapp {
             }
 
             if (0 == max_file_size) {
-                max_file_size = 65536; // 64KB
+                max_file_size = 262144; // 256KB
             }
 
             if (0 == rotate_size) {
