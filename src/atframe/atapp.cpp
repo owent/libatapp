@@ -1672,10 +1672,10 @@ namespace atapp {
             const char *msg = UV_EOF == errcode ? "got EOF" : "reset by peer";
             if (NULL != conn) {
                 if (NULL != ep) {
-                    WLOGINFO("bus node 0x%llx endpoint 0x%llx connection %s closed: %s", static_cast<unsigned long long>(n.get_id()),
-                             static_cast<unsigned long long>(ep->get_id()), conn->get_address().address.c_str(), msg);
+                    WLOGINFO("bus node 0x%llx endpoint 0x%llx connection %p(%s) closed: %s", static_cast<unsigned long long>(n.get_id()),
+                             static_cast<unsigned long long>(ep->get_id()), conn, conn->get_address().address.c_str(), msg);
                 } else {
-                    WLOGINFO("bus node 0x%llx connection %s closed: %s", static_cast<unsigned long long>(n.get_id()), conn->get_address().address.c_str(), msg);
+                    WLOGINFO("bus node 0x%llx connection %p(%s) closed: %s", static_cast<unsigned long long>(n.get_id()), conn, conn->get_address().address.c_str(), msg);
                 }
 
             } else {
@@ -1752,8 +1752,13 @@ namespace atapp {
         } else {
             // already disconncted finished.
             if (atbus::connection::state_t::DISCONNECTED != conn->get_status()) {
-                WLOGERROR("bus node 0x%llx make connection to %s done, res: %d", static_cast<unsigned long long>(n.get_id()),
-                          conn->get_address().address.c_str(), res);
+                if (is_closing()) {
+                    WLOGINFO("bus node 0x%llx make a invalid connection %p(%s) when closing, all unfinished connection will be aborted. res: %d", static_cast<unsigned long long>(n.get_id()),
+                        conn, conn->get_address().address.c_str(), res);
+                } else {
+                    WLOGWARNING("bus node 0x%llx make a invalid connection %p(%s), maybe it's a temporary connection. res: %d", static_cast<unsigned long long>(n.get_id()),
+                        conn, conn->get_address().address.c_str(), res);
+                }
             }
         }
         return 0;
