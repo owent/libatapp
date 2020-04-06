@@ -91,17 +91,17 @@ namespace atapp {
         typedef std::function<int(const msg_t &, const void *, size_t)> msg_handler_t;
 
         struct timer_info_t {
-            bool is_activited;
             uv_timer_t timer;
         };
+        typedef std::shared_ptr<timer_info_t> timer_ptr_t;
 
         struct tick_timer_t {
             util::time::time_utility::raw_time_t sec_update;
             time_t sec;
             time_t usec;
 
-            timer_info_t tick_timer;
-            timer_info_t timeout_timer;
+            timer_ptr_t tick_timer;
+            timer_ptr_t timeout_timer;
         };
 
 
@@ -244,7 +244,7 @@ namespace atapp {
 
         int setup_atbus();
 
-        void close_timer(timer_info_t &t);
+        void close_timer(timer_ptr_t &t);
 
         int setup_timer();
 

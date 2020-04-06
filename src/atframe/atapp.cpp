@@ -25,6 +25,18 @@
 namespace atapp {
     app *app::last_instance_;
 
+    static void _app_close_timer_handle(uv_handle_t *handle) {
+        app::timer_ptr_t* ptr = reinterpret_cast<app::timer_ptr_t*>(handle->data);
+        if (NULL == ptr) {
+            if (NULL != handle->loop) {
+                uv_stop(handle->loop);
+            }
+            return;
+        }
+
+        delete ptr;
+    }
+
     LIBATAPP_MACRO_API app::flag_guard_t::flag_guard_t(app &owner, flag_t::type f) : owner_(&owner), flag_(f) {
         if (owner_->check_flag(flag_)) {
             owner_ = NULL;
@@ -76,9 +88,6 @@ namespace atapp {
         tick_timer_.sec = 0;
         tick_timer_.usec = 0;
 
-        tick_timer_.tick_timer.is_activited = false;
-        tick_timer_.timeout_timer.is_activited = false;
-
         stat_.last_checkpoint_min = 0;
     }
 
@@ -101,8 +110,8 @@ namespace atapp {
             bus_node_.reset();
         }
 
-        assert(!tick_timer_.tick_timer.is_activited);
-        assert(!tick_timer_.timeout_timer.is_activited);
+        assert(!tick_timer_.tick_timer);
+        assert(!tick_timer_.timeout_timer);
     }
 
     LIBATAPP_MACRO_API int app::run(uv_loop_t *ev_loop, int argc, const char **argv, void *priv_data) {
@@ -381,11 +390,6 @@ namespace atapp {
         // step 1. set stop flag.
         // bool is_stoping = set_flag(flag_t::STOPING, true);
         set_flag(flag_t::STOPING, true);
-
-        // TODO stop reason = manual stop
-        if (bus_node_ && ::atbus::node::state_t::CREATED != bus_node_->get_state() && !bus_node_->check_flag(::atbus::node::flag_t::EN_FT_SHUTDOWN)) {
-            bus_node_->shutdown(0);
-        }
 
         // step 2. stop libuv and return from uv_run
         // if (!is_stoping) {
@@ -866,18 +870,27 @@ namespace atapp {
                     }
 
                     // step X. if stop is blocked and timeout not triggered, setup stop timeout and waiting for all modules finished
-                    if (false == tick_timer_.timeout_timer.is_activited) {
-                        uv_timer_init(bus_node_->get_evloop(), &tick_timer_.timeout_timer.timer);
-                        tick_timer_.timeout_timer.timer.data = this;
+                    if (!tick_timer_.timeout_timer) {
+                        timer_ptr_t timer = std::make_shared<timer_info_t>();
+                        uv_timer_init(bus_node_->get_evloop(), &timer->timer);
+                        timer->timer.data = this;
 
-                        int res = uv_timer_start(&tick_timer_.timeout_timer.timer, ev_stop_timeout, conf_.stop_timeout, 0);
+                        int res = uv_timer_start(&timer->timer, ev_stop_timeout, conf_.stop_timeout, 0);
                         if (0 == res) {
-                            tick_timer_.timeout_timer.is_activited = true;
+                            tick_timer_.timeout_timer = timer;
                         } else {
                             WLOGERROR("setup stop timeout failed, res: %d", res);
                             set_flag(flag_t::TIMEOUT, false);
+
+                            timer->timer.data = new timer_ptr_t(timer);
+                            uv_close(reinterpret_cast<uv_handle_t *>(&timer->timer), _app_close_timer_handle);
                         }
                     }
+                }
+
+                // stop atbus after all module closed
+                if (check_flag(flag_t::STOPPED) && bus_node_ && ::atbus::node::state_t::CREATED != bus_node_->get_state() && !bus_node_->check_flag(::atbus::node::flag_t::EN_FT_SHUTDOWN)) {
+                    bus_node_->shutdown(0);
                 }
             }
 
@@ -1196,16 +1209,21 @@ namespace atapp {
         // if has father node, block and connect to father node
         if (atbus::node::state_t::CONNECTING_PARENT == connection_node->get_state() || atbus::node::state_t::LOST_PARENT == connection_node->get_state()) {
             // setup timeout and waiting for parent connected
-            if (false == tick_timer_.timeout_timer.is_activited) {
-                uv_timer_init(connection_node->get_evloop(), &tick_timer_.timeout_timer.timer);
-                tick_timer_.timeout_timer.timer.data = this;
+            if (!tick_timer_.timeout_timer) {
+                timer_ptr_t timer = std::make_shared<timer_info_t>();
 
-                res = uv_timer_start(&tick_timer_.timeout_timer.timer, ev_stop_timeout, conf_.stop_timeout, 0);
+                uv_timer_init(connection_node->get_evloop(), &timer->timer);
+                timer->timer.data = this;
+
+                res = uv_timer_start(&timer->timer, ev_stop_timeout, conf_.stop_timeout, 0);
                 if (0 == res) {
-                    tick_timer_.timeout_timer.is_activited = true;
+                    tick_timer_.timeout_timer = timer;
                 } else {
                     WLOGERROR("setup stop timeout failed, res: %d", res);
                     set_flag(flag_t::TIMEOUT, false);
+
+                    timer->timer.data = new timer_ptr_t(timer);
+                    uv_close(reinterpret_cast<uv_handle_t *>(&timer->timer), _app_close_timer_handle);
                 }
 
                 while (NULL == connection_node->get_parent_endpoint()) {
@@ -1236,17 +1254,17 @@ namespace atapp {
         return 0;
     }
 
-    void app::close_timer(timer_info_t &t) {
-        if (t.is_activited) {
-            uv_timer_stop(&t.timer);
-            uv_close(reinterpret_cast<uv_handle_t *>(&t.timer), NULL);
-            t.is_activited = false;
+    void app::close_timer(timer_ptr_t &t) {
+        if (t) {
+            uv_timer_stop(&t->timer);
+            t->timer.data = new timer_ptr_t(t);
+            uv_close(reinterpret_cast<uv_handle_t *>(&t->timer), _app_close_timer_handle);
+
+            t.reset();
         }
     }
 
     static void _app_tick_timer_handle(uv_timer_t *handle) {
-        assert(handle && handle->data);
-
         if (NULL != handle && NULL != handle->data) {
             app *self = reinterpret_cast<app *>(handle->data);
             self->tick();
@@ -1265,14 +1283,20 @@ namespace atapp {
             WLOGINFO("setup tick interval to %llums.", static_cast<unsigned long long>(conf_.tick_interval));
         }
 
-        uv_timer_init(bus_node_->get_evloop(), &tick_timer_.tick_timer.timer);
-        tick_timer_.tick_timer.timer.data = this;
+        timer_ptr_t timer = std::make_shared<timer_info_t>();
 
-        int res = uv_timer_start(&tick_timer_.tick_timer.timer, _app_tick_timer_handle, conf_.tick_interval, conf_.tick_interval);
+        uv_timer_init(bus_node_->get_evloop(), &timer->timer);
+        timer->timer.data = this;
+
+        int res = uv_timer_start(&timer->timer, _app_tick_timer_handle, conf_.tick_interval, conf_.tick_interval);
         if (0 == res) {
-            tick_timer_.tick_timer.is_activited = true;
+            tick_timer_.tick_timer = timer;
         } else {
             WLOGERROR("setup tick timer failed, res: %d", res);
+
+            timer->timer.data = new timer_ptr_t(timer);
+            uv_close(reinterpret_cast<uv_handle_t *>(&timer->timer), _app_close_timer_handle);
+
             return EN_ATAPP_ERR_SETUP_TIMER;
         }
 
@@ -1984,16 +2008,20 @@ namespace atapp {
         }
 
         // step 3. setup timeout timer
-        if (false == tick_timer_.timeout_timer.is_activited) {
-            uv_timer_init(ev_loop, &tick_timer_.timeout_timer.timer);
-            tick_timer_.timeout_timer.timer.data = this;
+        if (!tick_timer_.timeout_timer) {
+            timer_ptr_t timer = std::make_shared<timer_info_t>();
+            uv_timer_init(ev_loop, &timer->timer);
+            timer->timer.data = this;
 
-            int res = uv_timer_start(&tick_timer_.timeout_timer.timer, ev_stop_timeout, conf_.stop_timeout, 0);
+            int res = uv_timer_start(&timer->timer, ev_stop_timeout, conf_.stop_timeout, 0);
             if (0 == res) {
-                tick_timer_.timeout_timer.is_activited = true;
+                tick_timer_.timeout_timer = timer;
             } else {
                 ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "setup timeout timer failed, res: " << res << std::endl;
                 set_flag(flag_t::TIMEOUT, false);
+
+                timer->timer.data = new timer_ptr_t(timer);
+                uv_close(reinterpret_cast<uv_handle_t *>(&timer->timer), _app_close_timer_handle);
             }
         }
 
