@@ -386,7 +386,11 @@ namespace atapp {
     }
 
     LIBATAPP_MACRO_API int app::stop() {
-        WLOGINFO("============ receive stop signal and ready to stop all modules ============");
+        if (check_flag(flag_t::STOPING)) {
+            WLOGINFO("============= recall stop after some event action(s) finished =============");
+        } else {
+            WLOGINFO("============ receive stop signal and ready to stop all modules ============");
+        }
         // step 1. set stop flag.
         // bool is_stoping = set_flag(flag_t::STOPING, true);
         set_flag(flag_t::STOPING, true);
