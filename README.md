@@ -181,7 +181,7 @@ public:
 
     virtual int tick() {
         // 每次tick的时候调用，tick间隔由配置文件指定，返回成功执行的任务数
-        time_t cur_print = util::time::time_utility::get_now() / 20;
+        time_t cur_print = util::time::time_utility::get_sys_now() / 20;
         static time_t print_per_sec = cur_print;
         if (print_per_sec != cur_print) {
             WLOGINFO("echo module tick");

@@ -40,7 +40,7 @@ public:
     virtual const char *name() const { return "echo_module"; }
 
     virtual int tick() {
-        time_t cur_print = util::time::time_utility::get_now() / 20;
+        time_t cur_print = util::time::time_utility::get_sys_now() / 20;
         static time_t print_per_sec = cur_print;
         if (print_per_sec != cur_print) {
             WLOGINFO("echo module tick");

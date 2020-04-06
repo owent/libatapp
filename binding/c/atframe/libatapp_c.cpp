@@ -707,7 +707,7 @@ LIBATAPP_MACRO_API void __cdecl libatapp_c_module_set_on_tick(libatapp_c_module 
     ATAPP_MODULE(mod)->on_tick_private_data_ = priv_data;
 }
 
-LIBATAPP_MACRO_API int64_t __cdecl libatapp_c_get_unix_timestamp() { return util::time::time_utility::get_now(); }
+LIBATAPP_MACRO_API int64_t __cdecl libatapp_c_get_unix_timestamp() { return util::time::time_utility::get_sys_now(); }
 
 LIBATAPP_MACRO_API void __cdecl libatapp_c_log_write(uint32_t tag, uint32_t level, const char *level_name, const char *file_path, const char *func_name,
                                                      uint32_t line_number, const char *content) {

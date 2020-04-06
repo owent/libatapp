@@ -403,8 +403,8 @@ namespace atapp {
         util::time::time_utility::raw_time_t start_tp = util::time::time_utility::now();
         util::time::time_utility::raw_time_t end_tp = start_tp;
         do {
-            if (tick_timer_.sec != util::time::time_utility::get_now()) {
-                tick_timer_.sec = util::time::time_utility::get_now();
+            if (tick_timer_.sec != util::time::time_utility::get_sys_now()) {
+                tick_timer_.sec = util::time::time_utility::get_sys_now();
                 tick_timer_.usec = 0;
                 tick_timer_.sec_update = util::time::time_utility::now();
             } else {
@@ -452,7 +452,7 @@ namespace atapp {
 
         // stat log
         do {
-            time_t now_min = util::time::time_utility::get_now() / util::time::time_utility::MINITE_SECONDS;
+            time_t now_min = util::time::time_utility::get_sys_now() / util::time::time_utility::MINITE_SECONDS;
             if (now_min != stat_.last_checkpoint_min) {
                 time_t last_min = stat_.last_checkpoint_min;
                 stat_.last_checkpoint_min = now_min;
