@@ -263,6 +263,12 @@ namespace atapp {
         static LIBATAPP_MACRO_API app_id_t convert_app_id_by_string(const char* id_in, const std::vector<app_id_t>& mask_in);
         static LIBATAPP_MACRO_API app_id_t convert_app_id_by_string(const char* id_in, const char* mask_in);
 
+        /**
+         * @brief get last instance
+         * @note this API is not thread-safety and only usageful when there is only one app instance
+         */
+        static LIBATAPP_MACRO_API app* get_last_instance();
+        
     private:
         int prog_option_handler_help(util::cli::callback_param params, util::cli::cmd_option *opt_mgr, util::cli::cmd_option_ci *cmd_mgr);
         int prog_option_handler_version(util::cli::callback_param params);

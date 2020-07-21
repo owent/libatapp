@@ -16,6 +16,12 @@
 #include "libatbus_protocol.h"
 
 #include <algorithm/murmur_hash.h>
+#include <algorithm/crypto_cipher.h>
+
+#if defined(CRYPTO_USE_OPENSSL) || defined(CRYPTO_USE_LIBRESSL) || defined(CRYPTO_USE_BORINGSSL)
+#include <openssl/ssl.h>
+#endif
+
 #include <common/file_system.h>
 #include <common/string_oprs.h>
 
@@ -23,7 +29,7 @@
 
 
 namespace atapp {
-    app *app::last_instance_;
+    app *app::last_instance_ = NULL;
 
     static void _app_close_timer_handle(uv_handle_t *handle) {
         app::timer_ptr_t* ptr = reinterpret_cast<app::timer_ptr_t*>(handle->data);
@@ -75,6 +81,17 @@ namespace atapp {
     }
 
     LIBATAPP_MACRO_API app::app() : setup_result_(0), last_proc_event_count_(0), mode_(mode_t::CUSTOM) {
+        if (NULL == last_instance_) {
+#if defined(OPENSSL_VERSION_NUMBER)
+#  if OPENSSL_VERSION_NUMBER < 0x10100000L
+            SSL_library_init();
+#  else
+            OPENSSL_init_ssl(0, NULL);
+#  endif
+#endif
+            util::crypto::cipher::init_global_algorithm();
+        }
+
         last_instance_ = this;
         conf_.id = 0;
         conf_.type_id = 0;
@@ -1454,6 +1471,10 @@ namespace atapp {
         std::vector<app_id_t> mask;
         split_ids_by_string(mask_in, mask);
         return convert_app_id_by_string(id_in, mask);
+    }
+
+    LIBATAPP_MACRO_API app* app::get_last_instance() {
+        return last_instance_;
     }
 
     int app::prog_option_handler_help(util::cli::callback_param /*params*/, util::cli::cmd_option *opt_mgr, util::cli::cmd_option_ci *cmd_mgr) {
