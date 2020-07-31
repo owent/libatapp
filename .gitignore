@@ -29,3 +29,8 @@
 
 
 /include/atframe/atapp_config.h
+/include/atframe/atapp_conf.pb.h
+/src/atframe/atapp_conf.pb.cc
+
+/3rd_party/yaml-cpp/pkg
+/3rd_party/yaml-cpp/prebuilt

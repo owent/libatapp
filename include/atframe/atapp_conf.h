@@ -9,11 +9,37 @@
 
 #pragma once
 
-#include "libatbus.h"
+#include <stdint.h>
+#include <cstddef>
+#include <cstring>
 #include <string>
 #include <vector>
+#include <memory>
+#include <type_traits>
+
+#include "libatbus.h"
 
 #include "atapp_config.h"
+
+#include <config/compiler/protobuf_prefix.h>
+
+#include "atapp_conf.pb.h"
+
+#include <config/compiler/protobuf_suffix.h>
+
+namespace util {
+    namespace config {
+        class ini_value;
+    }
+}
+
+namespace google {
+    namespace protobuf {
+        class Message;
+        class Timestamp;
+        class Duration;
+    }
+}
 
 namespace atapp {
     struct app_conf {
@@ -25,20 +51,13 @@ namespace atapp {
         std::string pid_file;
         const char *execute_path;
         bool resume_mode;
-        bool remove_pidfile_after_exit;
 
-        std::vector<std::string> bus_listen;
         atbus::node::conf_t bus_conf;
         std::string app_version;
-
-        // app configure
-        uint64_t stop_timeout;  // module timeout when receive a stop message, libuv use uint64_t
-        uint64_t tick_interval; // tick interval, libuv use uint64_t
-
-        atbus::node::bus_id_t type_id;
-        std::string type_name;
-        std::string name;
         std::string hash_code;
+
+        atapp::protocol::atapp_configure origin;
+        atapp::protocol::atapp_metadata metadata;
     };
 
     typedef enum {
@@ -57,6 +76,11 @@ namespace atapp {
         EN_ATAPP_ERR_CONNECT_ATAPP_FAILED = -1803,
         EN_ATAPP_ERR_MIN = -1999,
     } ATAPP_ERROR_TYPE;
+
+    LIBATAPP_MACRO_API void parse_timepoint(const std::string& in, google::protobuf::Timestamp& out);
+    LIBATAPP_MACRO_API void parse_duration(const std::string& in, google::protobuf::Duration& out);
+
+    LIBATAPP_MACRO_API void ini_loader_dump_to(const util::config::ini_value& src, ::google::protobuf::Message& dst);
 } // namespace atapp
 
 #endif

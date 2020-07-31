@@ -17,12 +17,11 @@
 
 #include <bitset>
 
-#include "uv.h"
+#include "atapp_conf.h"
 
 #include "cli/cmd_option.h"
 #include "time/time_utility.h"
 
-#include "atapp_conf.h"
 #include "atapp_log_sink_maker.h"
 #include "atapp_module_impl.h"
 
@@ -161,6 +160,7 @@ namespace atapp {
         LIBATAPP_MACRO_API app_id_t get_id() const;
 
         LIBATAPP_MACRO_API app_id_t convert_app_id_by_string(const char* id_in) const;
+        LIBATAPP_MACRO_API std::string convert_app_id_to_string(app_id_t id_in, bool hex = false) const;
 
         LIBATAPP_MACRO_API bool check_flag(flag_t::type f) const;
 
@@ -208,6 +208,11 @@ namespace atapp {
 
         LIBATAPP_MACRO_API util::config::ini_loader &get_configure();
         LIBATAPP_MACRO_API const util::config::ini_loader &get_configure() const;
+
+        LIBATAPP_MACRO_API const atapp::protocol::atapp_configure& get_origin_configure() const;
+        LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata& get_metadata() const;
+
+        LIBATAPP_MACRO_API void pack(atapp::protocol::atapp_discovery& out) const;
 
         LIBATAPP_MACRO_API bool add_log_sink_maker(const std::string &name, log_sink_maker::log_reg_t fn);
 
@@ -262,6 +267,8 @@ namespace atapp {
         static LIBATAPP_MACRO_API void split_ids_by_string(const char* in, std::vector<app_id_t>& out);
         static LIBATAPP_MACRO_API app_id_t convert_app_id_by_string(const char* id_in, const std::vector<app_id_t>& mask_in);
         static LIBATAPP_MACRO_API app_id_t convert_app_id_by_string(const char* id_in, const char* mask_in);
+        static LIBATAPP_MACRO_API std::string convert_app_id_to_string(app_id_t id_in, const std::vector<app_id_t>& mask_in, bool hex = false);
+        static LIBATAPP_MACRO_API std::string convert_app_id_to_string(app_id_t id_in, const char* mask_in, bool hex = false);
 
         /**
          * @brief get last instance

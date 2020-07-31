@@ -17,10 +17,18 @@
 #include "atapp_config.h"
 
 namespace atapp {
+    namespace protocol {
+        class atapp_log;
+        class atapp_log_category;
+        class atapp_log_sink;
+    }
+}
+
+namespace atapp {
     class log_sink_maker {
     public:
-        typedef std::function<util::log::log_wrapper::log_handler_t(const std::string &, util::log::log_wrapper &, uint32_t,
-                                                                    util::config::ini_value &)>
+        typedef std::function<util::log::log_wrapper::log_handler_t(
+            util::log::log_wrapper &, int32_t, const ::atapp::protocol::atapp_log&, const ::atapp::protocol::atapp_log_category&, const ::atapp::protocol::atapp_log_sink&)>
             log_reg_t;
 
     private:

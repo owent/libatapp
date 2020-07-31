@@ -1,0 +1,127 @@
+syntax = "proto3";
+
+import "google/protobuf/duration.proto";
+
+import "libatbus_protocol.proto";
+
+package atapp.protocol;
+
+message atbus_configure {
+    repeated string listen                  = 101;
+    repeated string subnets                 = 102;
+    string          proxy                   = 103;
+    int32           loop_times              = 104;
+    int32           ttl                     = 105;
+    int32           backlog                 = 106;
+    uint64          access_token_max_number = 107;
+    repeated string access_tokens           = 108;
+
+    google.protobuf.Duration first_idle_timeout = 201;
+    google.protobuf.Duration ping_interval      = 202;
+    google.protobuf.Duration retry_interval     = 203;
+
+    uint64 fault_tolerant     = 301;
+    uint64 msg_size           = 302;
+    uint64 recv_buffer_size   = 303;
+    uint64 send_buffer_size   = 304;
+    uint64 send_buffer_number = 305;
+}
+
+message atapp_timer {
+    google.protobuf.Duration stop_timeout  = 1;
+    google.protobuf.Duration tick_interval = 2;
+}
+
+message atapp_log_level_range {
+    string min = 1;
+    string max = 2;
+}
+
+message atapp_log_sink_file_rotate {
+    uint64 size   = 1;
+    uint32 number = 2;
+}
+
+message atapp_log_sink_file {
+    string                     file           = 1;
+    atapp_log_sink_file_rotate rotate         = 2;
+    uint32                     auto_flush     = 3;
+    google.protobuf.Duration   flush_interval = 4;
+    string                     writing_alias  = 5;
+}
+
+message atapp_log_sink_std {}
+
+message atapp_log_sink {
+    string                type  = 1;
+    atapp_log_level_range level = 2;
+
+    oneof backend {
+        atapp_log_sink_file log_backend_file   = 21;
+        atapp_log_sink_std  log_backend_stdout = 22;
+        atapp_log_sink_std  log_backend_stderr = 23;
+    }
+
+    map<string, string> unresolved_key_values = 101;
+}
+
+message atapp_log_category {
+    string                  name       = 1;
+    string                  prefix     = 2;
+    atapp_log_level_range   stacktrace = 3;
+    repeated atapp_log_sink sink       = 4;
+}
+
+message atapp_log {
+    string                      level    = 1;
+    repeated atapp_log_category category = 2;
+}
+
+message atapp_configure {
+    // bus configure
+    string id        = 101; // maybe hex or a.b.c.d
+    string id_mask   = 102; // convert a.b.c.d -> id
+    string name      = 103;
+    uint64 type_id   = 104;
+    string type_name = 105;
+
+    string hostname = 121;
+
+    bool        remove_pidfile_after_exit = 201;
+    atapp_timer timer                     = 202;
+
+    atbus_configure bus = 301;
+
+    atapp_log log = 401;
+}
+
+message atapp_metadata {
+    string api_version = 1;
+    string kind        = 2;
+    string group       = 3;
+
+
+    map<string, string> label = 21;
+    map<string, string> spec  = 22;
+}
+
+message atapp_discovery {
+    uint64          id                           = 1;
+    string          name                         = 2;
+    string          hostname                     = 3;
+    int32           pid                          = 4;
+    repeated string listen                       = 5;
+    string          hash_code                    = 6;
+    uint64          type_id                      = 7;
+    string          type_name                    = 8;
+    string          version                      = 9;
+    string          custom_data                  = 10;
+    repeated string gateway                      = 11;
+    repeated atbus.protocol.subnet_range subnets = 12;
+
+    uint64 atbus_protocol_version     = 21;
+    uint64 atbus_protocol_min_version = 22;
+
+    // just like in kubernetes
+    atapp_metadata metadata = 61;
+}

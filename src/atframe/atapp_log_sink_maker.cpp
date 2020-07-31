@@ -1,5 +1,7 @@
 ﻿#include <iostream>
 
+#include <atframe/atapp_conf.h>
+
 #include "cli/shell_font.h"
 #include "log/log_sink_file_backend.h"
 
@@ -8,22 +10,18 @@
 
 namespace atapp {
     namespace detail {
-        static util::log::log_wrapper::log_handler_t _log_sink_file(const std::string & /*sink_name*/, util::log::log_wrapper & /*logger*/, uint32_t /*index*/,
-                                                                    util::config::ini_value &ini_cfg) {
-            std::string file_pattern = ini_cfg["file"].as_cpp_string();
+        static util::log::log_wrapper::log_handler_t _log_sink_file(util::log::log_wrapper & /*logger*/, int32_t /*index*/,
+                                                                    const ::atapp::protocol::atapp_log& /*log_cfg*/, 
+                                                                    const ::atapp::protocol::atapp_log_category& /*cat_cfg*/, 
+                                                                    const ::atapp::protocol::atapp_log_sink& sink_cfg) {
+            std::string file_pattern = sink_cfg.log_backend_file().file();
             if (file_pattern.empty()) {
                 file_pattern = "server.%N.log";
             }
-            size_t max_file_size = 0; // 64KB
-            uint32_t rotate_size = 0; // 0-9
+            size_t max_file_size = static_cast<size_t>(sink_cfg.log_backend_file().rotate().size());
+            uint32_t rotate_size = static_cast<uint32_t>(sink_cfg.log_backend_file().rotate().number());
 
             util::log::log_sink_file_backend file_sink;
-            if (ini_cfg.get_children().end() != ini_cfg.get_children().find("rotate")) {
-                util::config::ini_value &rotate_conf = ini_cfg["rotate"];
-                max_file_size = rotate_conf["size"].as<size_t>();
-                rotate_size = rotate_conf["number"].as_uint32();
-            }
-
             if (0 == max_file_size) {
                 max_file_size = 262144; // 256KB
             }
@@ -36,19 +34,9 @@ namespace atapp {
             file_sink.set_max_file_size(max_file_size);
             file_sink.set_rotate_size(rotate_size);
 
-            if (ini_cfg.get_children().end() != ini_cfg.get_children().find("auto_flush")) {
-                uint32_t auto_flush = ini_cfg["auto_flush"].as_uint32();
-                file_sink.set_auto_flush(auto_flush);
-            }
-
-            if (ini_cfg.get_children().end() != ini_cfg.get_children().find("flush_interval")) {
-                util::config::duration_value flush_interval = ini_cfg["flush_interval"].as_duration();
-                file_sink.set_flush_interval(flush_interval.sec);
-            }
-
-            if (ini_cfg.get_children().end() != ini_cfg.get_children().find("writing_alias")) {
-                file_sink.set_writing_alias_pattern(ini_cfg["writing_alias"].as_cpp_string());
-            }
+            file_sink.set_auto_flush(sink_cfg.log_backend_file().auto_flush());
+            file_sink.set_flush_interval(static_cast<time_t>(sink_cfg.log_backend_file().flush_interval().seconds()));
+            file_sink.set_writing_alias_pattern(sink_cfg.log_backend_file().writing_alias());
 
             return file_sink;
         }
@@ -58,8 +46,10 @@ namespace atapp {
             std::cout << std::endl;
         }
 
-        static util::log::log_wrapper::log_handler_t _log_sink_stdout(const std::string & /*sink_name*/, util::log::log_wrapper & /*logger*/,
-                                                                      uint32_t /*index*/, util::config::ini_value & /*ini_cfg*/) {
+        static util::log::log_wrapper::log_handler_t _log_sink_stdout(util::log::log_wrapper & /*logger*/, int32_t /*index*/,
+                                                                    const ::atapp::protocol::atapp_log& /*log_cfg*/, 
+                                                                    const ::atapp::protocol::atapp_log_category& /*cat_cfg*/, 
+                                                                    const ::atapp::protocol::atapp_log_sink& /*sink_cfg*/) {
             return _log_sink_stdout_handle;
         }
 
@@ -68,8 +58,10 @@ namespace atapp {
             ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << content << std::endl;
         }
 
-        static util::log::log_wrapper::log_handler_t _log_sink_stderr(const std::string & /*sink_name*/, util::log::log_wrapper & /*logger*/,
-                                                                      uint32_t /*index*/, util::config::ini_value & /*ini_cfg*/) {
+        static util::log::log_wrapper::log_handler_t _log_sink_stderr(util::log::log_wrapper & /*logger*/, int32_t /*index*/,
+                                                                    const ::atapp::protocol::atapp_log& /*log_cfg*/, 
+                                                                    const ::atapp::protocol::atapp_log_category& /*cat_cfg*/, 
+                                                                    const ::atapp::protocol::atapp_log_sink& /*sink_cfg*/) {
             return _log_sink_stderr_handle;
         }
     } // namespace detail

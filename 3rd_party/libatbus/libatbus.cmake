@@ -3,7 +3,7 @@
 endif()
 
 # =========== libatbus ==================
-if (NOT TARGET atbus)
+if (NOT TARGET atbus AND NOT TARGET atframework::atbus)
     if (NOT 3RD_PARTY_LIBATBUS_BASE_DIR)
         set (3RD_PARTY_LIBATBUS_BASE_DIR ${CMAKE_CURRENT_LIST_DIR})
     endif()
@@ -36,9 +36,12 @@ if (NOT TARGET atbus)
                 WORKING_DIRECTORY ${3RD_PARTY_LIBATBUS_PKG_DIR}
             )
         endif()
+
+        set(LIBATBUS_ROOT ${3RD_PARTY_LIBATBUS_PKG_DIR})
+        unset(3RD_PARTY_LIBATBUS_PKG_DIR)
     endif()
 
-    add_subdirectory(${3RD_PARTY_LIBATBUS_PKG_DIR})
+    add_subdirectory(${LIBATBUS_ROOT})
 endif ()
 
 if (NOT TARGET atbus)

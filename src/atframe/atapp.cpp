@@ -28,6 +28,9 @@
 #include "cli/shell_font.h"
 
 
+#define ATAPP_DEFAULT_STOP_TIMEOUT 30000
+#define ATAPP_DEFAULT_TICK_INTERVAL 16
+
 namespace atapp {
     app *app::last_instance_ = NULL;
 
@@ -80,6 +83,42 @@ namespace atapp {
         return std::pair<uint64_t, const char *>(sz, unit);
     }
 
+    static uint64_t chrono_to_libuv_duration(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration& in, uint64_t default_value) {
+        uint64_t ret = static_cast<uint64_t>(in.seconds() * 1000 + in.nanos() / 1000000);
+        if (ret <= 0) {
+            ret = default_value;
+        }
+
+        return ret;
+    }
+
+    static void ini_loader_value_to_unresolved_key_values(const util::config::ini_value& src, 
+        ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Map< std::string, std::string >& dst, std::string prefix) {
+
+        if (src.size() > 0) {
+            if (1 == src.size()) {
+                dst[prefix] = src.as_cpp_string();
+            } else {
+                for (size_t i = 0; i < src.size(); ++ i) {
+                    dst[LOG_WRAPPER_FWAPI_FORMAT("{}.{}", prefix, i)] = src.as_cpp_string(i);
+                }
+            }
+        }
+
+        for (util::config::ini_value::node_type::const_iterator iter = src.get_children().begin(); iter != src.get_children().end(); ++ iter) {
+            // First level skip fields already in ::atapp::protocol::atapp_log_sink
+            if (prefix.empty()) {
+                const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor* fds = ::atapp::protocol::atapp_log_sink::descriptor()->FindFieldByName(iter->first);
+                if (NULL != fds && fds->name() != "unresolved_key_values") {
+                    continue;
+                }
+            }
+
+            std::string sub_prefix = prefix.empty()? iter->first: LOG_WRAPPER_FWAPI_FORMAT("{}.{}", prefix, iter->first);
+            ini_loader_value_to_unresolved_key_values(iter->second, dst, sub_prefix);
+        }
+    }
+
     LIBATAPP_MACRO_API app::app() : setup_result_(0), last_proc_event_count_(0), mode_(mode_t::CUSTOM) {
         if (NULL == last_instance_) {
 #if defined(OPENSSL_VERSION_NUMBER)
@@ -94,12 +133,8 @@ namespace atapp {
 
         last_instance_ = this;
         conf_.id = 0;
-        conf_.type_id = 0;
         conf_.execute_path = NULL;
         conf_.resume_mode = false;
-        conf_.remove_pidfile_after_exit = true;
-        conf_.stop_timeout = 30000; // 30s
-        conf_.tick_interval = 32;   // 32ms
 
         tick_timer_.sec_update = util::time::time_utility::raw_time_t::min();
         tick_timer_.sec = 0;
@@ -327,7 +362,8 @@ namespace atapp {
     LIBATAPP_MACRO_API bool app::is_closed() const UTIL_CONFIG_NOEXCEPT { return check_flag(flag_t::STOPPED); }
 
     LIBATAPP_MACRO_API int app::reload() {
-        app_conf old_conf = conf_;
+        atbus::adapter::loop_t* old_loop = conf_.bus_conf.ev_loop;
+        ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration old_tick_interval = conf_.origin.timer().tick_interval();
         util::cli::shell_stream ss(std::cerr);
 
         WLOGINFO("============ start to load configure ============");
@@ -340,6 +376,8 @@ namespace atapp {
             print_help();
             return EN_ATAPP_ERR_MISSING_CONFIGURE_FILE;
         }
+
+        // TODO yaml file
         if (cfg_loader_.load_file(conf_.conf_file.c_str(), false) < 0) {
             ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "load configure file " << conf_.conf_file << " failed" << std::endl;
             print_help();
@@ -353,6 +391,7 @@ namespace atapp {
             cfg_loader_.dump_to("atapp.config.external", external_confs);
             owent_foreach(std::string & conf_fp, external_confs) {
                 if (!conf_fp.empty()) {
+                    // TODO yaml file
                     if (cfg_loader_.load_file(conf_.conf_file.c_str(), true) < 0) {
                         if (is_running()) {
                             WLOGERROR("load external configure file %s failed", conf_fp.c_str());
@@ -369,7 +408,7 @@ namespace atapp {
         apply_configure();
         // reuse ev loop if not configued
         if (NULL == conf_.bus_conf.ev_loop) {
-            conf_.bus_conf.ev_loop = old_conf.bus_conf.ev_loop;
+            conf_.bus_conf.ev_loop = old_loop;
         }
 
         // step 5. if not in start mode, return
@@ -390,7 +429,7 @@ namespace atapp {
         }
 
         // step 8. if running and tick interval changed, reset timer
-        if (old_conf.tick_interval != conf_.tick_interval) {
+        if (old_tick_interval.seconds() != conf_.origin.timer().tick_interval().seconds() || old_tick_interval.nanos() != conf_.origin.timer().tick_interval().nanos()) {
             set_flag(flag_t::RESET_TIMER, true);
 
             if (is_running()) {
@@ -427,6 +466,10 @@ namespace atapp {
         // record start time point
         util::time::time_utility::raw_time_t start_tp = util::time::time_utility::now();
         util::time::time_utility::raw_time_t end_tp = start_tp;
+
+        std::chrono::system_clock::duration conf_tick_interval = std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::seconds(conf_.origin.timer().tick_interval().seconds()));
+        conf_tick_interval += std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::nanoseconds(conf_.origin.timer().tick_interval().seconds()));
+
         do {
             if (tick_timer_.sec != util::time::time_utility::get_sys_now()) {
                 tick_timer_.sec = util::time::time_utility::get_sys_now();
@@ -468,7 +511,7 @@ namespace atapp {
             if (active_count > 0) {
                 last_proc_event_count_ += static_cast<uint64_t>(active_count);
             }
-        } while (active_count > 0 && (end_tp - start_tp) < std::chrono::milliseconds(conf_.tick_interval));
+        } while (active_count > 0 && (end_tp - start_tp) < conf_tick_interval);
 
         // if is stoping, quit loop  every tick
         if (check_flag(flag_t::STOPING) && bus_node_ && NULL != bus_node_->get_evloop()) {
@@ -528,6 +571,8 @@ namespace atapp {
     LIBATAPP_MACRO_API app::app_id_t app::get_id() const { return conf_.id; }
 
     LIBATAPP_MACRO_API app::app_id_t app::convert_app_id_by_string(const char *id_in) const { return convert_app_id_by_string(id_in, conf_.id_mask); }
+
+    LIBATAPP_MACRO_API std::string app::convert_app_id_to_string(app_id_t id_in, bool hex) const { return convert_app_id_to_string(id_in, conf_.id_mask, hex); }
 
     LIBATAPP_MACRO_API void app::add_module(module_ptr_t module) {
         if (this == module->owner_) {
@@ -639,11 +684,11 @@ namespace atapp {
         return build_version_;
     }
 
-    LIBATAPP_MACRO_API const std::string &app::get_app_name() const { return conf_.name; }
+    LIBATAPP_MACRO_API const std::string &app::get_app_name() const { return conf_.origin.name(); }
 
-    LIBATAPP_MACRO_API const std::string &app::get_type_name() const { return conf_.type_name; }
+    LIBATAPP_MACRO_API const std::string &app::get_type_name() const { return conf_.origin.type_name(); }
 
-    LIBATAPP_MACRO_API app::app_id_t app::get_type_id() const { return conf_.type_id; }
+    LIBATAPP_MACRO_API app::app_id_t app::get_type_id() const { return static_cast<app::app_id_t>(conf_.origin.type_id()); }
 
     LIBATAPP_MACRO_API const std::string &app::get_hash_code() const { return conf_.hash_code; }
 
@@ -666,6 +711,13 @@ namespace atapp {
 
     LIBATAPP_MACRO_API util::config::ini_loader &app::get_configure() { return cfg_loader_; }
     LIBATAPP_MACRO_API const util::config::ini_loader &app::get_configure() const { return cfg_loader_; }
+
+    LIBATAPP_MACRO_API const atapp::protocol::atapp_configure& app::get_origin_configure() const { return conf_.origin; }
+    LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata& app::get_metadata() const { return conf_.metadata; }
+
+    LIBATAPP_MACRO_API void app::pack(atapp::protocol::atapp_discovery& out) const {
+        // TODO 
+    }
 
     LIBATAPP_MACRO_API bool app::add_log_sink_maker(const std::string &name, log_sink_maker::log_reg_t fn) {
         if (log_reg_.end() != log_reg_.find(name)) {
@@ -720,11 +772,19 @@ namespace atapp {
     }
 
     int app::apply_configure() {
+        std::string old_name = conf_.origin.name();
+        std::string old_hostname = conf_.origin.hostname();
+        {
+            util::config::ini_value::node_type::const_iterator iter = cfg_loader_.get_root_node().get_children().find("atapp");
+            if (iter != cfg_loader_.get_root_node().get_children().end()) {
+                conf_.origin.Clear();
+                ini_loader_dump_to(iter->second, conf_.origin);
+            }
+        }
+        
         // id and id mask
         if (conf_.id_mask.empty()) {
-            std::string id_mask_str;
-            cfg_loader_.dump_to("atapp.id_mask", id_mask_str);
-            split_ids_by_string(id_mask_str.c_str(), conf_.id_mask);
+            split_ids_by_string(conf_.origin.id_mask().c_str(), conf_.id_mask);
         }
 
         if (!conf_.id_cmd.empty()) {
@@ -732,116 +792,82 @@ namespace atapp {
         }
 
         if (0 == conf_.id) {
-            std::string id_cfg;
-            cfg_loader_.dump_to("atapp.id", id_cfg);
-            conf_.id = convert_app_id_by_string(id_cfg.c_str());
+            conf_.id = convert_app_id_by_string(conf_.origin.id().c_str());
         }
 
-        cfg_loader_.dump_to("atapp.name", conf_.name, true);
-        cfg_loader_.dump_to("atapp.type_id", conf_.type_id);
-        cfg_loader_.dump_to("atapp.type_name", conf_.type_name);
-        if (conf_.name.empty()) {
-            std::stringstream ss;
-            ss << conf_.type_name << "-0x" << std::ios::hex << conf_.id;
-            conf_.name = ss.str();
+        // Changing name is not allowed
+        if (!old_name.empty()) {
+            conf_.origin.set_name(old_name);
+        } else if (conf_.origin.name().empty()) {
+            conf_.origin.set_name(LOG_WRAPPER_FWAPI_FORMAT("{}-0x{:x}", conf_.origin.type_name(), conf_.id));
         }
+
         {
             uint64_t hash_out[2];
-            ::util::hash::murmur_hash3_x64_128(conf_.name.c_str(), static_cast<int>(conf_.name.size()), 0x01000193U, hash_out);
+            ::util::hash::murmur_hash3_x64_128(conf_.origin.name().c_str(), static_cast<int>(conf_.origin.name().size()), 0x01000193U, hash_out);
             char hash_code_str[40] = {0};
             UTIL_STRFUNC_SNPRINTF(hash_code_str, sizeof(hash_code_str), "%016llX%016llX", static_cast<unsigned long long>(hash_out[0]),
                                   static_cast<unsigned long long>(hash_out[1]));
             conf_.hash_code = &hash_code_str[0];
         }
 
-        cfg_loader_.dump_to("atapp.remove_pidfile_after_exit", conf_.remove_pidfile_after_exit);
-
-        // hostname
-        {
-            std::string hostname;
-            cfg_loader_.dump_to("atapp.hostname", hostname);
-            if (!hostname.empty()) {
-                atbus::node::set_hostname(hostname);
-            }
+        // Changing hostname is not allowed
+        if (!old_hostname.empty()) {
+            conf_.origin.set_hostname(old_hostname);
         }
-
-        conf_.bus_listen.clear();
-        cfg_loader_.dump_to("atapp.bus.listen", conf_.bus_listen);
-
-        // conf_.stop_timeout = 30000; // use last available value
-        {
-            util::config::duration_value duration;
-            cfg_loader_.dump_to("atapp.timer.stop_timeout", duration);
-            conf_.stop_timeout = duration.sec;
-        }
-
-        // conf_.tick_interval = 32; // use last available value
-        {
-            util::config::duration_value duration;
-            cfg_loader_.dump_to("atapp.timer.tick_interval", duration);
-            conf_.tick_interval = duration.sec;
+        
+        if (!conf_.origin.hostname().empty()) {
+            atbus::node::set_hostname(conf_.origin.hostname());
         }
 
         // atbus configure
         atbus::node::default_conf(&conf_.bus_conf);
 
         {
-            std::vector<std::string> subnets_conf;
-            cfg_loader_.dump_to("atapp.bus.subnets", subnets_conf);
-            conf_.bus_conf.subnets.reserve(subnets_conf.size());
-            for (size_t i = 0; i < subnets_conf.size(); ++ i) {
-                std::string::size_type sep_pos = subnets_conf[i].find('/');
+            conf_.bus_conf.subnets.reserve(static_cast<size_t>(conf_.origin.bus().subnets_size()));
+            for (int i = 0; i < conf_.origin.bus().subnets_size(); ++ i) {
+                const std::string& subset = conf_.origin.bus().subnets(i);
+                std::string::size_type sep_pos = subset.find('/');
                 if (std::string::npos == sep_pos) {
                     conf_.bus_conf.subnets.push_back(atbus::endpoint_subnet_conf(
-                        0, util::string::to_int<uint32_t>(subnets_conf[i].c_str())
+                        0, util::string::to_int<uint32_t>(subset.c_str())
                     ));
                 } else {
                     conf_.bus_conf.subnets.push_back(atbus::endpoint_subnet_conf(
-                        convert_app_id_by_string(subnets_conf[i].c_str()), 
-                        util::string::to_int<uint32_t>(subnets_conf[i].c_str() + sep_pos + 1)
+                        convert_app_id_by_string(subset.c_str()), 
+                        util::string::to_int<uint32_t>(subset.c_str() + sep_pos + 1)
                     ));
                 }
             }
         }
-        cfg_loader_.dump_to("atapp.bus.proxy", conf_.bus_conf.parent_address);
-        cfg_loader_.dump_to("atapp.bus.loop_times", conf_.bus_conf.loop_times);
-        cfg_loader_.dump_to("atapp.bus.ttl", conf_.bus_conf.ttl);
-        cfg_loader_.dump_to("atapp.bus.backlog", conf_.bus_conf.backlog);
-        cfg_loader_.dump_to("atapp.bus.access_token_max_number", conf_.bus_conf.access_token_max_number);
+
+        conf_.bus_conf.parent_address = conf_.origin.bus().proxy();
+        conf_.bus_conf.loop_times = conf_.origin.bus().loop_times();
+        conf_.bus_conf.ttl = conf_.origin.bus().ttl();
+        conf_.bus_conf.backlog = conf_.origin.bus().backlog();
+        conf_.bus_conf.access_token_max_number = static_cast<size_t>(conf_.origin.bus().access_token_max_number());
         {
-            std::vector<std::string> access_tokens;
-            cfg_loader_.dump_to("atapp.bus.access_tokens", access_tokens);
-            conf_.bus_conf.access_tokens.reserve(access_tokens.size());
-            for (size_t i = 0; i < access_tokens.size(); ++ i) {
+            conf_.bus_conf.access_tokens.reserve(static_cast<size_t>(conf_.origin.bus().access_tokens_size()));
+            for (int i = 0; i < conf_.origin.bus().access_tokens_size(); ++ i) {
+                const std::string& access_token = conf_.origin.bus().access_tokens(i);
                 conf_.bus_conf.access_tokens.push_back(std::vector<unsigned char>());
                 conf_.bus_conf.access_tokens.back().assign(
-                    reinterpret_cast<const unsigned char*>(access_tokens[i].data()), 
-                    reinterpret_cast<const unsigned char*>(access_tokens[i].data()) + access_tokens[i].size()
+                    reinterpret_cast<const unsigned char*>(access_token.data()), 
+                    reinterpret_cast<const unsigned char*>(access_token.data()) + access_token.size()
                 );
             }
         }
 
-        {
-            util::config::duration_value duration;
-            cfg_loader_.dump_to("atapp.bus.first_idle_timeout", duration);
-            conf_.bus_conf.first_idle_timeout = duration.sec;
-        }
-        {
-            util::config::duration_value duration;
-            cfg_loader_.dump_to("atapp.bus.ping_interval", duration);
-            conf_.bus_conf.ping_interval = duration.sec;
-        }
-        {
-            util::config::duration_value duration;
-            cfg_loader_.dump_to("atapp.bus.retry_interval", duration);
-            conf_.bus_conf.retry_interval = duration.sec;
-        }
+
+        conf_.bus_conf.first_idle_timeout = conf_.origin.bus().first_idle_timeout().seconds();
+        conf_.bus_conf.ping_interval = conf_.origin.bus().ping_interval().seconds();
+        conf_.bus_conf.retry_interval = conf_.origin.bus().retry_interval().seconds();
         
-        cfg_loader_.dump_to("atapp.bus.fault_tolerant", conf_.bus_conf.fault_tolerant);
-        cfg_loader_.dump_to("atapp.bus.msg_size", conf_.bus_conf.msg_size);
-        cfg_loader_.dump_to("atapp.bus.recv_buffer_size", conf_.bus_conf.recv_buffer_size);
-        cfg_loader_.dump_to("atapp.bus.send_buffer_size", conf_.bus_conf.send_buffer_size);
-        cfg_loader_.dump_to("atapp.bus.send_buffer_number", conf_.bus_conf.send_buffer_number);
+        conf_.bus_conf.fault_tolerant = static_cast<size_t>(conf_.origin.bus().fault_tolerant());
+        conf_.bus_conf.msg_size = static_cast<size_t>(conf_.origin.bus().msg_size());
+        conf_.bus_conf.recv_buffer_size = static_cast<size_t>(conf_.origin.bus().recv_buffer_size());
+        conf_.bus_conf.send_buffer_size = static_cast<size_t>(conf_.origin.bus().send_buffer_size());
+        conf_.bus_conf.send_buffer_number = static_cast<size_t>(conf_.origin.bus().send_buffer_number());
 
         return 0;
     } // namespace atapp
@@ -896,7 +922,8 @@ namespace atapp {
                         uv_timer_init(bus_node_->get_evloop(), &timer->timer);
                         timer->timer.data = this;
 
-                        int res = uv_timer_start(&timer->timer, ev_stop_timeout, conf_.stop_timeout, 0);
+                        int res = uv_timer_start(&timer->timer, ev_stop_timeout, 
+                            chrono_to_libuv_duration(conf_.origin.timer().stop_timeout(), ATAPP_DEFAULT_STOP_TIMEOUT), 0);
                         if (0 == res) {
                             tick_timer_.timeout_timer = timer;
                         } else {
@@ -1019,58 +1046,103 @@ namespace atapp {
             }
         }
 
-        // load configure
-        uint32_t log_cat_number = LOG_WRAPPER_CATEGORIZE_SIZE;
-        cfg_loader_.dump_to("atapp.log.cat.number", log_cat_number);
-        if (log_cat_number > LOG_WRAPPER_CATEGORIZE_SIZE) {
-            ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "log categorize should not be greater than " << LOG_WRAPPER_CATEGORIZE_SIZE
-                 << ". you can define LOG_WRAPPER_CATEGORIZE_SIZE to a greater number and rebuild atapp." << std::endl;
-            log_cat_number = LOG_WRAPPER_CATEGORIZE_SIZE;
-        }
         int log_level_id = util::log::log_wrapper::level_t::LOG_LW_INFO;
-        std::string log_level_name;
-        cfg_loader_.dump_to("atapp.log.level", log_level_name);
-        log_level_id = util::log::log_formatter::get_level_by_name(log_level_name.c_str());
+        log_level_id = util::log::log_formatter::get_level_by_name(conf_.origin.log().level().c_str());
 
-        char log_path[256] = {0};
+        typedef ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::RepeatedPtrField<::atapp::protocol::atapp_log_category> log_cat_array_t;
+        log_cat_array_t categories;
+        // conf_.origin.log().categories();
 
-        for (uint32_t i = 0; i < log_cat_number; ++i) {
-            std::string log_name, log_prefix, log_stacktrace_min, log_stacktrace_max;
-            UTIL_STRFUNC_SNPRINTF(log_path, sizeof(log_path), "atapp.log.cat.%u.name", i);
-            cfg_loader_.dump_to(log_path, log_name);
-
-            if (log_name.empty()) {
-                continue;
+        // load log configure - ini/conf
+        {
+            uint32_t log_cat_number = LOG_WRAPPER_CATEGORIZE_SIZE;
+            cfg_loader_.dump_to("atapp.log.cat.number", log_cat_number);
+            if (log_cat_number > LOG_WRAPPER_CATEGORIZE_SIZE) {
+                ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "log categorize should not be greater than " << LOG_WRAPPER_CATEGORIZE_SIZE
+                    << ". you can define LOG_WRAPPER_CATEGORIZE_SIZE to a greater number and rebuild atapp." << std::endl;
+                log_cat_number = LOG_WRAPPER_CATEGORIZE_SIZE;
             }
 
-            UTIL_STRFUNC_SNPRINTF(log_path, sizeof(log_path), "atapp.log.cat.%u.prefix", i);
-            cfg_loader_.dump_to(log_path, log_prefix);
+            char log_path[256] = {0};
 
-            UTIL_STRFUNC_SNPRINTF(log_path, sizeof(log_path), "atapp.log.cat.%u.stacktrace.min", i);
-            cfg_loader_.dump_to(log_path, log_stacktrace_min);
+            for (uint32_t i = 0; i < log_cat_number; ++i) {
+                UTIL_STRFUNC_SNPRINTF(log_path, sizeof(log_path), "atapp.log.cat.%u", i);
 
-            UTIL_STRFUNC_SNPRINTF(log_path, sizeof(log_path), "atapp.log.cat.%u.stacktrace.max", i);
-            cfg_loader_.dump_to(log_path, log_stacktrace_max);
+                util::config::ini_value& log_cat_conf_src = cfg_loader_.get_node(log_path);
+                std::string log_name = log_cat_conf_src["name"].as_cpp_string();
+                if (log_name.empty()) {
+                    continue;
+                }
 
-            // init and set prefix
-            if (0 != (WLOG_INIT(i, WLOG_LEVELID(log_level_id)))) {
-                ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "log init " << log_name << "(" << i << ") failed, skipped." << std::endl;
-                continue;
+                ::atapp::protocol::atapp_log_category* log_cat_conf = categories.Add();
+                if (NULL == log_cat_conf) {
+                    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "log malloc " << log_name << "(" << i << ") failed, skipped." << std::endl;
+                    continue;
+                }
+                ini_loader_dump_to(log_cat_conf_src, *log_cat_conf);
+
+                // init and set prefix
+                if (0 != (WLOG_INIT(i, WLOG_LEVELID(log_level_id)))) {
+                    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "log initialize " << log_name << "(" << i << ") failed, skipped." << std::endl;
+                    continue;
+                }
+
+                // register log handles
+                for (uint32_t j = 0;; ++j) {
+                    UTIL_STRFUNC_SNPRINTF(log_path, sizeof(log_path), "atapp.log.%s.%u", log_name.c_str(), j);
+                    
+                    util::config::ini_value& log_sink_conf_src = cfg_loader_.get_node(log_path);
+                    std::string sink_type = log_sink_conf_src["type"].as_cpp_string();
+
+                    if (sink_type.empty()) {
+                        break;
+                    }
+
+                    ::atapp::protocol::atapp_log_sink* log_sink = log_cat_conf->add_sink();
+                    if (NULL == log_sink) {
+                        ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "log " << log_name << "(" << i << ") malloc sink "<< sink_type<< "failed, skipped." << std::endl;
+                        continue;
+                    }
+
+                    ini_loader_dump_to(log_sink_conf_src, *log_sink);
+
+                    if (0 == UTIL_STRFUNC_STRCASE_CMP(sink_type.c_str(), log_sink_maker::get_file_sink_name().c_str())) {
+                        // Inner file sink
+                        ini_loader_dump_to(log_sink_conf_src, *log_sink->mutable_log_backend_file());
+                    } else if (0 == UTIL_STRFUNC_STRCASE_CMP(sink_type.c_str(), log_sink_maker::get_stdout_sink_name().c_str())) {
+                        // Inner stdout sink
+                        ini_loader_dump_to(log_sink_conf_src, *log_sink->mutable_log_backend_stdout());
+                    } else if (0 == UTIL_STRFUNC_STRCASE_CMP(sink_type.c_str(), log_sink_maker::get_stderr_sink_name().c_str())) {
+                        // Inner stderr sink
+                        ini_loader_dump_to(log_sink_conf_src, *log_sink->mutable_log_backend_stderr());
+                    } else {
+                        // Dump all configures into unresolved_key_values
+                        ini_loader_value_to_unresolved_key_values(log_sink_conf_src, *log_sink->mutable_unresolved_key_values(), std::string());
+                    }
+                }
             }
-            if (!log_prefix.empty()) {
-                WLOG_GETCAT(i)->set_prefix_format(log_prefix);
+        }
+
+        // TODO load log configure - yaml
+
+        // copy to atapp
+        conf_.origin.mutable_log()->mutable_category()->Swap(&categories);
+        for (int i = 0; i < conf_.origin.log().category_size() && i < util::log::log_wrapper::categorize_t::MAX; ++ i) {
+            const ::atapp::protocol::atapp_log_category& log_cat = conf_.origin.log().category(i);
+            if (!log_cat.prefix().empty()) {
+                WLOG_GETCAT(i)->set_prefix_format(log_cat.prefix());
             }
 
             // load stacktrace configure
-            if (!log_stacktrace_min.empty() || !log_stacktrace_max.empty()) {
+            if (!log_cat.stacktrace().min().empty() || !log_cat.stacktrace().max().empty()) {
                 util::log::log_formatter::level_t::type stacktrace_level_min = util::log::log_formatter::level_t::LOG_LW_DISABLED;
                 util::log::log_formatter::level_t::type stacktrace_level_max = util::log::log_formatter::level_t::LOG_LW_DISABLED;
-                if (!log_stacktrace_min.empty()) {
-                    stacktrace_level_min = util::log::log_formatter::get_level_by_name(log_stacktrace_min.c_str());
+                if (!log_cat.stacktrace().min().empty()) {
+                    stacktrace_level_min = util::log::log_formatter::get_level_by_name(log_cat.stacktrace().min().c_str());
                 }
 
-                if (!log_stacktrace_max.empty()) {
-                    stacktrace_level_max = util::log::log_formatter::get_level_by_name(log_stacktrace_max.c_str());
+                if (!log_cat.stacktrace().max().empty()) {
+                    stacktrace_level_max = util::log::log_formatter::get_level_by_name(log_cat.stacktrace().max().c_str());
                 }
 
                 WLOG_GETCAT(i)->set_stacktrace_level(stacktrace_level_max, stacktrace_level_min);
@@ -1081,45 +1153,31 @@ namespace atapp {
             size_t new_sink_number = 0;
 
             // register log handles
-            for (uint32_t j = 0;; ++j) {
-                std::string sink_type;
-                UTIL_STRFUNC_SNPRINTF(log_path, sizeof(log_path), "atapp.log.%s.%u.type", log_name.c_str(), j);
-                cfg_loader_.dump_to(log_path, sink_type);
-
-                if (sink_type.empty()) {
-                    break;
-                }
-
-                // already read log cat name, sink type name
+            for (int j = 0; j < log_cat.sink_size(); ++j) {
+                const ::atapp::protocol::atapp_log_sink& log_sink = log_cat.sink(j);
                 int log_handle_min = util::log::log_wrapper::level_t::LOG_LW_FATAL, log_handle_max = util::log::log_wrapper::level_t::LOG_LW_DEBUG;
-                UTIL_STRFUNC_SNPRINTF(log_path, sizeof(log_path), "atapp.log.%s.%u", log_name.c_str(), j);
-                util::config::ini_value &cfg_set = cfg_loader_.get_node(log_path);
-
-                UTIL_STRFUNC_SNPRINTF(log_path, sizeof(log_path), "atapp.log.%s.%u.level.min", log_name.c_str(), j);
-                log_level_name.clear();
-                cfg_loader_.dump_to(log_path, log_level_name);
-                log_handle_min = util::log::log_formatter::get_level_by_name(log_level_name.c_str());
-
-                UTIL_STRFUNC_SNPRINTF(log_path, sizeof(log_path), "atapp.log.%s.%u.level.max", log_name.c_str(), j);
-                log_level_name.clear();
-                cfg_loader_.dump_to(log_path, log_level_name);
-                log_handle_max = util::log::log_formatter::get_level_by_name(log_level_name.c_str());
+                if (!log_sink.level().min().empty()) {
+                    log_handle_min = util::log::log_formatter::get_level_by_name(log_sink.level().min().c_str());
+                }
+                if (!log_sink.level().max().empty()) {
+                    log_handle_max = util::log::log_formatter::get_level_by_name(log_sink.level().max().c_str());
+                }
 
                 // register log sink
                 if (new_sink_number >= old_sink_number) {
-                    std::map<std::string, log_sink_maker::log_reg_t>::iterator iter = log_reg_.find(sink_type);
+                    std::map<std::string, log_sink_maker::log_reg_t>::iterator iter = log_reg_.find(log_sink.type());
                     if (iter != log_reg_.end()) {
-                        util::log::log_wrapper::log_handler_t log_handler = iter->second(log_name, *WLOG_GETCAT(i), j, cfg_set);
+                        util::log::log_wrapper::log_handler_t log_handler = iter->second(*WLOG_GETCAT(i), j, conf_.origin.log(), log_cat, log_sink);
                         WLOG_GETCAT(i)->add_sink(log_handler, static_cast<util::log::log_wrapper::level_t::type>(log_handle_min),
-                                                 static_cast<util::log::log_wrapper::level_t::type>(log_handle_max));
+                                                static_cast<util::log::log_wrapper::level_t::type>(log_handle_max));
                         ++new_sink_number;
                     } else {
-                        ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "unavailable log type " << sink_type
-                             << ", you can add log type register handle before init." << std::endl;
+                        ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "unavailable log type " << log_sink.type()
+                            << ", you can add log type register handle before init." << std::endl;
                     }
                 } else {
                     WLOG_GETCAT(i)->set_sink(new_sink_number, static_cast<util::log::log_wrapper::level_t::type>(log_handle_min),
-                                             static_cast<util::log::log_wrapper::level_t::type>(log_handle_max));
+                                            static_cast<util::log::log_wrapper::level_t::type>(log_handle_max));
                     ++new_sink_number;
                 }
             }
@@ -1184,25 +1242,25 @@ namespace atapp {
         // if (false == conf_.resume_mode) {}
 
         // init listen
-        for (size_t i = 0; i < conf_.bus_listen.size(); ++i) {
-            res = connection_node->listen(conf_.bus_listen[i].c_str());
+        for (int i = 0; i < conf_.origin.bus().listen_size(); ++i) {
+            res = connection_node->listen(conf_.origin.bus().listen(i).c_str());
             if (res < 0) {
 #ifdef _WIN32
                 if (EN_ATBUS_ERR_SHM_GET_FAILED == res) {
                     WLOGERROR("Using global shared memory require SeCreateGlobalPrivilege, try to run as Administrator.\nWe will ignore %s this time.",
-                              conf_.bus_listen[i].c_str());
+                              conf_.origin.bus().listen(i).c_str());
                     util::cli::shell_stream ss(std::cerr);
                     ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED
                          << "Using global shared memory require SeCreateGlobalPrivilege, try to run as Administrator." << std::endl
-                         << "We will ignore " << conf_.bus_listen[i] << " this time." << std::endl;
+                         << "We will ignore " << conf_.origin.bus().listen(i) << " this time." << std::endl;
 
                     // res = 0; // Value stored to 'res' is never read
                 } else {
 #endif
-                    WLOGERROR("bus node listen %s failed. res: %d", conf_.bus_listen[i].c_str(), res);
+                    WLOGERROR("bus node listen %s failed. res: %d", conf_.origin.bus().listen(i).c_str(), res);
                     if (EN_ATBUS_ERR_PIPE_ADDR_TOO_LONG == res) {
                         atbus::channel::channel_address_t address;
-                        atbus::channel::make_address(conf_.bus_listen[i].c_str(), address);
+                        atbus::channel::make_address(conf_.origin.bus().listen(i).c_str(), address);
                         std::string abs_path = util::file_system::get_abs_path(address.host.c_str());
                         WLOGERROR("listen pipe socket %s, but the length (%llu) exceed the limit %llu", abs_path.c_str(),
                                   static_cast<unsigned long long>(abs_path.size()),
@@ -1236,7 +1294,7 @@ namespace atapp {
                 uv_timer_init(connection_node->get_evloop(), &timer->timer);
                 timer->timer.data = this;
 
-                res = uv_timer_start(&timer->timer, ev_stop_timeout, conf_.stop_timeout, 0);
+                res = uv_timer_start(&timer->timer, ev_stop_timeout, chrono_to_libuv_duration(conf_.origin.timer().stop_timeout(), ATAPP_DEFAULT_STOP_TIMEOUT), 0);
                 if (0 == res) {
                     tick_timer_.timeout_timer = timer;
                 } else {
@@ -1297,11 +1355,10 @@ namespace atapp {
 
         close_timer(tick_timer_.tick_timer);
 
-        if (conf_.tick_interval < 1) {
-            conf_.tick_interval = 1;
-            WLOGWARNING("tick interval can not smaller than 1ms, we use 1ms now.");
+        if (chrono_to_libuv_duration(conf_.origin.timer().tick_interval(), 0) < 1) {
+            WLOGWARNING("tick interval can not smaller than 1ms, we use default %dms now.", ATAPP_DEFAULT_TICK_INTERVAL);
         } else {
-            WLOGINFO("setup tick interval to %llums.", static_cast<unsigned long long>(conf_.tick_interval));
+            WLOGINFO("setup tick interval to %llums.", static_cast<unsigned long long>(chrono_to_libuv_duration(conf_.origin.timer().tick_interval(), ATAPP_DEFAULT_TICK_INTERVAL)));
         }
 
         timer_ptr_t timer = std::make_shared<timer_info_t>();
@@ -1309,7 +1366,10 @@ namespace atapp {
         uv_timer_init(bus_node_->get_evloop(), &timer->timer);
         timer->timer.data = this;
 
-        int res = uv_timer_start(&timer->timer, _app_tick_timer_handle, conf_.tick_interval, conf_.tick_interval);
+        int res = uv_timer_start(&timer->timer, _app_tick_timer_handle, 
+            chrono_to_libuv_duration(conf_.origin.timer().tick_interval(), ATAPP_DEFAULT_TICK_INTERVAL),
+            chrono_to_libuv_duration(conf_.origin.timer().tick_interval(), ATAPP_DEFAULT_TICK_INTERVAL)
+        );
         if (0 == res) {
             tick_timer_.tick_timer = timer;
         } else {
@@ -1344,7 +1404,7 @@ namespace atapp {
     }
 
     bool app::cleanup_pidfile() {
-        if (conf_.remove_pidfile_after_exit && !conf_.pid_file.empty()) {
+        if (conf_.origin.remove_pidfile_after_exit() && !conf_.pid_file.empty()) {
             std::fstream pid_file;
 
             pid_file.open(conf_.pid_file.c_str(), std::ios::in);
@@ -1471,6 +1531,41 @@ namespace atapp {
         std::vector<app_id_t> mask;
         split_ids_by_string(mask_in, mask);
         return convert_app_id_by_string(id_in, mask);
+    }
+
+    LIBATAPP_MACRO_API std::string app::convert_app_id_to_string(app_id_t id_in, const std::vector<app_id_t>& mask_in, bool hex) {
+        std::vector<app_id_t> ids;
+        ids.resize(mask_in.size(), 0);
+
+        for (size_t i = 0; i < mask_in.size(); ++ i) {
+            size_t idx = mask_in.size() - i - 1;
+            ids[idx] = id_in & ((static_cast<app_id_t>(1) << mask_in[idx]) - 1);
+            id_in >>= mask_in[idx];
+        }
+
+        std::stringstream ss;
+        if (hex) {
+            ss<< std::hex;
+        }
+
+        for (size_t i = 0; i < ids.size(); ++ i) {
+            if (0 != i) {
+                ss<< ".";
+            }
+
+            if (hex) {
+                ss<< "0x";
+            }
+            ss<< ids[i];
+        }
+
+        return ss.str();
+    }
+
+    LIBATAPP_MACRO_API std::string app::convert_app_id_to_string(app_id_t id_in, const char* mask_in, bool hex) {
+        std::vector<app_id_t> mask;
+        split_ids_by_string(mask_in, mask);
+        return convert_app_id_to_string(id_in, mask, hex);
     }
 
     LIBATAPP_MACRO_API app* app::get_last_instance() {
@@ -1945,9 +2040,9 @@ namespace atapp {
         bool is_sync_channel = false;
         atbus::channel::channel_address_t use_addr;
 
-        for (size_t i = 0; i < conf_.bus_listen.size(); ++i) {
+        for (int i = 0; i < conf_.origin.bus().listen_size(); ++i) {
             atbus::channel::channel_address_t parsed_addr;
-            make_address(conf_.bus_listen[i].c_str(), parsed_addr);
+            make_address(conf_.origin.bus().listen(i).c_str(), parsed_addr);
             int parsed_level = 0;
             if (0 == UTIL_STRFUNC_STRNCASE_CMP("shm", parsed_addr.scheme.c_str(), 3)) {
                 parsed_level = 5;
@@ -2038,7 +2133,7 @@ namespace atapp {
             uv_timer_init(ev_loop, &timer->timer);
             timer->timer.data = this;
 
-            int res = uv_timer_start(&timer->timer, ev_stop_timeout, conf_.stop_timeout, 0);
+            int res = uv_timer_start(&timer->timer, ev_stop_timeout, chrono_to_libuv_duration(conf_.origin.timer().stop_timeout(), ATAPP_DEFAULT_STOP_TIMEOUT), 0);
             if (0 == res) {
                 tick_timer_.timeout_timer = timer;
             } else {
