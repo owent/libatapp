@@ -429,8 +429,8 @@ namespace atapp {
                 return;
             }
 
-            if (fds->is_repeated()) {
-                size_t arrsz = src.size();
+            if (fds->is_repeated() && fds->cpp_type() != ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_MESSAGE) {
+                size_t arrsz = child_iter->second.size();
                 for (size_t i = 0; i < arrsz; ++ i) {
                     dump_pick_field(child_iter->second, dst, fds, i);
                 }     

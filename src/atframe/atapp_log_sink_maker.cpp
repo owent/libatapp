@@ -34,7 +34,7 @@ namespace atapp {
             file_sink.set_max_file_size(max_file_size);
             file_sink.set_rotate_size(rotate_size);
 
-            file_sink.set_auto_flush(sink_cfg.log_backend_file().auto_flush());
+            file_sink.set_auto_flush(util::log::log_formatter::get_level_by_name(sink_cfg.log_backend_file().auto_flush().c_str()));
             file_sink.set_flush_interval(static_cast<time_t>(sink_cfg.log_backend_file().flush_interval().seconds()));
             file_sink.set_writing_alias_pattern(sink_cfg.log_backend_file().writing_alias());
 
