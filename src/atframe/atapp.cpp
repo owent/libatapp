@@ -715,7 +715,7 @@ namespace atapp {
     LIBATAPP_MACRO_API const atapp::protocol::atapp_configure& app::get_origin_configure() const { return conf_.origin; }
     LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata& app::get_metadata() const { return conf_.metadata; }
 
-    LIBATAPP_MACRO_API void app::pack(atapp::protocol::atapp_discovery& out) const {
+    LIBATAPP_MACRO_API void app::pack(atapp::protocol::atapp_discovery& /*out*/) const {
         // TODO 
     }
 
