@@ -22,6 +22,8 @@
 #include "cli/cmd_option.h"
 #include "time/time_utility.h"
 
+#include "config/ini_loader.h"
+
 #include "atapp_log_sink_maker.h"
 #include "atapp_module_impl.h"
 
@@ -41,6 +43,7 @@ namespace atapp {
         typedef LIBATAPP_MACRO_BUSID_TYPE app_id_t;
         typedef atbus::protocol::msg msg_t;
         typedef std::shared_ptr<module_impl> module_ptr_t;
+        typedef atbus::detail::auto_select_map<std::string, std::vector<YAML::Node> >::type yaml_conf_map_t;
 
         struct flag_t {
             enum type {
@@ -206,8 +209,13 @@ namespace atapp {
 
         LIBATAPP_MACRO_API bool is_remote_address_available(const std::string &hostname, const std::string &address) const;
 
-        LIBATAPP_MACRO_API util::config::ini_loader &get_configure();
-        LIBATAPP_MACRO_API const util::config::ini_loader &get_configure() const;
+        LIBATAPP_MACRO_API util::config::ini_loader &get_configure_loader();
+        LIBATAPP_MACRO_API const util::config::ini_loader &get_configure_loader() const;
+
+        LIBATAPP_MACRO_API yaml_conf_map_t &get_yaml_loaders();
+        LIBATAPP_MACRO_API const yaml_conf_map_t &get_yaml_loaders() const;
+
+        LIBATAPP_MACRO_API void dump_configures(::google::protobuf::Message& dst, const std::string& path) const;
 
         LIBATAPP_MACRO_API const atapp::protocol::atapp_configure& get_origin_configure() const;
         LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata& get_metadata() const;
@@ -316,6 +324,7 @@ namespace atapp {
     private:
         static app *last_instance_;
         util::config::ini_loader cfg_loader_;
+        yaml_conf_map_t yaml_loader_;
         util::cli::cmd_option::ptr_type app_option_;
         util::cli::cmd_option_ci::ptr_type cmd_handler_;
         std::vector<std::string> last_command_;

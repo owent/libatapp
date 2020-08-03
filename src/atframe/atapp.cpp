@@ -383,7 +383,7 @@ namespace atapp {
             print_help();
             return EN_ATAPP_ERR_LOAD_CONFIGURE_FILE;
         }
-
+ 
         // step 3. reload from external configure files
         // step 4. merge configure
         {
@@ -709,14 +709,80 @@ namespace atapp {
         return true;
     }
 
-    LIBATAPP_MACRO_API util::config::ini_loader &app::get_configure() { return cfg_loader_; }
-    LIBATAPP_MACRO_API const util::config::ini_loader &app::get_configure() const { return cfg_loader_; }
+    LIBATAPP_MACRO_API util::config::ini_loader &app::get_configure_loader() { return cfg_loader_; }
+    LIBATAPP_MACRO_API const util::config::ini_loader &app::get_configure_loader() const { return cfg_loader_; }
+
+    LIBATAPP_MACRO_API app::yaml_conf_map_t &app::get_yaml_loaders() { return yaml_loader_; }
+    LIBATAPP_MACRO_API const app::yaml_conf_map_t &app::get_yaml_loaders() const { return yaml_loader_; }
+
+    LIBATAPP_MACRO_API void app::dump_configures(::google::protobuf::Message& dst, const std::string& path) const {
+        if (!path.empty()) {
+            util::config::ini_value::node_type::const_iterator iter = cfg_loader_.get_root_node().get_children().find(path);
+            if (iter != cfg_loader_.get_root_node().get_children().end()) {
+                ini_loader_dump_to(iter->second, dst);
+            }
+        } else {
+            ini_loader_dump_to(cfg_loader_.get_root_node(), dst);
+        }
+
+        for (yaml_conf_map_t::const_iterator iter = yaml_loader_.begin(); iter != yaml_loader_.end(); ++ iter) {
+            for (size_t i = 0; i < iter->second.size(); ++ i) {
+                yaml_loader_dump_to(yaml_loader_get_child_by_path(iter->second[i], path), dst);
+            }
+        }
+    }
 
     LIBATAPP_MACRO_API const atapp::protocol::atapp_configure& app::get_origin_configure() const { return conf_.origin; }
     LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata& app::get_metadata() const { return conf_.metadata; }
 
-    LIBATAPP_MACRO_API void app::pack(atapp::protocol::atapp_discovery& /*out*/) const {
-        // TODO 
+    LIBATAPP_MACRO_API void app::pack(atapp::protocol::atapp_discovery& out) const {
+        out.set_id(get_id());
+        out.set_name(get_app_name());
+        out.set_hostname(atbus::node::get_hostname());
+        out.set_pid(atbus::node::get_pid());
+
+        out.set_hash_code(get_hash_code());
+        out.set_type_id(get_type_id());
+        out.set_type_name(get_type_name());
+        out.set_version(get_app_version());
+        // out.set_custom_data(get_conf_custom_data());
+        out.mutable_gateway()->Reserve(conf_.origin.bus().gateway().size());
+        for (int i = 0; i < conf_.origin.bus().gateway().size(); ++ i) {
+            out.add_gateway(conf_.origin.bus().gateway(i));
+        }
+
+        out.mutable_metadata()->CopyFrom(get_metadata());
+
+        if (bus_node_) {
+            const std::vector<atbus::endpoint_subnet_conf>& subnets = bus_node_->get_conf().subnets;
+            for (size_t i = 0; i < subnets.size(); ++ i) {
+                atbus::protocol::subnet_range* subset = out.add_subnets();
+                if (NULL == subset) {
+                    FWLOGERROR("pack configures for {}(0x{:x}) but malloc subnet_range failed", 
+                        get_app_name(), get_id()
+                    );
+                    break;
+                }
+
+                subset->set_id_prefix(subnets[i].id_prefix);
+                subset->set_mask_bits(subnets[i].mask_bits);
+            }
+
+            out.mutable_listen()->Reserve(static_cast<int>(bus_node_->get_listen_list().size()));
+            // std::list<std::string>
+            for (std::list<std::string>::const_iterator iter = bus_node_->get_listen_list().begin(); iter != bus_node_->get_listen_list().end(); ++ iter) {
+                out.add_listen(*iter);
+            }
+            out.set_atbus_protocol_version(bus_node_->get_protocol_version());
+            out.set_atbus_protocol_min_version(bus_node_->get_protocol_minimal_version());
+        } else {
+            out.mutable_listen()->Reserve(conf_.origin.bus().listen().size());
+            for (int i = 0; i < conf_.origin.bus().listen().size(); ++ i) {
+                out.add_listen(conf_.origin.bus().listen(i));
+            }
+            out.set_atbus_protocol_version(atbus::protocol::ATBUS_PROTOCOL_VERSION);
+            out.set_atbus_protocol_min_version(atbus::protocol::ATBUS_PROTOCOL_MINIMAL_VERSION);
+        }
     }
 
     LIBATAPP_MACRO_API bool app::add_log_sink_maker(const std::string &name, log_sink_maker::log_reg_t fn) {

@@ -1,13 +1,17 @@
 #include <algorithm>
+#include <sstream>
 
 #include "libatbus.h"
 
+#include <config/atframe_utils_build_feature.h>
 #include <common/string_oprs.h>
 #include <time/time_utility.h>
 #include <config/ini_loader.h>
 #include <log/log_wrapper.h>
 
 #include <config/compiler/protobuf_prefix.h>
+
+#include "yaml-cpp/yaml.h"
 
 #include <google/protobuf/message.h>
 #include <google/protobuf/repeated_field.h>
@@ -439,6 +443,274 @@ namespace atapp {
                 dump_pick_field(child_iter->second, dst, fds, 0);
             }
         }
+
+        static void dump_message_item(const YAML::Node& src, ::google::protobuf::Message& dst);
+        static void dump_pick_field(const YAML::Node& val, ::google::protobuf::Message& dst, const ::google::protobuf::FieldDescriptor* fds) {
+            if (NULL == fds) {
+                return;
+            }
+
+#if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
+            try {
+#endif
+
+            if (!val) {
+                return;
+            }
+            if (val.IsNull() || val.IsSequence()) {
+                return;
+            }
+
+            switch(fds->cpp_type()) {
+                case google::protobuf::FieldDescriptor::CPPTYPE_INT32: {
+                    if (!val.IsScalar()) {
+                        break;
+                    }
+
+                    if (fds->is_repeated()) {
+                        dst.GetReflection()->AddInt32(&dst, fds, util::string::to_int<int32_t>(val.Scalar().c_str()));
+                    } else {
+                        dst.GetReflection()->SetInt32(&dst, fds, util::string::to_int<int32_t>(val.Scalar().c_str()));
+                    }
+                    break;
+                };
+                case google::protobuf::FieldDescriptor::CPPTYPE_INT64: {
+                    if (!val.IsScalar()) {
+                        break;
+                    }
+
+                    if (fds->is_repeated()) {
+                        dst.GetReflection()->AddInt64(&dst, fds, util::string::to_int<int64_t>(val.Scalar().c_str()));
+                    } else {
+                        dst.GetReflection()->SetInt64(&dst, fds, util::string::to_int<int64_t>(val.Scalar().c_str()));
+                    }
+                    break;
+                };
+                case google::protobuf::FieldDescriptor::CPPTYPE_UINT32: {
+                    if (!val.IsScalar()) {
+                        break;
+                    }
+
+                    if (fds->is_repeated()) {
+                        dst.GetReflection()->AddUInt32(&dst, fds, util::string::to_int<uint32_t>(val.Scalar().c_str()));
+                    } else {
+                        dst.GetReflection()->SetUInt32(&dst, fds, util::string::to_int<uint32_t>(val.Scalar().c_str()));
+                    }
+                    break;
+                };
+                case google::protobuf::FieldDescriptor::CPPTYPE_UINT64: {
+                    if (!val.IsScalar()) {
+                        break;
+                    }
+
+                    if (fds->is_repeated()) {
+                        dst.GetReflection()->AddUInt64(&dst, fds, util::string::to_int<uint64_t>(val.Scalar().c_str()));
+                    } else {
+                        dst.GetReflection()->SetUInt64(&dst, fds, util::string::to_int<uint64_t>(val.Scalar().c_str()));
+                    }
+                    break;
+                };
+                case google::protobuf::FieldDescriptor::CPPTYPE_STRING: {
+                    if (!val.IsScalar()) {
+                        break;
+                    }
+
+                    if (fds->is_repeated()) {
+                        dst.GetReflection()->AddString(&dst, fds, val.Scalar());
+                    } else {
+                        dst.GetReflection()->SetString(&dst, fds, val.Scalar());
+                    }
+                    break;
+                };
+                case google::protobuf::FieldDescriptor::CPPTYPE_MESSAGE: {
+                    // special message
+                    if (val.IsScalar()) {
+                        if (fds->message_type()->full_name() == ::google::protobuf::Duration::descriptor()->full_name()) {
+                            const std::string& value = val.Scalar();
+                            if (fds->is_repeated()) {
+                                parse_duration(value, *static_cast<::google::protobuf::Duration*>(dst.GetReflection()->AddMessage(&dst, fds)));
+                            } else {
+                                parse_duration(value, *static_cast<::google::protobuf::Duration*>(dst.GetReflection()->MutableMessage(&dst, fds)));
+                            }
+                            
+                        } else if (fds->message_type()->full_name() == ::google::protobuf::Timestamp::descriptor()->full_name()) {
+                            const std::string& value = val.Scalar();
+                            if (fds->is_repeated()) {
+                                parse_timepoint(value, *static_cast<::google::protobuf::Timestamp*>(dst.GetReflection()->AddMessage(&dst, fds)));
+                            } else {
+                                parse_timepoint(value, *static_cast<::google::protobuf::Timestamp*>(dst.GetReflection()->MutableMessage(&dst, fds)));
+                            }
+                        }
+
+                        break;
+                    }
+
+                    if (val.IsMap()) {
+                        ::google::protobuf::Message* submsg = dst.GetReflection()->MutableMessage(&dst, fds);
+                        if (NULL != submsg) {
+                            dump_message_item(val, *submsg);
+                        }
+                    }
+                    
+                    break;
+                };
+                case google::protobuf::FieldDescriptor::CPPTYPE_DOUBLE: {
+                    if (!val.IsScalar()) {
+                        break;
+                    }
+
+                    std::stringstream s_stream;
+                    double res;
+                    s_stream.str(val.Scalar());
+                    s_stream >> res;
+
+                    if (fds->is_repeated()) {
+                        dst.GetReflection()->AddDouble(&dst, fds, res);
+                    } else {
+                        dst.GetReflection()->SetDouble(&dst, fds, res);
+                    }
+                    break;
+                };
+                case google::protobuf::FieldDescriptor::CPPTYPE_FLOAT: {
+                    if (!val.IsScalar()) {
+                        break;
+                    }
+
+                    std::stringstream s_stream;
+                    float res;
+                    s_stream.str(val.Scalar());
+                    s_stream >> res;
+
+                    if (fds->is_repeated()) {
+                        dst.GetReflection()->AddFloat(&dst, fds, res);
+                    } else {
+                        dst.GetReflection()->SetFloat(&dst, fds, res);
+                    }
+                    break;
+                };
+                case google::protobuf::FieldDescriptor::CPPTYPE_BOOL: {
+                    if (!val.IsScalar()) {
+                        break;
+                    }
+
+                    bool jval = true;
+                    std::string trans = val.Scalar();
+                    std::transform(trans.begin(), trans.end(), trans.begin(), util::string::tolower<char>);
+
+                    if ("0" == trans || "false" == trans || "no" == trans || "disable" == trans || "disabled" == trans || "" == trans) {
+                        jval = false;
+                    }
+
+                    if (fds->is_repeated()) {
+                        dst.GetReflection()->AddBool(&dst, fds, jval);
+                    } else {
+                        dst.GetReflection()->SetBool(&dst, fds, jval);
+                    }
+                    break;
+                };
+                case google::protobuf::FieldDescriptor::CPPTYPE_ENUM: {
+                    if (!val.IsScalar()) {
+                        break;
+                    }
+
+                    const std::string& name = val.Scalar();
+                    const google::protobuf::EnumValueDescriptor* jval = NULL;
+                    if (name.empty() || (name[0] >= '0' && name[0] <= '9')) {
+                        jval = fds->enum_type()->FindValueByNumber(util::string::to_int<int32_t>(name.c_str()));
+                    } else {
+                        jval = fds->enum_type()->FindValueByName(name);
+                    }
+                    
+                    if (jval == NULL) {
+                        // invalid value
+                        break;
+                    }
+                    // fds->enum_type
+                    if (fds->is_repeated()) {
+                        dst.GetReflection()->AddEnum(&dst, fds, jval);
+                    } else {
+                        dst.GetReflection()->SetEnum(&dst, fds, jval);
+                    }
+                    break;
+                };
+                default: {
+                    WLOGERROR("%s in %s with type=%s is not supported now", fds->name().c_str(), dst.GetDescriptor()->full_name().c_str(), fds->type_name());
+                    break;
+                }
+            }
+
+#if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
+            } catch(...) {
+                // Ignore error
+            }
+#endif
+        }
+
+        static void dump_field_item(const YAML::Node& src, ::google::protobuf::Message& dst, const ::google::protobuf::FieldDescriptor* fds) {
+            if (NULL == fds) {
+                return;
+            }
+
+#if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
+            try {
+#endif
+            const YAML::Node child = src[fds->name()];
+            if (!child) {
+                return;
+            }
+            if (child.IsNull()) {
+                return;
+            }
+
+            if (fds->is_repeated()) {
+                // If it's not sequence, accept one element
+                if (child.IsSequence()) {
+                    for (YAML::Node::const_iterator child_iter = child.begin(); child_iter != child.end(); ++ child_iter) {
+                        dump_pick_field(*child_iter, dst, fds);
+                    }
+                } else {
+                    dump_pick_field(child, dst, fds);
+                }
+            } else {
+                if (child.IsSequence()) {
+                    return;
+                }
+                dump_pick_field(child, dst, fds);
+            }
+
+#if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
+            } catch(...) {
+                // Ignore error
+            }
+#endif
+        }
+
+        static void dump_message_item(const YAML::Node& src, ::google::protobuf::Message& dst) {
+            const ::google::protobuf::Descriptor* desc = dst.GetDescriptor();
+            if (NULL == desc) {
+                return;
+            }
+
+#if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
+            try {
+#endif
+
+            if (!src) {
+                return;
+            }
+            if (!src.IsMap()) {
+                return;
+            }
+
+#if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
+            } catch(...) {
+                // Ignore error
+            }
+#endif
+            for (int i = 0 ;i < desc->field_count(); ++ i) {
+                detail::dump_field_item(src, dst, desc->field(i));
+            }
+        }
     }
     
     LIBATAPP_MACRO_API void parse_timepoint(const std::string& in, google::protobuf::Timestamp& out) {
@@ -458,5 +730,54 @@ namespace atapp {
         for (int i = 0 ;i < desc->field_count(); ++ i) {
             detail::dump_field_item(src, dst, desc->field(i));
         }
+    }
+
+    LIBATAPP_MACRO_API void yaml_loader_dump_to(const YAML::Node& src, ::google::protobuf::Message& dst) {
+        detail::dump_message_item(src, dst);
+    }
+
+    LIBATAPP_MACRO_API const YAML::Node yaml_loader_get_child_by_path(const YAML::Node& src, const std::string& path) {
+        if (path.empty()) {
+            return src;
+        }
+
+        YAML::Node ret = src;
+
+#if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
+        try {
+#endif
+
+        const char *begin = path.c_str();
+        const char *end = begin + path.size();
+
+        for (begin = detail::skip_space(begin); end > begin && *begin; begin = detail::skip_space(begin)) {
+            const char *old_begin = begin;
+            ++ begin;
+            while (*begin && end > begin && '.' != *begin && ' ' != *begin && '\t' != *begin && '\r' != *begin && '\n' != *begin) {
+                ++ begin;
+            }
+
+            std::string key;
+            key.assign(old_begin, begin);
+
+            if (*begin) {
+                begin = detail::skip_space(path.c_str());
+                if ('.' == *begin) {
+                    begin = detail::skip_space(begin + 1);
+                }
+            }
+            ret = ret[key];
+
+            if (!ret) {
+                return ret;
+            }
+        }
+#if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
+        } catch(...) {
+            // Ignore error
+        }
+#endif
+
+        return ret;
     }
 }

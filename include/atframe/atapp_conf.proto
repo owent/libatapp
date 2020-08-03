@@ -15,6 +15,7 @@ message atbus_configure {
     int32           backlog                 = 106;
     uint64          access_token_max_number = 107;
     repeated string access_tokens           = 108;
+    repeated string gateway                 = 109;
 
     google.protobuf.Duration first_idle_timeout = 201;
     google.protobuf.Duration ping_interval      = 202;
@@ -96,13 +97,17 @@ message atapp_configure {
 }
 
 message atapp_metadata {
-    string api_version = 1;
-    string kind        = 2;
-    string group       = 3;
+    string namespace_name = 1;
+    string api_version    = 2;
+    string kind           = 3;
+    string group          = 4;
 
+    // string service_name    = 21; // Just use atapp_discovery.name
+    // string service_version = 22; // Just use atapp_discovery.version
+    string service_subset = 23;
 
-    map<string, string> label = 21;
-    map<string, string> spec  = 22;
+    map<string, string> label = 24;
+    map<string, string> spec  = 25;
 }
 
 message atapp_discovery {

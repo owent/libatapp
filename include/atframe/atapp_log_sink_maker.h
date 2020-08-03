@@ -11,7 +11,6 @@
 
 #include <string>
 
-#include "config/ini_loader.h"
 #include "log/log_wrapper.h"
 
 #include "atapp_config.h"

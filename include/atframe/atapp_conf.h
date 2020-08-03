@@ -23,6 +23,8 @@
 
 #include <config/compiler/protobuf_prefix.h>
 
+#include "yaml-cpp/yaml.h"
+
 #include "atapp_conf.pb.h"
 
 #include <config/compiler/protobuf_suffix.h>
@@ -81,6 +83,8 @@ namespace atapp {
     LIBATAPP_MACRO_API void parse_duration(const std::string& in, google::protobuf::Duration& out);
 
     LIBATAPP_MACRO_API void ini_loader_dump_to(const util::config::ini_value& src, ::google::protobuf::Message& dst);
+    LIBATAPP_MACRO_API void yaml_loader_dump_to(const YAML::Node& src, ::google::protobuf::Message& dst);
+    LIBATAPP_MACRO_API const YAML::Node yaml_loader_get_child_by_path(const YAML::Node& src, const std::string& path);
 } // namespace atapp
 
 #endif

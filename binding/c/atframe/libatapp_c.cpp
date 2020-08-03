@@ -410,7 +410,7 @@ LIBATAPP_MACRO_API uint64_t __cdecl libatapp_c_get_configure_size(libatapp_c_con
         return 0;
     }
 
-    return static_cast<uint64_t>(ATAPP_CONTEXT(context)->get_configure().get_node(path).size());
+    return static_cast<uint64_t>(ATAPP_CONTEXT(context)->get_configure_loader().get_node(path).size());
 }
 
 LIBATAPP_MACRO_API uint64_t __cdecl libatapp_c_get_configure(libatapp_c_context context, const char *path, const char *out_buf[], uint64_t out_len[],
@@ -419,7 +419,7 @@ LIBATAPP_MACRO_API uint64_t __cdecl libatapp_c_get_configure(libatapp_c_context 
         return 0;
     }
 
-    util::config::ini_value &val = ATAPP_CONTEXT(context)->get_configure().get_node(path);
+    util::config::ini_value &val = ATAPP_CONTEXT(context)->get_configure_loader().get_node(path);
     uint64_t ret = 0;
     for (ret = 0; ret < val.size() && ret < arr_sz; ++ret) {
         out_buf[ret] = val.as_cpp_string(static_cast<size_t>(ret)).c_str();
