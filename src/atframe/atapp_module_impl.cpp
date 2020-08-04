@@ -2,6 +2,8 @@
 #include <signal.h>
 #include <typeinfo>
 
+#include <config/atframe_utils_build_feature.h>
+
 #include "atframe/atapp.h"
 
 #include "cli/shell_font.h"
@@ -40,16 +42,20 @@ namespace atapp {
     }
 
     LIBATAPP_MACRO_API const char *module_impl::name() const {
-        const char *ret = typeid(*this).name();
-        if (NULL == ret) {
-            return "RTTI Unavailable";
+        if (auto_demangled_name_) {
+            return auto_demangled_name_->get();
         }
 
-        // some compiler will generate number to mark the type
-        while (ret && *ret >= '0' && *ret <= '9') {
-            ++ret;
+#if defined(LIBATFRAME_UTILS_ENABLE_RTTI) && LIBATFRAME_UTILS_ENABLE_RTTI
+        auto_demangled_name_.reset(new util::scoped_demangled_name(typeid(*this).name()));
+        if (auto_demangled_name_) {
+            return auto_demangled_name_->get();
+        } else {
+            return "atapp::module demangle symbol failed";
         }
-        return ret;
+#else
+        return "atapp::module RTTI Unavailable";
+#endif
     }
 
     LIBATAPP_MACRO_API bool module_impl::enable() {

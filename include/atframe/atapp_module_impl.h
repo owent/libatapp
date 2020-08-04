@@ -13,6 +13,8 @@
 #include "std/explicit_declare.h"
 #include "std/smart_ptr.h"
 
+#include <common/demangle.h>
+
 #include "atapp_config.h"
 
 namespace atapp {
@@ -105,6 +107,8 @@ namespace atapp {
     private:
         bool enabled_;
         app *owner_;
+
+        mutable std::unique_ptr<util::scoped_demangled_name> auto_demangled_name_;
 
         friend class app;
     };

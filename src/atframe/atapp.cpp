@@ -361,14 +361,128 @@ namespace atapp {
 
     LIBATAPP_MACRO_API bool app::is_closed() const UTIL_CONFIG_NOEXCEPT { return check_flag(flag_t::STOPPED); }
 
+
+    static bool reload_all_configure_files(app::yaml_conf_map_t& yaml_map, util::config::ini_loader& conf_loader,
+        atbus::detail::auto_select_set<std::string>::type& loaded_files, std::list<std::string>& pending_load_files
+    ) {
+        bool ret = true;
+        util::cli::shell_stream ss(std::cerr);
+        size_t conf_external_loaded_index;
+
+        while (!pending_load_files.empty()) {
+            std::string file_rule = pending_load_files.front();
+            pending_load_files.pop_front();
+
+            if (file_rule.empty()) {
+                continue;
+            }
+
+            std::string::size_type colon = file_rule.find('.');
+            bool is_yaml = false;
+
+            if (colon != std::string::npos) {
+                is_yaml = (0 == UTIL_STRFUNC_STRNCASE_CMP("yml", file_rule.c_str(), colon)) ||
+                    (0 == UTIL_STRFUNC_STRNCASE_CMP("yaml", file_rule.c_str(), colon));
+                file_rule = file_rule.substr(colon + 1);
+            }
+
+            if (loaded_files.end() != loaded_files.find(file_rule)) {
+                continue;
+            }
+            loaded_files.insert(file_rule);
+
+            if (is_yaml) {
+#if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
+                try {
+#endif
+                yaml_map[file_rule] = YAML::LoadAllFromFile(file_rule);
+                std::vector<YAML::Node>& nodes = yaml_map[file_rule];
+                if (nodes.empty()) {
+                    yaml_map.erase(file_rule);
+                    continue;
+                }
+
+                // external files
+                for (size_t i = 0; i < nodes.size(); ++ i) {
+                    const YAML::Node atapp_node = nodes[i]["atapp"];
+                    if (!atapp_node || !atapp_node.IsMap()) {
+                        continue;
+                    }
+                    const YAML::Node atapp_config = atapp_node["config"];
+                    if (!atapp_config || !atapp_config.IsMap()) {
+                        continue;
+                    }
+                    const YAML::Node atapp_external = atapp_node["external"];
+                    if (!atapp_external) {
+                        continue;
+                    }
+
+                    if (atapp_config.IsSequence()) {
+                        for (size_t j = 0; j < atapp_config.size(); ++ j) {
+                            const YAML::Node atapp_external_ele = atapp_config[j];
+                            if (!atapp_external_ele) {
+                                continue;
+                            }
+                            if (!atapp_external_ele.IsScalar()) {
+                                continue;
+                            }
+                            if (atapp_external_ele.Scalar().empty()) {
+                                continue;
+                            }
+                            pending_load_files.push_back(atapp_external_ele.Scalar());
+                        }
+                    } else if (atapp_config.IsScalar()) {
+                        if (!atapp_config.Scalar().empty()) {
+                            pending_load_files.push_back(atapp_config.Scalar());
+                        }
+                    }
+                }
+#if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
+                } catch(YAML::ParserException& e) {
+                    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "load configure file " << file_rule << " failed."<< e.what() << std::endl;
+                    FWLOGERROR("load configure file {} failed.{}", file_rule, e.what());
+                    ret = false;
+                } catch(YAML::BadSubscript& e) {
+                    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "load configure file " << file_rule << " failed."<< e.what() << std::endl;
+                    FWLOGERROR("load configure file {} failed.{}", file_rule, e.what());
+                    ret = false;
+                } catch(...) {
+                    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "load configure file " << file_rule << " failed." << std::endl;
+                    FWLOGERROR("load configure file {} failed.", file_rule);
+                    ret = false;
+                }
+#endif
+            } else {
+                conf_external_loaded_index = conf_loader.get_node("atapp.config.external").size();
+                if (conf_loader.load_file(file_rule.c_str(), false) < 0) {
+                    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "load configure file " << file_rule << " failed" << std::endl;
+                    FWLOGERROR("load configure file {} failed", file_rule);
+                    ret = false;
+                    continue;
+                } else {
+                    FWLOGINFO("load configure file {} success", file_rule);
+                }
+
+                // external files
+                util::config::ini_value& external_paths = conf_loader.get_node("atapp.config.external");
+                for (size_t i = conf_external_loaded_index; i < external_paths.size(); ++ i) {
+                    pending_load_files.push_back(external_paths.as_cpp_string(i));
+                }
+            }
+        }
+
+        return ret;
+    }
+
     LIBATAPP_MACRO_API int app::reload() {
         atbus::adapter::loop_t* old_loop = conf_.bus_conf.ev_loop;
         ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration old_tick_interval = conf_.origin.timer().tick_interval();
         util::cli::shell_stream ss(std::cerr);
 
-        WLOGINFO("============ start to load configure ============");
+        FWLOGINFO("============ start to load configure ============");
         // step 1. reset configure
         cfg_loader_.clear();
+        yaml_loader_.clear();
 
         // step 2. reload from program configure file
         if (conf_.conf_file.empty()) {
@@ -377,31 +491,13 @@ namespace atapp {
             return EN_ATAPP_ERR_MISSING_CONFIGURE_FILE;
         }
 
-        // TODO yaml file
-        if (cfg_loader_.load_file(conf_.conf_file.c_str(), false) < 0) {
-            ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "load configure file " << conf_.conf_file << " failed" << std::endl;
+        // load configures
+        atbus::detail::auto_select_set<std::string>::type loaded_files;
+        std::list<std::string> pending_load_files;
+        pending_load_files.push_back(conf_.conf_file);
+        if (!reload_all_configure_files(yaml_loader_, cfg_loader_, loaded_files, pending_load_files)) {
             print_help();
             return EN_ATAPP_ERR_LOAD_CONFIGURE_FILE;
-        }
- 
-        // step 3. reload from external configure files
-        // step 4. merge configure
-        {
-            std::vector<std::string> external_confs;
-            cfg_loader_.dump_to("atapp.config.external", external_confs);
-            owent_foreach(std::string & conf_fp, external_confs) {
-                if (!conf_fp.empty()) {
-                    // TODO yaml file
-                    if (cfg_loader_.load_file(conf_.conf_file.c_str(), true) < 0) {
-                        if (is_running()) {
-                            WLOGERROR("load external configure file %s failed", conf_fp.c_str());
-                        } else {
-                            ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "load external configure file " << conf_fp << " failed" << std::endl;
-                            return 1;
-                        }
-                    }
-                }
-            }
         }
 
         // apply ini configure
@@ -437,15 +533,15 @@ namespace atapp {
             }
         }
 
-        WLOGINFO("------------ load configure done ------------");
+        FWLOGINFO("------------ load configure done ------------");
         return 0;
     }
 
     LIBATAPP_MACRO_API int app::stop() {
         if (check_flag(flag_t::STOPING)) {
-            WLOGINFO("============= recall stop after some event action(s) finished =============");
+            FWLOGINFO("============= recall stop after some event action(s) finished =============");
         } else {
-            WLOGINFO("============ receive stop signal and ready to stop all modules ============");
+            FWLOGINFO("============ receive stop signal and ready to stop all modules ============");
         }
         // step 1. set stop flag.
         // bool is_stoping = set_flag(flag_t::STOPING, true);
@@ -487,7 +583,7 @@ namespace atapp {
                 if (mod->is_enabled()) {
                     res = mod->tick();
                     if (res < 0) {
-                        WLOGERROR("module %s run tick and return %d", mod->name(), res);
+                        FWLOGERROR("module {} run tick and return {}", mod->name(), res);
                     } else {
                         active_count += res;
                     }
@@ -498,7 +594,7 @@ namespace atapp {
             if (bus_node_ && ::atbus::node::state_t::CREATED != bus_node_->get_state()) {
                 res = bus_node_->proc(tick_timer_.sec, tick_timer_.usec);
                 if (res < 0) {
-                    WLOGERROR("atbus run tick and return %d", res);
+                    FWLOGERROR("atbus run tick and return {}", res);
                 } else {
                     active_count += res;
                 }
@@ -539,7 +635,7 @@ namespace atapp {
 
                     std::pair<uint64_t, const char *> max_rss = make_size_showup(last_usage.ru_maxrss);
 #ifdef WIN32
-                    WLOGINFO("[STAT]: %s CPU usage: user %02.03f%%, sys %02.03f%%, max rss: %llu%s, page faults: %llu", get_app_name().c_str(),
+                    FWLOGINFO("[STAT]: {} CPU usage: user {:02.3}%, sys {:02.3}%, max rss: {}{}, page faults: {}", get_app_name(),
                              offset_usr / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f), // usec and add %
                              offset_sys / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f), // usec and add %
                              static_cast<unsigned long long>(max_rss.first), max_rss.second, static_cast<unsigned long long>(last_usage.ru_majflt));
@@ -547,9 +643,9 @@ namespace atapp {
                     std::pair<uint64_t, const char *> ru_ixrss = make_size_showup(last_usage.ru_ixrss);
                     std::pair<uint64_t, const char *> ru_idrss = make_size_showup(last_usage.ru_idrss);
                     std::pair<uint64_t, const char *> ru_isrss = make_size_showup(last_usage.ru_isrss);
-                    WLOGINFO("[STAT]: %s CPU usage: user %02.03f%%, sys %02.03f%%, max rss: %llu%s, shared size: %llu%s, unshared data size: %llu%s, unshared "
-                             "stack size: %llu%s, page faults: %llu",
-                             get_app_name().c_str(),
+                    FWLOGINFO("[STAT]: {} CPU usage: user {:02.3}%, sys {:02.3}%, max rss: {}{}, shared size: {}{}, unshared data size: {}{}, unshared "
+                             "stack size: {}{}, page faults: {}",
+                             get_app_name(),
                              offset_usr / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f), // usec and add %
                              offset_sys / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f), // usec and add %
                              static_cast<unsigned long long>(max_rss.first), max_rss.second, static_cast<unsigned long long>(ru_ixrss.first), ru_ixrss.second,
@@ -715,7 +811,7 @@ namespace atapp {
     LIBATAPP_MACRO_API app::yaml_conf_map_t &app::get_yaml_loaders() { return yaml_loader_; }
     LIBATAPP_MACRO_API const app::yaml_conf_map_t &app::get_yaml_loaders() const { return yaml_loader_; }
 
-    LIBATAPP_MACRO_API void app::dump_configures(::google::protobuf::Message& dst, const std::string& path) const {
+    LIBATAPP_MACRO_API void app::parse_configures_into(::google::protobuf::Message& dst, const std::string& path) const {
         if (!path.empty()) {
             util::config::ini_value::node_type::const_iterator iter = cfg_loader_.get_root_node().get_children().find(path);
             if (iter != cfg_loader_.get_root_node().get_children().end()) {
@@ -840,13 +936,7 @@ namespace atapp {
     int app::apply_configure() {
         std::string old_name = conf_.origin.name();
         std::string old_hostname = conf_.origin.hostname();
-        {
-            util::config::ini_value::node_type::const_iterator iter = cfg_loader_.get_root_node().get_children().find("atapp");
-            if (iter != cfg_loader_.get_root_node().get_children().end()) {
-                conf_.origin.Clear();
-                ini_loader_dump_to(iter->second, conf_.origin);
-            }
-        }
+        parse_configures_into(conf_.origin, "atapp");
         
         // id and id mask
         if (conf_.id_mask.empty()) {
@@ -960,7 +1050,7 @@ namespace atapp {
                     // step X. notify all modules timeout
                     owent_foreach(module_ptr_t & mod, modules_) {
                         if (mod->is_enabled()) {
-                            WLOGERROR("try to stop module %s but timeout", mod->name());
+                            FWLOGERROR("try to stop module {} but timeout", mod->name());
                             mod->timeout();
                             mod->disable();
                         }
@@ -974,7 +1064,7 @@ namespace atapp {
                                 mod->disable();
                             } else if (res < 0) {
                                 mod->disable();
-                                WLOGERROR("try to stop module %s but failed and return %d", mod->name(), res);
+                                FWLOGERROR("try to stop module {} but failed and return {}", mod->name(), res);
                             } else {
                                 // any module stop running will make app wait
                                 set_flag(flag_t::STOPPED, false);
@@ -993,7 +1083,7 @@ namespace atapp {
                         if (0 == res) {
                             tick_timer_.timeout_timer = timer;
                         } else {
-                            WLOGERROR("setup stop timeout failed, res: %d", res);
+                            FWLOGERROR("setup stop timeout failed, res: {}", res);
                             set_flag(flag_t::TIMEOUT, false);
 
                             timer->timer.data = new timer_ptr_t(timer);
@@ -1265,13 +1355,13 @@ namespace atapp {
 
         std::shared_ptr<atbus::node> connection_node = atbus::node::create();
         if (!connection_node) {
-            WLOGERROR("create bus node failed.");
+            FWLOGERROR("create bus node failed.");
             return EN_ATAPP_ERR_SETUP_ATBUS;
         }
 
         ret = connection_node->init(conf_.id, &conf_.bus_conf);
         if (ret < 0) {
-            WLOGERROR("init bus node failed. ret: %d", ret);
+            FWLOGERROR("init bus node failed. ret: {}", ret);
             return EN_ATAPP_ERR_SETUP_ATBUS;
         }
 
@@ -1313,8 +1403,8 @@ namespace atapp {
             if (res < 0) {
 #ifdef _WIN32
                 if (EN_ATBUS_ERR_SHM_GET_FAILED == res) {
-                    WLOGERROR("Using global shared memory require SeCreateGlobalPrivilege, try to run as Administrator.\nWe will ignore %s this time.",
-                              conf_.origin.bus().listen(i).c_str());
+                    FWLOGERROR("Using global shared memory require SeCreateGlobalPrivilege, try to run as Administrator.\nWe will ignore {} this time.",
+                              conf_.origin.bus().listen(i));
                     util::cli::shell_stream ss(std::cerr);
                     ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED
                          << "Using global shared memory require SeCreateGlobalPrivilege, try to run as Administrator." << std::endl
@@ -1323,12 +1413,12 @@ namespace atapp {
                     // res = 0; // Value stored to 'res' is never read
                 } else {
 #endif
-                    WLOGERROR("bus node listen %s failed. res: %d", conf_.origin.bus().listen(i).c_str(), res);
+                    FWLOGERROR("bus node listen {} failed. res: {}", conf_.origin.bus().listen(i), res);
                     if (EN_ATBUS_ERR_PIPE_ADDR_TOO_LONG == res) {
                         atbus::channel::channel_address_t address;
                         atbus::channel::make_address(conf_.origin.bus().listen(i).c_str(), address);
                         std::string abs_path = util::file_system::get_abs_path(address.host.c_str());
-                        WLOGERROR("listen pipe socket %s, but the length (%llu) exceed the limit %llu", abs_path.c_str(),
+                        FWLOGERROR("listen pipe socket {}, but the length ({}) exceed the limit {}", abs_path,
                                   static_cast<unsigned long long>(abs_path.size()),
                                   static_cast<unsigned long long>(atbus::channel::io_stream_get_max_unix_socket_length()));
                     }
@@ -1340,14 +1430,14 @@ namespace atapp {
         }
 
         if (ret < 0) {
-            WLOGERROR("bus node listen failed");
+            FWLOGERROR("bus node listen failed");
             return ret;
         }
 
         // start
         ret = connection_node->start();
         if (ret < 0) {
-            WLOGERROR("bus node start failed, ret: %d", ret);
+            FWLOGERROR("bus node start failed, ret: {}", ret);
             return ret;
         }
 
@@ -1364,7 +1454,7 @@ namespace atapp {
                 if (0 == res) {
                     tick_timer_.timeout_timer = timer;
                 } else {
-                    WLOGERROR("setup stop timeout failed, res: %d", res);
+                    FWLOGERROR("setup stop timeout failed, res: {}", res);
                     set_flag(flag_t::TIMEOUT, false);
 
                     timer->timer.data = new timer_ptr_t(timer);
@@ -1373,7 +1463,7 @@ namespace atapp {
 
                 while (NULL == connection_node->get_parent_endpoint()) {
                     if (check_flag(flag_t::TIMEOUT)) {
-                        WLOGERROR("connection to parent node %s timeout", conf_.bus_conf.parent_address.c_str());
+                        FWLOGERROR("connection to parent node {} timeout", conf_.bus_conf.parent_address);
                         ret = -1;
                         break;
                     }
@@ -1388,7 +1478,7 @@ namespace atapp {
                 close_timer(tick_timer_.timeout_timer);
 
                 if (ret < 0) {
-                    WLOGERROR("connect to parent node failed");
+                    FWLOGERROR("connect to parent node failed");
                     return ret;
                 }
             }
@@ -1422,9 +1512,9 @@ namespace atapp {
         close_timer(tick_timer_.tick_timer);
 
         if (chrono_to_libuv_duration(conf_.origin.timer().tick_interval(), 0) < 1) {
-            WLOGWARNING("tick interval can not smaller than 1ms, we use default %dms now.", ATAPP_DEFAULT_TICK_INTERVAL);
+            FWLOGWARNING("tick interval can not smaller than 1ms, we use default {}ms now.", ATAPP_DEFAULT_TICK_INTERVAL);
         } else {
-            WLOGINFO("setup tick interval to %llums.", static_cast<unsigned long long>(chrono_to_libuv_duration(conf_.origin.timer().tick_interval(), ATAPP_DEFAULT_TICK_INTERVAL)));
+            FWLOGINFO("setup tick interval to {}ms.", static_cast<unsigned long long>(chrono_to_libuv_duration(conf_.origin.timer().tick_interval(), ATAPP_DEFAULT_TICK_INTERVAL)));
         }
 
         timer_ptr_t timer = std::make_shared<timer_info_t>();
@@ -1439,7 +1529,7 @@ namespace atapp {
         if (0 == res) {
             tick_timer_.tick_timer = timer;
         } else {
-            WLOGERROR("setup tick timer failed, res: %d", res);
+            FWLOGERROR("setup tick timer failed, res: {}", res);
 
             timer->timer.data = new timer_ptr_t(timer);
             uv_close(reinterpret_cast<uv_handle_t *>(&timer->timer), _app_close_timer_handle);
@@ -1457,7 +1547,7 @@ namespace atapp {
             if (!pid_file.is_open()) {
                 util::cli::shell_stream ss(std::cerr);
                 ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "open and write pid file " << conf_.pid_file << " failed" << std::endl;
-                WLOGERROR("open and write pid file %s failed", conf_.pid_file.c_str());
+                FWLOGERROR("open and write pid file {} failed", conf_.pid_file);
                 // failed and skip running
                 return false;
             } else {
@@ -1811,24 +1901,24 @@ namespace atapp {
 
     int app::command_handler_stop(util::cli::callback_param params) {
         char msg[256] = {0};
-        UTIL_STRFUNC_SNPRINTF(msg, sizeof(msg), "app node 0x%llx run stop command success", static_cast<unsigned long long>(get_id()));
-        WLOGINFO("%s", msg);
+        LOG_WRAPPER_FWAPI_FORMAT_TO_N(msg, sizeof(msg), "app node {0:#x} run stop command success", get_id());
+        FWLOGINFO("{}", msg);
         add_custom_command_rsp(params, msg);
         return stop();
     }
 
     int app::command_handler_reload(util::cli::callback_param params) {
         char msg[256] = {0};
-        UTIL_STRFUNC_SNPRINTF(msg, sizeof(msg), "app node 0x%llx run reload command success", static_cast<unsigned long long>(get_id()));
-        WLOGINFO("%s", msg);
+        LOG_WRAPPER_FWAPI_FORMAT_TO_N(msg, sizeof(msg), "app node {0:#x} run reload command success", get_id());
+        FWLOGINFO("{}", msg);
         add_custom_command_rsp(params, msg);
         return reload();
     }
 
     int app::command_handler_invalid(util::cli::callback_param params) {
         char msg[256] = {0};
-        UTIL_STRFUNC_SNPRINTF(msg, sizeof(msg), "receive invalid command %s", params.get("@Cmd")->to_string());
-        WLOGERROR("%s", msg);
+        LOG_WRAPPER_FWAPI_FORMAT_TO_N(msg, sizeof(msg), "receive invalid command {}", params.get("@Cmd")->to_string());
+        FWLOGERROR("{}", msg);
         add_custom_command_rsp(params, msg);
         return 0;
     }
@@ -1849,15 +1939,15 @@ namespace atapp {
 
         // call failed callback if it's message transfer
         if (NULL == m) {
-            WLOGERROR("app 0x%llx receive a send failure without message", static_cast<unsigned long long>(get_id()));
+            FWLOGERROR("app {0:#x} receive a send failure without message", get_id());
             return EN_ATAPP_ERR_SEND_FAILED;
         }
 
         if (m->head().ret() < 0) {
-            WLOGERROR("app 0x%llx receive a send failure from 0x%llx, message cmd: %s, type: %d, ret: %d, sequence: %llu",
-                    static_cast<unsigned long long>(get_id()), static_cast<unsigned long long>(m->head().src_bus_id()), 
+            FWLOGERROR("app {0:#x} receive a send failure from {0:#x}, message cmd: {}, type: {}, ret: {}, sequence: {}",
+                    get_id(), m->head().src_bus_id(), 
                     atbus::msg_handler::get_body_name(m->msg_body_case()), m->head().type(),
-                    m->head().ret(), static_cast<unsigned long long>(m->head().sequence()));
+                    m->head().ret(), m->head().sequence());
         }
 
         if (evt_on_forward_response_) {
@@ -1882,18 +1972,17 @@ namespace atapp {
             const char *msg = UV_EOF == errcode ? "got EOF" : "reset by peer";
             if (NULL != conn) {
                 if (NULL != ep) {
-                    WLOGINFO("bus node 0x%llx endpoint 0x%llx connection %p(%s) closed: %s", static_cast<unsigned long long>(n.get_id()),
-                             static_cast<unsigned long long>(ep->get_id()), conn, conn->get_address().address.c_str(), msg);
+                    FWLOGINFO("bus node {0:#x} endpoint {0:#x} connection {}({}) closed: {}", 
+                        n.get_id(), ep->get_id(), reinterpret_cast<const void*>(conn), conn->get_address().address, msg);
                 } else {
-                    WLOGINFO("bus node 0x%llx connection %p(%s) closed: %s", static_cast<unsigned long long>(n.get_id()), conn, conn->get_address().address.c_str(), msg);
+                    FWLOGINFO("bus node {0:#x} connection {}({}) closed: {}", n.get_id(), reinterpret_cast<const void*>(conn), conn->get_address().address, msg);
                 }
 
             } else {
                 if (NULL != ep) {
-                    WLOGINFO("bus node 0x%llx endpoint 0x%llx closed: %s", static_cast<unsigned long long>(n.get_id()),
-                             static_cast<unsigned long long>(ep->get_id()), msg);
+                    FWLOGINFO("bus node {0:#x} endpoint {0:#x} closed: {}", n.get_id(), ep->get_id(), msg);
                 } else {
-                    WLOGINFO("bus node 0x%llx closed: %s", static_cast<unsigned long long>(n.get_id()), msg);
+                    FWLOGINFO("bus node {0:#x} closed: {}", n.get_id(), msg);
                 }
             }
             return 0;
@@ -1901,19 +1990,17 @@ namespace atapp {
 
         if (NULL != conn) {
             if (NULL != ep) {
-                WLOGERROR("bus node 0x%llx endpoint 0x%llx connection %s error, status: %d, error code: %d", static_cast<unsigned long long>(n.get_id()),
-                          static_cast<unsigned long long>(ep->get_id()), conn->get_address().address.c_str(), status, errcode);
+                FWLOGERROR("bus node {0:#x} endpoint {0:#x} connection {} error, status: {}, error code: {}", 
+                    n.get_id(), ep->get_id(), conn->get_address().address, status, errcode);
             } else {
-                WLOGERROR("bus node 0x%llx connection %s error, status: %d, error code: %d", static_cast<unsigned long long>(n.get_id()),
-                          conn->get_address().address.c_str(), status, errcode);
+                FWLOGERROR("bus node {0:#x} connection {} error, status: {}, error code: {}", n.get_id(), conn->get_address().address, status, errcode);
             }
 
         } else {
             if (NULL != ep) {
-                WLOGERROR("bus node 0x%llx endpoint 0x%llx error, status: %d, error code: %d", static_cast<unsigned long long>(n.get_id()),
-                          static_cast<unsigned long long>(ep->get_id()), status, errcode);
+                FWLOGERROR("bus node {0:#x} endpoint {0:#x} error, status: {}, error code: {}", n.get_id(), ep->get_id(), status, errcode);
             } else {
-                WLOGERROR("bus node 0x%llx error, status: %d, error code: %d", static_cast<unsigned long long>(n.get_id()), status, errcode);
+                FWLOGERROR("bus node {0:#x} error, status: {}, error code: {}", n.get_id(), status, errcode);
             }
         }
 
@@ -1945,12 +2032,12 @@ namespace atapp {
     }
 
     int app::bus_evt_callback_on_shutdown(const atbus::node &n, int reason) {
-        WLOGINFO("bus node 0x%llx shutdown, reason: %d", static_cast<unsigned long long>(n.get_id()), reason);
+        FWLOGINFO("bus node {0:#x} shutdown, reason: {}", n.get_id(), reason);
         return stop();
     }
 
     int app::bus_evt_callback_on_available(const atbus::node &n, int res) {
-        WLOGINFO("bus node 0x%llx initialze done, res: %d", static_cast<unsigned long long>(n.get_id()), res);
+        FWLOGINFO("bus node {0:#x} initialze done, res: {}", n.get_id(), res);
         return res;
     }
 
@@ -1958,16 +2045,16 @@ namespace atapp {
         ++last_proc_event_count_;
 
         if (NULL == conn) {
-            WLOGERROR("bus node 0x%llx recv a invalid NULL connection , res: %d", static_cast<unsigned long long>(n.get_id()), res);
+            FWLOGERROR("bus node {0:#x} recv a invalid NULL connection , res: {}", n.get_id(), res);
         } else {
             // already disconncted finished.
             if (atbus::connection::state_t::DISCONNECTED != conn->get_status()) {
                 if (is_closing()) {
-                    WLOGINFO("bus node 0x%llx make a invalid connection %p(%s) when closing, all unfinished connection will be aborted. res: %d", static_cast<unsigned long long>(n.get_id()),
-                        conn, conn->get_address().address.c_str(), res);
+                    FWLOGINFO("bus node {0:#x} make a invalid connection {}({}) when closing, all unfinished connection will be aborted. res: {}", 
+                        n.get_id(), reinterpret_cast<const void*>(conn), conn->get_address().address, res);
                 } else {
-                    WLOGWARNING("bus node 0x%llx make a invalid connection %p(%s), maybe it's a temporary connection. res: %d", static_cast<unsigned long long>(n.get_id()),
-                        conn, conn->get_address().address.c_str(), res);
+                    FWLOGWARNING("bus node {0:#x} make a invalid connection {}({}), maybe it's a temporary connection. res: {}", 
+                        n.get_id(), reinterpret_cast<const void*>(conn), conn->get_address().address, res);
                 }
             }
         }
@@ -2026,10 +2113,9 @@ namespace atapp {
         ++last_proc_event_count_;
 
         if (NULL == ep) {
-            WLOGERROR("bus node 0x%llx make connection to NULL, res: %d", static_cast<unsigned long long>(n.get_id()), res);
+            FWLOGERROR("bus node {0:#x} make connection to NULL, res: {}", n.get_id(), res);
         } else {
-            WLOGINFO("bus node 0x%llx make connection to 0x%llx done, res: %d", static_cast<unsigned long long>(n.get_id()),
-                     static_cast<unsigned long long>(ep->get_id()), res);
+            FWLOGINFO("bus node {0:#x} make connection to {0:#x} done, res: {}", n.get_id(), ep->get_id(), res);
 
             if (evt_on_app_connected_) {
                 evt_on_app_connected_(std::ref(*this), std::ref(*ep), res);
@@ -2042,10 +2128,9 @@ namespace atapp {
         ++last_proc_event_count_;
 
         if (NULL == ep) {
-            WLOGERROR("bus node 0x%llx release connection to NULL, res: %d", static_cast<unsigned long long>(n.get_id()), res);
+            FWLOGERROR("bus node {0:#x} release connection to NULL, res: {}", n.get_id(), res);
         } else {
-            WLOGINFO("bus node 0x%llx release connection to 0x%llx done, res: %d", static_cast<unsigned long long>(n.get_id()),
-                     static_cast<unsigned long long>(ep->get_id()), res);
+            FWLOGINFO("bus node {0:#x} release connection to {0:#x} done, res: {}", n.get_id(), ep->get_id(), res);
 
             if (evt_on_app_disconnected_) {
                 evt_on_app_disconnected_(std::ref(*this), std::ref(*ep), res);

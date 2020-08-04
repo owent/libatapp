@@ -215,7 +215,7 @@ namespace atapp {
         LIBATAPP_MACRO_API yaml_conf_map_t &get_yaml_loaders();
         LIBATAPP_MACRO_API const yaml_conf_map_t &get_yaml_loaders() const;
 
-        LIBATAPP_MACRO_API void dump_configures(::google::protobuf::Message& dst, const std::string& path) const;
+        LIBATAPP_MACRO_API void parse_configures_into(::google::protobuf::Message& dst, const std::string& path) const;
 
         LIBATAPP_MACRO_API const atapp::protocol::atapp_configure& get_origin_configure() const;
         LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata& get_metadata() const;

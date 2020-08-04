@@ -416,7 +416,7 @@ namespace atapp {
                     break;
                 };
                 default: {
-                    WLOGERROR("%s in %s with type=%s is not supported now", fds->name().c_str(), dst.GetDescriptor()->full_name().c_str(), fds->type_name());
+                    FWLOGERROR("{} in {} with type={} is not supported now", fds->name(), dst.GetDescriptor()->full_name(), fds->type_name());
                     break;
                 }
             }
@@ -634,7 +634,7 @@ namespace atapp {
                     break;
                 };
                 default: {
-                    WLOGERROR("%s in %s with type=%s is not supported now", fds->name().c_str(), dst.GetDescriptor()->full_name().c_str(), fds->type_name());
+                    FWLOGERROR("{} in {} with type={} is not supported now", fds->name(), dst.GetDescriptor()->full_name(), fds->type_name());
                     break;
                 }
             }
