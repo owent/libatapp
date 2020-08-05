@@ -1,0 +1,84 @@
+atapp:
+  # =========== bus configure ===========
+  id: 0x00000001 # bus id
+  id_mask: 8.8.8.8 # if set, we can convert 0.0.0.1 to 0x00000001
+  name: "sample_echo_svr-1" # name with id
+  type_id: 1 # server type id
+  type_name: "sample_echo_svr" # server type name
+
+  hostname: # hostname, any host should has a unique name. if empty, use the hostname of system network
+  # remove_pidfile_after_exit: false
+  bus:
+    listen: "ipv6://:::21437" # tcp channel
+    subnets: "0/16" # children mask(at most 2^16 children )
+    proxy: "" # atproxy has no parent node
+    loop_times: 1000 # max message number in one loop
+    ttl: 16 # max ttl when transfer messages
+    backlog: 256 # tcp backlog
+    access_token_max_number: 5 # max number of access tokens
+    # access_tokens:           # access tokens
+    first_idle_timeout: 30 # first idle timeout when have new connection(second)
+    ping_interval: 60 # ping interval(second)
+    retry_interval: 3 # retry interval when error happen(second)
+    fault_tolerant: 3 # how many errors will lead to kill connection
+    msg_size: 262144 # max message size(256KB)
+    recv_buffer_size: 8388608 # recv channel size(8MB), will be used to initialize (shared) memory channel size
+    send_buffer_size: 2097152 # send buffer size, will be used to initialize io_stream channel write queue
+    send_buffer_number: 0 # send message number limit, will be used to initialize io_stream channel write queue, 0 for dynamic buffer
+    # gateway:
+    #   -
+  # =========== timer ===========
+  timer:
+    tick_interval: 32ms # 32ms for tick active
+    stop_timeout: 10s # 10s for stop operation
+  # =========== external configure files ===========
+  # config:
+  #   external:
+  #     - conf: 'sample_echo_svr.conf'
+  # =========== upper configures can not be reload ===========
+  # =========== log configure ===========
+  log:
+    level: debug
+    category:
+      - name: default
+        prefix: "[Log %L][%F %T.%f][%s:%n(%C)]: " # log categorize 0's name = default
+        stacktrace:
+          min: error
+          max: fatal
+        sink:
+          - type: file
+            level:
+              min: fatal
+              max: warning
+            rotate:
+              number: 10
+              size: 10485760 # 10MB
+            file: "../log/sample_echo_svr.error.%N.log"
+            writing_alias: "../log/sample_echo_svr.error.log"
+            auto_flush: info
+            flush_interval: 1m # 60s (unit: s,m,h,d)
+          - type: file
+            level:
+              min: fatal
+              max: debug
+            rotate:
+              number: 10
+              size: 10485760 # 10MB
+            file: "../log/sample_echo_svr.all.%N.log"
+            writing_alias: "../log/sample_echo_svr.all.log"
+            auto_flush: info
+            flush_interval: 1m # 60s (unit: s,m,h,d)
+          - type: stderr # default error log for stderr
+            level:
+              min: fatal
+              max: debug
+          - type: stdout # default normal log for stdout
+            level:
+              min: fatal
+              max: debug
+
+      - name: db
+        prefix: "[Log %L][%F %T.%f]: " # log categorize 1's name = db
+        stacktrace:
+          min: disable
+          max: disable

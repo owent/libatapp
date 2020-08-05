@@ -29,6 +29,8 @@
 
 #include <config/compiler/protobuf_suffix.h>
 
+#include <libatbus_protocol.h>
+
 namespace util {
     namespace config {
         class ini_value;
@@ -59,6 +61,7 @@ namespace atapp {
         std::string hash_code;
 
         atapp::protocol::atapp_configure origin;
+        atapp::protocol::atapp_log log;
         atapp::protocol::atapp_metadata metadata;
     };
 
@@ -79,11 +82,14 @@ namespace atapp {
         EN_ATAPP_ERR_MIN = -1999,
     } ATAPP_ERROR_TYPE;
 
-    LIBATAPP_MACRO_API void parse_timepoint(const std::string& in, google::protobuf::Timestamp& out);
-    LIBATAPP_MACRO_API void parse_duration(const std::string& in, google::protobuf::Duration& out);
+    LIBATAPP_MACRO_API void parse_timepoint(const std::string& in, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp& out);
+    LIBATAPP_MACRO_API void parse_duration(const std::string& in, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration& out);
 
-    LIBATAPP_MACRO_API void ini_loader_dump_to(const util::config::ini_value& src, ::google::protobuf::Message& dst);
-    LIBATAPP_MACRO_API void yaml_loader_dump_to(const YAML::Node& src, ::google::protobuf::Message& dst);
+    LIBATAPP_MACRO_API void ini_loader_dump_to(const util::config::ini_value& src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message& dst);
+    LIBATAPP_MACRO_API void ini_loader_dump_to(const util::config::ini_value& src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Map<std::string, std::string>& dst, std::string prefix);
+
+    LIBATAPP_MACRO_API void yaml_loader_dump_to(const YAML::Node& src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message& dst);
+    LIBATAPP_MACRO_API void yaml_loader_dump_to(const YAML::Node& src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Map<std::string, std::string>& dst, std::string prefix);
     LIBATAPP_MACRO_API const YAML::Node yaml_loader_get_child_by_path(const YAML::Node& src, const std::string& path);
 } // namespace atapp
 

@@ -92,8 +92,6 @@ message atapp_configure {
     atapp_timer timer                     = 202;
 
     atbus_configure bus = 301;
-
-    atapp_log log = 401;
 }
 
 message atapp_metadata {

@@ -212,10 +212,21 @@ namespace atapp {
         LIBATAPP_MACRO_API util::config::ini_loader &get_configure_loader();
         LIBATAPP_MACRO_API const util::config::ini_loader &get_configure_loader() const;
 
+        /**
+         * @brief get yaml configure loaders
+         * @note Be careful yaml API may throw a exception
+         * @return yaml configure loaders
+         */
         LIBATAPP_MACRO_API yaml_conf_map_t &get_yaml_loaders();
+
+        /**
+         * @brief get yaml configure loaders
+         * @note Be careful yaml API may throw a exception
+         * @return yaml configure loaders
+         */
         LIBATAPP_MACRO_API const yaml_conf_map_t &get_yaml_loaders() const;
 
-        LIBATAPP_MACRO_API void parse_configures_into(::google::protobuf::Message& dst, const std::string& path) const;
+        LIBATAPP_MACRO_API void parse_configures_into(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message& dst, const std::string& path) const;
 
         LIBATAPP_MACRO_API const atapp::protocol::atapp_configure& get_origin_configure() const;
         LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata& get_metadata() const;
