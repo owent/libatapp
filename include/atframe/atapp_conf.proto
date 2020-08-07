@@ -78,13 +78,96 @@ message atapp_log {
     repeated atapp_log_category category = 2;
 }
 
+message atapp_area {
+    // region -> district -> zone
+    string region   = 1;
+    string district = 2;
+    uint64 zone_id  = 3;
+}
+
+message atapp_etcd_http { bool debug = 1; }
+
+message atapp_etcd_ssl {
+    // @see https://curl.haxx.se/libcurl/c/curl_easy_setopt.html
+    bool enable_alpn = 1; // CURLOPT_SSL_ENABLE_ALPN
+    bool verify_peer = 2; // CURLOPT_SSL_VERIFYPEER, CURLOPT_SSL_VERIFYHOST, CURLOPT_SSL_VERIFYSTATUS and [CURLOPT_PROXY_SSL_VERIFYPEER, CURLOPT_PROXY_SSL_VERIFYHOST]
+
+    string ssl_min_version = 101; // CURLOPT_SSLVERSION and [CURLOPT_PROXY_SSLVERSION]
+
+    string ssl_client_cert       = 111; // CURLOPT_SSLCERT
+    string ssl_client_cert_type  = 112; // CURLOPT_SSLCERTTYPE: PEM or DER
+    string ssl_client_key        = 113; // CURLOPT_SSLKEY
+    string ssl_client_key_type   = 114; // CURLOPT_SSLKEYTYPE: PEM, DER or ENG
+    string ssl_client_key_passwd = 115; // CURLOPT_KEYPASSWD or CURLOPT_SSLCERTPASSWD
+    string ssl_ca_cert           = 116; // CURLOPT_CAINFO
+
+    string ssl_proxy_cert       = 121; // CURLOPT_PROXY_SSLCERT
+    string ssl_proxy_cert_type  = 122; // CURLOPT_PROXY_SSLCERTTYPE: PEM or DER
+    string ssl_proxy_key        = 123; // CURLOPT_PROXY_SSLKEY
+    string ssl_proxy_key_type   = 124; // CURLOPT_PROXY_SSLKEYTYPE: PEM, DER or ENG
+    string ssl_proxy_key_passwd = 125; // CURLOPT_PROXY_KEYPASSWD or CURLOPT_PROXY_SSLCERTPASSWD
+    string ssl_proxy_ca_cert    = 126; // CURLOPT_PROXY_CAINFO
+
+    string ssl_cipher_list       = 201; // CURLOPT_SSL_CIPHER_LIST
+    string ssl_cipher_list_tls13 = 202; // CURLOPT_TLS13_CIPHERS
+
+    string user_agent = 301;
+}
+
+message atapp_etcd_cluster {
+    google.protobuf.Duration update_interval = 1;
+    google.protobuf.Duration retry_interval  = 2;
+}
+
+message atapp_etcd_keepalive {
+    google.protobuf.Duration timeout = 1;
+    google.protobuf.Duration ttl     = 2;
+}
+
+message atapp_etcd_request { google.protobuf.Duration timeout = 1; }
+
+message atapp_etcd_init { google.protobuf.Duration timeout = 1; }
+
+message atapp_etcd_watcher {
+    google.protobuf.Duration retry_interval  = 101;
+    google.protobuf.Duration request_timeout = 102;
+
+    bool            by_id        = 201; // add watcher by id
+    bool            by_name      = 202; // add watcher by name
+    repeated uint64 by_type_id   = 203; // add watcher by type id
+    repeated string by_type_name = 204; // add watcher by type name
+    repeated string by_tag       = 205; // add watcher by tag
+}
+
+message atapp_etcd_report_alive {
+    bool            by_id   = 1;
+    bool            by_type = 2;
+    bool            by_name = 3;
+    repeated string by_tag  = 4;
+}
+
+message atapp_etcd {
+    repeated string         hosts         = 1;
+    string                  path          = 2;
+    string                  authorization = 3;
+    atapp_etcd_http         http          = 4;
+    atapp_etcd_ssl          ssl           = 5;
+    atapp_etcd_cluster      cluster       = 6;
+    atapp_etcd_keepalive    keepalive     = 7;
+    atapp_etcd_request      request       = 8;
+    atapp_etcd_init         init          = 9;
+    atapp_etcd_watcher      watcher       = 10;
+    atapp_etcd_report_alive report_alive  = 11;
+}
+
 message atapp_configure {
     // bus configure
-    string id        = 101; // maybe hex or a.b.c.d
-    string id_mask   = 102; // convert a.b.c.d -> id
-    string name      = 103;
-    uint64 type_id   = 104;
-    string type_name = 105;
+    string     id        = 101; // maybe hex or a.b.c.d
+    string     id_mask   = 102; // convert a.b.c.d -> id
+    string     name      = 103;
+    uint64     type_id   = 104;
+    string     type_name = 105;
+    atapp_area area      = 106; // Some service is splited by area
 
     string hostname = 121;
 
@@ -92,6 +175,8 @@ message atapp_configure {
     atapp_timer timer                     = 202;
 
     atbus_configure bus = 301;
+
+    atapp_etcd etcd = 401;
 }
 
 message atapp_metadata {
@@ -117,10 +202,11 @@ message atapp_discovery {
     string          hash_code                    = 6;
     uint64          type_id                      = 7;
     string          type_name                    = 8;
-    string          version                      = 9;
-    string          custom_data                  = 10;
-    repeated string gateway                      = 11;
-    repeated atbus.protocol.subnet_range subnets = 12;
+    atapp_area      area                         = 9; // Some service is splited by area
+    string          version                      = 10;
+    string          custom_data                  = 11;
+    repeated string gateway                      = 12;
+    repeated atbus.protocol.subnet_range subnets = 13;
 
     uint64 atbus_protocol_version     = 21;
     uint64 atbus_protocol_min_version = 22;

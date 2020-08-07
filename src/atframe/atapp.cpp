@@ -865,6 +865,9 @@ namespace atapp {
         out.set_hash_code(get_hash_code());
         out.set_type_id(get_type_id());
         out.set_type_name(get_type_name());
+        if (conf_.origin.has_area()) {
+            out.mutable_area()->CopyFrom(conf_.origin.area());
+        }
         out.set_version(get_app_version());
         // out.set_custom_data(get_conf_custom_data());
         out.mutable_gateway()->Reserve(conf_.origin.bus().gateway().size());
