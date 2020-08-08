@@ -85,14 +85,22 @@ message atapp_area {
     uint64 zone_id  = 3;
 }
 
-message atapp_etcd_http { bool debug = 1; }
+message atapp_etcd_http {
+    bool debug = 1;
+
+    string user_agent      = 301; // CURLOPT_USERAGENT
+    string proxy           = 302; // CURLOPT_HTTPPROXYTUNNEL, CURLOPT_PROXY: [SCHEME]://HOST[:PORT], SCHEME is one of http,https,socks4,socks4a,socks5,socks5h. PORT's default value is 1080
+    string no_proxy        = 303; // curl 7.19.4 CURLOPT_NOPROXY
+    string proxy_user_name = 304; // curl 7.19.1 CURLOPT_PROXYUSERNAME
+    string proxy_password  = 305; // curl 7.19.1 CURLOPT_PROXYPASSWORD
+}
 
 message atapp_etcd_ssl {
     // @see https://curl.haxx.se/libcurl/c/curl_easy_setopt.html
     bool enable_alpn = 1; // CURLOPT_SSL_ENABLE_ALPN
-    bool verify_peer = 2; // CURLOPT_SSL_VERIFYPEER, CURLOPT_SSL_VERIFYHOST, CURLOPT_SSL_VERIFYSTATUS and [CURLOPT_PROXY_SSL_VERIFYPEER, CURLOPT_PROXY_SSL_VERIFYHOST]
+    bool verify_peer = 2; // CURLOPT_SSL_VERIFYPEER, CURLOPT_SSL_VERIFYHOST, CURLOPT_SSL_VERIFYSTATUS and CURLOPT_PROXY_SSL_VERIFYPEER, CURLOPT_PROXY_SSL_VERIFYHOST
 
-    string ssl_min_version = 101; // CURLOPT_SSLVERSION and [CURLOPT_PROXY_SSLVERSION]
+    string ssl_min_version = 101; // CURLOPT_SSLVERSION and CURLOPT_PROXY_SSLVERSION
 
     string ssl_client_cert       = 111; // CURLOPT_SSLCERT
     string ssl_client_cert_type  = 112; // CURLOPT_SSLCERTTYPE: PEM or DER
@@ -110,8 +118,6 @@ message atapp_etcd_ssl {
 
     string ssl_cipher_list       = 201; // CURLOPT_SSL_CIPHER_LIST
     string ssl_cipher_list_tls13 = 202; // CURLOPT_TLS13_CIPHERS
-
-    string user_agent = 301;
 }
 
 message atapp_etcd_cluster {

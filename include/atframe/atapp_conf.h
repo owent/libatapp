@@ -31,17 +31,11 @@
 
 #include <libatbus_protocol.h>
 
+#include "atapp_conf_rapidjson.h"
+
 namespace util {
     namespace config {
         class ini_value;
-    }
-}
-
-namespace google {
-    namespace protobuf {
-        class Message;
-        class Timestamp;
-        class Duration;
     }
 }
 

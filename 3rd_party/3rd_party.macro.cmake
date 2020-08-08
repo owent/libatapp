@@ -7,6 +7,9 @@ endif ()
 
 include("${PROJECT_3RD_PARTY_ROOT_DIR}/yaml-cpp/yaml-cpp.cmake")
 
+# =========== 3rd_party - rapidjson ===========
+include("${PROJECT_3RD_PARTY_ROOT_DIR}/rapidjson/rapidjson.cmake")
+
 # =========== 3rd_party - crypto ===========
 # copy from atframework/libatframe_utils/repo/project/cmake/ProjectBuildOption.cmake
 set (OPENSSL_USE_STATIC_LIBS TRUE)
