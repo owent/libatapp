@@ -30,18 +30,17 @@ namespace atapp {
      * @note APIs just like this
      * @see https://coreos.com/etcd/docs/latest/dev-guide/api_reference_v3.html
      * @see https://coreos.com/etcd/docs/latest/dev-guide/apispec/swagger/rpc.swagger.json
-     * @note KeyValue: { "key": "KEY", "create_revision": "number", "mod_revision": "number", "version": "number", "value": "", "lease": "number" }
-     *   Get data => curl http://localhost:2379/v3/kv/range -X POST -d '{"key": "KEY", "range_end": ""}'
-     *       # Response {"kvs": [{...}], "more": "bool", "count": "COUNT"}
-     *   Set data => curl http://localhost:2379/v3/kv/put -X POST -d '{"key": "KEY", "value": "", "lease": "number", "prev_kv": "bool"}'
-     *   Renew data => curl http://localhost:2379/v3/kv/put -X POST -d '{"key": "KEY", "value": "", "prev_kv": "bool", "ignore_lease": true}'
-     *       # Response {"header":{...}, "prev_kv": {...}}
-     *   Delete data => curl http://localhost:2379/v3/kv/deleterange -X POST -d '{"key": "KEY", "range_end": "", "prev_kv": "bool"}'
-     *       # Response {"header":{...}, "deleted": "number", "prev_kvs": [{...}]}
+     * @note KeyValue: { "key": "KEY", "create_revision": "number", "mod_revision": "number", "version": "number", "value": "", "lease":
+     * "number" } Get data => curl http://localhost:2379/v3/kv/range -X POST -d '{"key": "KEY", "range_end": ""}' # Response {"kvs":
+     * [{...}], "more": "bool", "count": "COUNT"} Set data => curl http://localhost:2379/v3/kv/put -X POST -d '{"key": "KEY", "value": "",
+     * "lease": "number", "prev_kv": "bool"}' Renew data => curl http://localhost:2379/v3/kv/put -X POST -d '{"key": "KEY", "value": "",
+     * "prev_kv": "bool", "ignore_lease": true}' # Response {"header":{...}, "prev_kv": {...}} Delete data => curl
+     * http://localhost:2379/v3/kv/deleterange -X POST -d '{"key": "KEY", "range_end": "", "prev_kv": "bool"}' # Response {"header":{...},
+     * "deleted": "number", "prev_kvs": [{...}]}
      *
-     *   Watch => curl http://localhost:2379/v3/watch -XPOST -d '{"create_request":  {"key": "WATCH KEY", "range_end": "", "prev_kv": true} }'
-     *       # Response {"header":{...},"watch_id":"ID","created":"bool", "canceled": "bool", "compact_revision": "REVISION", "events": [{"type":
-     *                  "PUT=0|DELETE=1", "kv": {...}, prev_kv": {...}"}]}
+     *   Watch => curl http://localhost:2379/v3/watch -XPOST -d '{"create_request":  {"key": "WATCH KEY", "range_end": "", "prev_kv": true}
+     * }' # Response {"header":{...},"watch_id":"ID","created":"bool", "canceled": "bool", "compact_revision": "REVISION", "events":
+     * [{"type": "PUT=0|DELETE=1", "kv": {...}, prev_kv": {...}"}]}
      *
      *   Allocate Lease => curl http://localhost:2379/v3/lease/grant -XPOST -d '{"TTL": 5, "ID": 0}'
      *       # Response {"header":{...},"ID":"ID","TTL":"5"}
@@ -88,15 +87,15 @@ namespace atapp {
 #define ETCD_API_V3_LEASE_REVOKE "/v3/kv/lease/revoke"
 
     namespace details {
-        const std::string &get_default_user_agent() {
+        static const std::string &get_default_user_agent() {
             static std::string ret;
             if (!ret.empty()) {
                 return ret;
             }
 
-            char        buffer[256] = {0};
-            const char *prefix      = "Mozilla/5.0";
-            const char *suffix      = "Atframework Etcdcli/1.0";
+            char buffer[256]   = {0};
+            const char *prefix = "Mozilla/5.0";
+            const char *suffix = "Atframework Etcdcli/1.0";
 #if defined(_WIN32) || defined(__WIN32__)
 #if (defined(__MINGW32__) && __MINGW32__)
             const char *sys_env = "Win32; MinGW32";
@@ -131,14 +130,15 @@ namespace atapp {
             return ret;
         }
 
-        static int etcd_cluster_trace_porcess_callback(util::network::http_request &req, const util::network::http_request::progress_t &process) {
-            WLOGTRACE("Etcd cluster %p http request %p to %s, process: download %llu/%llu, upload %llu/%llu", req.get_priv_data(), &req,
-                        req.get_url().c_str(), static_cast<unsigned long long>(process.dlnow), static_cast<unsigned long long>(process.dltotal),
-                        static_cast<unsigned long long>(process.ulnow), static_cast<unsigned long long>(process.ultotal));
+        static int etcd_cluster_trace_porcess_callback(util::network::http_request &req,
+                                                       const util::network::http_request::progress_t &process) {
+            FWLOGTRACE("Etcd cluster {} http request {} to {}, process: download {}/{}, upload {}/{}", req.get_priv_data(),
+                       reinterpret_cast<const void *>(&req), req.get_url(), process.dlnow, process.dltotal, process.ulnow, process.ultotal);
             return 0;
         }
 
-        EXPLICIT_UNUSED_ATTR static int etcd_cluster_verbose_callback(util::network::http_request &req, curl_infotype type, char *data, size_t size) {
+        EXPLICIT_UNUSED_ATTR static int etcd_cluster_verbose_callback(util::network::http_request &req, curl_infotype type, char *data,
+                                                                      size_t size) {
             if (util::log::log_wrapper::check_level(WDTLOGGETCAT(util::log::log_wrapper::categorize_t::DEFAULT),
                                                     util::log::log_wrapper::level_t::LOG_LW_TRACE)) {
                 const char *verbose_type = "Unknown Action";
@@ -170,7 +170,8 @@ namespace atapp {
 
                 util::log::log_wrapper::caller_info_t caller = WDTLOGFILENF(util::log::log_wrapper::level_t::LOG_LW_TRACE, "Trace");
                 WDTLOGGETCAT(util::log::log_wrapper::categorize_t::DEFAULT)
-                    ->log(caller, "Etcd cluster %p http request %p to %s => Verbose: %s", req.get_priv_data(), &req, req.get_url().c_str(), verbose_type);
+                    ->log(caller, "Etcd cluster %p http request %p to %s => Verbose: %s", req.get_priv_data(), &req, req.get_url().c_str(),
+                          verbose_type);
                 WDTLOGGETCAT(util::log::log_wrapper::categorize_t::DEFAULT)->write_log(caller, data, size);
             }
 
@@ -178,7 +179,7 @@ namespace atapp {
         }
     } // namespace details
 
-    etcd_cluster::etcd_cluster() : flags_(0) {
+    LIBATAPP_MACRO_API etcd_cluster::etcd_cluster() : flags_(0) {
         conf_.authorization_next_update_time = std::chrono::system_clock::from_time_t(0);
         conf_.authorization_retry_interval   = std::chrono::seconds(5);
         conf_.auth_user_get_next_update_time = std::chrono::system_clock::from_time_t(0);
@@ -224,19 +225,19 @@ namespace atapp {
         memset(&stats_, 0, sizeof(stats_));
     }
 
-    etcd_cluster::~etcd_cluster() {
+    LIBATAPP_MACRO_API etcd_cluster::~etcd_cluster() {
         reset();
         cleanup_keepalive_deletors();
     }
 
-    void etcd_cluster::init(const util::network::http_request::curl_m_bind_ptr_t &curl_mgr) {
+    LIBATAPP_MACRO_API void etcd_cluster::init(const util::network::http_request::curl_m_bind_ptr_t &curl_mgr) {
         curl_multi_ = curl_mgr;
         random_generator_.init_seed(static_cast<util::random::mt19937::result_type>(util::time::time_utility::get_now()));
 
         set_flag(flag_t::CLOSING, false);
     }
 
-    util::network::http_request::ptr_t etcd_cluster::close(bool wait) {
+    LIBATAPP_MACRO_API util::network::http_request::ptr_t etcd_cluster::close(bool wait) {
         set_flag(flag_t::CLOSING, true);
 
         if (rpc_keepalive_) {
@@ -281,7 +282,7 @@ namespace atapp {
 
                 // wait to delete content
                 if (ret) {
-                    WLOGDEBUG("Etcd start to revoke lease %lld", static_cast<long long>(get_lease()));
+                    FWLOGDEBUG("Etcd start to revoke lease {}", get_lease());
                     ret->start(util::network::http_request::method_t::EN_MT_POST, wait);
                 }
 
@@ -296,7 +297,7 @@ namespace atapp {
         return ret;
     }
 
-    void etcd_cluster::reset() {
+    LIBATAPP_MACRO_API void etcd_cluster::reset() {
         close(true);
 
         curl_multi_.reset();
@@ -349,7 +350,7 @@ namespace atapp {
         conf_.ssl_cipher_list_tls13.clear();
     }
 
-    int etcd_cluster::tick() {
+    LIBATAPP_MACRO_API int etcd_cluster::tick() {
         int ret = 0;
 
         if (!curl_multi_) {
@@ -404,7 +405,7 @@ namespace atapp {
         return ret;
     }
 
-    bool etcd_cluster::is_available() const {
+    LIBATAPP_MACRO_API bool etcd_cluster::is_available() const {
         if (!curl_multi_) {
             return false;
         }
@@ -422,7 +423,7 @@ namespace atapp {
         return check_authorization();
     }
 
-    void etcd_cluster::set_flag(flag_t::type f, bool v) {
+    LIBATAPP_MACRO_API void etcd_cluster::set_flag(flag_t::type f, bool v) {
         assert(0 == (f & (f - 1)));
         if (v == check_flag(f)) {
             return;
@@ -451,7 +452,7 @@ namespace atapp {
         }
     }
 
-    void etcd_cluster::pick_conf_authorization(std::string &username, std::string *password) {
+    LIBATAPP_MACRO_API void etcd_cluster::pick_conf_authorization(std::string &username, std::string *password) {
         std::string::size_type username_sep = conf_.authorization.find(':');
         if (username_sep == std::string::npos) {
             username = conf_.authorization;
@@ -463,7 +464,7 @@ namespace atapp {
         }
     }
 
-    time_t etcd_cluster::get_http_timeout_ms() const {
+    LIBATAPP_MACRO_API time_t etcd_cluster::get_http_timeout_ms() const {
         time_t ret = static_cast<time_t>(std::chrono::duration_cast<std::chrono::milliseconds>(get_conf_http_timeout()).count());
         if (ret <= 0) {
             ret = 30000; // 30s
@@ -472,7 +473,7 @@ namespace atapp {
         return ret;
     }
 
-    bool etcd_cluster::add_keepalive(const std::shared_ptr<etcd_keepalive> &keepalive) {
+    LIBATAPP_MACRO_API bool etcd_cluster::add_keepalive(const std::shared_ptr<etcd_keepalive> &keepalive) {
         if (!keepalive) {
             return false;
         }
@@ -506,7 +507,7 @@ namespace atapp {
         return true;
     }
 
-    bool etcd_cluster::add_retry_keepalive(const std::shared_ptr<etcd_keepalive> &keepalive) {
+    LIBATAPP_MACRO_API bool etcd_cluster::add_retry_keepalive(const std::shared_ptr<etcd_keepalive> &keepalive) {
         if (!keepalive) {
             return false;
         }
@@ -528,7 +529,7 @@ namespace atapp {
         return true;
     }
 
-    bool etcd_cluster::remove_keepalive(std::shared_ptr<etcd_keepalive> keepalive) {
+    LIBATAPP_MACRO_API bool etcd_cluster::remove_keepalive(std::shared_ptr<etcd_keepalive> keepalive) {
         if (!keepalive) {
             return false;
         }
@@ -562,8 +563,8 @@ namespace atapp {
             if (keepalive->has_data()) {
                 etcd_keepalive_deletor *keepalive_deletor = new etcd_keepalive_deletor();
                 if (NULL == keepalive_deletor) {
-                    WLOGERROR("Etcd cluster try to delete keepalive %p path %s but malloc etcd_keepalive_deletor failed.", keepalive.get(),
-                                keepalive->get_path().c_str());
+                    FWLOGERROR("Etcd cluster try to delete keepalive {} path {} but malloc etcd_keepalive_deletor failed.",
+                               reinterpret_cast<const void *>(keepalive.get()), keepalive->get_path());
                 } else {
                     keepalive_deletor->retry_times    = 0;
                     keepalive_deletor->path           = keepalive->get_path();
@@ -582,7 +583,7 @@ namespace atapp {
         return found;
     }
 
-    bool etcd_cluster::add_watcher(const std::shared_ptr<etcd_watcher> &watcher) {
+    LIBATAPP_MACRO_API bool etcd_cluster::add_watcher(const std::shared_ptr<etcd_watcher> &watcher) {
         if (!watcher) {
             return false;
         }
@@ -603,7 +604,7 @@ namespace atapp {
         return true;
     }
 
-    bool etcd_cluster::remove_watcher(std::shared_ptr<etcd_watcher> watcher) {
+    LIBATAPP_MACRO_API bool etcd_cluster::remove_watcher(std::shared_ptr<etcd_watcher> watcher) {
         if (!watcher) {
             return false;
         }
@@ -658,16 +659,16 @@ namespace atapp {
         ++keepalive_deletor->retry_times;
         // retry at most 5 times
         if (keepalive_deletor->retry_times > 8) {
-            WLOGERROR("Etcd cluster try to delete keepalive %p path %s too many times, skip to retry again.", keepalive_deletor->keepalive_addr,
-                        keepalive_deletor->path.c_str());
+            FWLOGERROR("Etcd cluster try to delete keepalive {} path {} too many times, skip to retry again.",
+                       keepalive_deletor->keepalive_addr, keepalive_deletor->path);
             delete_keepalive_deletor(keepalive_deletor, true);
             return;
         }
 
         util::network::http_request::ptr_t rpc = create_request_kv_del(keepalive_deletor->path, "+1");
         if (!rpc) {
-            WLOGERROR("Etcd cluster create delete keepalive %p path request to %s failed", keepalive_deletor->keepalive_addr,
-                        keepalive_deletor->path.c_str());
+            FWLOGERROR("Etcd cluster create delete keepalive {} path request to {} failed", keepalive_deletor->keepalive_addr,
+                       keepalive_deletor->path);
 
             // insert and retry later
             keepalive_deletors_[keepalive_deletor->path] = keepalive_deletor;
@@ -680,7 +681,8 @@ namespace atapp {
 
         int res = rpc->start(util::network::http_request::method_t::EN_MT_POST, false);
         if (res != 0) {
-            WLOGERROR("Etcd cluster start delete keepalive %p request to %s failed, res: %d", this, rpc->get_url().c_str(), res);
+            FWLOGERROR("Etcd cluster start delete keepalive {} request to {} failed, res: {}", reinterpret_cast<const void *>(this),
+                       rpc->get_url(), res);
             rpc->set_on_complete(NULL);
             rpc->set_priv_data(NULL);
             keepalive_deletor->rpc.reset();
@@ -688,9 +690,10 @@ namespace atapp {
             // insert and retry later
             keepalive_deletors_[keepalive_deletor->path] = keepalive_deletor;
         } else {
-            WLOGDEBUG("Etcd cluster start delete keepalive %p request to %s success", this, rpc->get_url().c_str());
+            FWLOGDEBUG("Etcd cluster start delete keepalive {} request to {} success", reinterpret_cast<const void *>(this),
+                       rpc->get_url());
         }
-    } // namespace component
+    } // namespace atapp
 
     int etcd_cluster::libcurl_callback_on_remove_keepalive_path(util::network::http_request &req) {
         etcd_keepalive_deletor *self = reinterpret_cast<etcd_keepalive_deletor *>(req.get_priv_data());
@@ -702,7 +705,7 @@ namespace atapp {
         assert(self->keepalive_addr);
         do {
             if (NULL == self) {
-                WLOGERROR("Etcd cluster delete keepalive path shouldn't has request without private data");
+                FWLOGERROR("Etcd cluster delete keepalive path shouldn't has request without private data");
                 break;
             }
 
@@ -713,11 +716,11 @@ namespace atapp {
             // 服务器错误则忽略，正常流程path不存在也会返回200，然后没有 deleted=1 。如果删除成功会有 deleted=1
             // 判定 404 只是是个防御性判定
             if (0 != req.get_error_code() || (util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
-                                                    util::network::http_request::get_status_code_group(req.get_response_code()) &&
-                                                util::network::http_request::status_code_t::EN_SCT_NOT_FOUND != req.get_response_code())) {
+                                                  util::network::http_request::get_status_code_group(req.get_response_code()) &&
+                                              util::network::http_request::status_code_t::EN_SCT_NOT_FOUND != req.get_response_code())) {
 
-                WLOGERROR("Etcd cluster delete keepalive %p path %s failed, error code: %d, http code: %d\n%s", self->keepalive_addr, self->path.c_str(),
-                            req.get_error_code(), req.get_response_code(), req.get_error_msg());
+                FWLOGERROR("Etcd cluster delete keepalive {} path {} failed, error code: {}, http code: {}\n{}", self->keepalive_addr,
+                           self->path, req.get_error_code(), req.get_response_code(), req.get_error_msg());
 
                 if (NULL != self->owner) {
                     // only network error will trigger a etcd member update
@@ -736,8 +739,8 @@ namespace atapp {
                 return 0;
             }
 
-            WLOGINFO("Etcd cluster delete keepalive %p path %s finished, res: %d, http code: %d\n%s", self->keepalive_addr, self->path.c_str(),
-                        req.get_error_code(), req.get_response_code(), req.get_error_msg());
+            FWLOGINFO("Etcd cluster delete keepalive {} path {} finished, res: {}, http code: {}\n{}", self->keepalive_addr, self->path,
+                      req.get_error_code(), req.get_response_code(), req.get_error_msg());
         } while (false);
 
         delete_keepalive_deletor(self, false);
@@ -857,12 +860,12 @@ namespace atapp {
             int res = req->start(util::network::http_request::method_t::EN_MT_POST, false);
             if (res != 0) {
                 req->set_on_complete(NULL);
-                WLOGERROR("Etcd start authenticate request for user %s to %s failed, res: %d", username.c_str(), req->get_url().c_str(), res);
+                FWLOGERROR("Etcd start authenticate request for user {} to {} failed, res: {}", username, req->get_url(), res);
                 add_stats_error_request();
                 return false;
             }
 
-            WLOGINFO("Etcd start authenticate request for user %s to %s", username.c_str(), req->get_url().c_str());
+            FWLOGINFO("Etcd start authenticate request for user {} to {}", username, req->get_url());
             rpc_authenticate_ = req;
         } else {
             add_stats_error_request();
@@ -874,7 +877,7 @@ namespace atapp {
     int etcd_cluster::libcurl_callback_on_auth_authenticate(util::network::http_request &req) {
         etcd_cluster *self = reinterpret_cast<etcd_cluster *>(req.get_priv_data());
         if (NULL == self) {
-            WLOGERROR("Etcd authenticate shouldn't has request without private data");
+            FWLOGERROR("Etcd authenticate shouldn't has request without private data");
             return 0;
         }
 
@@ -882,8 +885,8 @@ namespace atapp {
         self->rpc_authenticate_.reset();
 
         // 服务器错误则忽略
-        if (0 != req.get_error_code() ||
-            util::network::http_request::status_code_t::EN_ECG_SUCCESS != util::network::http_request::get_status_code_group(req.get_response_code())) {
+        if (0 != req.get_error_code() || util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
+                                             util::network::http_request::get_status_code_group(req.get_response_code())) {
 
             // only network error will trigger a etcd member update
             if (0 != req.get_error_code()) {
@@ -891,32 +894,33 @@ namespace atapp {
             }
             self->add_stats_error_request();
 
-            WLOGERROR("Etcd authenticate failed, error code: %d, http code: %d\n%s", req.get_error_code(), req.get_response_code(), req.get_error_msg());
+            FWLOGERROR("Etcd authenticate failed, error code: {}, http code: {}\n{}", req.get_error_code(), req.get_response_code(),
+                       req.get_error_msg());
             self->check_authorization_expired(req.get_response_code(), req.get_response_stream().str());
             return 0;
         }
 
         std::string http_content;
         req.get_response_stream().str().swap(http_content);
-        WLOGTRACE("Etcd cluster got http response: %s", http_content.c_str());
+        FWLOGTRACE("Etcd cluster got http response: {}", http_content);
 
         do {
             // 如果lease不存在（没有TTL）则启动创建流程
             // 忽略空数据
             rapidjson::Document doc;
-            if (false == ::atframe::component::etcd_packer::parse_object(doc, http_content.c_str())) {
+            if (false == atapp::etcd_packer::parse_object(doc, http_content.c_str())) {
                 break;
             }
 
-            std::string                      token;
+            std::string token;
             if (false == etcd_packer::unpack_string(doc, "token", token)) {
-                WLOGERROR("Etcd authenticate failed, token not found.(%s)", http_content.c_str());
+                FWLOGERROR("Etcd authenticate failed, token not found.({})", http_content);
                 self->add_stats_error_request();
                 return 0;
             }
 
             self->conf_.authorization_header = "Authorization: " + token;
-            WLOGDEBUG("Etcd cluster got authenticate token: %s", token.c_str());
+            FWLOGDEBUG("Etcd cluster got authenticate token: {}", token);
 
             self->add_stats_success_request();
             self->retry_pending_actions();
@@ -988,12 +992,12 @@ namespace atapp {
             int res = req->start(util::network::http_request::method_t::EN_MT_POST, false);
             if (res != 0) {
                 req->set_on_complete(NULL);
-                WLOGERROR("Etcd start user get request for user %s to %s failed, res: %d", username.c_str(), req->get_url().c_str(), res);
+                FWLOGERROR("Etcd start user get request for user {} to {} failed, res: {}", username, req->get_url(), res);
                 add_stats_error_request();
                 return false;
             }
 
-            WLOGINFO("Etcd start user get request for user %s to %s", username.c_str(), req->get_url().c_str());
+            FWLOGINFO("Etcd start user get request for user {} to {}", username, req->get_url());
             rpc_authenticate_ = req;
         } else {
             add_stats_error_request();
@@ -1005,7 +1009,7 @@ namespace atapp {
     int etcd_cluster::libcurl_callback_on_auth_user_get(util::network::http_request &req) {
         etcd_cluster *self = reinterpret_cast<etcd_cluster *>(req.get_priv_data());
         if (NULL == self) {
-            WLOGERROR("Etcd user get shouldn't has request without private data");
+            FWLOGERROR("Etcd user get shouldn't has request without private data");
             return 0;
         }
 
@@ -1013,8 +1017,8 @@ namespace atapp {
         self->rpc_authenticate_.reset();
 
         // 服务器错误则忽略
-        if (0 != req.get_error_code() ||
-            util::network::http_request::status_code_t::EN_ECG_SUCCESS != util::network::http_request::get_status_code_group(req.get_response_code())) {
+        if (0 != req.get_error_code() || util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
+                                             util::network::http_request::get_status_code_group(req.get_response_code())) {
 
             // only network error will trigger a etcd member update
             if (0 != req.get_error_code()) {
@@ -1022,21 +1026,22 @@ namespace atapp {
             }
             self->add_stats_error_request();
 
-            WLOGERROR("Etcd user get failed, error code: %d, http code: %d\n%s", req.get_error_code(), req.get_response_code(), req.get_error_msg());
+            FWLOGERROR("Etcd user get failed, error code: {}, http code: {}\n{}", req.get_error_code(), req.get_response_code(),
+                       req.get_error_msg());
             self->check_authorization_expired(req.get_response_code(), req.get_response_stream().str());
             return 0;
         }
 
         std::string http_content;
         req.get_response_stream().str().swap(http_content);
-        WLOGTRACE("Etcd cluster got http response: %s", http_content.c_str());
+        FWLOGTRACE("Etcd cluster got http response: {}", http_content);
 
         bool is_success = false;
         do {
             // 如果lease不存在（没有TTL）则启动创建流程
             // 忽略空数据
             rapidjson::Document doc;
-            if (false == ::atframe::component::etcd_packer::parse_object(doc, http_content.c_str())) {
+            if (false == atapp::etcd_packer::parse_object(doc, http_content.c_str())) {
                 break;
             }
 
@@ -1045,7 +1050,7 @@ namespace atapp {
 
             rapidjson::Value::ConstMemberIterator iter = doc.FindMember("roles");
             if (iter == doc.MemberEnd() || false == iter->value.IsArray()) {
-                WLOGDEBUG("Etcd user get %s without any role", username.c_str());
+                FWLOGDEBUG("Etcd user get {} without any role", username);
                 break;
             }
 
@@ -1057,7 +1062,8 @@ namespace atapp {
                 if (role_iter->IsString()) {
                     self->conf_.authorization_user_roles.push_back(role_iter->GetString());
                 } else {
-                    WLOGERROR("Etcd user get %s with bad role type: %s", username.c_str(), etcd_packer::unpack_to_string(*role_iter).c_str());
+                    FWLOGERROR("Etcd user get {} with bad role type: {}", username,
+                              etcd_packer::unpack_to_string(*role_iter));
                 }
             }
 
@@ -1070,7 +1076,7 @@ namespace atapp {
                 ss << self->conf_.authorization_user_roles[i];
             }
             ss << " ]";
-            WLOGDEBUG("Etcd cluster got user %s with roles: %s", username.c_str(), ss.str().c_str());
+            FWLOGDEBUG("Etcd cluster got user {} with roles: {}", username, ss.str());
 
             is_success = true;
         } while (false);
@@ -1162,13 +1168,13 @@ namespace atapp {
             int res = req->start(util::network::http_request::method_t::EN_MT_POST, false);
             if (res != 0) {
                 req->set_on_complete(NULL);
-                WLOGERROR("Etcd start update member %lld request to %s failed, res: %d", static_cast<long long>(get_lease()), req->get_url().c_str(), res);
+                FWLOGERROR("Etcd start update member {} request to {} failed, res: {}", get_lease(), req->get_url().c_str(), res);
 
                 add_stats_error_request();
                 return false;
             }
 
-            WLOGTRACE("Etcd start update member %lld request to %s", static_cast<long long>(get_lease()), req->get_url().c_str());
+            FWLOGTRACE("Etcd start update member {} request to {}", get_lease(), req->get_url());
             rpc_update_members_ = req;
         } else {
             add_stats_error_request();
@@ -1180,7 +1186,7 @@ namespace atapp {
     int etcd_cluster::libcurl_callback_on_member_update(util::network::http_request &req) {
         etcd_cluster *self = reinterpret_cast<etcd_cluster *>(req.get_priv_data());
         if (NULL == self) {
-            WLOGERROR("Etcd member list shouldn't has request without private data");
+            FWLOGERROR("Etcd member list shouldn't has request without private data");
             return 0;
         }
 
@@ -1188,14 +1194,15 @@ namespace atapp {
         self->rpc_update_members_.reset();
 
         // 服务器错误则忽略
-        if (0 != req.get_error_code() ||
-            util::network::http_request::status_code_t::EN_ECG_SUCCESS != util::network::http_request::get_status_code_group(req.get_response_code())) {
+        if (0 != req.get_error_code() || util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
+                                             util::network::http_request::get_status_code_group(req.get_response_code())) {
 
             // only network error will trigger a etcd member update
             if (0 != req.get_error_code()) {
                 self->retry_request_member_update(req.get_url());
             }
-            WLOGERROR("Etcd member list failed, error code: %d, http code: %d\n%s", req.get_error_code(), req.get_response_code(), req.get_error_msg());
+            FWLOGERROR("Etcd member list failed, error code: {}, http code: {}\n{}", req.get_error_code(), req.get_response_code(),
+                       req.get_error_msg());
             self->add_stats_error_request();
 
             return 0;
@@ -1203,25 +1210,25 @@ namespace atapp {
 
         std::string http_content;
         req.get_response_stream().str().swap(http_content);
-        WLOGTRACE("Etcd cluster got http response: %s", http_content.c_str());
+        FWLOGTRACE("Etcd cluster got http response: {}", http_content);
 
         do {
             // ignore empty data
             rapidjson::Document doc;
-            if (false == ::atframe::component::etcd_packer::parse_object(doc, http_content.c_str())) {
+            if (false == atapp::etcd_packer::parse_object(doc, http_content.c_str())) {
                 break;
             }
 
             rapidjson::Document::ConstMemberIterator members = doc.FindMember("members");
             if (doc.MemberEnd() == members) {
-                WLOGERROR("Etcd members not found");
+                FWLOGERROR("Etcd members not found");
                 self->add_stats_error_request();
                 return 0;
             }
 
             self->conf_.hosts.clear();
-            bool                            need_select_node = true;
-            rapidjson::Document::ConstArray all_members      = members->value.GetArray();
+            bool need_select_node                       = true;
+            rapidjson::Document::ConstArray all_members = members->value.GetArray();
             for (rapidjson::Document::Array::ConstValueIterator iter = all_members.Begin(); iter != all_members.End(); ++iter) {
                 rapidjson::Document::ConstMemberIterator client_urls = iter->FindMember("clientURLs");
                 if (client_urls == iter->MemberEnd()) {
@@ -1229,8 +1236,8 @@ namespace atapp {
                 }
 
                 rapidjson::Document::ConstArray all_client_urls = client_urls->value.GetArray();
-                for (rapidjson::Document::Array::ConstValueIterator cli_url_iter = all_client_urls.Begin(); cli_url_iter != all_client_urls.End();
-                        ++cli_url_iter) {
+                for (rapidjson::Document::Array::ConstValueIterator cli_url_iter = all_client_urls.Begin();
+                     cli_url_iter != all_client_urls.End(); ++cli_url_iter) {
                     if (cli_url_iter->GetStringLength() > 0) {
                         self->conf_.hosts.push_back(cli_url_iter->GetString());
 
@@ -1243,7 +1250,7 @@ namespace atapp {
 
             if (!self->conf_.hosts.empty() && need_select_node) {
                 self->conf_.path_node = self->conf_.hosts[self->random_generator_.random_between<size_t>(0, self->conf_.hosts.size())];
-                WLOGINFO("Etcd cluster using node %s", self->conf_.path_node.c_str());
+                FWLOGINFO("Etcd cluster using node {}", self->conf_.path_node);
             }
 
             self->add_stats_success_request();
@@ -1285,7 +1292,7 @@ namespace atapp {
             doc.SetObject();
             doc.AddMember("ID", get_lease(), doc.GetAllocator());
             doc.AddMember("TTL", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(conf_.keepalive_timeout).count()),
-                            doc.GetAllocator());
+                          doc.GetAllocator());
 
             setup_http_request(req, doc, get_http_timeout_ms());
             req->set_priv_data(this);
@@ -1297,13 +1304,12 @@ namespace atapp {
             int res = req->start(util::network::http_request::method_t::EN_MT_POST, false);
             if (res != 0) {
                 req->set_on_complete(NULL);
-                WLOGERROR("Etcd start keepalive lease %lld request to %s failed, res: %d", static_cast<long long>(get_lease()), req->get_url().c_str(),
-                            res);
+                FWLOGERROR("Etcd start keepalive lease {} request to {} failed, res: {}", get_lease(), req->get_url(), res);
                 add_stats_error_request();
                 return false;
             }
 
-            WLOGDEBUG("Etcd start keepalive lease %lld request to %s", static_cast<long long>(get_lease()), req->get_url().c_str());
+            FWLOGDEBUG("Etcd start keepalive lease {} request to {}", get_lease(), req->get_url());
             rpc_keepalive_ = req;
         } else {
             add_stats_error_request();
@@ -1353,13 +1359,12 @@ namespace atapp {
             int res = req->start(util::network::http_request::method_t::EN_MT_POST, false);
             if (res != 0) {
                 req->set_on_complete(NULL);
-                WLOGERROR("Etcd start keepalive lease %lld request to %s failed, res: %d", static_cast<long long>(get_lease()), req->get_url().c_str(),
-                            res);
+                FWLOGERROR("Etcd start keepalive lease {} request to {} failed, res: {}", get_lease(), req->get_url().c_str(), res);
                 add_stats_error_request();
                 return false;
             }
 
-            WLOGTRACE("Etcd start keepalive lease %lld request to %s", static_cast<long long>(get_lease()), req->get_url().c_str());
+            FWLOGTRACE("Etcd start keepalive lease {} request to {}", get_lease(), req->get_url());
             rpc_keepalive_ = req;
         } else {
             add_stats_error_request();
@@ -1371,7 +1376,7 @@ namespace atapp {
     int etcd_cluster::libcurl_callback_on_lease_keepalive(util::network::http_request &req) {
         etcd_cluster *self = reinterpret_cast<etcd_cluster *>(req.get_priv_data());
         if (NULL == self) {
-            WLOGERROR("Etcd lease keepalive shouldn't has request without private data");
+            FWLOGERROR("Etcd lease keepalive shouldn't has request without private data");
             return 0;
         }
 
@@ -1379,8 +1384,8 @@ namespace atapp {
         self->rpc_keepalive_.reset();
 
         // 服务器错误则忽略
-        if (0 != req.get_error_code() ||
-            util::network::http_request::status_code_t::EN_ECG_SUCCESS != util::network::http_request::get_status_code_group(req.get_response_code())) {
+        if (0 != req.get_error_code() || util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
+                                             util::network::http_request::get_status_code_group(req.get_response_code())) {
 
             // only network error will trigger a etcd member update
             if (0 != req.get_error_code()) {
@@ -1388,26 +1393,27 @@ namespace atapp {
             }
             self->add_stats_error_request();
 
-            WLOGERROR("Etcd lease keepalive failed, error code: %d, http code: %d\n%s", req.get_error_code(), req.get_response_code(), req.get_error_msg());
+            FWLOGERROR("Etcd lease keepalive failed, error code: {}, http code: {}\n{}", req.get_error_code(), req.get_response_code(),
+                       req.get_error_msg());
             self->check_authorization_expired(req.get_response_code(), req.get_response_stream().str());
             return 0;
         }
 
         std::string http_content;
         req.get_response_stream().str().swap(http_content);
-        WLOGTRACE("Etcd cluster got http response: %s", http_content.c_str());
+        FWLOGTRACE("Etcd cluster got http response: {}", http_content);
 
         do {
             // 如果lease不存在（没有TTL）则启动创建流程
             // 忽略空数据
             rapidjson::Document doc;
-            if (false == ::atframe::component::etcd_packer::parse_object(doc, http_content.c_str())) {
+            if (false == atapp::etcd_packer::parse_object(doc, http_content.c_str())) {
                 break;
             }
 
-            bool                                  is_grant = false;
-            const rapidjson::Value*      root              = &doc;
-            rapidjson::Value::ConstMemberIterator result   = doc.FindMember("result");
+            bool is_grant                                = false;
+            const rapidjson::Value *root                 = &doc;
+            rapidjson::Value::ConstMemberIterator result = doc.FindMember("result");
             if (result == doc.MemberEnd()) {
                 is_grant = true;
             } else {
@@ -1417,9 +1423,9 @@ namespace atapp {
 
             if (root->MemberEnd() == root->FindMember("TTL")) {
                 if (is_grant) {
-                    WLOGERROR("Etcd lease grant failed");
+                    FWLOGERROR("Etcd lease grant failed");
                 } else {
-                    WLOGERROR("Etcd lease keepalive failed because not found, try to grant one");
+                    FWLOGERROR("Etcd lease keepalive failed because not found, try to grant one");
                     self->set_lease(0, is_grant);
                     self->create_request_lease_grant();
                 }
@@ -1433,15 +1439,15 @@ namespace atapp {
             etcd_packer::unpack_int(*root, "ID", new_lease);
 
             if (0 == new_lease) {
-                WLOGERROR("Etcd cluster got a error http response for grant or keepalive lease: %s", http_content.c_str());
+                FWLOGERROR("Etcd cluster got a error http response for grant or keepalive lease: {}", http_content);
                 self->add_stats_error_request();
                 break;
             }
 
             if (is_grant) {
-                WLOGDEBUG("Etcd lease %lld granted", static_cast<long long>(new_lease));
+                FWLOGDEBUG("Etcd lease {} granted", new_lease);
             } else {
-                WLOGDEBUG("Etcd lease %lld keepalive successed", static_cast<long long>(new_lease));
+                FWLOGDEBUG("Etcd lease {} keepalive successed", new_lease);
             }
 
             self->add_stats_success_request();
@@ -1480,8 +1486,8 @@ namespace atapp {
         return ret;
     }
 
-    util::network::http_request::ptr_t etcd_cluster::create_request_kv_get(const std::string &key, const std::string &range_end, int64_t limit,
-                                                                            int64_t revision) {
+    LIBATAPP_MACRO_API util::network::http_request::ptr_t
+    etcd_cluster::create_request_kv_get(const std::string &key, const std::string &range_end, int64_t limit, int64_t revision) {
         if (!curl_multi_ || conf_.path_node.empty() || check_flag(flag_t::CLOSING)) {
             return util::network::http_request::ptr_t();
         }
@@ -1494,7 +1500,7 @@ namespace atapp {
             add_stats_create_request();
 
             rapidjson::Document doc;
-            rapidjson::Value &  root = doc.SetObject();
+            rapidjson::Value &root = doc.SetObject();
 
             etcd_packer::pack_key_range(root, key, range_end, doc);
             doc.AddMember("limit", limit, doc.GetAllocator());
@@ -1508,8 +1514,10 @@ namespace atapp {
         return ret;
     }
 
-    util::network::http_request::ptr_t etcd_cluster::create_request_kv_set(const std::string &key, const std::string &value, bool assign_lease,
-                                                                            bool prev_kv, bool ignore_value, bool ignore_lease) {
+    LIBATAPP_MACRO_API util::network::http_request::ptr_t etcd_cluster::create_request_kv_set(const std::string &key,
+                                                                                              const std::string &value, bool assign_lease,
+                                                                                              bool prev_kv, bool ignore_value,
+                                                                                              bool ignore_lease) {
         if (!curl_multi_ || conf_.path_node.empty() || check_flag(flag_t::CLOSING)) {
             return util::network::http_request::ptr_t();
         }
@@ -1526,7 +1534,7 @@ namespace atapp {
             add_stats_create_request();
 
             rapidjson::Document doc;
-            rapidjson::Value &  root = doc.SetObject();
+            rapidjson::Value &root = doc.SetObject();
 
             etcd_packer::pack_base64(root, "key", key, doc);
             etcd_packer::pack_base64(root, "value", value, doc);
@@ -1546,7 +1554,8 @@ namespace atapp {
         return ret;
     }
 
-    util::network::http_request::ptr_t etcd_cluster::create_request_kv_del(const std::string &key, const std::string &range_end, bool prev_kv) {
+    LIBATAPP_MACRO_API util::network::http_request::ptr_t etcd_cluster::create_request_kv_del(const std::string &key,
+                                                                                              const std::string &range_end, bool prev_kv) {
         if (!curl_multi_ || conf_.path_node.empty() || check_flag(flag_t::CLOSING)) {
             return util::network::http_request::ptr_t();
         }
@@ -1559,7 +1568,7 @@ namespace atapp {
             add_stats_create_request();
 
             rapidjson::Document doc;
-            rapidjson::Value &  root = doc.SetObject();
+            rapidjson::Value &root = doc.SetObject();
 
             etcd_packer::pack_key_range(root, key, range_end, doc);
             doc.AddMember("prev_kv", prev_kv, doc.GetAllocator());
@@ -1572,8 +1581,10 @@ namespace atapp {
         return ret;
     }
 
-    util::network::http_request::ptr_t etcd_cluster::create_request_watch(const std::string &key, const std::string &range_end, int64_t start_revision,
-                                                                            bool prev_kv, bool progress_notify) {
+    LIBATAPP_MACRO_API util::network::http_request::ptr_t etcd_cluster::create_request_watch(const std::string &key,
+                                                                                             const std::string &range_end,
+                                                                                             int64_t start_revision, bool prev_kv,
+                                                                                             bool progress_notify) {
         if (!curl_multi_ || conf_.path_node.empty() || check_flag(flag_t::CLOSING)) {
             return util::network::http_request::ptr_t();
         }
@@ -1586,7 +1597,7 @@ namespace atapp {
             add_stats_create_request();
 
             rapidjson::Document doc;
-            rapidjson::Value &  root = doc.SetObject();
+            rapidjson::Value &root = doc.SetObject();
 
             rapidjson::Value create_request(rapidjson::kObjectType);
 
@@ -1675,16 +1686,16 @@ namespace atapp {
         }
     }
 
-    void etcd_cluster::check_authorization_expired(int http_code, const std::string &content) {
+    LIBATAPP_MACRO_API void etcd_cluster::check_authorization_expired(int http_code, const std::string &content) {
         if (ETCD_API_V3_ERROR_HTTP_CODE_AUTH == http_code) {
             conf_.authorization_header.clear();
             return;
         }
 
         rapidjson::Document doc;
-        if (::atframe::component::etcd_packer::parse_object(doc, content.c_str())) {
+        if (atapp::etcd_packer::parse_object(doc, content.c_str())) {
             int64_t error_code = 0;
-            ::atframe::component::etcd_packer::unpack_int(doc, "code", error_code);
+            atapp::etcd_packer::unpack_int(doc, "code", error_code);
             if (ETCD_API_V3_ERROR_GRPC_CODE_UNAUTHENTICATED == error_code) {
                 conf_.authorization_header.clear();
                 return;
@@ -1698,7 +1709,8 @@ namespace atapp {
         }
     }
 
-    void etcd_cluster::setup_http_request(util::network::http_request::ptr_t &req, rapidjson::Document &doc, time_t timeout) {
+    LIBATAPP_MACRO_API void etcd_cluster::setup_http_request(util::network::http_request::ptr_t &req, rapidjson::Document &doc,
+                                                             time_t timeout) {
         if (!req) {
             return;
         }
@@ -1709,13 +1721,13 @@ namespace atapp {
 
         req->set_opt_follow_location(true);
         req->set_opt_ssl_verify_peer(conf_.ssl_verify_peer);
-        req->set_opt_long(CURLOPT_SSL_VERIFYHOST, conf_.ssl_verify_peer? 2L:0L);
+        req->set_opt_long(CURLOPT_SSL_VERIFYHOST, conf_.ssl_verify_peer ? 2L : 0L);
 #if LIBCURL_VERSION_NUM >= 0x072900
         req->set_opt_bool(CURLOPT_SSL_VERIFYSTATUS, conf_.ssl_verify_peer);
 #endif
 #if LIBCURL_VERSION_NUM >= 0x073400
         req->set_opt_bool(CURLOPT_PROXY_SSL_VERIFYPEER, conf_.ssl_verify_peer);
-        req->set_opt_long(CURLOPT_PROXY_SSL_VERIFYHOST, conf_.ssl_verify_peer? 2L:0L);
+        req->set_opt_long(CURLOPT_PROXY_SSL_VERIFYHOST, conf_.ssl_verify_peer ? 2L : 0L);
 #endif
         req->set_opt_accept_encoding("");
         req->set_opt_http_content_decoding(true);
@@ -1783,7 +1795,7 @@ namespace atapp {
 
             if (!conf_.proxy.empty()) {
                 req->set_opt_string(CURLOPT_PROXY, &conf_.proxy[0]);
-                if (0 == UTIL_STRFUNC_STRNCASE_CMP("http:", &conf_.proxy[0], 5) || 
+                if (0 == UTIL_STRFUNC_STRNCASE_CMP("http:", &conf_.proxy[0], 5) ||
                     0 == UTIL_STRFUNC_STRNCASE_CMP("https:", &conf_.proxy[0], 6)) {
                     req->set_opt_bool(CURLOPT_HTTPPROXYTUNNEL, true);
                 }
@@ -1839,7 +1851,7 @@ namespace atapp {
             }
 
             // proxy cert and key
-            
+
 #if LIBCURL_VERSION_NUM >= 0x072400
             req->set_opt_bool(CURLOPT_SSL_ENABLE_ALPN, conf_.ssl_enable_alpn);
 #endif
@@ -1893,11 +1905,12 @@ namespace atapp {
         }
 
         // Stringify the DOM
-        rapidjson::StringBuffer                    buffer;
+        rapidjson::StringBuffer buffer;
         rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
         doc.Accept(writer);
 
         req->post_data().assign(buffer.GetString(), buffer.GetSize());
-        WLOGTRACE("Etcd cluster setup request %p to %s, post data: %s", req.get(), req->get_url().c_str(), req->post_data().c_str());
+        FWLOGTRACE("Etcd cluster setup request {} to {}, post data: {}", reinterpret_cast<const void *>(req.get()), req->get_url(),
+                   req->post_data());
     }
-} // namespace atframe
+} // namespace atapp

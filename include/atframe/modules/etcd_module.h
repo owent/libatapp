@@ -48,33 +48,31 @@ namespace atapp {
         };
 
         struct LIBATAPP_MACRO_API_HEAD_ONLY watcher_sender_list_t {
-            std::reference_wrapper<etcd_module>                                          atapp_module;
-            std::reference_wrapper<const ::atapp::etcd_response_header>     etcd_header;
+            std::reference_wrapper<etcd_module> atapp_module;
+            std::reference_wrapper<const ::atapp::etcd_response_header> etcd_header;
             std::reference_wrapper<const ::atapp::etcd_watcher::response_t> etcd_body;
-            std::reference_wrapper<const ::atapp::etcd_watcher::event_t>    event;
-            std::reference_wrapper<const node_info_t>                                    node;
+            std::reference_wrapper<const ::atapp::etcd_watcher::event_t> event;
+            std::reference_wrapper<const node_info_t> node;
 
-            inline watcher_sender_list_t(etcd_module &m, const ::atapp::etcd_response_header &h,
-                                            const ::atapp::etcd_watcher::response_t &b, const ::atapp::etcd_watcher::event_t &e,
-                                            const node_info_t &n)
+            inline watcher_sender_list_t(etcd_module &m, const ::atapp::etcd_response_header &h, const ::atapp::etcd_watcher::response_t &b,
+                                         const ::atapp::etcd_watcher::event_t &e, const node_info_t &n)
                 : atapp_module(std::ref(m)), etcd_header(std::cref(h)), etcd_body(std::cref(b)), event(std::cref(e)), node(std::cref(n)) {}
         };
 
         struct LIBATAPP_MACRO_API_HEAD_ONLY watcher_sender_one_t {
-            std::reference_wrapper<etcd_module>                                          atapp_module;
-            std::reference_wrapper<const ::atapp::etcd_response_header>     etcd_header;
+            std::reference_wrapper<etcd_module> atapp_module;
+            std::reference_wrapper<const ::atapp::etcd_response_header> etcd_header;
             std::reference_wrapper<const ::atapp::etcd_watcher::response_t> etcd_body;
-            std::reference_wrapper<const ::atapp::etcd_watcher::event_t>    event;
-            std::reference_wrapper<node_info_t>                                          node;
+            std::reference_wrapper<const ::atapp::etcd_watcher::event_t> event;
+            std::reference_wrapper<node_info_t> node;
 
-            inline watcher_sender_one_t(etcd_module &m, const ::atapp::etcd_response_header &h,
-                                        const ::atapp::etcd_watcher::response_t &b, const ::atapp::etcd_watcher::event_t &e,
-                                        node_info_t &n)
+            inline watcher_sender_one_t(etcd_module &m, const ::atapp::etcd_response_header &h, const ::atapp::etcd_watcher::response_t &b,
+                                        const ::atapp::etcd_watcher::event_t &e, node_info_t &n)
                 : atapp_module(std::ref(m)), etcd_header(std::cref(h)), etcd_body(std::cref(b)), event(std::cref(e)), node(std::ref(n)) {}
         };
 
         typedef std::function<void(watcher_sender_list_t &)> watcher_list_callback_t;
-        typedef std::function<void(watcher_sender_one_t &)>  watcher_one_callback_t;
+        typedef std::function<void(watcher_sender_one_t &)> watcher_one_callback_t;
 
     public:
         LIBATAPP_MACRO_API etcd_module();
@@ -96,7 +94,7 @@ namespace atapp {
         LIBATAPP_MACRO_API virtual int tick() UTIL_CONFIG_OVERRIDE;
 
         LIBATAPP_MACRO_API const std::string &get_conf_custom_data() const;
-        LIBATAPP_MACRO_API void               set_conf_custom_data(const std::string &v);
+        LIBATAPP_MACRO_API void set_conf_custom_data(const std::string &v);
 
         LIBATAPP_MACRO_API std::string get_by_id_path() const;
         LIBATAPP_MACRO_API std::string get_by_type_id_path() const;
@@ -119,10 +117,10 @@ namespace atapp {
         LIBATAPP_MACRO_API atapp::etcd_watcher::ptr_t add_watcher_by_custom_path(const std::string &custom_path, watcher_one_callback_t fn);
 
         LIBATAPP_MACRO_API const ::atapp::etcd_cluster &get_raw_etcd_ctx() const;
-        LIBATAPP_MACRO_API ::atapp::etcd_cluster &      get_raw_etcd_ctx();
+        LIBATAPP_MACRO_API ::atapp::etcd_cluster &get_raw_etcd_ctx();
 
         LIBATAPP_MACRO_API const atapp::protocol::atapp_etcd &get_configure() const;
-        LIBATAPP_MACRO_API const std::string& get_configure_path();
+        LIBATAPP_MACRO_API const std::string &get_configure_path() const;
 
         LIBATAPP_MACRO_API atapp::etcd_keepalive::ptr_t add_keepalive_actor(std::string &val, const std::string &node_path);
 
@@ -133,7 +131,7 @@ namespace atapp {
         static int http_callback_on_etcd_closed(util::network::http_request &req);
 
         struct watcher_callback_list_wrapper_t {
-            etcd_module *                       mod;
+            etcd_module *mod;
             std::list<watcher_list_callback_t> *callbacks;
 
             watcher_callback_list_wrapper_t(etcd_module &m, std::list<watcher_list_callback_t> &cbks);
@@ -141,7 +139,7 @@ namespace atapp {
         };
 
         struct watcher_callback_one_wrapper_t {
-            etcd_module *          mod;
+            etcd_module *mod;
             watcher_one_callback_t callback;
 
             watcher_callback_one_wrapper_t(etcd_module &m, watcher_one_callback_t cbk);
@@ -152,11 +150,11 @@ namespace atapp {
         std::string conf_path_cache_;
         std::string custom_data_;
         util::network::http_request::curl_m_bind_ptr_t curl_multi_;
-        util::network::http_request::ptr_t             cleanup_request_;
-        ::atapp::etcd_cluster             etcd_ctx_;
-        std::list<watcher_list_callback_t>             watcher_by_id_callbacks_;
-        std::list<watcher_list_callback_t>             watcher_by_name_callbacks_;
+        util::network::http_request::ptr_t cleanup_request_;
+        ::atapp::etcd_cluster etcd_ctx_;
+        std::list<watcher_list_callback_t> watcher_by_id_callbacks_;
+        std::list<watcher_list_callback_t> watcher_by_name_callbacks_;
     };
-} // namespace atframe
+} // namespace atapp
 
 #endif

@@ -12,20 +12,20 @@
 
 namespace atapp {
 
-    bool etcd_packer::parse_object(rapidjson::Document &doc, const char *data) {
+    LIBATAPP_MACRO_API bool etcd_packer::parse_object(rapidjson::Document &doc, const char *data) {
 #if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
         try {
 #endif
             doc.Parse(data);
             return doc.IsObject();
 #if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
-        } catch(...) {
+        } catch (...) {
             return false;
         }
 #endif
     }
 
-    void etcd_packer::pack(const etcd_key_value &etcd_val, rapidjson::Value &json_val, rapidjson::Document &doc) {
+    LIBATAPP_MACRO_API void etcd_packer::pack(const etcd_key_value &etcd_val, rapidjson::Value &json_val, rapidjson::Document &doc) {
         if (0 != etcd_val.create_revision) {
             json_val.AddMember("create_revision", etcd_val.create_revision, doc.GetAllocator());
         }
@@ -51,7 +51,7 @@ namespace atapp {
         }
     }
 
-    void etcd_packer::unpack(etcd_key_value &etcd_val, const rapidjson::Value &json_val) {
+    LIBATAPP_MACRO_API void etcd_packer::unpack(etcd_key_value &etcd_val, const rapidjson::Value &json_val) {
         {
             rapidjson::Value::ConstMemberIterator iter = json_val.FindMember("create_revision");
             if (iter == json_val.MemberEnd()) {
@@ -120,7 +120,7 @@ namespace atapp {
         unpack_base64(json_val, "value", etcd_val.value);
     }
 
-    void etcd_packer::pack(const etcd_response_header &etcd_val, rapidjson::Value &json_val, rapidjson::Document &doc) {
+    LIBATAPP_MACRO_API void etcd_packer::pack(const etcd_response_header &etcd_val, rapidjson::Value &json_val, rapidjson::Document &doc) {
         if (0 != etcd_val.cluster_id) {
             json_val.AddMember("cluster_id", etcd_val.cluster_id, doc.GetAllocator());
         }
@@ -138,7 +138,7 @@ namespace atapp {
         }
     }
 
-    void etcd_packer::unpack(etcd_response_header &etcd_val, const rapidjson::Value &json_val) {
+    LIBATAPP_MACRO_API void etcd_packer::unpack(etcd_response_header &etcd_val, const rapidjson::Value &json_val) {
         {
             rapidjson::Value::ConstMemberIterator iter = json_val.FindMember("cluster_id");
             if (iter == json_val.MemberEnd()) {
@@ -204,7 +204,8 @@ namespace atapp {
         }
     }
 
-    void etcd_packer::pack_key_range(rapidjson::Value &json_val, const std::string &key, std::string range_end, rapidjson::Document &doc) {
+    LIBATAPP_MACRO_API void etcd_packer::pack_key_range(rapidjson::Value &json_val, const std::string &key, std::string range_end,
+                                                        rapidjson::Document &doc) {
         if ("+1" == range_end) {
             range_end      = key;
             bool need_plus = true;
@@ -232,7 +233,8 @@ namespace atapp {
         }
     }
 
-    void etcd_packer::pack_string(rapidjson::Value &json_val, const char *key, const char *val, rapidjson::Document &doc) {
+    LIBATAPP_MACRO_API void etcd_packer::pack_string(rapidjson::Value &json_val, const char *key, const char *val,
+                                                     rapidjson::Document &doc) {
         rapidjson::Value k;
         rapidjson::Value v;
         k.SetString(key, doc.GetAllocator());
@@ -240,7 +242,7 @@ namespace atapp {
         json_val.AddMember(k, v, doc.GetAllocator());
     }
 
-    bool etcd_packer::unpack_string(const rapidjson::Value &json_val, const char *key, std::string &val) {
+    LIBATAPP_MACRO_API bool etcd_packer::unpack_string(const rapidjson::Value &json_val, const char *key, std::string &val) {
         rapidjson::Value::ConstMemberIterator iter = json_val.FindMember(key);
         if (iter == json_val.MemberEnd()) {
             return false;
@@ -250,7 +252,7 @@ namespace atapp {
         return true;
     }
 
-    std::string etcd_packer::unpack_to_string(const rapidjson::Value &json_val) {
+    LIBATAPP_MACRO_API std::string etcd_packer::unpack_to_string(const rapidjson::Value &json_val) {
         switch (json_val.GetType()) {
         case rapidjson::kNullType: {
             return "null";
@@ -292,7 +294,8 @@ namespace atapp {
         return "";
     }
 
-    void etcd_packer::pack_base64(rapidjson::Value &json_val, const char *key, const std::string &val, rapidjson::Document &doc) {
+    LIBATAPP_MACRO_API void etcd_packer::pack_base64(rapidjson::Value &json_val, const char *key, const std::string &val,
+                                                     rapidjson::Document &doc) {
         std::string base64_val;
         util::base64_encode(base64_val, val);
 
@@ -303,7 +306,7 @@ namespace atapp {
         json_val.AddMember(k, v, doc.GetAllocator());
     }
 
-    bool etcd_packer::unpack_base64(const rapidjson::Value &json_val, const char *key, std::string &val) {
+    LIBATAPP_MACRO_API bool etcd_packer::unpack_base64(const rapidjson::Value &json_val, const char *key, std::string &val) {
         rapidjson::Value::ConstMemberIterator iter = json_val.FindMember(key);
         if (iter == json_val.MemberEnd()) {
             return false;
@@ -313,13 +316,13 @@ namespace atapp {
             return false;
         }
 
-        const char *base64_val    = iter->value.GetString();
-        size_t      base64_val_sz = strlen(base64_val);
+        const char *base64_val = iter->value.GetString();
+        size_t base64_val_sz   = strlen(base64_val);
 
         return 0 == util::base64_decode(val, reinterpret_cast<const unsigned char *>(base64_val), base64_val_sz);
     }
 
-    void etcd_packer::unpack_int(const rapidjson::Value &json_val, const char *key, int64_t &out) {
+    LIBATAPP_MACRO_API void etcd_packer::unpack_int(const rapidjson::Value &json_val, const char *key, int64_t &out) {
         rapidjson::Value::ConstMemberIterator iter = json_val.FindMember(key);
         if (iter == json_val.MemberEnd()) {
             out = 0;
@@ -333,7 +336,7 @@ namespace atapp {
         }
     }
 
-    void etcd_packer::unpack_int(const rapidjson::Value &json_val, const char *key, uint64_t &out) {
+    LIBATAPP_MACRO_API void etcd_packer::unpack_int(const rapidjson::Value &json_val, const char *key, uint64_t &out) {
         rapidjson::Value::ConstMemberIterator iter = json_val.FindMember(key);
         if (iter == json_val.MemberEnd()) {
             out = 0;
@@ -347,7 +350,7 @@ namespace atapp {
         }
     }
 
-    void etcd_packer::unpack_bool(const rapidjson::Value &json_val, const char *key, bool &out) {
+    LIBATAPP_MACRO_API void etcd_packer::unpack_bool(const rapidjson::Value &json_val, const char *key, bool &out) {
         rapidjson::Value::ConstMemberIterator iter = json_val.FindMember(key);
         if (iter == json_val.MemberEnd()) {
             out = false;
@@ -359,8 +362,8 @@ namespace atapp {
             } else if (iter->value.IsInt64()) {
                 out = 0 != iter->value.GetInt64();
             } else if (iter->value.IsString()) {
-                const char *val    = iter->value.GetString();
-                int         outint = 1;
+                const char *val = iter->value.GetString();
+                int outint      = 1;
                 ::util::string::str2int(outint, val);
                 out = 0 != outint;
             }

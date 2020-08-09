@@ -15,8 +15,9 @@
 #include "libatbus.h"
 #include "libatbus_protocol.h"
 
-#include <algorithm/murmur_hash.h>
 #include <algorithm/crypto_cipher.h>
+#include <algorithm/murmur_hash.h>
+
 
 #if defined(CRYPTO_USE_OPENSSL) || defined(CRYPTO_USE_LIBRESSL) || defined(CRYPTO_USE_BORINGSSL)
 #include <openssl/ssl.h>
@@ -35,7 +36,7 @@ namespace atapp {
     app *app::last_instance_ = NULL;
 
     static void _app_close_timer_handle(uv_handle_t *handle) {
-        app::timer_ptr_t* ptr = reinterpret_cast<app::timer_ptr_t*>(handle->data);
+        app::timer_ptr_t *ptr = reinterpret_cast<app::timer_ptr_t *>(handle->data);
         if (NULL == ptr) {
             if (NULL != handle->loop) {
                 uv_stop(handle->loop);
@@ -83,7 +84,7 @@ namespace atapp {
         return std::pair<uint64_t, const char *>(sz, unit);
     }
 
-    static uint64_t chrono_to_libuv_duration(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration& in, uint64_t default_value) {
+    static uint64_t chrono_to_libuv_duration(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &in, uint64_t default_value) {
         uint64_t ret = static_cast<uint64_t>(in.seconds() * 1000 + in.nanos() / 1000000);
         if (ret <= 0) {
             ret = default_value;
@@ -95,23 +96,23 @@ namespace atapp {
     LIBATAPP_MACRO_API app::app() : setup_result_(0), last_proc_event_count_(0), mode_(mode_t::CUSTOM) {
         if (NULL == last_instance_) {
 #if defined(OPENSSL_VERSION_NUMBER)
-#  if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
             SSL_library_init();
-#  else
+#else
             OPENSSL_init_ssl(0, NULL);
-#  endif
+#endif
 #endif
             util::crypto::cipher::init_global_algorithm();
         }
 
-        last_instance_ = this;
-        conf_.id = 0;
+        last_instance_     = this;
+        conf_.id           = 0;
         conf_.execute_path = NULL;
-        conf_.resume_mode = false;
+        conf_.resume_mode  = false;
 
         tick_timer_.sec_update = util::time::time_utility::raw_time_t::min();
-        tick_timer_.sec = 0;
-        tick_timer_.usec = 0;
+        tick_timer_.sec        = 0;
+        tick_timer_.usec       = 0;
 
         stat_.last_checkpoint_min = 0;
     }
@@ -197,7 +198,7 @@ namespace atapp {
         util::cli::shell_stream ss(std::cerr);
         // step 4. load options from cmd line
         conf_.bus_conf.ev_loop = ev_loop;
-        int ret = reload();
+        int ret                = reload();
         if (ret < 0) {
             ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "load configure failed" << std::endl;
             return setup_result_ = ret;
@@ -213,7 +214,9 @@ namespace atapp {
         case mode_t::RELOAD: {
             return send_last_command(ev_loop);
         }
-        default: { return setup_result_ = 0; }
+        default: {
+            return setup_result_ = 0;
+        }
         }
 
         // step 6. setup log & signal
@@ -244,7 +247,8 @@ namespace atapp {
             if (mod->is_enabled()) {
                 ret = mod->reload();
                 if (ret < 0) {
-                    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "load configure of " << mod->name() << " failed" << std::endl;
+                    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "load configure of " << mod->name() << " failed"
+                         << std::endl;
                     write_pidfile();
                     return setup_result_ = ret;
                 }
@@ -253,12 +257,13 @@ namespace atapp {
 
         // step 8. all modules init
         size_t inited_mod_idx = 0;
-        int mod_init_res = 0;
+        int mod_init_res      = 0;
         for (; mod_init_res >= 0 && inited_mod_idx < modules_.size(); ++inited_mod_idx) {
             if (modules_[inited_mod_idx]->is_enabled()) {
                 mod_init_res = modules_[inited_mod_idx]->init();
                 if (mod_init_res < 0) {
-                    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "initialze " << modules_[inited_mod_idx]->name() << " failed" << std::endl;
+                    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "initialze " << modules_[inited_mod_idx]->name()
+                         << " failed" << std::endl;
                     break;
                 }
             }
@@ -309,7 +314,7 @@ namespace atapp {
 
     LIBATAPP_MACRO_API int app::run_noblock(uint64_t max_event_count) {
         uint64_t evt_count = 0;
-        int ret = 0;
+        int ret            = 0;
         do {
             ret = run_inner(UV_RUN_NOWAIT);
             if (ret < 0) {
@@ -334,7 +339,7 @@ namespace atapp {
 
     LIBATAPP_MACRO_API bool app::is_closed() const UTIL_CONFIG_NOEXCEPT { return check_flag(flag_t::STOPPED); }
 
-    static bool guess_configure_file_is_yaml(const std::string& file_path) { 
+    static bool guess_configure_file_is_yaml(const std::string &file_path) {
         std::fstream file;
         file.open(file_path.c_str(), std::ios::in | std::ios::binary);
         if (!file.is_open()) {
@@ -347,14 +352,14 @@ namespace atapp {
 
             if (is_first_line) {
                 // Skip UTF-8 BOM
-                if (line.size() > 3 && line[0] == 0xef && line[1] == 0xbb && line[2] == 0xbf) {
+                if (line.size() > 3 && line[0] == (char)0xef && line[1] == (char)0xbb && line[2] == (char)0xbf) {
                     line = line.substr(3);
                 }
             }
 
-            
+
             const char *begin = line.c_str();
-            const char *end = line.c_str() + line.size();
+            const char *end   = line.c_str() + line.size();
             for (; *begin && begin < end; ++begin) {
                 // YAML: Key: Value
                 //   ini section and ini key can not contain ':'
@@ -379,9 +384,9 @@ namespace atapp {
         return false;
     }
 
-    static bool reload_all_configure_files(app::yaml_conf_map_t& yaml_map, util::config::ini_loader& conf_loader,
-        atbus::detail::auto_select_set<std::string>::type& loaded_files, std::list<std::string>& pending_load_files
-    ) {
+    static bool reload_all_configure_files(app::yaml_conf_map_t &yaml_map, util::config::ini_loader &conf_loader,
+                                           atbus::detail::auto_select_set<std::string>::type &loaded_files,
+                                           std::list<std::string> &pending_load_files) {
         bool ret = true;
         util::cli::shell_stream ss(std::cerr);
         size_t conf_external_loaded_index;
@@ -403,7 +408,7 @@ namespace atapp {
 
             if (colon != std::string::npos) {
                 is_yaml = (0 == UTIL_STRFUNC_STRNCASE_CMP("yml", file_rule.c_str(), colon)) ||
-                    (0 == UTIL_STRFUNC_STRNCASE_CMP("yaml", file_rule.c_str(), colon));
+                          (0 == UTIL_STRFUNC_STRNCASE_CMP("yaml", file_rule.c_str(), colon));
                 file_rule = file_rule.substr(colon + 1);
             }
 
@@ -420,59 +425,62 @@ namespace atapp {
 #if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
                 try {
 #endif
-                yaml_map[file_rule] = YAML::LoadAllFromFile(file_rule);
-                std::vector<YAML::Node>& nodes = yaml_map[file_rule];
-                if (nodes.empty()) {
-                    yaml_map.erase(file_rule);
-                    continue;
-                }
-
-                // external files
-                for (size_t i = 0; i < nodes.size(); ++ i) {
-                    const YAML::Node atapp_node = nodes[i]["atapp"];
-                    if (!atapp_node || !atapp_node.IsMap()) {
-                        continue;
-                    }
-                    const YAML::Node atapp_config = atapp_node["config"];
-                    if (!atapp_config || !atapp_config.IsMap()) {
-                        continue;
-                    }
-                    const YAML::Node atapp_external = atapp_node["external"];
-                    if (!atapp_external) {
+                    yaml_map[file_rule]            = YAML::LoadAllFromFile(file_rule);
+                    std::vector<YAML::Node> &nodes = yaml_map[file_rule];
+                    if (nodes.empty()) {
+                        yaml_map.erase(file_rule);
                         continue;
                     }
 
-                    if (atapp_config.IsSequence()) {
-                        for (size_t j = 0; j < atapp_config.size(); ++ j) {
-                            const YAML::Node atapp_external_ele = atapp_config[j];
-                            if (!atapp_external_ele) {
-                                continue;
-                            }
-                            if (!atapp_external_ele.IsScalar()) {
-                                continue;
-                            }
-                            if (atapp_external_ele.Scalar().empty()) {
-                                continue;
-                            }
-                            pending_load_files.push_back(atapp_external_ele.Scalar());
+                    // external files
+                    for (size_t i = 0; i < nodes.size(); ++i) {
+                        const YAML::Node atapp_node = nodes[i]["atapp"];
+                        if (!atapp_node || !atapp_node.IsMap()) {
+                            continue;
                         }
-                    } else if (atapp_config.IsScalar()) {
-                        if (!atapp_config.Scalar().empty()) {
-                            pending_load_files.push_back(atapp_config.Scalar());
+                        const YAML::Node atapp_config = atapp_node["config"];
+                        if (!atapp_config || !atapp_config.IsMap()) {
+                            continue;
+                        }
+                        const YAML::Node atapp_external = atapp_node["external"];
+                        if (!atapp_external) {
+                            continue;
+                        }
+
+                        if (atapp_config.IsSequence()) {
+                            for (size_t j = 0; j < atapp_config.size(); ++j) {
+                                const YAML::Node atapp_external_ele = atapp_config[j];
+                                if (!atapp_external_ele) {
+                                    continue;
+                                }
+                                if (!atapp_external_ele.IsScalar()) {
+                                    continue;
+                                }
+                                if (atapp_external_ele.Scalar().empty()) {
+                                    continue;
+                                }
+                                pending_load_files.push_back(atapp_external_ele.Scalar());
+                            }
+                        } else if (atapp_config.IsScalar()) {
+                            if (!atapp_config.Scalar().empty()) {
+                                pending_load_files.push_back(atapp_config.Scalar());
+                            }
                         }
                     }
-                }
 #if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
-                } catch(YAML::ParserException& e) {
-                    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "load configure file " << file_rule << " failed."<< e.what() << std::endl;
+                } catch (YAML::ParserException &e) {
+                    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "load configure file " << file_rule << " failed."
+                         << e.what() << std::endl;
                     FWLOGERROR("load configure file {} failed.{}", file_rule, e.what());
                     ret = false;
-                } catch(YAML::BadSubscript& e) {
-                    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "load configure file " << file_rule << " failed."<< e.what() << std::endl;
+                } catch (YAML::BadSubscript &e) {
+                    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "load configure file " << file_rule << " failed."
+                         << e.what() << std::endl;
                     FWLOGERROR("load configure file {} failed.{}", file_rule, e.what());
                     ret = false;
-                } catch(...) {
-                    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "load configure file " << file_rule << " failed." << std::endl;
+                } catch (...) {
+                    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "load configure file " << file_rule << " failed."
+                         << std::endl;
                     FWLOGERROR("load configure file {} failed.", file_rule);
                     ret = false;
                 }
@@ -480,7 +488,8 @@ namespace atapp {
             } else {
                 conf_external_loaded_index = conf_loader.get_node("atapp.config.external").size();
                 if (conf_loader.load_file(file_rule.c_str(), false) < 0) {
-                    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "load configure file " << file_rule << " failed" << std::endl;
+                    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "load configure file " << file_rule << " failed"
+                         << std::endl;
                     FWLOGERROR("load configure file {} failed", file_rule);
                     ret = false;
                     continue;
@@ -489,8 +498,8 @@ namespace atapp {
                 }
 
                 // external files
-                util::config::ini_value& external_paths = conf_loader.get_node("atapp.config.external");
-                for (size_t i = conf_external_loaded_index; i < external_paths.size(); ++ i) {
+                util::config::ini_value &external_paths = conf_loader.get_node("atapp.config.external");
+                for (size_t i = conf_external_loaded_index; i < external_paths.size(); ++i) {
                     pending_load_files.push_back(external_paths.as_cpp_string(i));
                 }
             }
@@ -500,7 +509,7 @@ namespace atapp {
     }
 
     LIBATAPP_MACRO_API int app::reload() {
-        atbus::adapter::loop_t* old_loop = conf_.bus_conf.ev_loop;
+        atbus::adapter::loop_t *old_loop                              = conf_.bus_conf.ev_loop;
         ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration old_tick_interval = conf_.origin.timer().tick_interval();
         util::cli::shell_stream ss(std::cerr);
 
@@ -550,7 +559,8 @@ namespace atapp {
         }
 
         // step 8. if running and tick interval changed, reset timer
-        if (old_tick_interval.seconds() != conf_.origin.timer().tick_interval().seconds() || old_tick_interval.nanos() != conf_.origin.timer().tick_interval().nanos()) {
+        if (old_tick_interval.seconds() != conf_.origin.timer().tick_interval().seconds() ||
+            old_tick_interval.nanos() != conf_.origin.timer().tick_interval().nanos()) {
             set_flag(flag_t::RESET_TIMER, true);
 
             if (is_running()) {
@@ -586,19 +596,22 @@ namespace atapp {
         util::time::time_utility::update();
         // record start time point
         util::time::time_utility::raw_time_t start_tp = util::time::time_utility::now();
-        util::time::time_utility::raw_time_t end_tp = start_tp;
+        util::time::time_utility::raw_time_t end_tp   = start_tp;
 
-        std::chrono::system_clock::duration conf_tick_interval = std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::seconds(conf_.origin.timer().tick_interval().seconds()));
-        conf_tick_interval += std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::nanoseconds(conf_.origin.timer().tick_interval().seconds()));
+        std::chrono::system_clock::duration conf_tick_interval = std::chrono::duration_cast<std::chrono::system_clock::duration>(
+            std::chrono::seconds(conf_.origin.timer().tick_interval().seconds()));
+        conf_tick_interval += std::chrono::duration_cast<std::chrono::system_clock::duration>(
+            std::chrono::nanoseconds(conf_.origin.timer().tick_interval().seconds()));
 
         do {
             if (tick_timer_.sec != util::time::time_utility::get_sys_now()) {
-                tick_timer_.sec = util::time::time_utility::get_sys_now();
-                tick_timer_.usec = 0;
+                tick_timer_.sec        = util::time::time_utility::get_sys_now();
+                tick_timer_.usec       = 0;
                 tick_timer_.sec_update = util::time::time_utility::now();
             } else {
                 tick_timer_.usec = static_cast<time_t>(
-                    std::chrono::duration_cast<std::chrono::microseconds>(util::time::time_utility::now() - tick_timer_.sec_update).count());
+                    std::chrono::duration_cast<std::chrono::microseconds>(util::time::time_utility::now() - tick_timer_.sec_update)
+                        .count());
             }
 
             active_count = 0;
@@ -643,7 +656,7 @@ namespace atapp {
         do {
             time_t now_min = util::time::time_utility::get_sys_now() / util::time::time_utility::MINITE_SECONDS;
             if (now_min != stat_.last_checkpoint_min) {
-                time_t last_min = stat_.last_checkpoint_min;
+                time_t last_min           = stat_.last_checkpoint_min;
                 stat_.last_checkpoint_min = now_min;
                 if (last_min + 1 == now_min) {
                     uv_rusage_t last_usage;
@@ -661,21 +674,25 @@ namespace atapp {
                     std::pair<uint64_t, const char *> max_rss = make_size_showup(last_usage.ru_maxrss);
 #ifdef WIN32
                     FWLOGINFO("[STAT]: {} CPU usage: user {:02.3}%, sys {:02.3}%, max rss: {}{}, page faults: {}", get_app_name(),
-                             offset_usr / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f), // usec and add %
-                             offset_sys / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f), // usec and add %
-                             static_cast<unsigned long long>(max_rss.first), max_rss.second, static_cast<unsigned long long>(last_usage.ru_majflt));
+                              offset_usr / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f), // usec and add %
+                              offset_sys / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f), // usec and add %
+                              static_cast<unsigned long long>(max_rss.first), max_rss.second,
+                              static_cast<unsigned long long>(last_usage.ru_majflt));
 #else
                     std::pair<uint64_t, const char *> ru_ixrss = make_size_showup(last_usage.ru_ixrss);
                     std::pair<uint64_t, const char *> ru_idrss = make_size_showup(last_usage.ru_idrss);
                     std::pair<uint64_t, const char *> ru_isrss = make_size_showup(last_usage.ru_isrss);
-                    FWLOGINFO("[STAT]: {} CPU usage: user {:02.3}%, sys {:02.3}%, max rss: {}{}, shared size: {}{}, unshared data size: {}{}, unshared "
-                             "stack size: {}{}, page faults: {}",
-                             get_app_name(),
-                             offset_usr / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f), // usec and add %
-                             offset_sys / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f), // usec and add %
-                             static_cast<unsigned long long>(max_rss.first), max_rss.second, static_cast<unsigned long long>(ru_ixrss.first), ru_ixrss.second,
-                             static_cast<unsigned long long>(ru_idrss.first), ru_idrss.second, static_cast<unsigned long long>(ru_isrss.first), ru_isrss.second,
-                             static_cast<unsigned long long>(last_usage.ru_majflt));
+                    FWLOGINFO("[STAT]: {} CPU usage: user {:02.3}%, sys {:02.3}%, max rss: {}{}, shared size: {}{}, unshared data size: "
+                              "{}{}, unshared "
+                              "stack size: {}{}, page faults: {}",
+                              get_app_name(),
+                              offset_usr / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f), // usec and add %
+                              offset_sys / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f), // usec and add %
+                              static_cast<unsigned long long>(max_rss.first), max_rss.second,
+                              static_cast<unsigned long long>(ru_ixrss.first), ru_ixrss.second,
+                              static_cast<unsigned long long>(ru_idrss.first), ru_idrss.second,
+                              static_cast<unsigned long long>(ru_isrss.first), ru_isrss.second,
+                              static_cast<unsigned long long>(last_usage.ru_majflt));
 #endif
                 } else {
                     uv_getrusage(&stat_.last_checkpoint_usage);
@@ -691,9 +708,13 @@ namespace atapp {
 
     LIBATAPP_MACRO_API app::app_id_t app::get_id() const { return conf_.id; }
 
-    LIBATAPP_MACRO_API app::app_id_t app::convert_app_id_by_string(const char *id_in) const { return convert_app_id_by_string(id_in, conf_.id_mask); }
+    LIBATAPP_MACRO_API app::app_id_t app::convert_app_id_by_string(const char *id_in) const {
+        return convert_app_id_by_string(id_in, conf_.id_mask);
+    }
 
-    LIBATAPP_MACRO_API std::string app::convert_app_id_to_string(app_id_t id_in, bool hex) const { return convert_app_id_to_string(id_in, conf_.id_mask, hex); }
+    LIBATAPP_MACRO_API std::string app::convert_app_id_to_string(app_id_t id_in, bool hex) const {
+        return convert_app_id_to_string(id_in, conf_.id_mask, hex);
+    }
 
     LIBATAPP_MACRO_API void app::add_module(module_ptr_t module) {
         if (this == module->owner_) {
@@ -836,7 +857,7 @@ namespace atapp {
     LIBATAPP_MACRO_API app::yaml_conf_map_t &app::get_yaml_loaders() { return yaml_loader_; }
     LIBATAPP_MACRO_API const app::yaml_conf_map_t &app::get_yaml_loaders() const { return yaml_loader_; }
 
-    LIBATAPP_MACRO_API void app::parse_configures_into(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message& dst, const std::string& path) const {
+    LIBATAPP_MACRO_API void app::parse_configures_into(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst, const std::string &path) const {
         if (!path.empty()) {
             util::config::ini_value::node_type::const_iterator iter = cfg_loader_.get_root_node().get_children().find(path);
             if (iter != cfg_loader_.get_root_node().get_children().end()) {
@@ -846,17 +867,17 @@ namespace atapp {
             ini_loader_dump_to(cfg_loader_.get_root_node(), dst);
         }
 
-        for (yaml_conf_map_t::const_iterator iter = yaml_loader_.begin(); iter != yaml_loader_.end(); ++ iter) {
-            for (size_t i = 0; i < iter->second.size(); ++ i) {
+        for (yaml_conf_map_t::const_iterator iter = yaml_loader_.begin(); iter != yaml_loader_.end(); ++iter) {
+            for (size_t i = 0; i < iter->second.size(); ++i) {
                 yaml_loader_dump_to(yaml_loader_get_child_by_path(iter->second[i], path), dst);
             }
         }
     }
 
-    LIBATAPP_MACRO_API const atapp::protocol::atapp_configure& app::get_origin_configure() const { return conf_.origin; }
-    LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata& app::get_metadata() const { return conf_.metadata; }
+    LIBATAPP_MACRO_API const atapp::protocol::atapp_configure &app::get_origin_configure() const { return conf_.origin; }
+    LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata &app::get_metadata() const { return conf_.metadata; }
 
-    LIBATAPP_MACRO_API void app::pack(atapp::protocol::atapp_discovery& out) const {
+    LIBATAPP_MACRO_API void app::pack(atapp::protocol::atapp_discovery &out) const {
         out.set_id(get_id());
         out.set_name(get_app_name());
         out.set_hostname(atbus::node::get_hostname());
@@ -871,20 +892,18 @@ namespace atapp {
         out.set_version(get_app_version());
         // out.set_custom_data(get_conf_custom_data());
         out.mutable_gateway()->Reserve(conf_.origin.bus().gateway().size());
-        for (int i = 0; i < conf_.origin.bus().gateway().size(); ++ i) {
+        for (int i = 0; i < conf_.origin.bus().gateway().size(); ++i) {
             out.add_gateway(conf_.origin.bus().gateway(i));
         }
 
         out.mutable_metadata()->CopyFrom(get_metadata());
 
         if (bus_node_) {
-            const std::vector<atbus::endpoint_subnet_conf>& subnets = bus_node_->get_conf().subnets;
-            for (size_t i = 0; i < subnets.size(); ++ i) {
-                atbus::protocol::subnet_range* subset = out.add_subnets();
+            const std::vector<atbus::endpoint_subnet_conf> &subnets = bus_node_->get_conf().subnets;
+            for (size_t i = 0; i < subnets.size(); ++i) {
+                atbus::protocol::subnet_range *subset = out.add_subnets();
                 if (NULL == subset) {
-                    FWLOGERROR("pack configures for {}(0x{:x}) but malloc subnet_range failed", 
-                        get_app_name(), get_id()
-                    );
+                    FWLOGERROR("pack configures for {}(0x{:x}) but malloc subnet_range failed", get_app_name(), get_id());
                     break;
                 }
 
@@ -894,14 +913,15 @@ namespace atapp {
 
             out.mutable_listen()->Reserve(static_cast<int>(bus_node_->get_listen_list().size()));
             // std::list<std::string>
-            for (std::list<std::string>::const_iterator iter = bus_node_->get_listen_list().begin(); iter != bus_node_->get_listen_list().end(); ++ iter) {
+            for (std::list<std::string>::const_iterator iter = bus_node_->get_listen_list().begin();
+                 iter != bus_node_->get_listen_list().end(); ++iter) {
                 out.add_listen(*iter);
             }
             out.set_atbus_protocol_version(bus_node_->get_protocol_version());
             out.set_atbus_protocol_min_version(bus_node_->get_protocol_minimal_version());
         } else {
             out.mutable_listen()->Reserve(conf_.origin.bus().listen().size());
-            for (int i = 0; i < conf_.origin.bus().listen().size(); ++ i) {
+            for (int i = 0; i < conf_.origin.bus().listen().size(); ++i) {
                 out.add_listen(conf_.origin.bus().listen(i));
             }
             out.set_atbus_protocol_version(atbus::protocol::ATBUS_PROTOCOL_VERSION);
@@ -927,8 +947,12 @@ namespace atapp {
     LIBATAPP_MACRO_API const app::callback_fn_on_msg_t &app::get_evt_on_recv_msg() const { return evt_on_recv_msg_; }
     LIBATAPP_MACRO_API const app::callback_fn_on_forward_response_t &app::get_evt_on_send_fail() const { return evt_on_forward_response_; }
     LIBATAPP_MACRO_API const app::callback_fn_on_connected_t &app::get_evt_on_app_connected() const { return evt_on_app_connected_; }
-    LIBATAPP_MACRO_API const app::callback_fn_on_disconnected_t &app::get_evt_on_app_disconnected() const { return evt_on_app_disconnected_; }
-    LIBATAPP_MACRO_API const app::callback_fn_on_all_module_inited_t &app::get_evt_on_all_module_inited() const { return evt_on_all_module_inited_; }
+    LIBATAPP_MACRO_API const app::callback_fn_on_disconnected_t &app::get_evt_on_app_disconnected() const {
+        return evt_on_app_disconnected_;
+    }
+    LIBATAPP_MACRO_API const app::callback_fn_on_all_module_inited_t &app::get_evt_on_all_module_inited() const {
+        return evt_on_all_module_inited_;
+    }
 
     void app::ev_stop_timeout(uv_timer_t *handle) {
         assert(handle && handle->data);
@@ -962,10 +986,10 @@ namespace atapp {
     }
 
     int app::apply_configure() {
-        std::string old_name = conf_.origin.name();
+        std::string old_name     = conf_.origin.name();
         std::string old_hostname = conf_.origin.hostname();
         parse_configures_into(conf_.origin, "atapp");
-        
+
         // id and id mask
         if (conf_.id_mask.empty()) {
             split_ids_by_string(conf_.origin.id_mask().c_str(), conf_.id_mask);
@@ -988,7 +1012,8 @@ namespace atapp {
 
         {
             uint64_t hash_out[2];
-            ::util::hash::murmur_hash3_x64_128(conf_.origin.name().c_str(), static_cast<int>(conf_.origin.name().size()), 0x01000193U, hash_out);
+            ::util::hash::murmur_hash3_x64_128(conf_.origin.name().c_str(), static_cast<int>(conf_.origin.name().size()), 0x01000193U,
+                                               hash_out);
             char hash_code_str[40] = {0};
             UTIL_STRFUNC_SNPRINTF(hash_code_str, sizeof(hash_code_str), "%016llX%016llX", static_cast<unsigned long long>(hash_out[0]),
                                   static_cast<unsigned long long>(hash_out[1]));
@@ -999,7 +1024,7 @@ namespace atapp {
         if (!old_hostname.empty()) {
             conf_.origin.set_hostname(old_hostname);
         }
-        
+
         if (!conf_.origin.hostname().empty()) {
             atbus::node::set_hostname(conf_.origin.hostname());
         }
@@ -1009,48 +1034,43 @@ namespace atapp {
 
         {
             conf_.bus_conf.subnets.reserve(static_cast<size_t>(conf_.origin.bus().subnets_size()));
-            for (int i = 0; i < conf_.origin.bus().subnets_size(); ++ i) {
-                const std::string& subset = conf_.origin.bus().subnets(i);
+            for (int i = 0; i < conf_.origin.bus().subnets_size(); ++i) {
+                const std::string &subset      = conf_.origin.bus().subnets(i);
                 std::string::size_type sep_pos = subset.find('/');
                 if (std::string::npos == sep_pos) {
-                    conf_.bus_conf.subnets.push_back(atbus::endpoint_subnet_conf(
-                        0, util::string::to_int<uint32_t>(subset.c_str())
-                    ));
+                    conf_.bus_conf.subnets.push_back(atbus::endpoint_subnet_conf(0, util::string::to_int<uint32_t>(subset.c_str())));
                 } else {
                     conf_.bus_conf.subnets.push_back(atbus::endpoint_subnet_conf(
-                        convert_app_id_by_string(subset.c_str()), 
-                        util::string::to_int<uint32_t>(subset.c_str() + sep_pos + 1)
-                    ));
+                        convert_app_id_by_string(subset.c_str()), util::string::to_int<uint32_t>(subset.c_str() + sep_pos + 1)));
                 }
             }
         }
 
-        conf_.bus_conf.parent_address = conf_.origin.bus().proxy();
-        conf_.bus_conf.loop_times = conf_.origin.bus().loop_times();
-        conf_.bus_conf.ttl = conf_.origin.bus().ttl();
-        conf_.bus_conf.backlog = conf_.origin.bus().backlog();
+        conf_.bus_conf.parent_address          = conf_.origin.bus().proxy();
+        conf_.bus_conf.loop_times              = conf_.origin.bus().loop_times();
+        conf_.bus_conf.ttl                     = conf_.origin.bus().ttl();
+        conf_.bus_conf.backlog                 = conf_.origin.bus().backlog();
         conf_.bus_conf.access_token_max_number = static_cast<size_t>(conf_.origin.bus().access_token_max_number());
         {
             conf_.bus_conf.access_tokens.reserve(static_cast<size_t>(conf_.origin.bus().access_tokens_size()));
-            for (int i = 0; i < conf_.origin.bus().access_tokens_size(); ++ i) {
-                const std::string& access_token = conf_.origin.bus().access_tokens(i);
+            for (int i = 0; i < conf_.origin.bus().access_tokens_size(); ++i) {
+                const std::string &access_token = conf_.origin.bus().access_tokens(i);
                 conf_.bus_conf.access_tokens.push_back(std::vector<unsigned char>());
-                conf_.bus_conf.access_tokens.back().assign(
-                    reinterpret_cast<const unsigned char*>(access_token.data()), 
-                    reinterpret_cast<const unsigned char*>(access_token.data()) + access_token.size()
-                );
+                conf_.bus_conf.access_tokens.back().assign(reinterpret_cast<const unsigned char *>(access_token.data()),
+                                                           reinterpret_cast<const unsigned char *>(access_token.data()) +
+                                                               access_token.size());
             }
         }
 
 
         conf_.bus_conf.first_idle_timeout = conf_.origin.bus().first_idle_timeout().seconds();
-        conf_.bus_conf.ping_interval = conf_.origin.bus().ping_interval().seconds();
-        conf_.bus_conf.retry_interval = conf_.origin.bus().retry_interval().seconds();
-        
-        conf_.bus_conf.fault_tolerant = static_cast<size_t>(conf_.origin.bus().fault_tolerant());
-        conf_.bus_conf.msg_size = static_cast<size_t>(conf_.origin.bus().msg_size());
-        conf_.bus_conf.recv_buffer_size = static_cast<size_t>(conf_.origin.bus().recv_buffer_size());
-        conf_.bus_conf.send_buffer_size = static_cast<size_t>(conf_.origin.bus().send_buffer_size());
+        conf_.bus_conf.ping_interval      = conf_.origin.bus().ping_interval().seconds();
+        conf_.bus_conf.retry_interval     = conf_.origin.bus().retry_interval().seconds();
+
+        conf_.bus_conf.fault_tolerant     = static_cast<size_t>(conf_.origin.bus().fault_tolerant());
+        conf_.bus_conf.msg_size           = static_cast<size_t>(conf_.origin.bus().msg_size());
+        conf_.bus_conf.recv_buffer_size   = static_cast<size_t>(conf_.origin.bus().recv_buffer_size());
+        conf_.bus_conf.send_buffer_size   = static_cast<size_t>(conf_.origin.bus().send_buffer_size());
         conf_.bus_conf.send_buffer_number = static_cast<size_t>(conf_.origin.bus().send_buffer_number());
 
         return 0;
@@ -1106,8 +1126,9 @@ namespace atapp {
                         uv_timer_init(bus_node_->get_evloop(), &timer->timer);
                         timer->timer.data = this;
 
-                        int res = uv_timer_start(&timer->timer, ev_stop_timeout, 
-                            chrono_to_libuv_duration(conf_.origin.timer().stop_timeout(), ATAPP_DEFAULT_STOP_TIMEOUT), 0);
+                        int res =
+                            uv_timer_start(&timer->timer, ev_stop_timeout,
+                                           chrono_to_libuv_duration(conf_.origin.timer().stop_timeout(), ATAPP_DEFAULT_STOP_TIMEOUT), 0);
                         if (0 == res) {
                             tick_timer_.timeout_timer = timer;
                         } else {
@@ -1121,7 +1142,8 @@ namespace atapp {
                 }
 
                 // stop atbus after all module closed
-                if (check_flag(flag_t::STOPPED) && bus_node_ && ::atbus::node::state_t::CREATED != bus_node_->get_state() && !bus_node_->check_flag(::atbus::node::flag_t::EN_FT_SHUTDOWN)) {
+                if (check_flag(flag_t::STOPPED) && bus_node_ && ::atbus::node::state_t::CREATED != bus_node_->get_state() &&
+                    !bus_node_->check_flag(::atbus::node::flag_t::EN_FT_SHUTDOWN)) {
                     bus_node_->shutdown(0);
                 }
             }
@@ -1200,7 +1222,7 @@ namespace atapp {
         return 0;
     }
 
-    static void setup_load_sink(const YAML::Node& log_sink_yaml_src, atapp::protocol::atapp_log_sink& out) {
+    static void setup_load_sink(const YAML::Node &log_sink_yaml_src, atapp::protocol::atapp_log_sink &out) {
         // yaml_loader_dump_to(src, out); // already dumped before in setup_load_category(...)
 
         if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_file_sink_name().c_str())) {
@@ -1218,7 +1240,8 @@ namespace atapp {
         }
     }
 
-    static void setup_load_category(const YAML::Node& src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::RepeatedPtrField<atapp::protocol::atapp_log_category>& out) {
+    static void setup_load_category(const YAML::Node &src,
+                                    ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::RepeatedPtrField<atapp::protocol::atapp_log_category> &out) {
         if (!src || !src.IsMap()) {
             return;
         }
@@ -1232,8 +1255,8 @@ namespace atapp {
             return;
         }
 
-        atapp::protocol::atapp_log_category* log_cat = NULL;
-        for (int i = 0; i < out.size() && NULL == log_cat; ++ i) {
+        atapp::protocol::atapp_log_category *log_cat = NULL;
+        for (int i = 0; i < out.size() && NULL == log_cat; ++i) {
             if (out.Get(i).name() == name_node.Scalar()) {
                 log_cat = out.Mutable(i);
             }
@@ -1245,7 +1268,8 @@ namespace atapp {
 
         if (NULL == log_cat) {
             util::cli::shell_stream ss(std::cerr);
-            ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "log " << name_node.Scalar() << "malloc category failed, skipped." << std::endl;
+            ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "log " << name_node.Scalar() << "malloc category failed, skipped."
+                 << std::endl;
             return;
         }
 
@@ -1260,7 +1284,7 @@ namespace atapp {
         if (sink_node.IsMap() && log_cat->sink_size() > old_sink_count) {
             setup_load_sink(sink_node, *log_cat->mutable_sink(old_sink_count));
         } else if (sink_node.IsSequence()) {
-            for (int i = 0; i + old_sink_count < log_cat->sink_size(); ++ i) {
+            for (int i = 0; i + old_sink_count < log_cat->sink_size(); ++i) {
                 if (static_cast<size_t>(i) >= sink_node.size()) {
                     break;
                 }
@@ -1292,15 +1316,15 @@ namespace atapp {
                 if (mod && mod->is_enabled()) {
                     int res = mod->setup_log();
                     if (0 != res) {
-                        ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "setup log for module " << mod->name() << " failed, result: " << res << "."
-                             << std::endl;
+                        ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "setup log for module " << mod->name()
+                             << " failed, result: " << res << "." << std::endl;
                         return res;
                     }
                 }
             }
         }
 
-        typedef ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::RepeatedPtrField<::atapp::protocol::atapp_log_category> log_cat_array_t;
+        typedef ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::atapp::protocol::atapp_log_category> log_cat_array_t;
         log_cat_array_t categories;
         // load log configure - ini/conf
         {
@@ -1308,8 +1332,9 @@ namespace atapp {
             uint32_t log_cat_number = LOG_WRAPPER_CATEGORIZE_SIZE;
             cfg_loader_.dump_to("atapp.log.cat.number", log_cat_number);
             if (log_cat_number > LOG_WRAPPER_CATEGORIZE_SIZE) {
-                ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "log categorize should not be greater than " << LOG_WRAPPER_CATEGORIZE_SIZE
-                    << ". you can define LOG_WRAPPER_CATEGORIZE_SIZE to a greater number and rebuild atapp." << std::endl;
+                ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "log categorize should not be greater than "
+                     << LOG_WRAPPER_CATEGORIZE_SIZE << ". you can define LOG_WRAPPER_CATEGORIZE_SIZE to a greater number and rebuild atapp."
+                     << std::endl;
                 log_cat_number = LOG_WRAPPER_CATEGORIZE_SIZE;
             }
 
@@ -1318,15 +1343,16 @@ namespace atapp {
             for (uint32_t i = 0; i < log_cat_number; ++i) {
                 UTIL_STRFUNC_SNPRINTF(log_path, sizeof(log_path), "atapp.log.cat.%u", i);
 
-                util::config::ini_value& log_cat_conf_src = cfg_loader_.get_node(log_path);
-                std::string log_name = log_cat_conf_src["name"].as_cpp_string();
+                util::config::ini_value &log_cat_conf_src = cfg_loader_.get_node(log_path);
+                std::string log_name                      = log_cat_conf_src["name"].as_cpp_string();
                 if (log_name.empty()) {
                     continue;
                 }
 
-                ::atapp::protocol::atapp_log_category* log_cat_conf = categories.Add();
+                ::atapp::protocol::atapp_log_category *log_cat_conf = categories.Add();
                 if (NULL == log_cat_conf) {
-                    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "log malloc " << log_name << "(" << i << ") failed, skipped." << std::endl;
+                    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "log malloc " << log_name << "(" << i
+                         << ") failed, skipped." << std::endl;
                     continue;
                 }
                 ini_loader_dump_to(log_cat_conf_src, *log_cat_conf);
@@ -1334,17 +1360,18 @@ namespace atapp {
                 // register log handles
                 for (uint32_t j = 0;; ++j) {
                     UTIL_STRFUNC_SNPRINTF(log_path, sizeof(log_path), "atapp.log.%s.%u", log_name.c_str(), j);
-                    
-                    util::config::ini_value& log_sink_conf_src = cfg_loader_.get_node(log_path);
-                    std::string sink_type = log_sink_conf_src["type"].as_cpp_string();
+
+                    util::config::ini_value &log_sink_conf_src = cfg_loader_.get_node(log_path);
+                    std::string sink_type                      = log_sink_conf_src["type"].as_cpp_string();
 
                     if (sink_type.empty()) {
                         break;
                     }
 
-                    ::atapp::protocol::atapp_log_sink* log_sink = log_cat_conf->add_sink();
+                    ::atapp::protocol::atapp_log_sink *log_sink = log_cat_conf->add_sink();
                     if (NULL == log_sink) {
-                        ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "log " << log_name << "(" << i << ") malloc sink "<< sink_type<< "failed, skipped." << std::endl;
+                        ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "log " << log_name << "(" << i << ") malloc sink "
+                             << sink_type << "failed, skipped." << std::endl;
                         continue;
                     }
 
@@ -1369,43 +1396,43 @@ namespace atapp {
         conf_.log.mutable_category()->Swap(&categories);
 
         // load log configure - yaml
-        for (yaml_conf_map_t::const_iterator iter = yaml_loader_.begin(); iter != yaml_loader_.end(); ++ iter) {
-            for (size_t i = 0; i < iter->second.size(); ++ i) {
+        for (yaml_conf_map_t::const_iterator iter = yaml_loader_.begin(); iter != yaml_loader_.end(); ++iter) {
+            for (size_t i = 0; i < iter->second.size(); ++i) {
 #if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
                 try {
 #endif
-                const YAML::Node atapp_node = yaml_loader_get_child_by_path(iter->second[i], "atapp");
-                if (!atapp_node || !atapp_node.IsMap()) {
-                    continue;
-                }
-                const YAML::Node log_node = atapp_node["log"];
-                if (!log_node || !log_node.IsMap()) {
-                    continue;
-                }
-                const YAML::Node log_level_node = log_node["level"];
-                if (log_level_node && log_level_node.IsScalar() && !log_level_node.Scalar().empty()) {
-                    conf_.log.set_level(log_level_node.Scalar());
-                }
-                
-                const YAML::Node log_category_node = log_node["category"];
-                if (!log_category_node) {
-                    continue;
-                }
-                if (log_category_node.IsMap()) {
-                    setup_load_category(log_category_node, *conf_.log.mutable_category());
-                } else if (log_category_node.IsSequence()) {
-                    size_t sz = log_category_node.size();
-                    for (size_t j = 0; j < sz; ++ j) {
-                        const YAML::Node cat_node = log_category_node[j];
-                        if (!cat_node || !cat_node.IsMap()) {
-                            continue;
-                        }
-                        setup_load_category(cat_node, *conf_.log.mutable_category());
+                    const YAML::Node atapp_node = yaml_loader_get_child_by_path(iter->second[i], "atapp");
+                    if (!atapp_node || !atapp_node.IsMap()) {
+                        continue;
                     }
-                }
-                
+                    const YAML::Node log_node = atapp_node["log"];
+                    if (!log_node || !log_node.IsMap()) {
+                        continue;
+                    }
+                    const YAML::Node log_level_node = log_node["level"];
+                    if (log_level_node && log_level_node.IsScalar() && !log_level_node.Scalar().empty()) {
+                        conf_.log.set_level(log_level_node.Scalar());
+                    }
+
+                    const YAML::Node log_category_node = log_node["category"];
+                    if (!log_category_node) {
+                        continue;
+                    }
+                    if (log_category_node.IsMap()) {
+                        setup_load_category(log_category_node, *conf_.log.mutable_category());
+                    } else if (log_category_node.IsSequence()) {
+                        size_t sz = log_category_node.size();
+                        for (size_t j = 0; j < sz; ++j) {
+                            const YAML::Node cat_node = log_category_node[j];
+                            if (!cat_node || !cat_node.IsMap()) {
+                                continue;
+                            }
+                            setup_load_category(cat_node, *conf_.log.mutable_category());
+                        }
+                    }
+
 #if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
-                } catch(...) {
+                } catch (...) {
                     // Ignore error
                 }
 #endif
@@ -1414,16 +1441,17 @@ namespace atapp {
 
         // copy to atapp
         int log_level_id = util::log::log_wrapper::level_t::LOG_LW_INFO;
-        log_level_id = util::log::log_formatter::get_level_by_name(conf_.log.level().c_str());
-        
-        for (int i = 0; i < conf_.log.category_size() && i < util::log::log_wrapper::categorize_t::MAX; ++ i) {
+        log_level_id     = util::log::log_formatter::get_level_by_name(conf_.log.level().c_str());
+
+        for (int i = 0; i < conf_.log.category_size() && i < util::log::log_wrapper::categorize_t::MAX; ++i) {
             // init and set prefix
             if (0 != (WLOG_INIT(i, WLOG_LEVELID(log_level_id)))) {
-                ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "log initialize " << conf_.log.category(i).name() << "(" << i << ") failed, skipped." << std::endl;
+                ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "log initialize " << conf_.log.category(i).name() << "(" << i
+                     << ") failed, skipped." << std::endl;
                 continue;
             }
 
-            const ::atapp::protocol::atapp_log_category& log_cat = conf_.log.category(i);
+            const ::atapp::protocol::atapp_log_category &log_cat = conf_.log.category(i);
             if (!log_cat.prefix().empty()) {
                 WLOG_GETCAT(i)->set_prefix_format(log_cat.prefix());
             }
@@ -1449,8 +1477,9 @@ namespace atapp {
 
             // register log handles
             for (int j = 0; j < log_cat.sink_size(); ++j) {
-                const ::atapp::protocol::atapp_log_sink& log_sink = log_cat.sink(j);
-                int log_handle_min = util::log::log_wrapper::level_t::LOG_LW_FATAL, log_handle_max = util::log::log_wrapper::level_t::LOG_LW_DEBUG;
+                const ::atapp::protocol::atapp_log_sink &log_sink = log_cat.sink(j);
+                int log_handle_min                                = util::log::log_wrapper::level_t::LOG_LW_FATAL,
+                    log_handle_max                                = util::log::log_wrapper::level_t::LOG_LW_DEBUG;
                 if (!log_sink.level().min().empty()) {
                     log_handle_min = util::log::log_formatter::get_level_by_name(log_sink.level().min().c_str());
                 }
@@ -1464,15 +1493,15 @@ namespace atapp {
                     if (iter != log_reg_.end()) {
                         util::log::log_wrapper::log_handler_t log_handler = iter->second(*WLOG_GETCAT(i), j, conf_.log, log_cat, log_sink);
                         WLOG_GETCAT(i)->add_sink(log_handler, static_cast<util::log::log_wrapper::level_t::type>(log_handle_min),
-                                                static_cast<util::log::log_wrapper::level_t::type>(log_handle_max));
+                                                 static_cast<util::log::log_wrapper::level_t::type>(log_handle_max));
                         ++new_sink_number;
                     } else {
                         ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "unavailable log type " << log_sink.type()
-                            << ", you can add log type register handle before init." << std::endl;
+                             << ", you can add log type register handle before init." << std::endl;
                     }
                 } else {
                     WLOG_GETCAT(i)->set_sink(new_sink_number, static_cast<util::log::log_wrapper::level_t::type>(log_handle_min),
-                                            static_cast<util::log::log_wrapper::level_t::type>(log_handle_max));
+                                             static_cast<util::log::log_wrapper::level_t::type>(log_handle_max));
                     ++new_sink_number;
                 }
             }
@@ -1505,32 +1534,36 @@ namespace atapp {
         }
 
         // setup all callbacks
-        connection_node->set_on_recv_handle(std::bind(&app::bus_evt_callback_on_recv_msg, this, std::placeholders::_1, std::placeholders::_2,
-                                                      std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6));
+        connection_node->set_on_recv_handle(std::bind(&app::bus_evt_callback_on_recv_msg, this, std::placeholders::_1,
+                                                      std::placeholders::_2, std::placeholders::_3, std::placeholders::_4,
+                                                      std::placeholders::_5, std::placeholders::_6));
 
-        connection_node->set_on_forward_response_handle(
-            std::bind(&app::bus_evt_callback_on_forward_response, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
+        connection_node->set_on_forward_response_handle(std::bind(&app::bus_evt_callback_on_forward_response, this, std::placeholders::_1,
+                                                                  std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 
         connection_node->set_on_error_handle(std::bind(&app::bus_evt_callback_on_error, this, std::placeholders::_1, std::placeholders::_2,
                                                        std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
 
-        connection_node->set_on_register_handle(
-            std::bind(&app::bus_evt_callback_on_reg, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
+        connection_node->set_on_register_handle(std::bind(&app::bus_evt_callback_on_reg, this, std::placeholders::_1, std::placeholders::_2,
+                                                          std::placeholders::_3, std::placeholders::_4));
 
-        connection_node->set_on_shutdown_handle(std::bind(&app::bus_evt_callback_on_shutdown, this, std::placeholders::_1, std::placeholders::_2));
+        connection_node->set_on_shutdown_handle(
+            std::bind(&app::bus_evt_callback_on_shutdown, this, std::placeholders::_1, std::placeholders::_2));
 
-        connection_node->set_on_available_handle(std::bind(&app::bus_evt_callback_on_available, this, std::placeholders::_1, std::placeholders::_2));
+        connection_node->set_on_available_handle(
+            std::bind(&app::bus_evt_callback_on_available, this, std::placeholders::_1, std::placeholders::_2));
 
-        connection_node->set_on_invalid_connection_handle(
-            std::bind(&app::bus_evt_callback_on_invalid_connection, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+        connection_node->set_on_invalid_connection_handle(std::bind(&app::bus_evt_callback_on_invalid_connection, this,
+                                                                    std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
-        connection_node->set_on_custom_cmd_handle(std::bind(&app::bus_evt_callback_on_custom_cmd, this, std::placeholders::_1, std::placeholders::_2,
-                                                            std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6));
+        connection_node->set_on_custom_cmd_handle(std::bind(&app::bus_evt_callback_on_custom_cmd, this, std::placeholders::_1,
+                                                            std::placeholders::_2, std::placeholders::_3, std::placeholders::_4,
+                                                            std::placeholders::_5, std::placeholders::_6));
         connection_node->set_on_add_endpoint_handle(
             std::bind(&app::bus_evt_callback_on_add_endpoint, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
-        connection_node->set_on_remove_endpoint_handle(
-            std::bind(&app::bus_evt_callback_on_remove_endpoint, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+        connection_node->set_on_remove_endpoint_handle(std::bind(&app::bus_evt_callback_on_remove_endpoint, this, std::placeholders::_1,
+                                                                 std::placeholders::_2, std::placeholders::_3));
 
 
         // TODO if not in resume mode, destroy shm
@@ -1542,8 +1575,9 @@ namespace atapp {
             if (res < 0) {
 #ifdef _WIN32
                 if (EN_ATBUS_ERR_SHM_GET_FAILED == res) {
-                    FWLOGERROR("Using global shared memory require SeCreateGlobalPrivilege, try to run as Administrator.\nWe will ignore {} this time.",
-                              conf_.origin.bus().listen(i));
+                    FWLOGERROR("Using global shared memory require SeCreateGlobalPrivilege, try to run as Administrator.\nWe will ignore "
+                               "{} this time.",
+                               conf_.origin.bus().listen(i));
                     util::cli::shell_stream ss(std::cerr);
                     ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED
                          << "Using global shared memory require SeCreateGlobalPrivilege, try to run as Administrator." << std::endl
@@ -1558,8 +1592,8 @@ namespace atapp {
                         atbus::channel::make_address(conf_.origin.bus().listen(i).c_str(), address);
                         std::string abs_path = util::file_system::get_abs_path(address.host.c_str());
                         FWLOGERROR("listen pipe socket {}, but the length ({}) exceed the limit {}", abs_path,
-                                  static_cast<unsigned long long>(abs_path.size()),
-                                  static_cast<unsigned long long>(atbus::channel::io_stream_get_max_unix_socket_length()));
+                                   static_cast<unsigned long long>(abs_path.size()),
+                                   static_cast<unsigned long long>(atbus::channel::io_stream_get_max_unix_socket_length()));
                     }
                     ret = res;
 #ifdef _WIN32
@@ -1581,7 +1615,8 @@ namespace atapp {
         }
 
         // if has father node, block and connect to father node
-        if (atbus::node::state_t::CONNECTING_PARENT == connection_node->get_state() || atbus::node::state_t::LOST_PARENT == connection_node->get_state()) {
+        if (atbus::node::state_t::CONNECTING_PARENT == connection_node->get_state() ||
+            atbus::node::state_t::LOST_PARENT == connection_node->get_state()) {
             // setup timeout and waiting for parent connected
             if (!tick_timer_.timeout_timer) {
                 timer_ptr_t timer = std::make_shared<timer_info_t>();
@@ -1589,7 +1624,8 @@ namespace atapp {
                 uv_timer_init(connection_node->get_evloop(), &timer->timer);
                 timer->timer.data = this;
 
-                res = uv_timer_start(&timer->timer, ev_stop_timeout, chrono_to_libuv_duration(conf_.origin.timer().stop_timeout(), ATAPP_DEFAULT_STOP_TIMEOUT), 0);
+                res = uv_timer_start(&timer->timer, ev_stop_timeout,
+                                     chrono_to_libuv_duration(conf_.origin.timer().stop_timeout(), ATAPP_DEFAULT_STOP_TIMEOUT), 0);
                 if (0 == res) {
                     tick_timer_.timeout_timer = timer;
                 } else {
@@ -1653,7 +1689,8 @@ namespace atapp {
         if (chrono_to_libuv_duration(conf_.origin.timer().tick_interval(), 0) < 1) {
             FWLOGWARNING("tick interval can not smaller than 1ms, we use default {}ms now.", ATAPP_DEFAULT_TICK_INTERVAL);
         } else {
-            FWLOGINFO("setup tick interval to {}ms.", static_cast<unsigned long long>(chrono_to_libuv_duration(conf_.origin.timer().tick_interval(), ATAPP_DEFAULT_TICK_INTERVAL)));
+            FWLOGINFO("setup tick interval to {}ms.", static_cast<unsigned long long>(chrono_to_libuv_duration(
+                                                          conf_.origin.timer().tick_interval(), ATAPP_DEFAULT_TICK_INTERVAL)));
         }
 
         timer_ptr_t timer = std::make_shared<timer_info_t>();
@@ -1661,10 +1698,9 @@ namespace atapp {
         uv_timer_init(bus_node_->get_evloop(), &timer->timer);
         timer->timer.data = this;
 
-        int res = uv_timer_start(&timer->timer, _app_tick_timer_handle, 
-            chrono_to_libuv_duration(conf_.origin.timer().tick_interval(), ATAPP_DEFAULT_TICK_INTERVAL),
-            chrono_to_libuv_duration(conf_.origin.timer().tick_interval(), ATAPP_DEFAULT_TICK_INTERVAL)
-        );
+        int res = uv_timer_start(&timer->timer, _app_tick_timer_handle,
+                                 chrono_to_libuv_duration(conf_.origin.timer().tick_interval(), ATAPP_DEFAULT_TICK_INTERVAL),
+                                 chrono_to_libuv_duration(conf_.origin.timer().tick_interval(), ATAPP_DEFAULT_TICK_INTERVAL));
         if (0 == res) {
             tick_timer_.tick_timer = timer;
         } else {
@@ -1685,7 +1721,8 @@ namespace atapp {
             pid_file.open(conf_.pid_file.c_str(), std::ios::out | std::ios::trunc);
             if (!pid_file.is_open()) {
                 util::cli::shell_stream ss(std::cerr);
-                ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "open and write pid file " << conf_.pid_file << " failed" << std::endl;
+                ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "open and write pid file " << conf_.pid_file << " failed"
+                     << std::endl;
                 FWLOGERROR("open and write pid file {} failed", conf_.pid_file);
                 // failed and skip running
                 return false;
@@ -1705,7 +1742,8 @@ namespace atapp {
             pid_file.open(conf_.pid_file.c_str(), std::ios::in);
             if (!pid_file.is_open()) {
                 util::cli::shell_stream ss(std::cerr);
-                ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "try to remove pid file " << conf_.pid_file << " failed" << std::endl;
+                ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "try to remove pid file " << conf_.pid_file << " failed"
+                     << std::endl;
 
                 // failed and skip running
                 return false;
@@ -1716,8 +1754,8 @@ namespace atapp {
 
                 if (pid != atbus::node::get_pid()) {
                     util::cli::shell_stream ss(std::cerr);
-                    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW << "skip remove pid file " << conf_.pid_file << ". because it has pid " << pid
-                         << ", but our pid is " << atbus::node::get_pid() << std::endl;
+                    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW << "skip remove pid file " << conf_.pid_file
+                         << ". because it has pid " << pid << ", but our pid is " << atbus::node::get_pid() << std::endl;
 
                     return false;
                 } else {
@@ -1732,8 +1770,8 @@ namespace atapp {
     void app::print_help() {
         util::cli::shell_stream shls(std::cout);
 
-        shls() << util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW << util::cli::shell_font_style::SHELL_FONT_SPEC_BOLD << "Usage: " << conf_.execute_path
-               << " <options> <command> [command paraters...]" << std::endl;
+        shls() << util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW << util::cli::shell_font_style::SHELL_FONT_SPEC_BOLD
+               << "Usage: " << conf_.execute_path << " <options> <command> [command paraters...]" << std::endl;
         shls() << get_option_manager()->get_help_msg() << std::endl << std::endl;
 
         if (!(get_command_manager()->empty() && get_command_manager()->children_empty())) {
@@ -1745,7 +1783,7 @@ namespace atapp {
 
     LIBATAPP_MACRO_API app::custom_command_sender_t app::get_custom_command_sender(util::cli::callback_param params) {
         custom_command_sender_t ret;
-        ret.self = NULL;
+        ret.self     = NULL;
         ret.response = NULL;
         if (NULL != params.get_ext_param()) {
             ret = *reinterpret_cast<custom_command_sender_t *>(params.get_ext_param());
@@ -1828,52 +1866,51 @@ namespace atapp {
         return convert_app_id_by_string(id_in, mask);
     }
 
-    LIBATAPP_MACRO_API std::string app::convert_app_id_to_string(app_id_t id_in, const std::vector<app_id_t>& mask_in, bool hex) {
+    LIBATAPP_MACRO_API std::string app::convert_app_id_to_string(app_id_t id_in, const std::vector<app_id_t> &mask_in, bool hex) {
         std::vector<app_id_t> ids;
         ids.resize(mask_in.size(), 0);
 
-        for (size_t i = 0; i < mask_in.size(); ++ i) {
+        for (size_t i = 0; i < mask_in.size(); ++i) {
             size_t idx = mask_in.size() - i - 1;
-            ids[idx] = id_in & ((static_cast<app_id_t>(1) << mask_in[idx]) - 1);
+            ids[idx]   = id_in & ((static_cast<app_id_t>(1) << mask_in[idx]) - 1);
             id_in >>= mask_in[idx];
         }
 
         std::stringstream ss;
         if (hex) {
-            ss<< std::hex;
+            ss << std::hex;
         }
 
-        for (size_t i = 0; i < ids.size(); ++ i) {
+        for (size_t i = 0; i < ids.size(); ++i) {
             if (0 != i) {
-                ss<< ".";
+                ss << ".";
             }
 
             if (hex) {
-                ss<< "0x";
+                ss << "0x";
             }
-            ss<< ids[i];
+            ss << ids[i];
         }
 
         return ss.str();
     }
 
-    LIBATAPP_MACRO_API std::string app::convert_app_id_to_string(app_id_t id_in, const char* mask_in, bool hex) {
+    LIBATAPP_MACRO_API std::string app::convert_app_id_to_string(app_id_t id_in, const char *mask_in, bool hex) {
         std::vector<app_id_t> mask;
         split_ids_by_string(mask_in, mask);
         return convert_app_id_to_string(id_in, mask, hex);
     }
 
-    LIBATAPP_MACRO_API app* app::get_last_instance() {
-        return last_instance_;
-    }
+    LIBATAPP_MACRO_API app *app::get_last_instance() { return last_instance_; }
 
-    int app::prog_option_handler_help(util::cli::callback_param /*params*/, util::cli::cmd_option *opt_mgr, util::cli::cmd_option_ci *cmd_mgr) {
+    int app::prog_option_handler_help(util::cli::callback_param /*params*/, util::cli::cmd_option *opt_mgr,
+                                      util::cli::cmd_option_ci *cmd_mgr) {
         assert(opt_mgr);
         mode_ = mode_t::INFO;
         util::cli::shell_stream shls(std::cout);
 
-        shls() << util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW << util::cli::shell_font_style::SHELL_FONT_SPEC_BOLD << "Usage: " << conf_.execute_path
-               << " <options> <command> [command paraters...]" << std::endl;
+        shls() << util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW << util::cli::shell_font_style::SHELL_FONT_SPEC_BOLD
+               << "Usage: " << conf_.execute_path << " <options> <command> [command paraters...]" << std::endl;
         shls() << opt_mgr->get_help_msg() << std::endl << std::endl;
 
         shls() << util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW << util::cli::shell_font_style::SHELL_FONT_SPEC_BOLD
@@ -1974,7 +2011,7 @@ namespace atapp {
     void app::setup_option(int argc, const char *argv[], void *priv_data) {
         assert(argc > 0);
 
-        util::cli::cmd_option::ptr_type opt_mgr = get_option_manager();
+        util::cli::cmd_option::ptr_type opt_mgr    = get_option_manager();
         util::cli::cmd_option_ci::ptr_type cmd_mgr = get_command_manager();
         // show help and exit
         opt_mgr->bind_cmd("-h, --help, help", &app::prog_option_handler_help, this, opt_mgr.get(), cmd_mgr.get())
@@ -1985,27 +2022,32 @@ namespace atapp {
             ->set_help_msg("-v, --version                          show version and exit.");
 
         // set app bus id
-        opt_mgr->bind_cmd("-id", &app::prog_option_handler_set_id, this)->set_help_msg("-id <bus id>                           set app bus id.");
+        opt_mgr->bind_cmd("-id", &app::prog_option_handler_set_id, this)
+            ->set_help_msg("-id <bus id>                           set app bus id.");
         // set app bus id
         opt_mgr->bind_cmd("-id-mask", &app::prog_option_handler_set_id_mask, this)
-            ->set_help_msg("-id-mask <bit number of bus id mask>   set app bus id mask(example: 8.8.8.8, and then -id 1.2.3.4 is just like -id 0x01020304).");
+            ->set_help_msg("-id-mask <bit number of bus id mask>   set app bus id mask(example: 8.8.8.8, and then -id 1.2.3.4 is just like "
+                           "-id 0x01020304).");
 
         // set configure file path
         opt_mgr->bind_cmd("-c, --conf, --config", &app::prog_option_handler_set_conf_file, this)
             ->set_help_msg("-c, --conf, --config <file path>       set configure file path.");
 
         // set app pid file
-        opt_mgr->bind_cmd("-p, --pid", &app::prog_option_handler_set_pid, this)->set_help_msg("-p, --pid <pid file>                   set where to store pid.");
+        opt_mgr->bind_cmd("-p, --pid", &app::prog_option_handler_set_pid, this)
+            ->set_help_msg("-p, --pid <pid file>                   set where to store pid.");
 
         // set configure file path
         opt_mgr->bind_cmd("-r, --resume", &app::prog_option_handler_resume_mode, this)
             ->set_help_msg("-r, --resume                           try to resume when start.");
 
         // start server
-        opt_mgr->bind_cmd("start", &app::prog_option_handler_start, this)->set_help_msg("start                                  start mode.");
+        opt_mgr->bind_cmd("start", &app::prog_option_handler_start, this)
+            ->set_help_msg("start                                  start mode.");
 
         // stop server
-        opt_mgr->bind_cmd("stop", &app::prog_option_handler_stop, this)->set_help_msg("stop                                   send stop command to server.");
+        opt_mgr->bind_cmd("stop", &app::prog_option_handler_stop, this)
+            ->set_help_msg("stop                                   send stop command to server.");
 
         // reload all configures
         opt_mgr->bind_cmd("reload", &app::prog_option_handler_reload, this)
@@ -2040,7 +2082,7 @@ namespace atapp {
 
     int app::command_handler_stop(util::cli::callback_param params) {
         char msg[256] = {0};
-        LOG_WRAPPER_FWAPI_FORMAT_TO_N(msg, sizeof(msg), "app node {0:#x} run stop command success", get_id());
+        LOG_WRAPPER_FWAPI_FORMAT_TO_N(msg, sizeof(msg), "app node {:#x} run stop command success", get_id());
         FWLOGINFO("{}", msg);
         add_custom_command_rsp(params, msg);
         return stop();
@@ -2048,7 +2090,7 @@ namespace atapp {
 
     int app::command_handler_reload(util::cli::callback_param params) {
         char msg[256] = {0};
-        LOG_WRAPPER_FWAPI_FORMAT_TO_N(msg, sizeof(msg), "app node {0:#x} run reload command success", get_id());
+        LOG_WRAPPER_FWAPI_FORMAT_TO_N(msg, sizeof(msg), "app node {:#x} run reload command success", get_id());
         FWLOGINFO("{}", msg);
         add_custom_command_rsp(params, msg);
         return reload();
@@ -2062,8 +2104,8 @@ namespace atapp {
         return 0;
     }
 
-    int app::bus_evt_callback_on_recv_msg(const atbus::node &, const atbus::endpoint *, const atbus::connection *, const msg_t &msg, const void *buffer,
-                                          size_t len) {
+    int app::bus_evt_callback_on_recv_msg(const atbus::node &, const atbus::endpoint *, const atbus::connection *, const msg_t &msg,
+                                          const void *buffer, size_t len) {
         // call recv callback
         if (evt_on_recv_msg_) {
             return evt_on_recv_msg_(std::ref(*this), std::cref(msg), buffer, len);
@@ -2073,30 +2115,30 @@ namespace atapp {
         return 0;
     }
 
-    int app::bus_evt_callback_on_forward_response(const atbus::node &, const atbus::endpoint *, const atbus::connection *, const atbus::protocol::msg *m) {
+    int app::bus_evt_callback_on_forward_response(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
+                                                  const atbus::protocol::msg *m) {
         ++last_proc_event_count_;
 
         // call failed callback if it's message transfer
         if (NULL == m) {
-            FWLOGERROR("app {0:#x} receive a send failure without message", get_id());
+            FWLOGERROR("app {:#x} receive a send failure without message", get_id());
             return EN_ATAPP_ERR_SEND_FAILED;
         }
 
         if (m->head().ret() < 0) {
-            FWLOGERROR("app {0:#x} receive a send failure from {0:#x}, message cmd: {}, type: {}, ret: {}, sequence: {}",
-                    get_id(), m->head().src_bus_id(), 
-                    atbus::msg_handler::get_body_name(m->msg_body_case()), m->head().type(),
-                    m->head().ret(), m->head().sequence());
+            FWLOGERROR("app {:#x} receive a send failure from {:#x}, message cmd: {}, type: {}, ret: {}, sequence: {}", get_id(),
+                       m->head().src_bus_id(), atbus::msg_handler::get_body_name(m->msg_body_case()), m->head().type(), m->head().ret(),
+                       m->head().sequence());
         }
 
         if (evt_on_forward_response_) {
-            const atbus::protocol::forward_data* fwd_data = NULL;
+            const atbus::protocol::forward_data *fwd_data = NULL;
             if (atbus::protocol::msg::kDataTransformRsp == m->msg_body_case()) {
                 fwd_data = &m->data_transform_rsp();
             }
             if (NULL != fwd_data) {
                 app_id_t origin_from = fwd_data->to();
-                app_id_t origin_to = fwd_data->from();
+                app_id_t origin_to   = fwd_data->from();
                 return evt_on_forward_response_(std::ref(*this), origin_from, origin_to, std::cref(*m));
             }
         }
@@ -2104,24 +2146,26 @@ namespace atapp {
         return 0;
     }
 
-    int app::bus_evt_callback_on_error(const atbus::node &n, const atbus::endpoint *ep, const atbus::connection *conn, int status, int errcode) {
+    int app::bus_evt_callback_on_error(const atbus::node &n, const atbus::endpoint *ep, const atbus::connection *conn, int status,
+                                       int errcode) {
 
         // meet eof or reset by peer is not a error
         if (UV_EOF == errcode || UV_ECONNRESET == errcode) {
             const char *msg = UV_EOF == errcode ? "got EOF" : "reset by peer";
             if (NULL != conn) {
                 if (NULL != ep) {
-                    FWLOGINFO("bus node {0:#x} endpoint {0:#x} connection {}({}) closed: {}", 
-                        n.get_id(), ep->get_id(), reinterpret_cast<const void*>(conn), conn->get_address().address, msg);
+                    FWLOGINFO("bus node {:#x} endpoint {:#x} connection {}({}) closed: {}", n.get_id(), ep->get_id(),
+                              reinterpret_cast<const void *>(conn), conn->get_address().address, msg);
                 } else {
-                    FWLOGINFO("bus node {0:#x} connection {}({}) closed: {}", n.get_id(), reinterpret_cast<const void*>(conn), conn->get_address().address, msg);
+                    FWLOGINFO("bus node {:#x} connection {}({}) closed: {}", n.get_id(), reinterpret_cast<const void *>(conn),
+                              conn->get_address().address, msg);
                 }
 
             } else {
                 if (NULL != ep) {
-                    FWLOGINFO("bus node {0:#x} endpoint {0:#x} closed: {}", n.get_id(), ep->get_id(), msg);
+                    FWLOGINFO("bus node {:#x} endpoint {:#x} closed: {}", n.get_id(), ep->get_id(), msg);
                 } else {
-                    FWLOGINFO("bus node {0:#x} closed: {}", n.get_id(), msg);
+                    FWLOGINFO("bus node {:#x} closed: {}", n.get_id(), msg);
                 }
             }
             return 0;
@@ -2129,17 +2173,18 @@ namespace atapp {
 
         if (NULL != conn) {
             if (NULL != ep) {
-                FWLOGERROR("bus node {0:#x} endpoint {0:#x} connection {} error, status: {}, error code: {}", 
-                    n.get_id(), ep->get_id(), conn->get_address().address, status, errcode);
+                FWLOGERROR("bus node {:#x} endpoint {:#x} connection {} error, status: {}, error code: {}", n.get_id(), ep->get_id(),
+                           conn->get_address().address, status, errcode);
             } else {
-                FWLOGERROR("bus node {0:#x} connection {} error, status: {}, error code: {}", n.get_id(), conn->get_address().address, status, errcode);
+                FWLOGERROR("bus node {:#x} connection {} error, status: {}, error code: {}", n.get_id(), conn->get_address().address,
+                           status, errcode);
             }
 
         } else {
             if (NULL != ep) {
-                FWLOGERROR("bus node {0:#x} endpoint {0:#x} error, status: {}, error code: {}", n.get_id(), ep->get_id(), status, errcode);
+                FWLOGERROR("bus node {:#x} endpoint {:#x} error, status: {}, error code: {}", n.get_id(), ep->get_id(), status, errcode);
             } else {
-                FWLOGERROR("bus node {0:#x} error, status: {}, error code: {}", n.get_id(), status, errcode);
+                FWLOGERROR("bus node {:#x} error, status: {}, error code: {}", n.get_id(), status, errcode);
             }
         }
 
@@ -2154,8 +2199,8 @@ namespace atapp {
                 WLOGINFO("bus node 0x%llx endpoint 0x%llx connection %s registered, res: %d", static_cast<unsigned long long>(n.get_id()),
                          static_cast<unsigned long long>(ep->get_id()), conn->get_address().address.c_str(), res);
             } else {
-                WLOGINFO("bus node 0x%llx connection %s registered, res: %d", static_cast<unsigned long long>(n.get_id()), conn->get_address().address.c_str(),
-                         res);
+                WLOGINFO("bus node 0x%llx connection %s registered, res: %d", static_cast<unsigned long long>(n.get_id()),
+                         conn->get_address().address.c_str(), res);
             }
 
         } else {
@@ -2171,12 +2216,12 @@ namespace atapp {
     }
 
     int app::bus_evt_callback_on_shutdown(const atbus::node &n, int reason) {
-        FWLOGINFO("bus node {0:#x} shutdown, reason: {}", n.get_id(), reason);
+        FWLOGINFO("bus node {:#x} shutdown, reason: {}", n.get_id(), reason);
         return stop();
     }
 
     int app::bus_evt_callback_on_available(const atbus::node &n, int res) {
-        FWLOGINFO("bus node {0:#x} initialze done, res: {}", n.get_id(), res);
+        FWLOGINFO("bus node {:#x} initialze done, res: {}", n.get_id(), res);
         return res;
     }
 
@@ -2184,23 +2229,24 @@ namespace atapp {
         ++last_proc_event_count_;
 
         if (NULL == conn) {
-            FWLOGERROR("bus node {0:#x} recv a invalid NULL connection , res: {}", n.get_id(), res);
+            FWLOGERROR("bus node {:#x} recv a invalid NULL connection , res: {}", n.get_id(), res);
         } else {
             // already disconncted finished.
             if (atbus::connection::state_t::DISCONNECTED != conn->get_status()) {
                 if (is_closing()) {
-                    FWLOGINFO("bus node {0:#x} make a invalid connection {}({}) when closing, all unfinished connection will be aborted. res: {}", 
-                        n.get_id(), reinterpret_cast<const void*>(conn), conn->get_address().address, res);
+                    FWLOGINFO(
+                        "bus node {:#x} make a invalid connection {}({}) when closing, all unfinished connection will be aborted. res: {}",
+                        n.get_id(), reinterpret_cast<const void *>(conn), conn->get_address().address, res);
                 } else {
-                    FWLOGWARNING("bus node {0:#x} make a invalid connection {}({}), maybe it's a temporary connection. res: {}", 
-                        n.get_id(), reinterpret_cast<const void*>(conn), conn->get_address().address, res);
+                    FWLOGWARNING("bus node {:#x} make a invalid connection {}({}), maybe it's a temporary connection. res: {}", n.get_id(),
+                                 reinterpret_cast<const void *>(conn), conn->get_address().address, res);
                 }
             }
         }
         return 0;
     }
 
-    int app::bus_evt_callback_on_custom_cmd(const atbus::node & n, const atbus::endpoint *, const atbus::connection *, app_id_t /*src_id*/,
+    int app::bus_evt_callback_on_custom_cmd(const atbus::node &n, const atbus::endpoint *, const atbus::connection *, app_id_t /*src_id*/,
                                             const std::vector<std::pair<const void *, size_t> > &args, std::list<std::string> &rsp) {
         ++last_proc_event_count_;
         if (args.empty()) {
@@ -2216,7 +2262,7 @@ namespace atapp {
 
         util::cli::cmd_option_ci::ptr_type cmd_mgr = get_command_manager();
         custom_command_sender_t sender;
-        sender.self = this;
+        sender.self     = this;
         sender.response = &rsp;
         cmd_mgr->start(args_str, true, &sender);
 
@@ -2225,7 +2271,7 @@ namespace atapp {
         size_t sum_size   = 0;
         bool is_truncated = false;
         for (std::list<std::string>::iterator iter = rsp.begin(); iter != rsp.end();) {
-            std::list<std::string>::iterator cur = iter ++;
+            std::list<std::string>::iterator cur = iter++;
             sum_size += (*cur).size();
             if (is_truncated) {
                 rsp.erase(cur);
@@ -2233,7 +2279,7 @@ namespace atapp {
             }
             if (use_size + cur->size() > max_size) {
                 cur->resize(max_size - use_size);
-                use_size = max_size;
+                use_size     = max_size;
                 is_truncated = true;
             } else {
                 use_size += (*cur).size();
@@ -2242,7 +2288,7 @@ namespace atapp {
 
         if (is_truncated) {
             std::stringstream ss;
-            ss<< "Response message size "<< sum_size<< " is greater than size limit "<< max_size<< ", some data will be truncated.";
+            ss << "Response message size " << sum_size << " is greater than size limit " << max_size << ", some data will be truncated.";
             rsp.push_back(ss.str());
         }
         return 0;
@@ -2252,9 +2298,9 @@ namespace atapp {
         ++last_proc_event_count_;
 
         if (NULL == ep) {
-            FWLOGERROR("bus node {0:#x} make connection to NULL, res: {}", n.get_id(), res);
+            FWLOGERROR("bus node {:#x} make connection to NULL, res: {}", n.get_id(), res);
         } else {
-            FWLOGINFO("bus node {0:#x} make connection to {0:#x} done, res: {}", n.get_id(), ep->get_id(), res);
+            FWLOGINFO("bus node {:#x} make connection to {:#x} done, res: {}", n.get_id(), ep->get_id(), res);
 
             if (evt_on_app_connected_) {
                 evt_on_app_connected_(std::ref(*this), std::ref(*ep), res);
@@ -2267,9 +2313,9 @@ namespace atapp {
         ++last_proc_event_count_;
 
         if (NULL == ep) {
-            FWLOGERROR("bus node {0:#x} release connection to NULL, res: {}", n.get_id(), res);
+            FWLOGERROR("bus node {:#x} release connection to NULL, res: {}", n.get_id(), res);
         } else {
-            FWLOGINFO("bus node {0:#x} release connection to {0:#x} done, res: {}", n.get_id(), ep->get_id(), res);
+            FWLOGINFO("bus node {:#x} release connection to {:#x} done, res: {}", n.get_id(), ep->get_id(), res);
 
             if (evt_on_app_disconnected_) {
                 evt_on_app_disconnected_(std::ref(*this), std::ref(*ep), res);
@@ -2326,7 +2372,7 @@ namespace atapp {
         }
 
         // step 1. using the fastest way to connect to server
-        int use_level = 0;
+        int use_level        = 0;
         bool is_sync_channel = false;
         atbus::channel::channel_address_t use_addr;
 
@@ -2335,7 +2381,7 @@ namespace atapp {
             make_address(conf_.origin.bus().listen(i).c_str(), parsed_addr);
             int parsed_level = 0;
             if (0 == UTIL_STRFUNC_STRNCASE_CMP("shm", parsed_addr.scheme.c_str(), 3)) {
-                parsed_level = 5;
+                parsed_level    = 5;
                 is_sync_channel = true;
             } else if (0 == UTIL_STRFUNC_STRNCASE_CMP("unix", parsed_addr.scheme.c_str(), 4)) {
                 parsed_level = 4;
@@ -2355,13 +2401,14 @@ namespace atapp {
                     continue;
                 }
 #endif
-                use_addr = parsed_addr;
+                use_addr  = parsed_addr;
                 use_level = parsed_level;
             }
         }
 
         if (0 == use_level) {
-            ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "there is no available listener address to send command." << std::endl;
+            ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "there is no available listener address to send command."
+                 << std::endl;
             return EN_ATAPP_ERR_NO_AVAILABLE_ADDRESS;
         }
 
@@ -2400,7 +2447,8 @@ namespace atapp {
                 atbus::endpoint::create(bus_node_.get(), conf_.id, subnets, bus_node_->get_pid(), bus_node_->get_hostname());
             ret = bus_node_->add_endpoint(new_ep);
             if (ret < 0) {
-                ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "connect to " << use_addr.address << " failed. ret: " << ret << std::endl;
+                ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "connect to " << use_addr.address << " failed. ret: " << ret
+                     << std::endl;
                 return ret;
             }
 
@@ -2413,7 +2461,8 @@ namespace atapp {
         }
 
         if (ret < 0) {
-            ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "connect to " << use_addr.address << " failed. ret: " << ret << std::endl;
+            ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "connect to " << use_addr.address << " failed. ret: " << ret
+                 << std::endl;
             return ret;
         }
 
@@ -2423,7 +2472,8 @@ namespace atapp {
             uv_timer_init(ev_loop, &timer->timer);
             timer->timer.data = this;
 
-            int res = uv_timer_start(&timer->timer, ev_stop_timeout, chrono_to_libuv_duration(conf_.origin.timer().stop_timeout(), ATAPP_DEFAULT_STOP_TIMEOUT), 0);
+            int res = uv_timer_start(&timer->timer, ev_stop_timeout,
+                                     chrono_to_libuv_duration(conf_.origin.timer().stop_timeout(), ATAPP_DEFAULT_STOP_TIMEOUT), 0);
             if (0 == res) {
                 tick_timer_.timeout_timer = timer;
             } else {
@@ -2464,8 +2514,9 @@ namespace atapp {
             arr_size[i] = last_command_[i].size();
         }
 
-        bus_node_->set_on_custom_rsp_handle(std::bind(&app::bus_evt_callback_on_custom_rsp, this, std::placeholders::_1, std::placeholders::_2,
-                                                      std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6));
+        bus_node_->set_on_custom_rsp_handle(std::bind(&app::bus_evt_callback_on_custom_rsp, this, std::placeholders::_1,
+                                                      std::placeholders::_2, std::placeholders::_3, std::placeholders::_4,
+                                                      std::placeholders::_5, std::placeholders::_6));
 
         ret = bus_node_->send_custom_cmd(ep->get_id(), &arr_buff[0], &arr_size[0], last_command_.size());
         if (ret < 0) {

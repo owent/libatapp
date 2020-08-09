@@ -28,16 +28,17 @@
 
 namespace atapp {
     namespace detail {
-        std::chrono::system_clock::duration convert_to_chrono(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration& in, time_t default_value_ms) {
+        std::chrono::system_clock::duration convert_to_chrono(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &in,
+                                                              time_t default_value_ms) {
             if (in.seconds() <= 0 && in.nanos() <= 0) {
-                return std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::miliseconds(default_value_ms));
+                return std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::milliseconds(default_value_ms));
             }
             return std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::seconds(in.seconds())) +
-                    std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::nanoseconds(in.nanos()));
+                   std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::nanoseconds(in.nanos()));
         }
 
-        template<class T>
-        static T convert_to_ms(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration& in, T default_value) {
+        template <class T>
+        static T convert_to_ms(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &in, T default_value) {
             T ret = static_cast<T>(in.seconds() * 1000 + in.nanos() / 1000000);
             if (ret <= 0) {
                 ret = default_value;
@@ -81,7 +82,7 @@ namespace atapp {
 
     } // namespace detail
 
-    LIBATAPP_MACRO_API etcd_module::etcd_module() { }
+    LIBATAPP_MACRO_API etcd_module::etcd_module() {}
 
     LIBATAPP_MACRO_API etcd_module::~etcd_module() { reset(); }
 
@@ -106,18 +107,18 @@ namespace atapp {
         // init curl
         int res = curl_global_init(CURL_GLOBAL_ALL);
         if (res) {
-            WLOGERROR("init cURL failed, errcode: %d", res);
+            FWLOGERROR("init cURL failed, errcode: {}", res);
             return -1;
         }
 
         if (etcd_ctx_.get_conf_hosts().empty()) {
-            WLOGINFO("etcd host not found, start singel mode");
+            FWLOGINFO("etcd host not found, start singel mode");
             return 0;
         }
 
         util::network::http_request::create_curl_multi(get_app()->get_bus_node()->get_evloop(), curl_multi_);
         if (!curl_multi_) {
-            WLOGERROR("create curl multi instance failed.");
+            FWLOGERROR("create curl multi instance failed.");
             return -1;
         }
 
@@ -125,49 +126,49 @@ namespace atapp {
 
         // generate keepalive data
         std::vector<atapp::etcd_keepalive::ptr_t> keepalive_actors;
-        std::string                                            keepalive_val;
+        std::string keepalive_val;
         keepalive_actors.reserve(4);
-        const atapp::protocol::atapp_etcd& conf = get_configure();
+        const atapp::protocol::atapp_etcd &conf = get_configure();
 
         if (conf.report_alive().by_id()) {
             atapp::etcd_keepalive::ptr_t actor = add_keepalive_actor(keepalive_val, get_by_id_path());
             if (!actor) {
-                WLOGERROR("create etcd_keepalive for by_id index failed.");
+                FWLOGERROR("create etcd_keepalive for by_id index failed.");
                 return -1;
             }
 
             keepalive_actors.push_back(actor);
-            WLOGINFO("create etcd_keepalive for by_id index %s success", get_by_id_path().c_str());
+            FWLOGINFO("create etcd_keepalive for by_id index {} success", get_by_id_path());
         }
 
         if (conf.report_alive().by_type()) {
             atapp::etcd_keepalive::ptr_t actor = add_keepalive_actor(keepalive_val, get_by_type_id_path());
             if (!actor) {
-                WLOGERROR("create etcd_keepalive for by_type_id index failed.");
+                FWLOGERROR("create etcd_keepalive for by_type_id index failed.");
                 return -1;
             }
             keepalive_actors.push_back(actor);
-            WLOGINFO("create etcd_keepalive for by_type_id index %s success", get_by_type_id_path().c_str());
+            FWLOGINFO("create etcd_keepalive for by_type_id index {} success", get_by_type_id_path());
 
             actor = add_keepalive_actor(keepalive_val, get_by_type_name_path());
             if (!actor) {
-                WLOGERROR("create etcd_keepalive for by_type_name index failed.");
+                FWLOGERROR("create etcd_keepalive for by_type_name index failed.");
                 return -1;
             }
             keepalive_actors.push_back(actor);
 
-            WLOGINFO("create etcd_keepalive for by_type_name index %s success", get_by_type_name_path().c_str());
+            FWLOGINFO("create etcd_keepalive for by_type_name index {} success", get_by_type_name_path());
         }
 
         if (conf.report_alive().by_name()) {
             atapp::etcd_keepalive::ptr_t actor = add_keepalive_actor(keepalive_val, get_by_name_path());
             if (!actor) {
-                WLOGERROR("create etcd_keepalive for by_name index failed.");
+                FWLOGERROR("create etcd_keepalive for by_name index failed.");
                 return -1;
             }
 
             keepalive_actors.push_back(actor);
-            WLOGINFO("create etcd_keepalive for by_name index %s success", get_by_name_path().c_str());
+            FWLOGINFO("create etcd_keepalive for by_name index {} success", get_by_name_path());
         }
 
         for (int i = 0; i < conf.report_alive().by_tag_size(); ++i) {
@@ -179,12 +180,12 @@ namespace atapp {
 
             atapp::etcd_keepalive::ptr_t actor = add_keepalive_actor(keepalive_val, get_by_tag_path(tag_name));
             if (!actor) {
-                WLOGERROR("create etcd_keepalive for by_tag %s index failed.", tag_name.c_str());
+                FWLOGERROR("create etcd_keepalive for by_tag {} index failed.", tag_name);
                 return -1;
             }
 
             keepalive_actors.push_back(actor);
-            WLOGINFO("create etcd_keepalive for by_tag index %s success", get_by_tag_path(tag_name).c_str());
+            FWLOGINFO("create etcd_keepalive for by_tag index {} success", get_by_tag_path(tag_name));
         }
 
         // 执行到首次检测结束
@@ -199,7 +200,7 @@ namespace atapp {
         timeout_timer.data = &is_timeout;
         tick_timer.data    = &etcd_ctx_;
 
-        uint64_t timeout_ms = detail::convert_to_ms<uint64_t>(conf.init().timeout());
+        uint64_t timeout_ms = detail::convert_to_ms<uint64_t>(conf.init().timeout(), 5000);
         uv_timer_start(&timeout_timer, detail::init_timer_timeout_callback, timeout_ms, 0);
         uv_timer_start(&tick_timer, detail::init_timer_tick_callback, 128, 128);
 
@@ -213,7 +214,7 @@ namespace atapp {
             for (size_t i = 0; false == is_failed && i < keepalive_actors.size(); ++i) {
                 if (keepalive_actors[i]->is_check_run()) {
                     if (!keepalive_actors[i]->is_check_passed()) {
-                        WLOGERROR("etcd_keepalive lock %s failed.", keepalive_actors[i]->get_path().c_str());
+                        FWLOGERROR("etcd_keepalive lock {} failed.", keepalive_actors[i]->get_path());
                         is_failed = true;
                     }
 
@@ -236,8 +237,8 @@ namespace atapp {
                     if (etcd_ctx_.get_stats().continue_error_requests > retry_times) {
                         retry_times = etcd_ctx_.get_stats().continue_error_requests > retry_times;
                     }
-                    WLOGERROR("etcd_keepalive request %s for %llu times (with %d ticks) failed.", keepalive_actors[i]->get_path().c_str(),
-                                static_cast<unsigned long long>(retry_times), ticks);
+                    FWLOGERROR("etcd_keepalive request {} for {} times (with {} ticks) failed.", keepalive_actors[i]->get_path(),
+                               retry_times, ticks);
                     is_failed = true;
                     break;
                 }
@@ -255,8 +256,8 @@ namespace atapp {
                 if (etcd_ctx_.get_stats().continue_error_requests > retry_times) {
                     retry_times = etcd_ctx_.get_stats().continue_error_requests;
                 }
-                WLOGERROR("etcd_keepalive request %s timeout, retry %llu times (with %d ticks).", keepalive_actors[i]->get_path().c_str(),
-                            static_cast<unsigned long long>(retry_times), ticks);
+                FWLOGERROR("etcd_keepalive request {} timeout, retry {} times (with {} ticks).", keepalive_actors[i]->get_path(),
+                           retry_times, ticks);
             }
         }
 
@@ -281,13 +282,13 @@ namespace atapp {
 
     LIBATAPP_MACRO_API int etcd_module::reload() {
         // load configure
-        const atapp::protocol::atapp_etcd& conf = get_configure();
+        const atapp::protocol::atapp_etcd &conf = get_configure();
         conf_path_cache_.clear();
 
         {
             std::vector<std::string> conf_hosts;
             conf_hosts.reserve(static_cast<size_t>(conf.hosts_size()));
-            for (int i = 0; i < conf.hosts_size(); ++ i) {
+            for (int i = 0; i < conf.hosts_size(); ++i) {
                 conf_hosts.push_back(conf.hosts(i));
             }
             if (!conf_hosts.empty()) {
@@ -305,19 +306,19 @@ namespace atapp {
 
         // HTTP
         if (!conf.http().user_agent().empty()) {
-            etcd_ctx_.set_conf_user_agent(conf.user_agent());
+            etcd_ctx_.set_conf_user_agent(conf.http().user_agent());
         }
         if (!conf.http().proxy().empty()) {
-            etcd_ctx_.set_conf_proxy(conf.proxy());
+            etcd_ctx_.set_conf_proxy(conf.http().proxy());
         }
         if (!conf.http().no_proxy().empty()) {
-            etcd_ctx_.set_conf_no_proxy(conf.no_proxy());
+            etcd_ctx_.set_conf_no_proxy(conf.http().no_proxy());
         }
         if (!conf.http().proxy_user_name().empty()) {
-            etcd_ctx_.set_conf_proxy_user_name(conf.proxy_user_name());
+            etcd_ctx_.set_conf_proxy_user_name(conf.http().proxy_user_name());
         }
         if (!conf.http().proxy_password().empty()) {
-            etcd_ctx_.set_conf_proxy_password(conf.proxy_password());
+            etcd_ctx_.set_conf_proxy_password(conf.http().proxy_password());
         }
 
         etcd_ctx_.set_conf_http_debug_mode(conf.http().debug());
@@ -326,21 +327,22 @@ namespace atapp {
         etcd_ctx_.set_conf_ssl_enable_alpn(conf.ssl().enable_alpn());
         etcd_ctx_.set_conf_ssl_verify_peer(conf.ssl().verify_peer());
         do {
-            const std::string& ssl_version = conf.ssl().ssl_min_version();
+            const std::string &ssl_version = conf.ssl().ssl_min_version();
             if (ssl_version.empty()) {
                 break;
             }
-            if (0 == UTIL_STRFUNC_STRNCASE_CMP(ssl_version.c_str(), "TLSv1.3", 7) || 0 == UTIL_STRFUNC_STRNCASE_CMP(ssl_version.c_str(), "TLSv13", 6)) {
+            if (0 == UTIL_STRFUNC_STRNCASE_CMP(ssl_version.c_str(), "TLSv1.3", 7) ||
+                0 == UTIL_STRFUNC_STRNCASE_CMP(ssl_version.c_str(), "TLSv13", 6)) {
                 etcd_ctx_.set_conf_ssl_min_version(etcd_cluster::ssl_version_t::TLS_V13);
             } else if (0 == UTIL_STRFUNC_STRNCASE_CMP(ssl_version.c_str(), "TLSv1.2", 7) ||
-                        0 == UTIL_STRFUNC_STRNCASE_CMP(ssl_version.c_str(), "TLSv12", 6)) {
+                       0 == UTIL_STRFUNC_STRNCASE_CMP(ssl_version.c_str(), "TLSv12", 6)) {
                 etcd_ctx_.set_conf_ssl_min_version(etcd_cluster::ssl_version_t::TLS_V12);
             } else if (0 == UTIL_STRFUNC_STRNCASE_CMP(ssl_version.c_str(), "TLSv1.1", 7) ||
-                        0 == UTIL_STRFUNC_STRNCASE_CMP(ssl_version.c_str(), "TLSv11", 6)) {
+                       0 == UTIL_STRFUNC_STRNCASE_CMP(ssl_version.c_str(), "TLSv11", 6)) {
                 etcd_ctx_.set_conf_ssl_min_version(etcd_cluster::ssl_version_t::TLS_V11);
             } else if (0 == UTIL_STRFUNC_STRNCASE_CMP(ssl_version.c_str(), "TLSv1", 5) ||
-                        0 == UTIL_STRFUNC_STRNCASE_CMP(ssl_version.c_str(), "TLSv1.0", 7) ||
-                        0 == UTIL_STRFUNC_STRNCASE_CMP(ssl_version.c_str(), "TLSv10", 6)) {
+                       0 == UTIL_STRFUNC_STRNCASE_CMP(ssl_version.c_str(), "TLSv1.0", 7) ||
+                       0 == UTIL_STRFUNC_STRNCASE_CMP(ssl_version.c_str(), "TLSv10", 6)) {
                 etcd_ctx_.set_conf_ssl_min_version(etcd_cluster::ssl_version_t::TLS_V10);
             } else if (0 == UTIL_STRFUNC_STRNCASE_CMP(ssl_version.c_str(), "SSLv3", 5)) {
                 etcd_ctx_.set_conf_ssl_min_version(etcd_cluster::ssl_version_t::SSL3);
@@ -444,7 +446,7 @@ namespace atapp {
         if (!curl_multi_) {
             int res = init();
             if (res < 0) {
-                WLOGERROR("initialize etcd failed, res: %d", res);
+                FWLOGERROR("initialize etcd failed, res: {}", res);
                 get_app()->stop();
                 return res;
             }
@@ -453,19 +455,21 @@ namespace atapp {
         return etcd_ctx_.tick();
     }
 
-    LIBATAPP_MACRO_API const std::string & etcd_module::get_conf_custom_data() const { return custom_data_; }
-    LIBATAPP_MACRO_API void                etcd_module::set_conf_custom_data(const std::string &v) { custom_data_ = v; }
+    LIBATAPP_MACRO_API const std::string &etcd_module::get_conf_custom_data() const { return custom_data_; }
+    LIBATAPP_MACRO_API void etcd_module::set_conf_custom_data(const std::string &v) { custom_data_ = v; }
 
     LIBATAPP_MACRO_API std::string etcd_module::get_by_id_path() const {
         return LOG_WRAPPER_FWAPI_FORMAT("{}/{}/{}", get_configure_path(), ETCD_MODULE_BY_ID_DIR, get_app()->get_id());
     }
 
     LIBATAPP_MACRO_API std::string etcd_module::get_by_type_id_path() const {
-        return LOG_WRAPPER_FWAPI_FORMAT("{}/{}/{}/{}", get_configure_path(), ETCD_MODULE_BY_TYPE_ID_DIR, get_app()->get_type_id(), get_app()->get_id());
+        return LOG_WRAPPER_FWAPI_FORMAT("{}/{}/{}/{}", get_configure_path(), ETCD_MODULE_BY_TYPE_ID_DIR, get_app()->get_type_id(),
+                                        get_app()->get_id());
     }
 
     LIBATAPP_MACRO_API std::string etcd_module::get_by_type_name_path() const {
-        return LOG_WRAPPER_FWAPI_FORMAT("{}/{}/{}/{}", get_configure_path(), ETCD_MODULE_BY_TYPE_NAME_DIR, get_app()->get_type_name(), get_app()->get_id());
+        return LOG_WRAPPER_FWAPI_FORMAT("{}/{}/{}/{}", get_configure_path(), ETCD_MODULE_BY_TYPE_NAME_DIR, get_app()->get_type_name(),
+                                        get_app()->get_id());
     }
 
     LIBATAPP_MACRO_API std::string etcd_module::get_by_name_path() const {
@@ -508,14 +512,14 @@ namespace atapp {
 
             atapp::etcd_watcher::ptr_t p = atapp::etcd_watcher::create(etcd_ctx_, watch_path, "+1");
             if (!p) {
-                WLOGERROR("create etcd_watcher by_id failed.");
+                FWLOGERROR("create etcd_watcher by_id failed.");
                 return EN_ATBUS_ERR_MALLOC;
             }
 
             p->set_conf_request_timeout(detail::convert_to_chrono(get_configure().watcher().request_timeout(), 3600000));
             p->set_conf_retry_interval(detail::convert_to_chrono(get_configure().watcher().retry_interval(), 15000));
             etcd_ctx_.add_watcher(p);
-            WLOGINFO("create etcd_watcher for by_id index %s success", watch_path.c_str());
+            FWLOGINFO("create etcd_watcher for by_id index {} success", watch_path);
 
             p->set_evt_handle(watcher_callback_list_wrapper_t(*this, watcher_by_id_callbacks_));
         }
@@ -534,14 +538,14 @@ namespace atapp {
 
         atapp::etcd_watcher::ptr_t p = atapp::etcd_watcher::create(etcd_ctx_, watch_path, "+1");
         if (!p) {
-            WLOGERROR("create etcd_watcher by_type_id failed.");
+            FWLOGERROR("create etcd_watcher by_type_id failed.");
             return EN_ATBUS_ERR_MALLOC;
         }
 
         p->set_conf_request_timeout(detail::convert_to_chrono(get_configure().watcher().request_timeout(), 3600000));
         p->set_conf_retry_interval(detail::convert_to_chrono(get_configure().watcher().retry_interval(), 15000));
         etcd_ctx_.add_watcher(p);
-        WLOGINFO("create etcd_watcher for by_type_id index %s success", watch_path.c_str());
+        FWLOGINFO("create etcd_watcher for by_type_id index {} success", watch_path);
 
         p->set_evt_handle(watcher_callback_one_wrapper_t(*this, fn));
         return 0;
@@ -557,14 +561,14 @@ namespace atapp {
 
         atapp::etcd_watcher::ptr_t p = atapp::etcd_watcher::create(etcd_ctx_, watch_path, "+1");
         if (!p) {
-            WLOGERROR("create etcd_watcher by_type_name failed.");
+            FWLOGERROR("create etcd_watcher by_type_name failed.");
             return EN_ATBUS_ERR_MALLOC;
         }
 
         p->set_conf_request_timeout(detail::convert_to_chrono(get_configure().watcher().request_timeout(), 3600000));
         p->set_conf_retry_interval(detail::convert_to_chrono(get_configure().watcher().retry_interval(), 15000));
         etcd_ctx_.add_watcher(p);
-        WLOGINFO("create etcd_watcher for by_type_name index %s success", watch_path.c_str());
+        FWLOGINFO("create etcd_watcher for by_type_name index {} success", watch_path);
 
         p->set_evt_handle(watcher_callback_one_wrapper_t(*this, fn));
         return 0;
@@ -583,14 +587,14 @@ namespace atapp {
 
             atapp::etcd_watcher::ptr_t p = atapp::etcd_watcher::create(etcd_ctx_, watch_path, "+1");
             if (!p) {
-                WLOGERROR("create etcd_watcher by_name failed.");
+                FWLOGERROR("create etcd_watcher by_name failed.");
                 return EN_ATBUS_ERR_MALLOC;
             }
 
             p->set_conf_request_timeout(detail::convert_to_chrono(get_configure().watcher().request_timeout(), 3600000));
             p->set_conf_retry_interval(detail::convert_to_chrono(get_configure().watcher().retry_interval(), 15000));
             etcd_ctx_.add_watcher(p);
-            WLOGINFO("create etcd_watcher for by_name index %s success", watch_path.c_str());
+            FWLOGINFO("create etcd_watcher for by_name index {} success", watch_path);
 
             p->set_evt_handle(watcher_callback_list_wrapper_t(*this, watcher_by_name_callbacks_));
         }
@@ -609,41 +613,42 @@ namespace atapp {
 
         atapp::etcd_watcher::ptr_t p = atapp::etcd_watcher::create(etcd_ctx_, watch_path, "+1");
         if (!p) {
-            WLOGERROR("create etcd_watcher by_tag failed.");
+            FWLOGERROR("create etcd_watcher by_tag failed.");
             return EN_ATBUS_ERR_MALLOC;
         }
 
         etcd_ctx_.add_watcher(p);
-        WLOGINFO("create etcd_watcher for by_tag index %s success", watch_path.c_str());
+        FWLOGINFO("create etcd_watcher for by_tag index {} success", watch_path);
 
         p->set_evt_handle(watcher_callback_one_wrapper_t(*this, fn));
         return 0;
     }
 
-    LIBATAPP_MACRO_API atapp::etcd_watcher::ptr_t etcd_module::add_watcher_by_custom_path(const std::string &custom_path, watcher_one_callback_t fn) {
+    LIBATAPP_MACRO_API atapp::etcd_watcher::ptr_t etcd_module::add_watcher_by_custom_path(const std::string &custom_path,
+                                                                                          watcher_one_callback_t fn) {
         if (!fn) {
-            WLOGERROR("create etcd_watcher by custom path %s failed. callback can not be empty.", custom_path.c_str());
+            FWLOGERROR("create etcd_watcher by custom path {} failed. callback can not be empty.", custom_path);
             return NULL;
         }
 
         if (custom_path.size() < get_configure_path().size() ||
             0 != UTIL_STRFUNC_STRNCMP(custom_path.c_str(), get_configure_path().c_str(), get_configure_path().size())) {
 
-            WLOGERROR("create etcd_watcher by custom path %s failed. path must has prefix of %s.", custom_path.c_str(), get_configure_path().c_str());
+            FWLOGERROR("create etcd_watcher by custom path {} failed. path must has prefix of {}.", custom_path, get_configure_path());
             return NULL;
         }
 
         atapp::etcd_watcher::ptr_t p = atapp::etcd_watcher::create(etcd_ctx_, custom_path, "+1");
         if (!p) {
-            WLOGERROR("create etcd_watcher by custom path %s failed. malloc etcd_watcher failed.", custom_path.c_str());
+            FWLOGERROR("create etcd_watcher by custom path {} failed. malloc etcd_watcher failed.", custom_path);
             return NULL;
         }
 
         p->set_evt_handle(watcher_callback_one_wrapper_t(*this, fn));
         if (etcd_ctx_.add_watcher(p)) {
-            WLOGINFO("create etcd_watcher by custom path %s success", custom_path.c_str());
+            FWLOGINFO("create etcd_watcher by custom path {} success", custom_path);
         } else {
-            WLOGINFO("add etcd_watcher by custom path %s failed", custom_path.c_str());
+            FWLOGINFO("add etcd_watcher by custom path {} failed", custom_path);
             p->set_evt_handle(NULL);
             p.reset();
         }
@@ -652,20 +657,21 @@ namespace atapp {
     }
 
     LIBATAPP_MACRO_API const ::atapp::etcd_cluster &etcd_module::get_raw_etcd_ctx() const { return etcd_ctx_; }
-    LIBATAPP_MACRO_API ::atapp::etcd_cluster &      etcd_module::get_raw_etcd_ctx() { return etcd_ctx_; }
+    LIBATAPP_MACRO_API ::atapp::etcd_cluster &etcd_module::get_raw_etcd_ctx() { return etcd_ctx_; }
 
-    LIBATAPP_MACRO_API const atapp::protocol::atapp_etcd &etcd_module::get_configure() const { 
-        return get_app()->get_configure().origin().etcd(); 
+    LIBATAPP_MACRO_API const atapp::protocol::atapp_etcd &etcd_module::get_configure() const {
+        return get_app()->get_origin_configure().etcd();
     }
 
-    LIBATAPP_MACRO_API const std::string& etcd_module::get_configure_path() {
+    LIBATAPP_MACRO_API const std::string &etcd_module::get_configure_path() const {
         if (conf_path_cache_.empty()) {
-            conf_path_cache_ = get_configure().path();
+            etcd_module *self      = const_cast<etcd_module *>(this);
+            self->conf_path_cache_ = get_configure().path();
 
-            if (!conf_path_cache_.empty()) {
-                size_t last_idx = conf_path_cache_.size() - 1;
-                if (conf_path_cache_[last_idx] != '//' && conf_path_cache_[last_idx] != '\\') {
-                    conf_path_cache_ += '/';
+            if (!self->conf_path_cache_.empty()) {
+                size_t last_idx = self->conf_path_cache_.size() - 1;
+                if (self->conf_path_cache_[last_idx] != '/' && self->conf_path_cache_[last_idx] != '\\') {
+                    self->conf_path_cache_ += '/';
                 }
             }
         }
@@ -683,7 +689,7 @@ namespace atapp {
 
         ret = atapp::etcd_keepalive::create(etcd_ctx_, node_path);
         if (!ret) {
-            WLOGERROR("create etcd_keepalive failed.");
+            FWLOGERROR("create etcd_keepalive failed.");
             return ret;
         }
 
@@ -712,7 +718,7 @@ namespace atapp {
 
             // parse id from key if key is a number
             if (start_idx < path.size()) {
-                util::string::str2int(out.id, &path[start_idx]);
+                out.node_discovery.set_id(util::string::to_int<uint64_t>(&path[start_idx]));
             }
             return false;
         }
@@ -720,20 +726,18 @@ namespace atapp {
         return atapp::rapidsjon_loader_parse(out.node_discovery, json);
     }
 
-    void etcd_module::pack(const node_info_t &src, std::string &json) {
-        json = atapp::rapidsjon_loader_stringify(src.node_discovery);
-    }
+    void etcd_module::pack(const node_info_t &src, std::string &json) { json = atapp::rapidsjon_loader_stringify(src.node_discovery); }
 
     int etcd_module::http_callback_on_etcd_closed(util::network::http_request &req) {
         etcd_module *self = reinterpret_cast<etcd_module *>(req.get_priv_data());
         if (NULL == self) {
-            WLOGERROR("etcd_module get request shouldn't has request without private data");
+            FWLOGERROR("etcd_module get request shouldn't has request without private data");
             return 0;
         }
 
         self->cleanup_request_.reset();
 
-        WLOGDEBUG("Etcd revoke lease finished");
+        FWLOGDEBUG("Etcd revoke lease finished");
 
         // call stop to trigger stop process again.
         self->get_app()->stop();
@@ -743,8 +747,8 @@ namespace atapp {
 
     etcd_module::watcher_callback_list_wrapper_t::watcher_callback_list_wrapper_t(etcd_module &m, std::list<watcher_list_callback_t> &cbks)
         : mod(&m), callbacks(&cbks) {}
-    void etcd_module::watcher_callback_list_wrapper_t::operator()(const ::atapp::etcd_response_header &    header,
-                                                                    const ::atapp::etcd_watcher::response_t &body) {
+    void etcd_module::watcher_callback_list_wrapper_t::operator()(const ::atapp::etcd_response_header &header,
+                                                                  const ::atapp::etcd_watcher::response_t &body) {
 
         if (NULL == callbacks || NULL == mod) {
             return;
@@ -752,13 +756,13 @@ namespace atapp {
         // decode data
         for (size_t i = 0; i < body.events.size(); ++i) {
             const ::atapp::etcd_watcher::event_t &evt_data = body.events[i];
-            node_info_t                                        node;
+            node_info_t node;
             if (evt_data.kv.value.empty()) {
                 unpack(node, evt_data.kv.key, evt_data.prev_kv.value, true);
             } else {
                 unpack(node, evt_data.kv.key, evt_data.kv.value, true);
             }
-            if (node.id == 0) {
+            if (node.node_discovery.id() == 0) {
                 continue;
             }
 
@@ -777,9 +781,10 @@ namespace atapp {
         }
     }
 
-    etcd_module::watcher_callback_one_wrapper_t::watcher_callback_one_wrapper_t(etcd_module &m, watcher_one_callback_t cbk) : mod(&m), callback(cbk) {}
-    void etcd_module::watcher_callback_one_wrapper_t::operator()(const ::atapp::etcd_response_header &    header,
-                                                                    const ::atapp::etcd_watcher::response_t &body) {
+    etcd_module::watcher_callback_one_wrapper_t::watcher_callback_one_wrapper_t(etcd_module &m, watcher_one_callback_t cbk)
+        : mod(&m), callback(cbk) {}
+    void etcd_module::watcher_callback_one_wrapper_t::operator()(const ::atapp::etcd_response_header &header,
+                                                                 const ::atapp::etcd_watcher::response_t &body) {
         if (!callback || NULL == mod) {
             return;
         }
@@ -787,14 +792,14 @@ namespace atapp {
         // decode data
         for (size_t i = 0; i < body.events.size(); ++i) {
             const ::atapp::etcd_watcher::event_t &evt_data = body.events[i];
-            node_info_t                                        node;
+            node_info_t node;
 
             if (evt_data.kv.value.empty()) {
                 unpack(node, evt_data.kv.key, evt_data.prev_kv.value, true);
             } else {
                 unpack(node, evt_data.kv.key, evt_data.kv.value, true);
             }
-            if (node.id == 0) {
+            if (node.node_discovery.id() == 0) {
                 continue;
             }
 
@@ -808,4 +813,4 @@ namespace atapp {
             callback(std::ref(sender));
         }
     }
-} // namespace atframe
+} // namespace atapp

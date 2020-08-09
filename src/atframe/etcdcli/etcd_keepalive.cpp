@@ -10,10 +10,12 @@
 namespace atapp {
 
     etcd_keepalive::default_checker_t::default_checker_t(const std::string &checked) : data(checked) {}
+    etcd_keepalive::default_checker_t::~default_checker_t() {}
 
     bool etcd_keepalive::default_checker_t::operator()(const std::string &checked) const { return checked.empty() || data == checked; }
 
-    etcd_keepalive::etcd_keepalive(etcd_cluster &owner, const std::string &path, constrict_helper_t &) : owner_(&owner), path_(path) {
+    LIBATAPP_MACRO_API etcd_keepalive::etcd_keepalive(etcd_cluster &owner, const std::string &path, constrict_helper_t &)
+        : owner_(&owner), path_(path) {
         checker_.is_check_run    = false;
         checker_.is_check_passed = false;
         checker_.retry_times     = 0;
@@ -22,16 +24,16 @@ namespace atapp {
         rpc_.has_data            = false;
     }
 
-    etcd_keepalive::~etcd_keepalive() { close(true); }
+    LIBATAPP_MACRO_API etcd_keepalive::~etcd_keepalive() { close(true); }
 
-    etcd_keepalive::ptr_t etcd_keepalive::create(etcd_cluster &owner, const std::string &path) {
+    LIBATAPP_MACRO_API etcd_keepalive::ptr_t etcd_keepalive::create(etcd_cluster &owner, const std::string &path) {
         constrict_helper_t h;
         return std::make_shared<etcd_keepalive>(owner, path, h);
     }
 
-    void etcd_keepalive::close(bool reset_has_data_flag) {
+    LIBATAPP_MACRO_API void etcd_keepalive::close(bool reset_has_data_flag) {
         if (rpc_.rpc_opr_) {
-            WLOGDEBUG("Etcd watcher %p cancel http request.", this);
+            FWLOGDEBUG("Etcd watcher {} cancel http request.", reinterpret_cast<const void *>(this));
             rpc_.rpc_opr_->set_on_complete(NULL);
             rpc_.rpc_opr_->set_priv_data(NULL);
             rpc_.rpc_opr_->stop();
@@ -50,11 +52,11 @@ namespace atapp {
         checker_.retry_times     = 0;
     }
 
-    void etcd_keepalive::set_checker(const std::string &checked_str) { checker_.fn = default_checker_t(checked_str); }
+    LIBATAPP_MACRO_API void etcd_keepalive::set_checker(const std::string &checked_str) { checker_.fn = default_checker_t(checked_str); }
 
-    void etcd_keepalive::set_checker(checker_fn_t fn) { checker_.fn = fn; }
+    LIBATAPP_MACRO_API void etcd_keepalive::set_checker(checker_fn_t fn) { checker_.fn = fn; }
 
-    void etcd_keepalive::set_value(const std::string &str) {
+    LIBATAPP_MACRO_API void etcd_keepalive::set_value(const std::string &str) {
         if (value_ != str) {
             value_                = str;
             rpc_.is_value_changed = true;
@@ -65,11 +67,13 @@ namespace atapp {
         }
     }
 
-    void etcd_keepalive::reset_value_changed() { rpc_.is_value_changed = true; }
+    LIBATAPP_MACRO_API void etcd_keepalive::reset_value_changed() { rpc_.is_value_changed = true; }
 
-    const std::string &etcd_keepalive::get_path() const { return path_; }
+    LIBATAPP_MACRO_API const std::string &etcd_keepalive::get_value() const { return value_; }
 
-    void etcd_keepalive::active() {
+    LIBATAPP_MACRO_API const std::string &etcd_keepalive::get_path() const { return path_; }
+
+    LIBATAPP_MACRO_API void etcd_keepalive::active() {
         rpc_.is_actived = true;
         process();
     }
@@ -96,7 +100,7 @@ namespace atapp {
                 if (!rpc_.rpc_opr_) {
                     need_retry = true;
                     ++checker_.retry_times;
-                    WLOGERROR("Etcd keepalive %p create get data request to %s failed", this, path_.c_str());
+                    FWLOGERROR("Etcd keepalive {} create get data request to {} failed", reinterpret_cast<const void *>(this), path_);
                     break;
                 }
 
@@ -111,7 +115,7 @@ namespace atapp {
                 rpc_.rpc_opr_ = owner_->create_request_kv_set(path_, value_, true);
                 if (!rpc_.rpc_opr_) {
                     need_retry = true;
-                    WLOGERROR("Etcd keepalive %p create set data request to %s failed", this, path_.c_str());
+                    FWLOGERROR("Etcd keepalive {} create set data request to {} failed", reinterpret_cast<const void *>(this), path_);
                     break;
                 }
 
@@ -127,10 +131,12 @@ namespace atapp {
                 need_retry = true;
                 rpc_.rpc_opr_->set_priv_data(NULL);
                 rpc_.rpc_opr_->set_on_complete(NULL);
-                WLOGERROR("Etcd keepalive %p start request to %s failed, res: %d", this, rpc_.rpc_opr_->get_url().c_str(), res);
+                FWLOGERROR("Etcd keepalive {} start request to {} failed, res: {}", reinterpret_cast<const void *>(this),
+                           rpc_.rpc_opr_->get_url(), res);
                 rpc_.rpc_opr_.reset();
             } else {
-                WLOGDEBUG("Etcd keepalive %p start request to %s success.", this, rpc_.rpc_opr_->get_url().c_str());
+                FWLOGDEBUG("Etcd keepalive {} start request to {} success.", reinterpret_cast<const void *>(this),
+                           rpc_.rpc_opr_->get_url());
             }
         }
 
@@ -142,7 +148,7 @@ namespace atapp {
     int etcd_keepalive::libcurl_callback_on_get_data(util::network::http_request &req) {
         etcd_keepalive *self = reinterpret_cast<etcd_keepalive *>(req.get_priv_data());
         if (NULL == self) {
-            WLOGERROR("Etcd keepalive get request shouldn't has request without private data");
+            FWLOGERROR("Etcd keepalive get request shouldn't has request without private data");
             return 0;
         }
         util::network::http_request::ptr_t keep_rpc = self->rpc_.rpc_opr_;
@@ -151,10 +157,10 @@ namespace atapp {
         ++self->checker_.retry_times;
 
         // 服务器错误则重试，预检查请求的404是正常的
-        if (0 != req.get_error_code() ||
-            util::network::http_request::status_code_t::EN_ECG_SUCCESS != util::network::http_request::get_status_code_group(req.get_response_code())) {
-            WLOGERROR("Etcd keepalive %p get request failed, error code: %d, http code: %d\n%s", self, req.get_error_code(), req.get_response_code(),
-                        req.get_error_msg());
+        if (0 != req.get_error_code() || util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
+                                             util::network::http_request::get_status_code_group(req.get_response_code())) {
+            FWLOGERROR("Etcd keepalive {} get request failed, error code: {}, http code: {}\n{}", reinterpret_cast<const void *>(self),
+                       req.get_error_code(), req.get_response_code(), req.get_error_msg());
 
             self->owner_->add_retry_keepalive(self->shared_from_this());
             self->owner_->check_authorization_expired(req.get_response_code(), req.get_response_stream().str());
@@ -165,12 +171,12 @@ namespace atapp {
         std::string value_content;
 
         req.get_response_stream().str().swap(http_content);
-        WLOGTRACE("Etcd keepalive %p got http response: %s", self, http_content.c_str());
+        FWLOGTRACE("Etcd keepalive {} got http response: {}", reinterpret_cast<const void *>(self), http_content);
 
         // 如果lease不存在（没有TTL）则启动创建流程
         rapidjson::Document doc;
 
-        if (::atframe::component::etcd_packer::parse_object(doc, http_content.c_str())) {
+        if (atapp::etcd_packer::parse_object(doc, http_content.c_str())) {
             rapidjson::Value root = doc.GetObject();
 
             // Run check function
@@ -180,13 +186,13 @@ namespace atapp {
             if (count > 0) {
                 rapidjson::Document::ConstMemberIterator kvs = root.FindMember("kvs");
                 if (root.MemberEnd() == kvs) {
-                    WLOGERROR("Etcd keepalive %p get data count=%lld, but kvs not found", self, static_cast<long long>(count));
+                    FWLOGERROR("Etcd keepalive {} get data count={}, but kvs not found", reinterpret_cast<const void *>(self), count);
                     self->owner_->add_retry_keepalive(self->shared_from_this());
                     return 0;
                 }
 
                 rapidjson::Document::ConstArray all_kvs = kvs->value.GetArray();
-                if(all_kvs.Begin() != all_kvs.End()) {
+                if (all_kvs.Begin() != all_kvs.End()) {
                     etcd_key_value kv;
                     etcd_packer::unpack(kv, *all_kvs.Begin());
                     value_content.swap(kv.value);
@@ -200,7 +206,8 @@ namespace atapp {
         } else {
             self->checker_.is_check_passed = self->checker_.fn(value_content);
         }
-        WLOGDEBUG("Etcd keepalive %p check data %s", self, self->checker_.is_check_passed ? "passed" : "failed");
+        FWLOGDEBUG("Etcd keepalive {} check data {}", reinterpret_cast<const void *>(self),
+                   self->checker_.is_check_passed ? "passed" : "failed");
 
         self->active();
         return 0;
@@ -209,7 +216,7 @@ namespace atapp {
     int etcd_keepalive::libcurl_callback_on_set_data(util::network::http_request &req) {
         etcd_keepalive *self = reinterpret_cast<etcd_keepalive *>(req.get_priv_data());
         if (NULL == self) {
-            WLOGERROR("Etcd keepalive set request shouldn't has request without private data");
+            FWLOGERROR("Etcd keepalive set request shouldn't has request without private data");
             return 0;
         }
 
@@ -217,10 +224,10 @@ namespace atapp {
         self->rpc_.rpc_opr_.reset();
 
         // 服务器错误则忽略
-        if (0 != req.get_error_code() ||
-            util::network::http_request::status_code_t::EN_ECG_SUCCESS != util::network::http_request::get_status_code_group(req.get_response_code())) {
-            WLOGERROR("Etcd keepalive %p set request failed, error code: %d, http code: %d\n%s", self, req.get_error_code(), req.get_response_code(),
-                        req.get_error_msg());
+        if (0 != req.get_error_code() || util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
+                                             util::network::http_request::get_status_code_group(req.get_response_code())) {
+            FWLOGERROR("Etcd keepalive {} set request failed, error code: {}, http code: {}\n{}", reinterpret_cast<const void *>(self),
+                       req.get_error_code(), req.get_response_code(), req.get_error_msg());
 
             self->rpc_.is_value_changed = true;
             self->owner_->add_retry_keepalive(self->shared_from_this());
@@ -229,7 +236,7 @@ namespace atapp {
         }
 
         self->rpc_.has_data = true;
-        WLOGTRACE("Etcd keepalive %p set data http response: %s", self, req.get_response_stream().str().c_str());
+        FWLOGTRACE("Etcd keepalive {} set data http response: {}", reinterpret_cast<const void *>(self), req.get_response_stream().str());
         self->active();
         return 0;
     }
