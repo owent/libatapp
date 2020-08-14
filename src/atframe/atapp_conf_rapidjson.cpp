@@ -23,22 +23,26 @@
 #undef max
 #endif
 
+#if defined(GetMessage)
+#undef GetMessage
+#endif
+
 namespace atapp {
     namespace detail {
         static void load_field_string_filter(const std::string& input, rapidjson::Value& output, rapidjson::Document& doc, const rapidsjon_loader_load_options& options) {
             switch (options.string_mode) {
             case rapidsjon_loader_string_mode::URI : {
                 std::string strv = util::uri::encode_uri(input.c_str(), input.size());
-                output.SetString(strv.c_str(), strv.size(), doc.GetAllocator());
+                output.SetString(strv.c_str(), static_cast<rapidjson::SizeType>(strv.size()), doc.GetAllocator());
                 break;
             }
             case rapidsjon_loader_string_mode::URI_COMPONENT : {
                 std::string strv = util::uri::encode_uri_component(input.c_str(), input.size());
-                output.SetString(strv.c_str(), strv.size(), doc.GetAllocator());
+                output.SetString(strv.c_str(), static_cast<rapidjson::SizeType>(strv.size()), doc.GetAllocator());
                 break;
             }
             default: {
-                output.SetString(input.c_str(), input.size(), doc.GetAllocator());
+                output.SetString(input.c_str(), static_cast<rapidjson::SizeType>(input.size()), doc.GetAllocator());
                 break;
             }
             }
@@ -80,7 +84,7 @@ namespace atapp {
                                 char str_val[24] = {0};
                                 util::string::int2str(str_val, sizeof(str_val) - 1, int_val);
                                 rapidjson::Value v;
-                                v.SetString(str_val, strlen(str_val), doc.GetAllocator());
+                                v.SetString(str_val, static_cast<rapidjson::SizeType>(strlen(str_val)), doc.GetAllocator());
                                 rapidsjon_loader_append_to_list(ls, std::move(v), doc);
                             } else {
                                 rapidsjon_loader_append_to_list(ls, int_val, doc);
@@ -93,7 +97,7 @@ namespace atapp {
                             char str_val[24] = {0};
                             util::string::int2str(str_val, sizeof(str_val) - 1, int_val);
                             rapidjson::Value v;
-                            v.SetString(str_val, strlen(str_val), doc.GetAllocator());
+                            v.SetString(str_val, static_cast<rapidjson::SizeType>(strlen(str_val)), doc.GetAllocator());
                             rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), std::move(v), doc);
                         } else {
                             rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), int_val, doc);
@@ -112,7 +116,7 @@ namespace atapp {
                                 char str_val[24] = {0};
                                 util::string::int2str(str_val, sizeof(str_val) - 1, int_val);
                                 rapidjson::Value v;
-                                v.SetString(str_val, strlen(str_val), doc.GetAllocator());
+                                v.SetString(str_val, static_cast<rapidjson::SizeType>(strlen(str_val)), doc.GetAllocator());
                                 rapidsjon_loader_append_to_list(ls, std::move(v), doc);
                             } else {
                                 rapidsjon_loader_append_to_list(ls, int_val, doc);
@@ -125,7 +129,7 @@ namespace atapp {
                             char str_val[24] = {0};
                             util::string::int2str(str_val, sizeof(str_val) - 1, int_val);
                             rapidjson::Value v;
-                            v.SetString(str_val, strlen(str_val), doc.GetAllocator());
+                            v.SetString(str_val, static_cast<rapidjson::SizeType>(strlen(str_val)), doc.GetAllocator());
                             rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), std::move(v), doc);
                         } else {
                             rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), int_val, doc);
@@ -144,7 +148,7 @@ namespace atapp {
                                 char str_val[24] = {0};
                                 util::string::int2str(str_val, sizeof(str_val) - 1, int_val);
                                 rapidjson::Value v;
-                                v.SetString(str_val, strlen(str_val), doc.GetAllocator());
+                                v.SetString(str_val, static_cast<rapidjson::SizeType>(strlen(str_val)), doc.GetAllocator());
                                 rapidsjon_loader_append_to_list(ls, std::move(v), doc);
                             } else {
                                 rapidsjon_loader_append_to_list(ls, int_val, doc);
@@ -157,7 +161,7 @@ namespace atapp {
                             char str_val[24] = {0};
                             util::string::int2str(str_val, sizeof(str_val) - 1, int_val);
                             rapidjson::Value v;
-                            v.SetString(str_val, strlen(str_val), doc.GetAllocator());
+                            v.SetString(str_val, static_cast<rapidjson::SizeType>(strlen(str_val)), doc.GetAllocator());
                             rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), std::move(v), doc);
                         } else {
                             rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), int_val, doc);
@@ -453,8 +457,8 @@ namespace atapp {
                     return;
                 }
 
-                size_t arrsz = val.Size();
-                for (size_t i = 0; i < arrsz; ++ i) {
+                rapidjson::SizeType arrsz = val.Size();
+                for (rapidjson::SizeType i = 0; i < arrsz; ++ i) {
                     dump_pick_field(val[i], dst, fds, options);
                 }     
             } else {
@@ -578,13 +582,13 @@ namespace atapp {
 
     LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value& parent, const char* key, const std::string& val, rapidjson::Document &doc) {
         rapidjson::Value v;
-        v.SetString(val.c_str(), val.size(), doc.GetAllocator());
+        v.SetString(val.c_str(), static_cast<rapidjson::SizeType>(val.size()), doc.GetAllocator());
         rapidsjon_loader_mutable_set_member(parent, key, std::move(v), doc);
     }
 
     LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value& parent, const char* key, std::string& val, rapidjson::Document &doc) {
         rapidjson::Value v;
-        v.SetString(val.c_str(), val.size(), doc.GetAllocator());
+        v.SetString(val.c_str(), static_cast<rapidjson::SizeType>(val.size()), doc.GetAllocator());
         rapidsjon_loader_mutable_set_member(parent, key, std::move(v), doc);
     }
 
@@ -596,13 +600,13 @@ namespace atapp {
 
     LIBATAPP_MACRO_API void rapidsjon_loader_append_to_list(rapidjson::Value& list_parent, const std::string& val, rapidjson::Document &doc) {
         rapidjson::Value v;
-        v.SetString(val.c_str(), val.size(), doc.GetAllocator());
+        v.SetString(val.c_str(), static_cast<rapidjson::SizeType>(val.size()), doc.GetAllocator());
         rapidsjon_loader_append_to_list(list_parent, std::move(v), doc);
     }
 
     LIBATAPP_MACRO_API void rapidsjon_loader_append_to_list(rapidjson::Value& list_parent, std::string& val, rapidjson::Document &doc) {
         rapidjson::Value v;
-        v.SetString(val.c_str(), val.size(), doc.GetAllocator());
+        v.SetString(val.c_str(), static_cast<rapidjson::SizeType>(val.size()), doc.GetAllocator());
         rapidsjon_loader_append_to_list(list_parent, std::move(v), doc);
     }
 

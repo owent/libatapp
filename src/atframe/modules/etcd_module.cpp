@@ -434,7 +434,7 @@ namespace atapp {
         return 0;
     }
 
-    LIBATAPP_MACRO_API const char *etcd_module::name() const { return "etcd module"; }
+    LIBATAPP_MACRO_API const char *etcd_module::name() const { return "atapp: etcd module"; }
 
     LIBATAPP_MACRO_API int etcd_module::tick() {
         // single mode
@@ -762,7 +762,7 @@ namespace atapp {
             } else {
                 unpack(node, evt_data.kv.key, evt_data.kv.value, true);
             }
-            if (node.node_discovery.id() == 0) {
+            if (node.node_discovery.id() == 0 && node.node_discovery.name().empty()) {
                 continue;
             }
 
@@ -771,6 +771,8 @@ namespace atapp {
             } else {
                 node.action = node_action_t::EN_NAT_PUT;
             }
+
+            // TODO add into inner indexer
 
             watcher_sender_list_t sender(*mod, header, body, evt_data, node);
             for (std::list<watcher_list_callback_t>::iterator iter = callbacks->begin(); iter != callbacks->end(); ++iter) {
@@ -799,7 +801,7 @@ namespace atapp {
             } else {
                 unpack(node, evt_data.kv.key, evt_data.kv.value, true);
             }
-            if (node.node_discovery.id() == 0) {
+            if (node.node_discovery.id() == 0 && node.node_discovery.name().empty()) {
                 continue;
             }
 
@@ -808,6 +810,8 @@ namespace atapp {
             } else {
                 node.action = node_action_t::EN_NAT_PUT;
             }
+
+            // TODO add into inner indexer
 
             watcher_sender_one_t sender(*mod, header, body, evt_data, node);
             callback(std::ref(sender));

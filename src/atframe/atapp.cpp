@@ -351,8 +351,9 @@ namespace atapp {
         while (std::getline(file, line)) {
 
             if (is_first_line) {
+                const unsigned char utf8_bom[3] = {0xef, 0xbb, 0xbf};
                 // Skip UTF-8 BOM
-                if (line.size() > 3 && line[0] == (char)0xef && line[1] == (char)0xbb && line[2] == (char)0xbf) {
+                if (line.size() > 3 && 0 == memcmp(line.c_str(), utf8_bom, 3)) {
                     line = line.substr(3);
                 }
             }
