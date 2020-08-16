@@ -82,7 +82,7 @@ namespace atapp {
 
     } // namespace detail
 
-    LIBATAPP_MACRO_API etcd_module::etcd_module() {}
+    LIBATAPP_MACRO_API etcd_module::etcd_module() : etcd_ctx_enabled_(false) {}
 
     LIBATAPP_MACRO_API etcd_module::~etcd_module() { reset(); }
 
@@ -111,24 +111,131 @@ namespace atapp {
             return -1;
         }
 
-        if (etcd_ctx_.get_conf_hosts().empty()) {
-            FWLOGINFO("etcd host not found, start singel mode");
-            return 0;
-        }
-
         util::network::http_request::create_curl_multi(get_app()->get_bus_node()->get_evloop(), curl_multi_);
         if (!curl_multi_) {
             FWLOGERROR("create curl multi instance failed.");
             return -1;
         }
 
+        const atapp::protocol::atapp_etcd &conf = get_configure();
+        if (etcd_ctx_.get_conf_hosts().empty() || !etcd_ctx_enabled_) {
+            FWLOGINFO("etcd host not found, start single mode");
+            return res;
+        }
+
         etcd_ctx_.init(curl_multi_);
 
-        // generate keepalive data
+        // generate keepalives
         std::vector<atapp::etcd_keepalive::ptr_t> keepalive_actors;
         std::string keepalive_val;
-        keepalive_actors.reserve(4);
+        res = init_keepalives(keepalive_actors, keepalive_val);
+        if (res < 0) {
+            return res;
+        }
+        // generate watchers data
+        res = init_watchers();
+        if (res < 0) {
+            return res;
+        }
+
+        // Setup for first, we must check if all resource available.
+        bool is_failed  = false;
+        bool is_timeout = false;
+
+        // setup timer for timeout
+        uv_timer_t timeout_timer;
+        uv_timer_t tick_timer;
+        uv_timer_init(get_app()->get_bus_node()->get_evloop(), &timeout_timer);
+        uv_timer_init(get_app()->get_bus_node()->get_evloop(), &tick_timer);
+        timeout_timer.data = &is_timeout;
+        tick_timer.data    = &etcd_ctx_;
+
+        uint64_t timeout_ms = detail::convert_to_ms<uint64_t>(conf.init().timeout(), 5000);
+        uv_timer_start(&timeout_timer, detail::init_timer_timeout_callback, timeout_ms, 0);
+        uv_timer_start(&tick_timer, detail::init_timer_tick_callback, 128, 128);
+
+        int ticks = 0;
+        while (false == is_failed && false == is_timeout) {
+            util::time::time_utility::update();
+            etcd_ctx_.tick();
+            ++ticks;
+
+            size_t run_count = 0;
+            // Check keepalives
+            for (size_t i = 0; false == is_failed && i < keepalive_actors.size(); ++i) {
+                if (keepalive_actors[i]->is_check_run()) {
+                    if (!keepalive_actors[i]->is_check_passed()) {
+                        FWLOGERROR("etcd_keepalive lock {} failed.", keepalive_actors[i]->get_path());
+                        is_failed = true;
+                    }
+
+                    ++run_count;
+                }
+            }
+
+            // Check watchers
+
+            // 全部成功或任意失败则退出
+            if (is_failed || run_count >= keepalive_actors.size()) {
+                break;
+            }
+
+            uv_run(get_app()->get_bus_node()->get_evloop(), UV_RUN_ONCE);
+
+            // 任意重试次数过多则失败退出
+            for (size_t i = 0; false == is_failed && i < keepalive_actors.size(); ++i) {
+                if (keepalive_actors[i]->get_check_times() >= ETCD_MODULE_STARTUP_RETRY_TIMES ||
+                    etcd_ctx_.get_stats().continue_error_requests > ETCD_MODULE_STARTUP_RETRY_TIMES) {
+                    size_t retry_times = keepalive_actors[i]->get_check_times();
+                    if (etcd_ctx_.get_stats().continue_error_requests > retry_times) {
+                        retry_times = etcd_ctx_.get_stats().continue_error_requests > retry_times;
+                    }
+                    FWLOGERROR("etcd_keepalive request {} for {} times (with {} ticks) failed.", keepalive_actors[i]->get_path(),
+                               retry_times, ticks);
+                    is_failed = true;
+                    break;
+                }
+            }
+
+            if (is_failed) {
+                break;
+            }
+        }
+
+        if (is_timeout) {
+            is_failed = true;
+            for (size_t i = 0; i < keepalive_actors.size(); ++i) {
+                size_t retry_times = keepalive_actors[i]->get_check_times();
+                if (etcd_ctx_.get_stats().continue_error_requests > retry_times) {
+                    retry_times = etcd_ctx_.get_stats().continue_error_requests;
+                }
+                FWLOGERROR("etcd_keepalive request {} timeout, retry {} times (with {} ticks).", keepalive_actors[i]->get_path(),
+                           retry_times, ticks);
+            }
+        }
+
+        // close timer for timeout
+        uv_timer_stop(&timeout_timer);
+        uv_timer_stop(&tick_timer);
+        uv_close((uv_handle_t *)&timeout_timer, detail::init_timer_closed_callback);
+        uv_close((uv_handle_t *)&tick_timer, detail::init_timer_closed_callback);
+        while (timeout_timer.data || tick_timer.data) {
+            uv_run(get_app()->get_bus_node()->get_evloop(), UV_RUN_ONCE);
+        }
+
+        // 初始化失败则回收资源
+        if (is_failed) {
+            stop();
+            reset();
+            return -1;
+        }
+
+        return res;
+    }
+
+    int etcd_module::init_keepalives(std::vector<atapp::etcd_keepalive::ptr_t> &keepalive_actors, std::string &keepalive_val) {
         const atapp::protocol::atapp_etcd &conf = get_configure();
+        keepalive_actors.reserve(5);
 
         if (conf.report_alive().by_id()) {
             atapp::etcd_keepalive::ptr_t actor = add_keepalive_actor(keepalive_val, get_by_id_path());
@@ -188,96 +295,19 @@ namespace atapp {
             FWLOGINFO("create etcd_keepalive for by_tag index {} success", get_by_tag_path(tag_name));
         }
 
-        // 执行到首次检测结束
-        bool is_failed  = false;
-        bool is_timeout = false;
+        // TODO create custom keepalives
+        return 0;
+    }
 
-        // setup timer for timeout
-        uv_timer_t timeout_timer;
-        uv_timer_t tick_timer;
-        uv_timer_init(get_app()->get_bus_node()->get_evloop(), &timeout_timer);
-        uv_timer_init(get_app()->get_bus_node()->get_evloop(), &tick_timer);
-        timeout_timer.data = &is_timeout;
-        tick_timer.data    = &etcd_ctx_;
+    int etcd_module::init_watchers() {
+        // TODO setup configured watchers
+        // TODO 内置有按id或按name watch, return
+        // TODO 内置有按type id或按type name watch
+        // TODO 内置有按tag watch
+        // TODO 内置有自定义 watch
 
-        uint64_t timeout_ms = detail::convert_to_ms<uint64_t>(conf.init().timeout(), 5000);
-        uv_timer_start(&timeout_timer, detail::init_timer_timeout_callback, timeout_ms, 0);
-        uv_timer_start(&tick_timer, detail::init_timer_tick_callback, 128, 128);
-
-        int ticks = 0;
-        while (false == is_failed && false == is_timeout) {
-            util::time::time_utility::update();
-            etcd_ctx_.tick();
-            ++ticks;
-
-            size_t run_count = 0;
-            for (size_t i = 0; false == is_failed && i < keepalive_actors.size(); ++i) {
-                if (keepalive_actors[i]->is_check_run()) {
-                    if (!keepalive_actors[i]->is_check_passed()) {
-                        FWLOGERROR("etcd_keepalive lock {} failed.", keepalive_actors[i]->get_path());
-                        is_failed = true;
-                    }
-
-                    ++run_count;
-                }
-            }
-
-            // 全部成功或任意失败则退出
-            if (is_failed || run_count >= keepalive_actors.size()) {
-                break;
-            }
-
-            uv_run(get_app()->get_bus_node()->get_evloop(), UV_RUN_ONCE);
-
-            // 任意重试次数过多则失败退出
-            for (size_t i = 0; false == is_failed && i < keepalive_actors.size(); ++i) {
-                if (keepalive_actors[i]->get_check_times() >= ETCD_MODULE_STARTUP_RETRY_TIMES ||
-                    etcd_ctx_.get_stats().continue_error_requests > ETCD_MODULE_STARTUP_RETRY_TIMES) {
-                    size_t retry_times = keepalive_actors[i]->get_check_times();
-                    if (etcd_ctx_.get_stats().continue_error_requests > retry_times) {
-                        retry_times = etcd_ctx_.get_stats().continue_error_requests > retry_times;
-                    }
-                    FWLOGERROR("etcd_keepalive request {} for {} times (with {} ticks) failed.", keepalive_actors[i]->get_path(),
-                               retry_times, ticks);
-                    is_failed = true;
-                    break;
-                }
-            }
-
-            if (is_failed) {
-                break;
-            }
-        }
-
-        if (is_timeout) {
-            is_failed = true;
-            for (size_t i = 0; i < keepalive_actors.size(); ++i) {
-                size_t retry_times = keepalive_actors[i]->get_check_times();
-                if (etcd_ctx_.get_stats().continue_error_requests > retry_times) {
-                    retry_times = etcd_ctx_.get_stats().continue_error_requests;
-                }
-                FWLOGERROR("etcd_keepalive request {} timeout, retry {} times (with {} ticks).", keepalive_actors[i]->get_path(),
-                           retry_times, ticks);
-            }
-        }
-
-        // close timer for timeout
-        uv_timer_stop(&timeout_timer);
-        uv_timer_stop(&tick_timer);
-        uv_close((uv_handle_t *)&timeout_timer, detail::init_timer_closed_callback);
-        uv_close((uv_handle_t *)&tick_timer, detail::init_timer_closed_callback);
-        while (timeout_timer.data || tick_timer.data) {
-            uv_run(get_app()->get_bus_node()->get_evloop(), UV_RUN_ONCE);
-        }
-
-        // 初始化失败则回收资源
-        if (is_failed) {
-            stop();
-            reset();
-            return -1;
-        }
-
-        return res;
+        // TODO create custom watchers
+        return 0;
     }
 
     LIBATAPP_MACRO_API int etcd_module::reload() {
@@ -407,6 +437,23 @@ namespace atapp {
             etcd_ctx_.set_conf_ssl_cipher_list_tls13(conf.ssl().ssl_cipher_list_tls13());
         }
 
+        etcd_ctx_enabled_ = conf.enable();
+
+        // Close etcd cluster if disabled and running
+        if (etcd_ctx_enabled_) {
+            // It's safe to call etcd_ctx_.init(curl_multi_); when running
+            if (!etcd_ctx_.is_available()) {
+                etcd_ctx_.init(curl_multi_);
+            }
+        } else {
+            // Maybe running initialization and etcd_cluster::flag_t::RUNNING not set yet
+            //   If etcd_ctx_ is not initialized, it's ok to just call etcd_ctx_.close(false) and just set etcd_cluster::flag_t::CLOSING
+            //   into true
+            if (!cleanup_request_ && !etcd_ctx_.check_flag(etcd_cluster::flag_t::CLOSING)) {
+                cleanup_request_ = etcd_ctx_.close(false);
+            }
+        }
+
         return 0;
     }
 
@@ -438,7 +485,11 @@ namespace atapp {
 
     LIBATAPP_MACRO_API int etcd_module::tick() {
         // single mode
-        if (etcd_ctx_.get_conf_hosts().empty()) {
+        if (!etcd_ctx_enabled_ || etcd_ctx_.get_conf_hosts().empty()) {
+            if (!cleanup_request_ && etcd_ctx_.is_available()) {
+                cleanup_request_ = etcd_ctx_.close(false);
+            }
+
             return 0;
         }
 
@@ -457,6 +508,10 @@ namespace atapp {
 
     LIBATAPP_MACRO_API const std::string &etcd_module::get_conf_custom_data() const { return custom_data_; }
     LIBATAPP_MACRO_API void etcd_module::set_conf_custom_data(const std::string &v) { custom_data_ = v; }
+
+    LIBATAPP_MACRO_API const util::network::http_request::curl_m_bind_ptr_t &etcd_module::get_shared_curl_multi_context() const {
+        return curl_multi_;
+    }
 
     LIBATAPP_MACRO_API std::string etcd_module::get_by_id_path() const {
         return LOG_WRAPPER_FWAPI_FORMAT("{}/{}/{}", get_configure_path(), ETCD_MODULE_BY_ID_DIR, get_app()->get_id());

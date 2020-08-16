@@ -83,6 +83,11 @@ namespace atapp {
 
         LIBATAPP_MACRO_API virtual int init() UTIL_CONFIG_OVERRIDE;
 
+    private:
+        int init_keepalives(std::vector<atapp::etcd_keepalive::ptr_t> &keepalive_actors, std::string &keepalive_val);
+        int init_watchers();
+
+    public:
         LIBATAPP_MACRO_API virtual int reload() UTIL_CONFIG_OVERRIDE;
 
         LIBATAPP_MACRO_API virtual int stop() UTIL_CONFIG_OVERRIDE;
@@ -95,6 +100,8 @@ namespace atapp {
 
         LIBATAPP_MACRO_API const std::string &get_conf_custom_data() const;
         LIBATAPP_MACRO_API void set_conf_custom_data(const std::string &v);
+
+        LIBATAPP_MACRO_API const util::network::http_request::curl_m_bind_ptr_t &get_shared_curl_multi_context() const;
 
         LIBATAPP_MACRO_API std::string get_by_id_path() const;
         LIBATAPP_MACRO_API std::string get_by_type_id_path() const;
@@ -151,6 +158,7 @@ namespace atapp {
         std::string custom_data_;
         util::network::http_request::curl_m_bind_ptr_t curl_multi_;
         util::network::http_request::ptr_t cleanup_request_;
+        bool etcd_ctx_enabled_;
         ::atapp::etcd_cluster etcd_ctx_;
         std::list<watcher_list_callback_t> watcher_by_id_callbacks_;
         std::list<watcher_list_callback_t> watcher_by_name_callbacks_;

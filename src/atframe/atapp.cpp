@@ -29,6 +29,8 @@
 #include "cli/shell_font.h"
 
 
+#include <atframe/modules/etcd_module.h>
+
 #define ATAPP_DEFAULT_STOP_TIMEOUT 30000
 #define ATAPP_DEFAULT_TICK_INTERVAL 16
 
@@ -162,6 +164,12 @@ namespace atapp {
 
         if (mode_t::START != mode_) {
             return 0;
+        }
+
+        // inner modules
+        if (!inner_module_etcd_) {
+            inner_module_etcd_ = std::make_shared<atapp::etcd_module>();
+            add_module(inner_module_etcd_);
         }
 
         int ret = 0;
@@ -742,6 +750,14 @@ namespace atapp {
         }
 
         return app_option_;
+    }
+
+    LIBATAPP_MACRO_API const util::network::http_request::curl_m_bind_ptr_t &app::get_shared_curl_multi_context() const {
+        if (likely(inner_module_etcd_)) {
+            return inner_module_etcd_->get_shared_curl_multi_context();
+        }
+
+        return NULL;
     }
 
     LIBATAPP_MACRO_API void app::set_app_version(const std::string &ver) { conf_.app_version = ver; }

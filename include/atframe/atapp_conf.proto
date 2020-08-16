@@ -153,17 +153,18 @@ message atapp_etcd_report_alive {
 }
 
 message atapp_etcd {
-    repeated string         hosts         = 1;
-    string                  path          = 2;
-    string                  authorization = 3;
-    atapp_etcd_http         http          = 4;
-    atapp_etcd_ssl          ssl           = 5;
-    atapp_etcd_cluster      cluster       = 6;
-    atapp_etcd_keepalive    keepalive     = 7;
-    atapp_etcd_request      request       = 8;
-    atapp_etcd_init         init          = 9;
-    atapp_etcd_watcher      watcher       = 10;
-    atapp_etcd_report_alive report_alive  = 11;
+    bool                    enable        = 1;
+    repeated string         hosts         = 2;
+    string                  path          = 3;
+    string                  authorization = 4;
+    atapp_etcd_http         http          = 5;
+    atapp_etcd_ssl          ssl           = 6;
+    atapp_etcd_cluster      cluster       = 7;
+    atapp_etcd_keepalive    keepalive     = 8;
+    atapp_etcd_request      request       = 9;
+    atapp_etcd_init         init          = 10;
+    atapp_etcd_watcher      watcher       = 11;
+    atapp_etcd_report_alive report_alive  = 12;
 }
 
 message atapp_configure {

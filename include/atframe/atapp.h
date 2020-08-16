@@ -24,9 +24,10 @@
 
 #include "config/ini_loader.h"
 
+#include <network/http_request.h>
+
 #include "atapp_log_sink_maker.h"
 #include "atapp_module_impl.h"
-
 
 namespace atbus {
     namespace protocol {
@@ -38,6 +39,9 @@ namespace atbus {
 } // namespace atbus
 
 namespace atapp {
+
+    class etcd_module;
+
     class app {
     public:
         typedef LIBATAPP_MACRO_BUSID_TYPE app_id_t;
@@ -108,7 +112,8 @@ namespace atapp {
 
 
         typedef std::function<int(app &, const msg_t &, const void *, size_t)> callback_fn_on_msg_t;
-        typedef std::function<int(app &, app_id_t src_pd, app_id_t dst_pd, const atbus::protocol::msg &m)> callback_fn_on_forward_response_t;
+        typedef std::function<int(app &, app_id_t src_pd, app_id_t dst_pd, const atbus::protocol::msg &m)>
+            callback_fn_on_forward_response_t;
         typedef std::function<int(app &, atbus::endpoint &, int)> callback_fn_on_connected_t;
         typedef std::function<int(app &, atbus::endpoint &, int)> callback_fn_on_disconnected_t;
         typedef std::function<int(app &)> callback_fn_on_all_module_inited_t;
@@ -162,7 +167,7 @@ namespace atapp {
 
         LIBATAPP_MACRO_API app_id_t get_id() const;
 
-        LIBATAPP_MACRO_API app_id_t convert_app_id_by_string(const char* id_in) const;
+        LIBATAPP_MACRO_API app_id_t convert_app_id_by_string(const char *id_in) const;
         LIBATAPP_MACRO_API std::string convert_app_id_to_string(app_id_t id_in, bool hex = false) const;
 
         LIBATAPP_MACRO_API bool check_flag(flag_t::type f) const;
@@ -180,13 +185,25 @@ namespace atapp {
             add_module(std::dynamic_pointer_cast<module_impl>(module));
         }
 
-        // api: add custom log type
-        // api: add custom module
-        // api: add custom command callback
+        /**
+         * @brief api: add custom command callback
+         * @return the command manager
+         */
         LIBATAPP_MACRO_API util::cli::cmd_option_ci::ptr_type get_command_manager();
 
-        // api: add custem program options
+        /**
+         * @brief api: add custem program options
+         * @return the program options manager
+         */
         LIBATAPP_MACRO_API util::cli::cmd_option::ptr_type get_option_manager();
+
+        /**
+         * @brief api: get shared httr_request context, this context can be reused to create util::network::http_request
+         * @note All the http_requests created from this context should be cleaned before atapp is destroyed.
+         * @note this function only return a valid context after initialized.
+         * @return the shared http_request context
+         */
+        LIBATAPP_MACRO_API const util::network::http_request::curl_m_bind_ptr_t &get_shared_curl_multi_context() const;
 
         LIBATAPP_MACRO_API void set_app_version(const std::string &ver);
 
@@ -226,13 +243,16 @@ namespace atapp {
          */
         LIBATAPP_MACRO_API const yaml_conf_map_t &get_yaml_loaders() const;
 
-        LIBATAPP_MACRO_API void parse_configures_into(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message& dst, const std::string& path) const;
+        LIBATAPP_MACRO_API void parse_configures_into(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst, const std::string &path) const;
 
-        LIBATAPP_MACRO_API const atapp::protocol::atapp_configure& get_origin_configure() const;
-        LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata& get_metadata() const;
+        LIBATAPP_MACRO_API const atapp::protocol::atapp_configure &get_origin_configure() const;
+        LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata &get_metadata() const;
 
-        LIBATAPP_MACRO_API void pack(atapp::protocol::atapp_discovery& out) const;
+        LIBATAPP_MACRO_API void pack(atapp::protocol::atapp_discovery &out) const;
 
+        /**
+         * @brief add log sink maker, this function allow user to add custom log sink from the configure of atapp
+         */
         LIBATAPP_MACRO_API bool add_log_sink_maker(const std::string &name, log_sink_maker::log_reg_t fn);
 
         LIBATAPP_MACRO_API void set_evt_on_recv_msg(callback_fn_on_msg_t fn);
@@ -283,18 +303,19 @@ namespace atapp {
     public:
         static LIBATAPP_MACRO_API custom_command_sender_t get_custom_command_sender(util::cli::callback_param);
         static LIBATAPP_MACRO_API bool add_custom_command_rsp(util::cli::callback_param, const std::string &rsp_text);
-        static LIBATAPP_MACRO_API void split_ids_by_string(const char* in, std::vector<app_id_t>& out);
-        static LIBATAPP_MACRO_API app_id_t convert_app_id_by_string(const char* id_in, const std::vector<app_id_t>& mask_in);
-        static LIBATAPP_MACRO_API app_id_t convert_app_id_by_string(const char* id_in, const char* mask_in);
-        static LIBATAPP_MACRO_API std::string convert_app_id_to_string(app_id_t id_in, const std::vector<app_id_t>& mask_in, bool hex = false);
-        static LIBATAPP_MACRO_API std::string convert_app_id_to_string(app_id_t id_in, const char* mask_in, bool hex = false);
+        static LIBATAPP_MACRO_API void split_ids_by_string(const char *in, std::vector<app_id_t> &out);
+        static LIBATAPP_MACRO_API app_id_t convert_app_id_by_string(const char *id_in, const std::vector<app_id_t> &mask_in);
+        static LIBATAPP_MACRO_API app_id_t convert_app_id_by_string(const char *id_in, const char *mask_in);
+        static LIBATAPP_MACRO_API std::string convert_app_id_to_string(app_id_t id_in, const std::vector<app_id_t> &mask_in,
+                                                                       bool hex = false);
+        static LIBATAPP_MACRO_API std::string convert_app_id_to_string(app_id_t id_in, const char *mask_in, bool hex = false);
 
         /**
          * @brief get last instance
          * @note this API is not thread-safety and only usageful when there is only one app instance
          */
-        static LIBATAPP_MACRO_API app* get_last_instance();
-        
+        static LIBATAPP_MACRO_API app *get_last_instance();
+
     private:
         int prog_option_handler_help(util::cli::callback_param params, util::cli::cmd_option *opt_mgr, util::cli::cmd_option_ci *cmd_mgr);
         int prog_option_handler_version(util::cli::callback_param params);
@@ -314,8 +335,10 @@ namespace atapp {
         int command_handler_invalid(util::cli::callback_param params);
 
     private:
-        int bus_evt_callback_on_recv_msg(const atbus::node &, const atbus::endpoint *, const atbus::connection *, const msg_t &, const void *, size_t);
-        int bus_evt_callback_on_forward_response(const atbus::node &, const atbus::endpoint *, const atbus::connection *, const atbus::protocol::msg *m);
+        int bus_evt_callback_on_recv_msg(const atbus::node &, const atbus::endpoint *, const atbus::connection *, const msg_t &,
+                                         const void *, size_t);
+        int bus_evt_callback_on_forward_response(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
+                                                 const atbus::protocol::msg *m);
         int bus_evt_callback_on_error(const atbus::node &, const atbus::endpoint *, const atbus::connection *, int, int);
         int bus_evt_callback_on_reg(const atbus::node &, const atbus::endpoint *, const atbus::connection *, int);
         int bus_evt_callback_on_shutdown(const atbus::node &, int);
@@ -351,7 +374,8 @@ namespace atapp {
         tick_timer_t tick_timer_;
 
         std::vector<module_ptr_t> modules_;
-        std::map<std::string, log_sink_maker::log_reg_t> log_reg_; // log reg will not changed or be checked outside the init, so std::map is enough
+        std::map<std::string, log_sink_maker::log_reg_t>
+            log_reg_; // log reg will not changed or be checked outside the init, so std::map is enough
 
         // callbacks
         callback_fn_on_msg_t evt_on_recv_msg_;
@@ -366,6 +390,9 @@ namespace atapp {
             time_t last_checkpoint_min;
         };
         stat_data_t stat_;
+
+        // inner modules
+        std::shared_ptr< ::atapp::etcd_module> inner_module_etcd_;
     };
 } // namespace atapp
 

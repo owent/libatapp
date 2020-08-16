@@ -95,7 +95,7 @@ namespace atapp {
 
             char buffer[256]   = {0};
             const char *prefix = "Mozilla/5.0";
-            const char *suffix = "Atframework Etcdcli/1.0";
+            const char *suffix = "Atapp Etcdcli/1.0";
 #if defined(_WIN32) || defined(__WIN32__)
 #if (defined(__MINGW32__) && __MINGW32__)
             const char *sys_env = "Win32; MinGW32";
@@ -239,6 +239,7 @@ namespace atapp {
 
     LIBATAPP_MACRO_API util::network::http_request::ptr_t etcd_cluster::close(bool wait) {
         set_flag(flag_t::CLOSING, true);
+        set_flag(flag_t::RUNNING, false);
 
         if (rpc_keepalive_) {
             rpc_keepalive_->set_on_complete(NULL);
@@ -835,9 +836,8 @@ namespace atapp {
             conf_.authorization_next_update_time = util::time::time_utility::now() + conf_.authorization_retry_interval;
         }
 
-        std::stringstream ss;
-        ss << conf_.path_node << ETCD_API_V3_AUTH_AUTHENTICATE;
-        util::network::http_request::ptr_t req = util::network::http_request::create(curl_multi_.get(), ss.str());
+        util::network::http_request::ptr_t req = util::network::http_request::create(
+            curl_multi_.get(), LOG_WRAPPER_FWAPI_FORMAT("{}{}", conf_.path_node, ETCD_API_V3_AUTH_AUTHENTICATE));
 
         std::string username, password;
         pick_conf_authorization(username, &password);
@@ -968,9 +968,8 @@ namespace atapp {
             conf_.auth_user_get_next_update_time = util::time::time_utility::now() + conf_.auth_user_get_retry_interval;
         }
 
-        std::stringstream ss;
-        ss << conf_.path_node << ETCD_API_V3_AUTH_USER_GET;
-        util::network::http_request::ptr_t req = util::network::http_request::create(curl_multi_.get(), ss.str());
+        util::network::http_request::ptr_t req = util::network::http_request::create(
+            curl_multi_.get(), LOG_WRAPPER_FWAPI_FORMAT("{}{}", conf_.path_node, ETCD_API_V3_AUTH_USER_GET));
 
         std::string username;
         pick_conf_authorization(username, NULL);
@@ -1062,8 +1061,7 @@ namespace atapp {
                 if (role_iter->IsString()) {
                     self->conf_.authorization_user_roles.push_back(role_iter->GetString());
                 } else {
-                    FWLOGERROR("Etcd user get {} with bad role type: {}", username,
-                              etcd_packer::unpack_to_string(*role_iter));
+                    FWLOGERROR("Etcd user get {} with bad role type: {}", username, etcd_packer::unpack_to_string(*role_iter));
                 }
             }
 
@@ -1151,9 +1149,8 @@ namespace atapp {
             selected_host = &conf_.conf_hosts[random_generator_.random_between<size_t>(0, conf_.conf_hosts.size())];
         }
 
-        std::stringstream ss;
-        ss << (*selected_host) << ETCD_API_V3_MEMBER_LIST;
-        util::network::http_request::ptr_t req = util::network::http_request::create(curl_multi_.get(), ss.str());
+        util::network::http_request::ptr_t req = util::network::http_request::create(
+            curl_multi_.get(), LOG_WRAPPER_FWAPI_FORMAT("{}{}", (*selected_host), ETCD_API_V3_MEMBER_LIST));
 
         if (req) {
             add_stats_create_request();
@@ -1281,9 +1278,8 @@ namespace atapp {
             conf_.keepalive_next_update_time = util::time::time_utility::now() + conf_.keepalive_interval;
         }
 
-        std::stringstream ss;
-        ss << conf_.path_node << ETCD_API_V3_LEASE_GRANT;
-        util::network::http_request::ptr_t req = util::network::http_request::create(curl_multi_.get(), ss.str());
+        util::network::http_request::ptr_t req = util::network::http_request::create(
+            curl_multi_.get(), LOG_WRAPPER_FWAPI_FORMAT("{}{}", conf_.path_node, ETCD_API_V3_LEASE_GRANT));
 
         if (req) {
             add_stats_create_request();
@@ -1341,9 +1337,8 @@ namespace atapp {
             conf_.keepalive_next_update_time = util::time::time_utility::now() + conf_.keepalive_interval;
         }
 
-        std::stringstream ss;
-        ss << conf_.path_node << ETCD_API_V3_LEASE_KEEPALIVE;
-        util::network::http_request::ptr_t req = util::network::http_request::create(curl_multi_.get(), ss.str());
+        util::network::http_request::ptr_t req = util::network::http_request::create(
+            curl_multi_.get(), LOG_WRAPPER_FWAPI_FORMAT("{}{}", conf_.path_node, ETCD_API_V3_LEASE_KEEPALIVE));
 
         if (req) {
             add_stats_create_request();
@@ -1451,7 +1446,7 @@ namespace atapp {
             }
 
             self->add_stats_success_request();
-            if (!self->check_flag(flag_t::RUNNING)) {
+            if (!self->check_flag(flag_t::RUNNING) && !self->check_flag(flag_t::CLOSING)) {
                 self->set_flag(flag_t::RUNNING, true);
             }
 
@@ -1467,9 +1462,8 @@ namespace atapp {
             return util::network::http_request::ptr_t();
         }
 
-        std::stringstream ss;
-        ss << conf_.path_node << ETCD_API_V3_LEASE_REVOKE;
-        util::network::http_request::ptr_t ret = util::network::http_request::create(curl_multi_.get(), ss.str());
+        util::network::http_request::ptr_t ret = util::network::http_request::create(
+            curl_multi_.get(), LOG_WRAPPER_FWAPI_FORMAT("{}{}", conf_.path_node, ETCD_API_V3_LEASE_REVOKE));
 
         if (ret) {
             add_stats_create_request();
@@ -1492,9 +1486,8 @@ namespace atapp {
             return util::network::http_request::ptr_t();
         }
 
-        std::stringstream ss;
-        ss << conf_.path_node << ETCD_API_V3_KV_GET;
-        util::network::http_request::ptr_t ret = util::network::http_request::create(curl_multi_.get(), ss.str());
+        util::network::http_request::ptr_t ret =
+            util::network::http_request::create(curl_multi_.get(), LOG_WRAPPER_FWAPI_FORMAT("{}{}", conf_.path_node, ETCD_API_V3_KV_GET));
 
         if (ret) {
             add_stats_create_request();
@@ -1526,9 +1519,8 @@ namespace atapp {
             return util::network::http_request::ptr_t();
         }
 
-        std::stringstream ss;
-        ss << conf_.path_node << ETCD_API_V3_KV_SET;
-        util::network::http_request::ptr_t ret = util::network::http_request::create(curl_multi_.get(), ss.str());
+        util::network::http_request::ptr_t ret =
+            util::network::http_request::create(curl_multi_.get(), LOG_WRAPPER_FWAPI_FORMAT("{}{}", conf_.path_node, ETCD_API_V3_KV_SET));
 
         if (ret) {
             add_stats_create_request();
@@ -1560,9 +1552,8 @@ namespace atapp {
             return util::network::http_request::ptr_t();
         }
 
-        std::stringstream ss;
-        ss << conf_.path_node << ETCD_API_V3_KV_DELETE;
-        util::network::http_request::ptr_t ret = util::network::http_request::create(curl_multi_.get(), ss.str());
+        util::network::http_request::ptr_t ret = util::network::http_request::create(
+            curl_multi_.get(), LOG_WRAPPER_FWAPI_FORMAT("{}{}", conf_.path_node, ETCD_API_V3_KV_DELETE));
 
         if (ret) {
             add_stats_create_request();
@@ -1589,9 +1580,8 @@ namespace atapp {
             return util::network::http_request::ptr_t();
         }
 
-        std::stringstream ss;
-        ss << conf_.path_node << ETCD_API_V3_WATCH;
-        util::network::http_request::ptr_t ret = util::network::http_request::create(curl_multi_.get(), ss.str());
+        util::network::http_request::ptr_t ret =
+            util::network::http_request::create(curl_multi_.get(), LOG_WRAPPER_FWAPI_FORMAT("{}{}", conf_.path_node, ETCD_API_V3_WATCH));
 
         if (ret) {
             add_stats_create_request();
