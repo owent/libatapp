@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 
+#include <config/atframe_utils_build_feature.h>
+
 #include <config/compiler/template_prefix.h>
 
 #include <rapidjson/document.h>
@@ -31,6 +33,7 @@
 namespace atapp {
     class etcd_module : public ::atapp::module_impl {
     public:
+        typedef std::shared_ptr<atapp::protocol::atapp_discovery> atapp_discovery_ptr_t;
         struct LIBATAPP_MACRO_API_HEAD_ONLY node_action_t {
             enum type {
                 EN_NAT_UNKNOWN = 0,
@@ -38,6 +41,7 @@ namespace atapp {
                 EN_NAT_DELETE,
             };
         };
+
         struct LIBATAPP_MACRO_API_HEAD_ONLY node_info_t {
             atapp::protocol::atapp_discovery node_discovery;
             node_action_t::type action;
@@ -73,6 +77,9 @@ namespace atapp {
 
         typedef std::function<void(watcher_sender_list_t &)> watcher_list_callback_t;
         typedef std::function<void(watcher_sender_one_t &)> watcher_one_callback_t;
+        typedef std::function<void(node_info_t &)> node_event_callback_t;
+        typedef std::list<node_event_callback_t> node_event_callback_list_t;
+        typedef node_event_callback_list_t::const_iterator node_event_callback_handle_t;
 
     public:
         LIBATAPP_MACRO_API etcd_module();
@@ -100,6 +107,10 @@ namespace atapp {
 
         LIBATAPP_MACRO_API const std::string &get_conf_custom_data() const;
         LIBATAPP_MACRO_API void set_conf_custom_data(const std::string &v);
+
+        LIBATAPP_MACRO_API bool is_etcd_enabled() const;
+        LIBATAPP_MACRO_API void enable_etcd();
+        LIBATAPP_MACRO_API void disable_etcd();
 
         LIBATAPP_MACRO_API const util::network::http_request::curl_m_bind_ptr_t &get_shared_curl_multi_context() const;
 
@@ -131,6 +142,8 @@ namespace atapp {
 
         LIBATAPP_MACRO_API atapp::etcd_keepalive::ptr_t add_keepalive_actor(std::string &val, const std::string &node_path);
 
+        LIBATAPP_MACRO_API node_event_callback_handle_t add_on_node_discovery_event(node_event_callback_t fn);
+        LIBATAPP_MACRO_API void remove_on_node_event(node_event_callback_handle_t handle);
     private:
         static bool unpack(node_info_t &out, const std::string &path, const std::string &json, bool reset_data);
         static void pack(const node_info_t &out, std::string &json);
@@ -153,15 +166,24 @@ namespace atapp {
             void operator()(const ::atapp::etcd_response_header &header, const ::atapp::etcd_watcher::response_t &evt_data);
         };
 
+        bool update_inner_watcher_event(node_info_t& node);
     private:
         std::string conf_path_cache_;
         std::string custom_data_;
         util::network::http_request::curl_m_bind_ptr_t curl_multi_;
         util::network::http_request::ptr_t cleanup_request_;
         bool etcd_ctx_enabled_;
+        util::time::time_utility::raw_time_t tick_next_timepoint_;
+        std::chrono::system_clock::duration tick_interval_;
         ::atapp::etcd_cluster etcd_ctx_;
         std::list<watcher_list_callback_t> watcher_by_id_callbacks_;
         std::list<watcher_list_callback_t> watcher_by_name_callbacks_;
+
+        typedef LIBATFRAME_UTILS_AUTO_SELETC_MAP(std::string, atapp_discovery_ptr_t) node_discovery_cache_by_name_t;
+        typedef LIBATFRAME_UTILS_AUTO_SELETC_MAP(uint64_t, atapp_discovery_ptr_t) node_discovery_cache_by_id_t;
+        node_discovery_cache_by_name_t node_discovery_cache_by_name_;
+        node_discovery_cache_by_id_t node_discovery_cache_by_id_;
+        node_event_callback_list_t node_event_callbacks_;
     };
 } // namespace atapp
 

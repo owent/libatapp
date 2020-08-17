@@ -22,6 +22,10 @@
 
 #include <atframe/atapp_conf.h>
 
+#ifdef GetMessage
+#undef GetMessage
+#endif
+
 namespace atapp {
     namespace detail {
         static const char* skip_space(const char *str) {
@@ -878,5 +882,180 @@ namespace atapp {
 #endif
 
         return YAML::Node(YAML::NodeType::Undefined);
+    }
+
+    static bool protobuf_equal_inner_message(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message& l, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message& r);
+    static bool protobuf_equal_inner_field(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message& l, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message& r, 
+        const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor* fds);
+
+
+    bool protobuf_equal_inner_message(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message& l, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message& r) {
+        if (&l == &r) {
+            return true;
+        }
+
+        const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Descriptor* desc = l.GetDescriptor();
+        if (desc != r.GetDescriptor()) {
+            return false;
+        }
+
+        for (int i = 0; i < desc->field_count(); ++ i) {
+            if (false == protobuf_equal_inner_field(l, r, desc->field(i))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool protobuf_equal_inner_field(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message& l, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message& r, 
+        const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor* fds) {
+
+        if (nullptr == fds) {
+            return true;
+        }
+
+        int field_size = 0;
+        if (fds->is_repeated()) {
+            field_size = l.GetReflection()->FieldSize(l, fds);
+            if (field_size != r.GetReflection()->FieldSize(r, fds)) {
+                return false;
+            }
+        }
+        
+        switch(fds->cpp_type()) {
+            case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_INT32: {
+                if (fds->is_repeated()) {
+                    for (int i = 0; i < field_size; ++ i)  {
+                        if (l.GetReflection()->GetRepeatedInt32(l, fds, i) != r.GetReflection()->GetRepeatedInt32(r, fds, i)) {
+                            return false;
+                        }
+                    }
+                } else {
+                    return l.GetReflection()->GetInt32(l, fds) == r.GetReflection()->GetInt32(r, fds);
+                }
+                break;
+            };
+            case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_INT64: {
+                if (fds->is_repeated()) {
+                    for (int i = 0; i < field_size; ++ i)  {
+                        if (l.GetReflection()->GetRepeatedInt64(l, fds, i) != r.GetReflection()->GetRepeatedInt64(r, fds, i)) {
+                            return false;
+                        }
+                    }
+                } else {
+                    return l.GetReflection()->GetInt64(l, fds) == r.GetReflection()->GetInt64(r, fds);
+                }
+                break;
+            };
+            case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_UINT32: {
+                if (fds->is_repeated()) {
+                    for (int i = 0; i < field_size; ++ i)  {
+                        if (l.GetReflection()->GetRepeatedUInt32(l, fds, i) != r.GetReflection()->GetRepeatedUInt32(r, fds, i)) {
+                            return false;
+                        }
+                    }
+                } else {
+                    return l.GetReflection()->GetUInt32(l, fds) == r.GetReflection()->GetUInt32(r, fds);
+                }
+                break;
+            };
+            case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_UINT64: {
+                if (fds->is_repeated()) {
+                    for (int i = 0; i < field_size; ++ i)  {
+                        if (l.GetReflection()->GetRepeatedUInt64(l, fds, i) != r.GetReflection()->GetRepeatedUInt64(r, fds, i)) {
+                            return false;
+                        }
+                    }
+                } else {
+                    return l.GetReflection()->GetUInt64(l, fds) == r.GetReflection()->GetUInt64(r, fds);
+                }
+                break;
+            };
+            case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_STRING: {
+                if (fds->is_repeated()) {
+                    for (int i = 0; i < field_size; ++ i)  {
+                        if (l.GetReflection()->GetRepeatedString(l, fds, i) != r.GetReflection()->GetRepeatedString(r, fds, i)) {
+                            return false;
+                        }
+                    }
+                } else {
+                    return l.GetReflection()->GetString(l, fds) == r.GetReflection()->GetString(r, fds);
+                }
+                break;
+            };
+            case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_MESSAGE: {
+                if (fds->is_repeated()) {
+                    for (int i = 0; i < field_size; ++ i)  {
+                        if (false == protobuf_equal_inner_message(
+                            l.GetReflection()->GetRepeatedMessage(l, fds, i), 
+                            r.GetReflection()->GetRepeatedMessage(r, fds, i)
+                        )) {
+                            return false;
+                        }
+                    }
+                } else {
+                    return protobuf_equal_inner_message(l.GetReflection()->GetMessage(l, fds), r.GetReflection()->GetMessage(r, fds));
+                }
+                break;
+            };
+            case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_DOUBLE: {
+                if (fds->is_repeated()) {
+                    for (int i = 0; i < field_size; ++ i)  {
+                        if (l.GetReflection()->GetRepeatedDouble(l, fds, i) != r.GetReflection()->GetRepeatedDouble(r, fds, i)) {
+                            return false;
+                        }
+                    }
+                } else {
+                    return l.GetReflection()->GetDouble(l, fds) == r.GetReflection()->GetDouble(r, fds);
+                }
+                break;
+            };
+            case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_FLOAT: {
+                if (fds->is_repeated()) {
+                    for (int i = 0; i < field_size; ++ i)  {
+                        if (l.GetReflection()->GetRepeatedFloat(l, fds, i) != r.GetReflection()->GetRepeatedFloat(r, fds, i)) {
+                            return false;
+                        }
+                    }
+                } else {
+                    return l.GetReflection()->GetFloat(l, fds) == r.GetReflection()->GetFloat(r, fds);
+                }
+                break;
+            };
+            case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_BOOL: {
+                if (fds->is_repeated()) {
+                    for (int i = 0; i < field_size; ++ i)  {
+                        if (l.GetReflection()->GetRepeatedBool(l, fds, i) != r.GetReflection()->GetRepeatedBool(r, fds, i)) {
+                            return false;
+                        }
+                    }
+                } else {
+                    return l.GetReflection()->GetBool(l, fds) == r.GetReflection()->GetBool(r, fds);
+                }
+                break;
+            };
+            case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_ENUM: {
+                if (fds->is_repeated()) {
+                    for (int i = 0; i < field_size; ++ i)  {
+                        if (l.GetReflection()->GetRepeatedEnumValue(l, fds, i) != r.GetReflection()->GetRepeatedEnumValue(r, fds, i)) {
+                            return false;
+                        }
+                    }
+                } else {
+                    return l.GetReflection()->GetEnumValue(l, fds) == r.GetReflection()->GetEnumValue(r, fds);
+                }
+                break;
+            };
+            default: {
+                break;
+            }
+        }
+
+        return true;
+    }
+
+    LIBATAPP_MACRO_API bool protobuf_equal(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message& l, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message& r) {
+        return protobuf_equal_inner_message(l, r);
     }
 }

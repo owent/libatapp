@@ -752,7 +752,7 @@ namespace atapp {
         return app_option_;
     }
 
-    LIBATAPP_MACRO_API const util::network::http_request::curl_m_bind_ptr_t &app::get_shared_curl_multi_context() const {
+    LIBATAPP_MACRO_API util::network::http_request::curl_m_bind_ptr_t app::get_shared_curl_multi_context() const {
         if (likely(inner_module_etcd_)) {
             return inner_module_etcd_->get_shared_curl_multi_context();
         }
@@ -2121,6 +2121,48 @@ namespace atapp {
         return 0;
     }
 
+    int app::command_handler_disable_etcd(util::cli::callback_param params) {
+        if (!inner_module_etcd_) {
+            const char* msg = "Etcd module is not initialized, skip command.";
+            FWLOGERROR("{}", msg);
+            add_custom_command_rsp(params, msg);
+        } else if (inner_module_etcd_->is_etcd_enabled()) {
+            inner_module_etcd_->disable_etcd();
+            const char* msg = "Etcd context is disabled now.";
+            FWLOGINFO("{}", msg);
+            add_custom_command_rsp(params, msg);
+        } else {
+            const char* msg = "Etcd context is already disabled, skip command.";
+            FWLOGERROR("{}", msg);
+            add_custom_command_rsp(params, msg);
+        }
+        return 0;
+    }
+
+    int app::command_handler_enable_etcd(util::cli::callback_param params) {
+        if (!inner_module_etcd_) {
+            const char* msg = "Etcd module not initialized, skip command.";
+            FWLOGERROR("{}", msg);
+            add_custom_command_rsp(params, msg);
+        } else if (inner_module_etcd_->is_etcd_enabled()) {
+            const char* msg = "Etcd context is already enabled, skip command.";
+            FWLOGERROR("{}", msg);
+            add_custom_command_rsp(params, msg);
+        } else {
+            inner_module_etcd_->enable_etcd();
+            if (inner_module_etcd_->is_etcd_enabled()) {
+                const char* msg = "Etcd context is enabled now.";
+                FWLOGINFO("{}", msg);
+            } else {
+                const char* msg = "Etcd context can not be enabled, maybe need configure etcd.hosts.";
+                FWLOGERROR("{}", msg);
+                add_custom_command_rsp(params, msg);
+            }
+        }
+
+        return 0;
+    }
+
     int app::bus_evt_callback_on_recv_msg(const atbus::node &, const atbus::endpoint *, const atbus::connection *, const msg_t &msg,
                                           const void *buffer, size_t len) {
         // call recv callback
@@ -2375,6 +2417,13 @@ namespace atapp {
         cmd_mgr->bind_cmd("stop", &app::app::command_handler_stop, this);
         // reload all configures
         cmd_mgr->bind_cmd("reload", &app::app::command_handler_reload, this);
+        // enable etcd
+        cmd_mgr->bind_cmd("enable-etcd", &app::command_handler_enable_etcd, this)
+            ->set_help_msg("enable-etcd                            enable etcd discovery module.");
+
+        // disable etcd
+        cmd_mgr->bind_cmd("disable-etcd", &app::command_handler_disable_etcd, this)
+            ->set_help_msg("disable-etcd                           disable etcd discovery module.");
 
         // invalid command
         cmd_mgr->bind_cmd("@OnError", &app::command_handler_invalid, this);

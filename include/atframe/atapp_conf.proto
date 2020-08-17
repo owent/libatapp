@@ -132,7 +132,10 @@ message atapp_etcd_keepalive {
 
 message atapp_etcd_request { google.protobuf.Duration timeout = 1; }
 
-message atapp_etcd_init { google.protobuf.Duration timeout = 1; }
+message atapp_etcd_init {
+    google.protobuf.Duration timeout       = 1;
+    google.protobuf.Duration tick_interval = 2;
+}
 
 message atapp_etcd_watcher {
     google.protobuf.Duration retry_interval  = 101;

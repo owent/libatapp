@@ -85,6 +85,8 @@ namespace atapp {
     LIBATAPP_MACRO_API void yaml_loader_dump_to(const YAML::Node& src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message& dst);
     LIBATAPP_MACRO_API void yaml_loader_dump_to(const YAML::Node& src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Map<std::string, std::string>& dst, std::string prefix);
     LIBATAPP_MACRO_API const YAML::Node yaml_loader_get_child_by_path(const YAML::Node& src, const std::string& path);
+
+    LIBATAPP_MACRO_API bool protobuf_equal(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message& l, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message& r);
 } // namespace atapp
 
 #endif

@@ -203,7 +203,7 @@ namespace atapp {
          * @note this function only return a valid context after initialized.
          * @return the shared http_request context
          */
-        LIBATAPP_MACRO_API const util::network::http_request::curl_m_bind_ptr_t &get_shared_curl_multi_context() const;
+        LIBATAPP_MACRO_API util::network::http_request::curl_m_bind_ptr_t get_shared_curl_multi_context() const;
 
         LIBATAPP_MACRO_API void set_app_version(const std::string &ver);
 
@@ -333,6 +333,8 @@ namespace atapp {
         int command_handler_stop(util::cli::callback_param params);
         int command_handler_reload(util::cli::callback_param params);
         int command_handler_invalid(util::cli::callback_param params);
+        int command_handler_disable_etcd(util::cli::callback_param params);
+        int command_handler_enable_etcd(util::cli::callback_param params);
 
     private:
         int bus_evt_callback_on_recv_msg(const atbus::node &, const atbus::endpoint *, const atbus::connection *, const msg_t &,
