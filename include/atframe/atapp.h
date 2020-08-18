@@ -44,10 +44,17 @@ namespace atapp {
 
     class app {
     public:
+#if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
+        using app_id_t        = LIBATAPP_MACRO_BUSID_TYPE;
+        using msg_t           = atbus::protocol::msg;
+        using module_ptr_t    = std::shared_ptr<module_impl>;
+        using yaml_conf_map_t = atbus::detail::auto_select_map<std::string, std::vector<YAML::Node> >::type;
+#else
         typedef LIBATAPP_MACRO_BUSID_TYPE app_id_t;
         typedef atbus::protocol::msg msg_t;
         typedef std::shared_ptr<module_impl> module_ptr_t;
         typedef atbus::detail::auto_select_map<std::string, std::vector<YAML::Node> >::type yaml_conf_map_t;
+#endif
 
         struct flag_t {
             enum type {
@@ -91,15 +98,25 @@ namespace atapp {
             std::list<std::string> *response;
         };
 
+        struct timer_info_t {
+            uv_timer_t timer;
+        };
+
+#if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
+        // return > 0 means busy and will enter tick again as soon as possiable
+        using tick_handler_t = std::function<int()>;
+        // parameters is (message head, buffer address, buffer size)
+        using msg_handler_t  = std::function<int(const msg_t &, const void *, size_t)>;
+
+        using timer_ptr_t = std::shared_ptr<timer_info_t>;
+#else
         // return > 0 means busy and will enter tick again as soon as possiable
         typedef std::function<int()> tick_handler_t;
         // parameters is (message head, buffer address, buffer size)
         typedef std::function<int(const msg_t &, const void *, size_t)> msg_handler_t;
 
-        struct timer_info_t {
-            uv_timer_t timer;
-        };
         typedef std::shared_ptr<timer_info_t> timer_ptr_t;
+#endif
 
         struct tick_timer_t {
             util::time::time_utility::raw_time_t sec_update;
@@ -110,13 +127,19 @@ namespace atapp {
             timer_ptr_t timeout_timer;
         };
 
-
+#if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
+        using callback_fn_on_msg_t               = std::function<int(app &, const msg_t &, const void *, size_t)>;
+        using callback_fn_on_forward_response_t  = std::function<int(app &, app_id_t src_pd, app_id_t dst_pd, const atbus::protocol::msg &m)>;
+        using callback_fn_on_connected_t         = std::function<int(app &, atbus::endpoint &, int)>;
+        using callback_fn_on_disconnected_t      = std::function<int(app &, atbus::endpoint &, int)>;
+        using callback_fn_on_all_module_inited_t = std::function<int(app &)>;
+#else
         typedef std::function<int(app &, const msg_t &, const void *, size_t)> callback_fn_on_msg_t;
-        typedef std::function<int(app &, app_id_t src_pd, app_id_t dst_pd, const atbus::protocol::msg &m)>
-            callback_fn_on_forward_response_t;
+        typedef std::function<int(app &, app_id_t src_pd, app_id_t dst_pd, const atbus::protocol::msg &m)> callback_fn_on_forward_response_t;
         typedef std::function<int(app &, atbus::endpoint &, int)> callback_fn_on_connected_t;
         typedef std::function<int(app &, atbus::endpoint &, int)> callback_fn_on_disconnected_t;
         typedef std::function<int(app &)> callback_fn_on_all_module_inited_t;
+#endif
 
     public:
         LIBATAPP_MACRO_API app();

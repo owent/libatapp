@@ -34,8 +34,7 @@ namespace atapp {
 
     class etcd_watcher {
     public:
-        typedef std::shared_ptr<etcd_watcher> ptr_t;
-
+    
         struct LIBATAPP_MACRO_API_HEAD_ONLY event_t {
             etcd_watch_event::type evt_type;
             etcd_key_value kv;
@@ -50,7 +49,13 @@ namespace atapp {
             std::vector<event_t> events;
         };
 
+#if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
+        using ptr_t            = std::shared_ptr<etcd_watcher>;
+        using watch_event_fn_t = std::function<void(const etcd_response_header &header, const response_t &evt_data)>;
+#else
+        typedef std::shared_ptr<etcd_watcher> ptr_t;
         typedef std::function<void(const etcd_response_header &header, const response_t &evt_data)> watch_event_fn_t;
+#endif
 
     private:
         struct constrict_helper_t {};

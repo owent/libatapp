@@ -385,7 +385,11 @@ namespace atapp {
         LIBATAPP_MACRO_API void setup_http_request(util::network::http_request::ptr_t &req, rapidjson::Document &doc, time_t timeout);
 
     private:
-        typedef ATBUS_ADVANCE_TYPE_MAP(std::string, etcd_keepalive_deletor *) etcd_keepalive_deletor_map_t;
+#if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
+        using etcd_keepalive_deletor_map_t = LIBATFRAME_UTILS_AUTO_SELETC_MAP(std::string, etcd_keepalive_deletor *);
+#else
+        typedef LIBATFRAME_UTILS_AUTO_SELETC_MAP(std::string, etcd_keepalive_deletor *) etcd_keepalive_deletor_map_t;
+#endif
         uint32_t flags_;
         util::random::mt19937 random_generator_;
         conf_t conf_;

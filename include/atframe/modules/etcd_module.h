@@ -33,7 +33,11 @@
 namespace atapp {
     class etcd_module : public ::atapp::module_impl {
     public:
-        typedef std::shared_ptr<atapp::protocol::atapp_discovery> atapp_discovery_ptr_t;
+        struct LIBATAPP_MACRO_API_HEAD_ONLY node_discovery_t {
+            atapp::protocol::atapp_discovery node;
+            void* user_data;
+        };
+
         struct LIBATAPP_MACRO_API_HEAD_ONLY node_action_t {
             enum type {
                 EN_NAT_UNKNOWN = 0,
@@ -75,11 +79,21 @@ namespace atapp {
                 : atapp_module(std::ref(m)), etcd_header(std::cref(h)), etcd_body(std::cref(b)), event(std::cref(e)), node(std::ref(n)) {}
         };
 
+#if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
+        using watcher_list_callback_t      = std::function<void(watcher_sender_list_t &)>;
+        using watcher_one_callback_t       = std::function<void(watcher_sender_one_t &)>;
+        using node_event_callback_t        = std::function<void(node_info_t &)>;
+        using node_event_callback_list_t   = std::list<node_event_callback_t>;
+        using node_event_callback_handle_t = node_event_callback_list_t::const_iterator;
+        using atapp_discovery_ptr_t        = std::shared_ptr<atapp::protocol::atapp_discovery>;
+#else
         typedef std::function<void(watcher_sender_list_t &)> watcher_list_callback_t;
         typedef std::function<void(watcher_sender_one_t &)> watcher_one_callback_t;
         typedef std::function<void(node_info_t &)> node_event_callback_t;
         typedef std::list<node_event_callback_t> node_event_callback_list_t;
         typedef node_event_callback_list_t::const_iterator node_event_callback_handle_t;
+        typedef std::shared_ptr<atapp::protocol::atapp_discovery> atapp_discovery_ptr_t;
+#endif
 
     public:
         LIBATAPP_MACRO_API etcd_module();
@@ -179,8 +193,13 @@ namespace atapp {
         std::list<watcher_list_callback_t> watcher_by_id_callbacks_;
         std::list<watcher_list_callback_t> watcher_by_name_callbacks_;
 
+#if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
+        using node_discovery_cache_by_name_t = LIBATFRAME_UTILS_AUTO_SELETC_MAP(std::string, atapp_discovery_ptr_t);
+        using node_discovery_cache_by_id_t   = LIBATFRAME_UTILS_AUTO_SELETC_MAP(uint64_t, atapp_discovery_ptr_t);
+#else
         typedef LIBATFRAME_UTILS_AUTO_SELETC_MAP(std::string, atapp_discovery_ptr_t) node_discovery_cache_by_name_t;
         typedef LIBATFRAME_UTILS_AUTO_SELETC_MAP(uint64_t, atapp_discovery_ptr_t) node_discovery_cache_by_id_t;
+#endif
         node_discovery_cache_by_name_t node_discovery_cache_by_name_;
         node_discovery_cache_by_id_t node_discovery_cache_by_id_;
         node_event_callback_list_t node_event_callbacks_;
