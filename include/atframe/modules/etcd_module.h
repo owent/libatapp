@@ -29,15 +29,11 @@
 #include <atframe/etcdcli/etcd_cluster.h>
 #include <atframe/etcdcli/etcd_keepalive.h>
 #include <atframe/etcdcli/etcd_watcher.h>
+#include <atframe/etcdcli/etcd_discovery.h>
 
 namespace atapp {
     class etcd_module : public ::atapp::module_impl {
     public:
-        struct LIBATAPP_MACRO_API_HEAD_ONLY node_discovery_t {
-            atapp::protocol::atapp_discovery node;
-            void* user_data;
-        };
-
         struct LIBATAPP_MACRO_API_HEAD_ONLY node_action_t {
             enum type {
                 EN_NAT_UNKNOWN = 0,
@@ -82,14 +78,14 @@ namespace atapp {
 #if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
         using watcher_list_callback_t      = std::function<void(watcher_sender_list_t &)>;
         using watcher_one_callback_t       = std::function<void(watcher_sender_one_t &)>;
-        using node_event_callback_t        = std::function<void(node_info_t &)>;
+        using node_event_callback_t        = std::function<void(node_action_t::type, const etcd_discovery_node::ptr_t &)>;
         using node_event_callback_list_t   = std::list<node_event_callback_t>;
         using node_event_callback_handle_t = node_event_callback_list_t::const_iterator;
         using atapp_discovery_ptr_t        = std::shared_ptr<atapp::protocol::atapp_discovery>;
 #else
         typedef std::function<void(watcher_sender_list_t &)> watcher_list_callback_t;
         typedef std::function<void(watcher_sender_one_t &)> watcher_one_callback_t;
-        typedef std::function<void(node_info_t &)> node_event_callback_t;
+        typedef std::function<void(node_action_t::type, const etcd_discovery_node::ptr_t &)> node_event_callback_t;
         typedef std::list<node_event_callback_t> node_event_callback_list_t;
         typedef node_event_callback_list_t::const_iterator node_event_callback_handle_t;
         typedef std::shared_ptr<atapp::protocol::atapp_discovery> atapp_discovery_ptr_t;
@@ -157,7 +153,10 @@ namespace atapp {
         LIBATAPP_MACRO_API atapp::etcd_keepalive::ptr_t add_keepalive_actor(std::string &val, const std::string &node_path);
 
         LIBATAPP_MACRO_API node_event_callback_handle_t add_on_node_discovery_event(node_event_callback_t fn);
-        LIBATAPP_MACRO_API void remove_on_node_event(node_event_callback_handle_t handle);
+        LIBATAPP_MACRO_API void remove_on_node_event(node_event_callback_handle_t& handle);
+
+        LIBATAPP_MACRO_API etcd_discovery_set& get_global_discovery();
+        LIBATAPP_MACRO_API const etcd_discovery_set& get_global_discovery() const;
     private:
         static bool unpack(node_info_t &out, const std::string &path, const std::string &json, bool reset_data);
         static void pack(const node_info_t &out, std::string &json);
@@ -181,6 +180,7 @@ namespace atapp {
         };
 
         bool update_inner_watcher_event(node_info_t& node);
+        void reset_inner_watchers_and_keepalives();
     private:
         std::string conf_path_cache_;
         std::string custom_data_;
@@ -193,15 +193,9 @@ namespace atapp {
         std::list<watcher_list_callback_t> watcher_by_id_callbacks_;
         std::list<watcher_list_callback_t> watcher_by_name_callbacks_;
 
-#if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
-        using node_discovery_cache_by_name_t = LIBATFRAME_UTILS_AUTO_SELETC_MAP(std::string, atapp_discovery_ptr_t);
-        using node_discovery_cache_by_id_t   = LIBATFRAME_UTILS_AUTO_SELETC_MAP(uint64_t, atapp_discovery_ptr_t);
-#else
-        typedef LIBATFRAME_UTILS_AUTO_SELETC_MAP(std::string, atapp_discovery_ptr_t) node_discovery_cache_by_name_t;
-        typedef LIBATFRAME_UTILS_AUTO_SELETC_MAP(uint64_t, atapp_discovery_ptr_t) node_discovery_cache_by_id_t;
-#endif
-        node_discovery_cache_by_name_t node_discovery_cache_by_name_;
-        node_discovery_cache_by_id_t node_discovery_cache_by_id_;
+        etcd_watcher::ptr_t inner_watcher_by_name_;
+        etcd_watcher::ptr_t inner_watcher_by_id_;
+        etcd_discovery_set global_discovery_;
         node_event_callback_list_t node_event_callbacks_;
     };
 } // namespace atapp

@@ -218,14 +218,14 @@ namespace atapp {
         if (has_insert) {
             if (0 != old_id) {
                 node_by_id_t::iterator iter_id = node_by_id_.find(old_id);
-                if (iter_id != node_by_id_.end()) {
+                if (iter_id != node_by_id_.end() && iter_id->second != node) {
                     node_by_id_.erase(iter_id);
                 }
             }
 
             if (!old_name.empty()) {
                 node_by_name_t::iterator iter_name = node_by_name_.find(old_name);
-                if (iter_name != node_by_name_.end()) {
+                if (iter_name != node_by_name_.end() && iter_name->second != node) {
                     node_by_name_.erase(iter_name);
                 }
             }

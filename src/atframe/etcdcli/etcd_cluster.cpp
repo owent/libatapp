@@ -447,6 +447,22 @@ namespace atapp {
             }
             break;
         }
+        case flag_t::RUNNING: {
+            if (v) {
+                for (on_event_up_down_handle_set_t::iterator iter = event_on_up_callbacks_.begin(); iter != event_on_up_callbacks_.end(); ++ iter) {
+                    if (*iter) {
+                        (*iter)(*this);
+                    }
+                }
+            } else {
+                for (on_event_up_down_handle_set_t::iterator iter = event_on_down_callbacks_.begin(); iter != event_on_down_callbacks_.end(); ++ iter) {
+                    if (*iter) {
+                        (*iter)(*this);
+                    }
+                }
+            }
+            break;
+        }
         default: {
             break;
         }
@@ -1616,6 +1632,48 @@ namespace atapp {
         }
 
         return ret;
+    }
+
+    LIBATAPP_MACRO_API etcd_cluster::on_event_up_down_handle_t etcd_cluster::add_on_event_up(on_event_up_down_fn_t fn, bool trigger_if_running) {
+        if (!fn) {
+            return event_on_up_callbacks_.end();
+        }
+
+        if (trigger_if_running && check_flag(flag_t::RUNNING)) {
+            fn(*this);
+        }
+
+        return event_on_up_callbacks_.insert(event_on_up_callbacks_.end(), fn);
+    }
+
+    LIBATAPP_MACRO_API void etcd_cluster::remove_on_event_up(on_event_up_down_handle_t& handle) {
+        if (handle == event_on_up_callbacks_.end()) {
+            return;
+        }
+
+        event_on_up_callbacks_.erase(handle);
+        handle = event_on_up_callbacks_.end();
+    }
+
+    LIBATAPP_MACRO_API etcd_cluster::on_event_up_down_handle_t etcd_cluster::add_on_event_down(on_event_up_down_fn_t fn, bool trigger_if_not_running) {
+        if (!fn) {
+            return event_on_down_callbacks_.end();
+        }
+
+        if (trigger_if_not_running && !check_flag(flag_t::RUNNING)) {
+            fn(*this);
+        }
+
+        return event_on_down_callbacks_.insert(event_on_down_callbacks_.end(), fn);
+    }
+
+    LIBATAPP_MACRO_API void etcd_cluster::remove_on_event_down(on_event_up_down_handle_t& handle) {
+        if (handle == event_on_down_callbacks_.end()) {
+            return;
+        }
+
+        event_on_down_callbacks_.erase(handle);
+        handle = event_on_down_callbacks_.end();
     }
 
     void etcd_cluster::add_stats_error_request() {
