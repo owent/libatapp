@@ -49,6 +49,36 @@ namespace atapp {
         delete ptr;
     }
 
+    LIBATAPP_MACRO_API app::message_t::message_t(): type(0), msg_sequence(0), data(NULL), data_size(0), metadata(NULL) {}
+    LIBATAPP_MACRO_API app::message_t::~message_t() {}
+
+    LIBATAPP_MACRO_API app::message_t::message_t(const message_t & other) {
+        (*this) = other;
+    }
+    
+    LIBATAPP_MACRO_API app::message_t &app::message_t::operator=(const message_t & other) {
+        type         = other.type;
+        msg_sequence = other.msg_sequence;
+        data         = other.data;
+        data_size    = other.data_size;
+        metadata     = other.metadata;
+        return *this;
+    }
+
+    LIBATAPP_MACRO_API app::message_sender_t::message_sender_t(): id(0), name(NULL), remote(NULL) {}
+    LIBATAPP_MACRO_API app::message_sender_t::~message_sender_t() {}
+
+    LIBATAPP_MACRO_API app::message_sender_t::message_sender_t(const message_sender_t & other) {
+        (*this) = other;
+    }
+    
+    LIBATAPP_MACRO_API app::message_sender_t & app::message_sender_t::operator=(const message_sender_t & other) {
+        id     = other.id;
+        name   = other.name;
+        remote = other.remote;
+        return *this;
+    }
+
     LIBATAPP_MACRO_API app::flag_guard_t::flag_guard_t(app &owner, flag_t::type f) : owner_(&owner), flag_(f) {
         if (owner_->check_flag(flag_)) {
             owner_ = NULL;
@@ -117,9 +147,15 @@ namespace atapp {
         tick_timer_.usec       = 0;
 
         stat_.last_checkpoint_min = 0;
+
+        atbus_connector_ = add_connector<atapp_connector_atbus>();
     }
 
     LIBATAPP_MACRO_API app::~app() {
+        endpoint_index_by_id_.clear();
+        endpoint_index_by_name_.clear();
+        endpoint_waker_.clear();
+
         if (this == last_instance_) {
             last_instance_ = NULL;
         }
@@ -164,12 +200,6 @@ namespace atapp {
 
         if (mode_t::START != mode_) {
             return 0;
-        }
-
-        // inner modules
-        if (!inner_module_etcd_) {
-            inner_module_etcd_ = std::make_shared<atapp::etcd_module>();
-            add_module(inner_module_etcd_);
         }
 
         int ret = 0;
@@ -225,6 +255,12 @@ namespace atapp {
         default: {
             return setup_result_ = 0;
         }
+        }
+
+        // inner modules
+        if (!inner_module_etcd_) {
+            inner_module_etcd_ = std::make_shared<atapp::etcd_module>();
+            add_module(inner_module_etcd_);
         }
 
         // step 6. setup log & signal
@@ -604,22 +640,22 @@ namespace atapp {
         int active_count;
         util::time::time_utility::update();
         // record start time point
-        util::time::time_utility::raw_time_t start_tp = util::time::time_utility::now();
+        util::time::time_utility::raw_time_t start_tp = util::time::time_utility::sys_now();
         util::time::time_utility::raw_time_t end_tp   = start_tp;
 
         std::chrono::system_clock::duration conf_tick_interval = std::chrono::duration_cast<std::chrono::system_clock::duration>(
             std::chrono::seconds(conf_.origin.timer().tick_interval().seconds()));
         conf_tick_interval += std::chrono::duration_cast<std::chrono::system_clock::duration>(
-            std::chrono::nanoseconds(conf_.origin.timer().tick_interval().seconds()));
+            std::chrono::nanoseconds(conf_.origin.timer().tick_interval().nanos()));
 
         do {
             if (tick_timer_.sec != util::time::time_utility::get_sys_now()) {
                 tick_timer_.sec        = util::time::time_utility::get_sys_now();
                 tick_timer_.usec       = 0;
-                tick_timer_.sec_update = util::time::time_utility::now();
+                tick_timer_.sec_update = util::time::time_utility::sys_now();
             } else {
                 tick_timer_.usec = static_cast<time_t>(
-                    std::chrono::duration_cast<std::chrono::microseconds>(util::time::time_utility::now() - tick_timer_.sec_update)
+                    std::chrono::duration_cast<std::chrono::microseconds>(util::time::time_utility::sys_now() - tick_timer_.sec_update)
                         .count());
             }
 
@@ -647,9 +683,26 @@ namespace atapp {
                 }
             }
 
+            // step 3. proc for pending messages of endpoints
+            while (!endpoint_waker_.empty() && endpoint_waker_.begin()->first <= tick_timer_.sec_update) {
+                atapp_endpoint::ptr_t ep = endpoint_waker_.begin()->second.lock();
+                endpoint_waker_.erase(endpoint_waker_.begin());
+                if (ep) {
+                    res = ep->retry_pending_messages(tick_timer_.sec_update, conf_.origin.bus().loop_times());
+                    if (res > 0) {
+                        active_count += res;
+                    }
+
+                    // TODO Support for delay recycle?
+                    if (!ep->has_connection_handle()) {
+                        remove_endpoint(ep);
+                    }
+                }
+            }
+
             // only tick time less than tick interval will run loop again
             util::time::time_utility::update();
-            end_tp = util::time::time_utility::now();
+            end_tp = util::time::time_utility::sys_now();
 
             if (active_count > 0) {
                 last_proc_event_count_ += static_cast<uint64_t>(active_count);
@@ -854,18 +907,8 @@ namespace atapp {
     LIBATAPP_MACRO_API std::shared_ptr<atbus::node> app::get_bus_node() { return bus_node_; }
     LIBATAPP_MACRO_API const std::shared_ptr<atbus::node> app::get_bus_node() const { return bus_node_; }
 
-    LIBATAPP_MACRO_API bool app::is_remote_address_available(const std::string & /*hostname*/, const std::string &address) const {
-        if (0 == UTIL_STRFUNC_STRNCASE_CMP("mem:", address.c_str(), 4)) {
-            return false;
-        }
-
-        if (0 == UTIL_STRFUNC_STRNCASE_CMP("shm:", address.c_str(), 4) || 0 == UTIL_STRFUNC_STRNCASE_CMP("unix:", address.c_str(), 5)) {
-            // return hostname == ::atbus::node::get_hostname();
-            // shm can not used as a remote address, it can only connect with a exist endpoint
-            return false;
-        }
-
-        return true;
+    LIBATAPP_MACRO_API util::time::time_utility::raw_time_t app::get_last_tick_time() const {
+        return tick_timer_.sec_update;
     }
 
     LIBATAPP_MACRO_API util::config::ini_loader &app::get_configure_loader() { return cfg_loader_; }
@@ -893,6 +936,18 @@ namespace atapp {
 
     LIBATAPP_MACRO_API const atapp::protocol::atapp_configure &app::get_origin_configure() const { return conf_.origin; }
     LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata &app::get_metadata() const { return conf_.metadata; }
+    LIBATAPP_MACRO_API util::time::time_utility::raw_time_t::duration app::get_configure_message_timeout() const {
+        const google::protobuf::Duration& dur = conf_.origin.timer().message_timeout();
+        if (dur.seconds() <= 0 && dur.nanos() <= 0) {
+            return std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::seconds(5));
+        }
+
+        util::time::time_utility::raw_time_t::duration ret = std::chrono::duration_cast<std::chrono::system_clock::duration>(
+            std::chrono::nanoseconds(dur.seconds()));
+        ret += std::chrono::duration_cast<std::chrono::system_clock::duration>(
+            std::chrono::nanoseconds(dur.nanos()));
+        return ret;
+    }
 
     LIBATAPP_MACRO_API void app::pack(atapp::protocol::atapp_discovery &out) const {
         out.set_id(get_id());
@@ -946,6 +1001,28 @@ namespace atapp {
         }
     }
 
+    LIBATAPP_MACRO_API std::shared_ptr<::atapp::etcd_module> app::get_etcd_module() const {
+        return inner_module_etcd_;
+    }
+
+    LIBATAPP_MACRO_API uint32_t app::get_address_type(const std::string& address) const {
+        uint32_t ret = address_type_t::EN_ACAT_NONE;
+
+        atbus::channel::channel_address_t addr;
+        atbus::channel::make_address(address.c_str(), addr);
+
+        connector_protocol_map_t::const_iterator iter = connector_protocols_.find(addr.scheme);
+        if (iter == connector_protocols_.end()) {
+            return ret;
+        }
+
+        if (!iter->second) {
+            return ret;
+        }
+
+        return iter->second->get_address_type(addr);
+    }
+
     LIBATAPP_MACRO_API bool app::add_log_sink_maker(const std::string &name, log_sink_maker::log_reg_t fn) {
         if (log_reg_.end() != log_reg_.find(name)) {
             return false;
@@ -955,20 +1032,194 @@ namespace atapp {
         return true;
     }
 
-    LIBATAPP_MACRO_API void app::set_evt_on_recv_msg(callback_fn_on_msg_t fn) { evt_on_recv_msg_ = fn; }
+    LIBATAPP_MACRO_API void app::set_evt_on_forward_request(callback_fn_on_forward_request_t fn) { evt_on_forward_request_ = fn; }
     LIBATAPP_MACRO_API void app::set_evt_on_forward_response(callback_fn_on_forward_response_t fn) { evt_on_forward_response_ = fn; }
     LIBATAPP_MACRO_API void app::set_evt_on_app_connected(callback_fn_on_connected_t fn) { evt_on_app_connected_ = fn; }
     LIBATAPP_MACRO_API void app::set_evt_on_app_disconnected(callback_fn_on_disconnected_t fn) { evt_on_app_disconnected_ = fn; }
     LIBATAPP_MACRO_API void app::set_evt_on_all_module_inited(callback_fn_on_all_module_inited_t fn) { evt_on_all_module_inited_ = fn; }
 
-    LIBATAPP_MACRO_API const app::callback_fn_on_msg_t &app::get_evt_on_recv_msg() const { return evt_on_recv_msg_; }
-    LIBATAPP_MACRO_API const app::callback_fn_on_forward_response_t &app::get_evt_on_send_fail() const { return evt_on_forward_response_; }
+    LIBATAPP_MACRO_API const app::callback_fn_on_forward_request_t &app::get_evt_on_forward_request() const { return evt_on_forward_request_; }
+    LIBATAPP_MACRO_API const app::callback_fn_on_forward_response_t &app::get_evt_on_forward_response() const { return evt_on_forward_response_; }
     LIBATAPP_MACRO_API const app::callback_fn_on_connected_t &app::get_evt_on_app_connected() const { return evt_on_app_connected_; }
     LIBATAPP_MACRO_API const app::callback_fn_on_disconnected_t &app::get_evt_on_app_disconnected() const {
         return evt_on_app_disconnected_;
     }
     LIBATAPP_MACRO_API const app::callback_fn_on_all_module_inited_t &app::get_evt_on_all_module_inited() const {
         return evt_on_all_module_inited_;
+    }
+
+    LIBATAPP_MACRO_API bool app::add_endpoint_waker(util::time::time_utility::raw_time_t wakeup_time, const atapp_endpoint::weak_ptr_t& ep_watcher) {
+        if (is_closing()) {
+            return false;
+        }
+
+        endpoint_waker_.insert(std::pair<const util::time::time_utility::raw_time_t, atapp_endpoint::weak_ptr_t>(wakeup_time, ep_watcher));
+        return true;
+    }
+
+    LIBATAPP_MACRO_API void app::remove_endpoint(uint64_t by_id) {
+        endpoint_index_by_id_t::const_iterator iter_id = endpoint_index_by_id_.find(by_id);
+        if (iter_id == endpoint_index_by_id_.end()) {
+            return;
+        }
+
+        atapp_endpoint::ptr_t res = iter_id->second;
+        endpoint_index_by_id_.erase(iter_id);
+
+        std::string name;
+        if (res) {
+            name = res->get_name();
+        }
+        if (!name.empty()) {
+            endpoint_index_by_name_t::const_iterator iter_name = endpoint_index_by_name_.find(name);
+            if (iter_name != endpoint_index_by_name_.end() && iter_name->second == res) {
+                endpoint_index_by_name_.erase(iter_name);
+            }
+        }
+
+        // RAII destruction of res
+    }
+
+    LIBATAPP_MACRO_API void app::remove_endpoint(const std::string& by_name) {
+        endpoint_index_by_name_t::const_iterator iter_name = endpoint_index_by_name_.find(by_name);
+        if (iter_name == endpoint_index_by_name_.end()) {
+            return;
+        }
+
+        atapp_endpoint::ptr_t res = iter_name->second;
+        endpoint_index_by_name_.erase(iter_name);
+
+        uint64_t id = 0;
+        if (res) {
+            id = res->get_id();
+        }
+        if (id != 0) {
+            endpoint_index_by_id_t::const_iterator iter_id = endpoint_index_by_id_.find(id);
+            if (iter_id != endpoint_index_by_id_.end() && iter_id->second == res) {
+                endpoint_index_by_id_.erase(iter_id);
+            }
+        }
+
+        // RAII destruction of res
+    }
+
+    LIBATAPP_MACRO_API void app::remove_endpoint(const atapp_endpoint::ptr_t& enpoint) {
+        if (!enpoint) {
+            return;
+        }
+
+        {
+            uint64_t id = enpoint->get_id();
+            if (id != 0) {
+                endpoint_index_by_id_t::const_iterator iter_id = endpoint_index_by_id_.find(id);
+                if (iter_id != endpoint_index_by_id_.end() && iter_id->second == enpoint) {
+                    endpoint_index_by_id_.erase(iter_id);
+                }
+            }
+        }
+
+        {
+            std::string name = enpoint->get_name();
+            if (!name.empty()) {
+                endpoint_index_by_name_t::const_iterator iter_name = endpoint_index_by_name_.find(name);
+                if (iter_name != endpoint_index_by_name_.end() && iter_name->second == enpoint) {
+                    endpoint_index_by_name_.erase(iter_name);
+                }
+            }
+        }
+    }
+
+    LIBATAPP_MACRO_API atapp_endpoint::ptr_t app::mutable_endpoint(const etcd_discovery_node::ptr_t& discovery) {
+        if (is_closing()) {
+            return NULL;
+        }
+
+        if (!discovery) {
+            return NULL;
+        }
+
+        uint64_t id = discovery->get_discovery_info().id();
+        const std::string& name = discovery->get_discovery_info().name();
+        atapp_endpoint::ptr_t ret;
+        bool is_created = false;
+        if (id != 0) {
+            endpoint_index_by_id_t::const_iterator iter_id = endpoint_index_by_id_.find(id);
+            if (iter_id != endpoint_index_by_id_.end()) {
+                ret = iter_id->second;
+            } else {
+                ret = atapp_endpoint::create(*this);
+                if (ret) {
+                    is_created = true;
+                    endpoint_index_by_id_[id] = ret;
+                }
+            }
+            if (ret) {
+                ret->update_discovery(discovery);
+            }
+        }
+
+        if (!name.empty()) {
+            endpoint_index_by_name_t::const_iterator iter_name = endpoint_index_by_name_.find(name);
+            if (iter_name != endpoint_index_by_name_.end()) {
+                if (iter_name->second == ret) {
+                    return ret;
+                }
+                ret = iter_name->second;
+                if (ret) {
+                    ret->update_discovery(discovery);
+                }
+            } else if (!ret) {
+                ret = atapp_endpoint::create(*this);
+                if (ret) {
+                    is_created = true;
+                    endpoint_index_by_name_[name] = ret;
+                    ret->update_discovery(discovery);
+                }
+            }
+        }
+
+        // Wake and maybe it's should be cleanup if it's a new endpoint
+        if (is_created && ret) {
+            ret->add_waker(get_last_tick_time());
+        }
+
+        return ret;
+    }
+
+    LIBATAPP_MACRO_API atapp_endpoint* app::get_endpoint(uint64_t by_id) {
+        endpoint_index_by_id_t::iterator iter_id = endpoint_index_by_id_.find(by_id);
+        if (iter_id != endpoint_index_by_id_.end()) {
+            return iter_id->second.get();
+        }
+
+        return NULL;
+    }
+
+    LIBATAPP_MACRO_API const atapp_endpoint* app::get_endpoint(uint64_t by_id) const {
+        endpoint_index_by_id_t::const_iterator iter_id = endpoint_index_by_id_.find(by_id);
+        if (iter_id != endpoint_index_by_id_.end()) {
+            return iter_id->second.get();
+        }
+
+        return NULL;
+    }
+
+    LIBATAPP_MACRO_API atapp_endpoint* app::get_endpoint(const std::string& by_name) {
+        endpoint_index_by_name_t::iterator iter_name = endpoint_index_by_name_.find(by_name);
+        if (iter_name != endpoint_index_by_name_.end()) {
+            return iter_name->second.get();
+        }
+
+        return NULL;
+    }
+
+    LIBATAPP_MACRO_API const atapp_endpoint* app::get_endpoint(const std::string& by_name) const {
+        endpoint_index_by_name_t::const_iterator iter_name = endpoint_index_by_name_.find(by_name);
+        if (iter_name != endpoint_index_by_name_.end()) {
+            return iter_name->second.get();
+        }
+
+        return NULL;
     }
 
     void app::ev_stop_timeout(uv_timer_t *handle) {
@@ -1183,8 +1434,6 @@ namespace atapp {
             return 0;
         }
 
-        // TODO if atbus is reset, init it again
-
         run_ev_loop(run_mode);
 
         if (is_closed() && is_inited()) {
@@ -1217,6 +1466,30 @@ namespace atapp {
     void app::_app_setup_signal_term(int /*signo*/) {
         if (NULL != app::last_instance_) {
             app::last_instance_->stop();
+        }
+    }
+
+    LIBATAPP_MACRO_API int app::trigger_event_on_forward_request(const message_sender_t& source, const message_t &msg) {
+        if (evt_on_forward_request_) {
+            return evt_on_forward_request_(std::ref(*this), source, msg);
+        }
+
+        return 0;
+    }
+
+    LIBATAPP_MACRO_API int app::trigger_event_on_forward_response(const message_sender_t& source, const message_t &msg, int32_t error_code) {
+        if (evt_on_forward_response_) {
+            return evt_on_forward_response_(std::ref(*this), source, msg, error_code);
+        }
+
+        return 0;
+    }
+
+    LIBATAPP_MACRO_API void app::trigger_event_on_discovery_event(etcd_discovery_action_t::type action, const etcd_discovery_node::ptr_t & node) {
+        for (std::list<std::shared_ptr<atapp_connector_impl> >::const_iterator iter = connectors_.begin(); iter != connectors_.end(); ++ iter) {
+            if (*iter) {
+                (*iter)->on_discovery_event(action, node);
+            }
         }
     }
 
@@ -2163,12 +2436,29 @@ namespace atapp {
         return 0;
     }
 
-    int app::bus_evt_callback_on_recv_msg(const atbus::node &, const atbus::endpoint *, const atbus::connection *, const msg_t &msg,
+    int app::bus_evt_callback_on_recv_msg(const atbus::node &, const atbus::endpoint *, const atbus::connection *, const atbus::protocol::msg &msg,
                                           const void *buffer, size_t len) {
-        // call recv callback
-        if (evt_on_recv_msg_) {
-            return evt_on_recv_msg_(std::ref(*this), std::cref(msg), buffer, len);
+        if (atbus::protocol::msg::kDataTransformReq != msg.msg_body_case() || 0 == msg.head().src_bus_id()) {
+            FWLOGERROR("receive a message from unknown source {} or invalid body case", msg.head().src_bus_id());
+            return EN_ATBUS_ERR_BAD_DATA;
         }
+
+        app_id_t from_id = msg.data_transform_req().from();
+        app::message_t message;
+        message.data = reinterpret_cast<const void*>(msg.data_transform_req().content().c_str());
+        message.data_size = msg.data_transform_req().content().size();
+        message.metadata = NULL;
+        message.msg_sequence = msg.head().sequence();
+        message.type = msg.head().type();
+
+        app::message_sender_t sender;
+        sender.id = from_id;
+        sender.remote = get_endpoint(from_id);
+        if (NULL != sender.remote) {
+            sender.name = &sender.remote->get_name();
+        }
+
+        trigger_event_on_forward_request(sender, message);
 
         ++last_proc_event_count_;
         return 0;
@@ -2190,18 +2480,36 @@ namespace atapp {
                        m->head().sequence());
         }
 
-        if (evt_on_forward_response_) {
-            const atbus::protocol::forward_data *fwd_data = NULL;
-            if (atbus::protocol::msg::kDataTransformRsp == m->msg_body_case()) {
-                fwd_data = &m->data_transform_rsp();
-            }
-            if (NULL != fwd_data) {
-                app_id_t origin_from = fwd_data->to();
-                app_id_t origin_to   = fwd_data->from();
-                return evt_on_forward_response_(std::ref(*this), origin_from, origin_to, std::cref(*m));
-            }
+        if (atbus::protocol::msg::kDataTransformRsp != m->msg_body_case() || 0 == m->head().src_bus_id()) {
+            FWLOGERROR("receive a message from unknown source {} or invalid body case", m->head().src_bus_id());
+            return EN_ATBUS_ERR_BAD_DATA;
         }
 
+        if (atbus_connector_) {
+            atbus_connector_->on_receive_forward_response(
+                m->data_transform_rsp().from(), m->head().type(), m->head().sequence(), m->head().ret(),
+                reinterpret_cast<const void*>(m->data_transform_rsp().content().c_str()), m->data_transform_rsp().content().size(),
+                NULL
+            );
+            return 0;
+        }
+
+        app_id_t from_id = m->data_transform_rsp().from();
+        app::message_t message;
+        message.data = reinterpret_cast<const void*>(m->data_transform_rsp().content().c_str());
+        message.data_size = m->data_transform_rsp().content().size();
+        message.metadata = NULL;
+        message.msg_sequence = m->head().sequence();
+        message.type = m->head().type();
+
+        app::message_sender_t sender;
+        sender.id = from_id;
+        sender.remote = get_endpoint(from_id);
+        if (NULL != sender.remote) {
+            sender.name = &sender.remote->get_name();
+        }
+
+        trigger_event_on_forward_response(sender, message, m->head().ret());
         return 0;
     }
 
@@ -2401,6 +2709,26 @@ namespace atapp {
         }
 
         return 0;
+    }
+
+    void app::add_connector_inner(std::shared_ptr<atapp_connector_impl> connector) {
+        if (!connector) {
+            return;
+        }
+
+        connectors_.push_back(connector);
+
+        // record all protocols
+        for (atapp_connector_impl::protocol_set_t::const_iterator iter = connector->get_support_protocols().begin();
+            iter != connector->get_support_protocols().end(); ++ iter
+        ) {
+            connector_protocol_map_t::const_iterator find_iter = connector_protocols_.find(*iter);
+            if (find_iter != connector_protocols_.end()) {
+                FWLOGWARNING("protocol {} is already registered by {}, we will overwrite it with {}", *iter, find_iter->second->name(), connector->name());
+            }
+
+            connector_protocols_[*iter] = connector;
+        }
     }
 
     void app::setup_command() {

@@ -34,13 +34,11 @@
 namespace atapp {
     class etcd_module : public ::atapp::module_impl {
     public:
-        struct LIBATAPP_MACRO_API_HEAD_ONLY node_action_t {
-            enum type {
-                EN_NAT_UNKNOWN = 0,
-                EN_NAT_PUT,
-                EN_NAT_DELETE,
-            };
-        };
+#if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
+        using node_action_t = etcd_discovery_action_t;
+#else
+        typedef etcd_discovery_action_t node_action_t;
+#endif
 
         struct LIBATAPP_MACRO_API_HEAD_ONLY node_info_t {
             atapp::protocol::atapp_discovery node_discovery;

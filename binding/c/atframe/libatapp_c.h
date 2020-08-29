@@ -15,7 +15,7 @@ extern "C" {
 typedef void *libatapp_c_context;
 typedef void *libatapp_c_custom_cmd_sender;
 
-typedef const void *libatapp_c_message;
+typedef const void *libatapp_c_message[2];
 
 typedef void *libatapp_c_module;
 
@@ -101,13 +101,8 @@ LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_send_custom_msg(libatapp_c_context
                                                               uint64_t arr_count);
 
 // =========================== message ===========================
-LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_msg_get_cmd(libatapp_c_message msg);
 LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_msg_get_type(libatapp_c_message msg);
-LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_msg_get_ret(libatapp_c_message msg);
-LIBATAPP_MACRO_API uint32_t __cdecl libatapp_c_msg_get_sequence(libatapp_c_message msg);
-LIBATAPP_MACRO_API uint64_t __cdecl libatapp_c_msg_get_src_bus_id(libatapp_c_message msg);
 LIBATAPP_MACRO_API uint64_t __cdecl libatapp_c_msg_get_forward_from(libatapp_c_message msg);
-LIBATAPP_MACRO_API uint64_t __cdecl libatapp_c_msg_get_forward_to(libatapp_c_message msg);
 
 // =========================== module ===========================
 LIBATAPP_MACRO_API libatapp_c_module __cdecl libatapp_c_module_create(libatapp_c_context context, const char *mod_name);

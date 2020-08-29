@@ -121,27 +121,20 @@ static int app_option_handler_echo(util::cli::callback_param params) {
     return 0;
 }
 
-static int app_handle_on_msg(atapp::app &app, const atapp::app::msg_t &msg, const void *buffer, size_t len) {
+static int app_handle_on_msg(atapp::app &app, const atapp::app::message_sender_t& source, const atapp::app::message_t &msg) {
     std::string data;
-    data.assign(reinterpret_cast<const char *>(buffer), len);
-    WLOGINFO("receive a message(from 0x%llx, type=%d) %s", static_cast<unsigned long long>(msg.head().src_bus_id()), msg.head().type(), data.c_str());
+    data.assign(reinterpret_cast<const char *>(msg.data), msg.data_size);
+    FWLOGINFO("receive a message(from {:#x}, type={}) {}", source.id, msg.type, data);
 
-    const atbus::protocol::forward_data* fwd_data = NULL;
-    if (atbus::protocol::msg::kDataTransformReq == msg.msg_body_case()) {
-        fwd_data = &msg.data_transform_req();
-    } else if (atbus::protocol::msg::kDataTransformRsp == msg.msg_body_case()) {
-        fwd_data = &msg.data_transform_rsp();
-    }
-
-    if (NULL != fwd_data) {
-        return app.get_bus_node()->send_data(fwd_data->from(), msg.head().type(), buffer, len);
-    }
-
-    return 0;
+    return app.get_bus_node()->send_data(source.id, msg.type, msg.data, msg.data_size);
 }
 
-static int app_handle_on_send_fail(atapp::app &, atapp::app::app_id_t src_pd, atapp::app::app_id_t dst_pd, const atbus::protocol::msg &) {
-    WLOGERROR("send data from 0x%llx to 0x%llx failed", static_cast<unsigned long long>(src_pd), static_cast<unsigned long long>(dst_pd));
+static int app_handle_on_response(atapp::app & app, const atapp::app::message_sender_t& source, const atapp::app::message_t & msg, int32_t error_code) {
+    if (error_code < 0) {
+        FWLOGERROR("send data from {:#x} to {:#x} failed, sequence: {}, code: {}", app.get_id(), source.id, msg.msg_sequence, error_code);
+    } else {
+        FWLOGDEBUG("send data from {:#x} to {:#x} got response, sequence: {}", app.get_id(), source.id, msg.msg_sequence);
+    }
     return 0;
 }
 
@@ -183,8 +176,8 @@ int main(int argc, char *argv[]) {
     opt_mgr->bind_cmd("-echo", app_option_handler_echo)->set_help_msg("-echo [text]                           echo a message.");
 
     // setup handle
-    app.set_evt_on_recv_msg(app_handle_on_msg);
-    app.set_evt_on_forward_response(app_handle_on_send_fail);
+    app.set_evt_on_forward_request(app_handle_on_msg);
+    app.set_evt_on_forward_response(app_handle_on_response);
     app.set_evt_on_app_connected(app_handle_on_connected);
     app.set_evt_on_app_disconnected(app_handle_on_disconnected);
 

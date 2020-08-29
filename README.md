@@ -42,21 +42,20 @@ GET START
 #include <atframe/atapp.h>
 #include <common/file_system.h>
 
-static int app_handle_on_msg(atapp::app &app, const atapp::app::msg_t &msg, const void *buffer, size_t len) {
+static int app_handle_on_msg(atapp::app &app, const atapp::app::message_sender_t& source, const atapp::app::message_t &msg) {
     std::string data;
-    data.assign(reinterpret_cast<const char *>(buffer), len);
-    WLOGINFO("receive a message(from 0x%llx, type=%d) %s", static_cast<unsigned long long>(msg.head.src_bus_id), msg.head.type, data.c_str());
+    data.assign(reinterpret_cast<const char *>(msg.data), msg.data_size);
+    FWLOGINFO("receive a message(from {:#x}, type={}) {}", source.id, msg.type, data);
 
-    if (NULL != msg.body.forward && 0 != msg.body.forward->from) {
-        // echo server 调用发送接口发回
-        return app.get_bus_node()->send_data(msg.body.forward->from, msg.head.type, buffer, len);
-    }
-
-    return 0;
+    return app.get_bus_node()->send_data(source.id, msg.type, msg.data, msg.data_size);
 }
 
-static int app_handle_on_send_fail(atapp::app &app, atapp::app::app_id_t src_pd, atapp::app::app_id_t dst_pd, const atbus::protocol::msg &m) {
-    WLOGERROR("send data from 0x%llx to 0x%llx failed", static_cast<unsigned long long>(src_pd), static_cast<unsigned long long>(dst_pd));
+static int app_handle_on_response(atapp::app & app, const atapp::app::message_sender_t& source, const atapp::app::message_t & msg, int32_t error_code) {
+    if (error_code < 0) {
+        FWLOGERROR("send data from {:#x} to {:#x} failed, sequence: {}, code: {}", app.get_id(), source.id, msg.msg_sequence, error_code);
+    } else {
+        FWLOGDEBUG("send data from {:#x} to {:#x} got response, sequence: {}", app.get_id(), source.id, msg.msg_sequence);
+    }
     return 0;
 }
 
@@ -71,7 +70,7 @@ int main(int argc, char *argv[]) {
     }
 
     // setup handle
-    app.set_evt_on_recv_msg(app_handle_on_msg);         // 注册接收到数据后的回掉
+    app.set_evt_on_forward_request(app_handle_on_msg);         // 注册接收到数据后的回掉
     app.set_evt_on_forward_response(app_handle_on_send_fail);  // 注册发送消息失败的回掉
 
     // run with default loop in libuv

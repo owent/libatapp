@@ -363,7 +363,7 @@ namespace atapp {
         }
 
         // update members
-        if (util::time::time_utility::now() > conf_.etcd_members_next_update_time) {
+        if (util::time::time_utility::sys_now() > conf_.etcd_members_next_update_time) {
             ret += create_request_member_update() ? 1 : 0;
         }
 
@@ -393,7 +393,7 @@ namespace atapp {
 
                 // run actions after lease granted
                 return ret;
-            } else if (util::time::time_utility::now() > conf_.keepalive_next_update_time) {
+            } else if (util::time::time_utility::sys_now() > conf_.keepalive_next_update_time) {
                 ret += create_request_lease_keepalive() ? 1 : 0;
             }
         } else if (!check_flag(flag_t::RUNNING)) {
@@ -841,15 +841,15 @@ namespace atapp {
             return false;
         }
 
-        if (util::time::time_utility::now() <= conf_.authorization_next_update_time) {
+        if (util::time::time_utility::sys_now() <= conf_.authorization_next_update_time) {
             return false;
         }
 
         // At least 1 second
         if (std::chrono::system_clock::duration::zero() >= conf_.authorization_retry_interval) {
-            conf_.authorization_next_update_time = util::time::time_utility::now();
+            conf_.authorization_next_update_time = util::time::time_utility::sys_now();
         } else {
-            conf_.authorization_next_update_time = util::time::time_utility::now() + conf_.authorization_retry_interval;
+            conf_.authorization_next_update_time = util::time::time_utility::sys_now() + conf_.authorization_retry_interval;
         }
 
         util::network::http_request::ptr_t req = util::network::http_request::create(
@@ -943,9 +943,9 @@ namespace atapp {
 
             // Renew user token later
             if (std::chrono::system_clock::duration::zero() >= self->conf_.auth_user_get_retry_interval) {
-                self->conf_.auth_user_get_next_update_time = util::time::time_utility::now();
+                self->conf_.auth_user_get_next_update_time = util::time::time_utility::sys_now();
             } else {
-                self->conf_.auth_user_get_next_update_time = util::time::time_utility::now() + self->conf_.auth_user_get_retry_interval;
+                self->conf_.auth_user_get_next_update_time = util::time::time_utility::sys_now() + self->conf_.auth_user_get_retry_interval;
             }
         } while (false);
 
@@ -973,15 +973,15 @@ namespace atapp {
             return false;
         }
 
-        if (util::time::time_utility::now() <= conf_.auth_user_get_next_update_time) {
+        if (util::time::time_utility::sys_now() <= conf_.auth_user_get_next_update_time) {
             return false;
         }
 
         // At least 1 second
         if (std::chrono::system_clock::duration::zero() >= conf_.auth_user_get_retry_interval) {
-            conf_.auth_user_get_next_update_time = util::time::time_utility::now();
+            conf_.auth_user_get_next_update_time = util::time::time_utility::sys_now();
         } else {
-            conf_.auth_user_get_next_update_time = util::time::time_utility::now() + conf_.auth_user_get_retry_interval;
+            conf_.auth_user_get_next_update_time = util::time::time_utility::sys_now() + conf_.auth_user_get_retry_interval;
         }
 
         util::network::http_request::ptr_t req = util::network::http_request::create(
@@ -1123,12 +1123,12 @@ namespace atapp {
             }
         }
 
-        if (util::time::time_utility::now() + conf_.etcd_members_retry_interval < conf_.etcd_members_next_update_time) {
-            conf_.etcd_members_next_update_time = util::time::time_utility::now() + conf_.etcd_members_retry_interval;
+        if (util::time::time_utility::sys_now() + conf_.etcd_members_retry_interval < conf_.etcd_members_next_update_time) {
+            conf_.etcd_members_next_update_time = util::time::time_utility::sys_now() + conf_.etcd_members_retry_interval;
             return false;
         }
 
-        if (util::time::time_utility::now() <= conf_.etcd_members_next_update_time) {
+        if (util::time::time_utility::sys_now() <= conf_.etcd_members_next_update_time) {
             return false;
         }
 
@@ -1153,9 +1153,9 @@ namespace atapp {
         }
 
         if (std::chrono::system_clock::duration::zero() >= conf_.etcd_members_update_interval) {
-            conf_.etcd_members_next_update_time = util::time::time_utility::now() + std::chrono::seconds(1);
+            conf_.etcd_members_next_update_time = util::time::time_utility::sys_now() + std::chrono::seconds(1);
         } else {
-            conf_.etcd_members_next_update_time = util::time::time_utility::now() + conf_.etcd_members_update_interval;
+            conf_.etcd_members_next_update_time = util::time::time_utility::sys_now() + conf_.etcd_members_update_interval;
         }
 
         std::string *selected_host;
@@ -1289,9 +1289,9 @@ namespace atapp {
         }
 
         if (std::chrono::system_clock::duration::zero() >= conf_.keepalive_interval) {
-            conf_.keepalive_next_update_time = util::time::time_utility::now() + std::chrono::seconds(1);
+            conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + std::chrono::seconds(1);
         } else {
-            conf_.keepalive_next_update_time = util::time::time_utility::now() + conf_.keepalive_interval;
+            conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + conf_.keepalive_interval;
         }
 
         util::network::http_request::ptr_t req = util::network::http_request::create(
@@ -1343,14 +1343,14 @@ namespace atapp {
             return false;
         }
 
-        if (util::time::time_utility::now() <= conf_.keepalive_next_update_time) {
+        if (util::time::time_utility::sys_now() <= conf_.keepalive_next_update_time) {
             return false;
         }
 
         if (std::chrono::system_clock::duration::zero() >= conf_.keepalive_interval) {
-            conf_.keepalive_next_update_time = util::time::time_utility::now() + std::chrono::seconds(1);
+            conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + std::chrono::seconds(1);
         } else {
-            conf_.keepalive_next_update_time = util::time::time_utility::now() + conf_.keepalive_interval;
+            conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + conf_.keepalive_interval;
         }
 
         util::network::http_request::ptr_t req = util::network::http_request::create(

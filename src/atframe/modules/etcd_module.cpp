@@ -83,7 +83,7 @@ namespace atapp {
     } // namespace detail
 
     LIBATAPP_MACRO_API etcd_module::etcd_module() : etcd_ctx_enabled_(false) {
-        tick_next_timepoint_ = util::time::time_utility::now();
+        tick_next_timepoint_ = util::time::time_utility::sys_now();
         tick_interval_ = std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::milliseconds(128));
     }
 
@@ -510,10 +510,10 @@ namespace atapp {
 
     LIBATAPP_MACRO_API int etcd_module::tick() {
         // Slow down the tick interval of etcd module, it require http request which is very slow compared to atbus
-        if (tick_next_timepoint_ >= util::time::time_utility::now()) {
+        if (tick_next_timepoint_ >= get_app()->get_last_tick_time()) {
             return 0;
         }
-        tick_next_timepoint_ = util::time::time_utility::now() + tick_interval_;
+        tick_next_timepoint_ = get_app()->get_last_tick_time() + tick_interval_;
 
         // single mode
         if (etcd_ctx_.get_conf_hosts().empty() || !etcd_ctx_enabled_) {
@@ -1038,11 +1038,34 @@ namespace atapp {
             }
         }
 
+        // remove endpoint if got DELETE event
+        if (has_event) {
+            app* owner = get_app();
+            if (node_action_t::EN_NAT_DELETE == node.action && NULL != owner) {
+                if (0 != node.node_discovery.id()) {
+                    owner->remove_endpoint(node.node_discovery.id());
+                }
+                if (!node.node_discovery.name().empty()) {
+                    owner->remove_endpoint(node.node_discovery.name());
+                }
+            }
+
+            if (NULL != owner) {
+                // notify all connector discovery event
+                if (new_inst) {
+                    owner->trigger_event_on_discovery_event(node.action, new_inst);
+                } else if (local_cache_by_name) {
+                    owner->trigger_event_on_discovery_event(node.action, local_cache_by_name);
+                } else {
+                    owner->trigger_event_on_discovery_event(node.action, local_cache_by_id);
+                }
+            }
+        }
+
         return has_event;
     }
 
     void etcd_module::reset_inner_watchers_and_keepalives() {
-        // TODO
         if (inner_watcher_by_name_) {
             etcd_ctx_.remove_watcher(inner_watcher_by_name_);
             inner_watcher_by_name_.reset();

@@ -42,15 +42,19 @@ public:
     virtual int tick() { return 0; }
 };
 
-static int app_handle_on_msg(atapp::app &, const atapp::app::msg_t &msg, const void *buffer, size_t len) {
+static int app_handle_on_msg(atapp::app &, const atapp::app::message_sender_t& source, const atapp::app::message_t &msg) {
     std::string data;
-    data.assign(reinterpret_cast<const char *>(buffer), len);
-    WLOGINFO("receive a message(from 0x%llx, type=%d) %s", static_cast<unsigned long long>(msg.head().src_bus_id()), msg.head().type(), data.c_str());
+    data.assign(reinterpret_cast<const char *>(msg.data), msg.data_size);
+    FWLOGINFO("receive a message(from {:#x}, type={}) {}", source.id, msg.type, data);
     return 0;
 }
 
-static int app_handle_on_send_fail(atapp::app &, atapp::app::app_id_t, atapp::app::app_id_t dst_pd, const atbus::protocol::msg &) {
-    WLOGERROR("send data to 0x%llx failed", static_cast<unsigned long long>(dst_pd));
+static int app_handle_on_response(atapp::app &, const atapp::app::message_sender_t& source, const atapp::app::message_t &, int32_t error_code) {
+    if (error_code < 0) {
+        FWLOGERROR("send data to {:#x} failed, code: {}", source.id, error_code);
+    } else {
+        FWLOGINFO("send data to {:#x} finished", source.id);
+    }
     exit_code = 1;
     return 0;
 }
@@ -79,8 +83,8 @@ int main(int argc, char *argv[]) {
     app.add_module(std::make_shared<atappctl_module>());
 
     // setup handle
-    app.set_evt_on_recv_msg(app_handle_on_msg);
-    app.set_evt_on_forward_response(app_handle_on_send_fail);
+    app.set_evt_on_forward_request(app_handle_on_msg);
+    app.set_evt_on_forward_response(app_handle_on_response);
     app.set_evt_on_app_connected(app_handle_on_connected);
     app.set_evt_on_app_disconnected(app_handle_on_disconnected);
 

@@ -59,6 +59,11 @@ endif ()
 include(GNUInstallDirs)
 
 set (LIBATAPP_MACRO_BUSID_TYPE ${ATBUS_MACRO_BUSID_TYPE})
+if( ${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS "5.0.0")
+        set(LIBATAPP_ENABLE_CUSTOM_COUNT_FOR_STD_LIST YES)
+    endif ()
+endif ()
 configure_file(
     "${CMAKE_CURRENT_LIST_DIR}/include/atframe/atapp_config.h.in"
     "${CMAKE_CURRENT_LIST_DIR}/include/atframe/atapp_config.h"

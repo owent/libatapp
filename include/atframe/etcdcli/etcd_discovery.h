@@ -23,6 +23,14 @@
 #include <atframe/atapp_conf.h>
 
 namespace atapp {
+    struct LIBATAPP_MACRO_API_HEAD_ONLY etcd_discovery_action_t {
+        enum type {
+            EN_NAT_UNKNOWN = 0,
+            EN_NAT_PUT,
+            EN_NAT_DELETE,
+        };
+    };
+
     class etcd_discovery_node {
     public:
 #if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES

@@ -19,14 +19,16 @@
 #define ATAPP_CONTEXT(x) ((::atapp::app *)(x))
 #define ATAPP_CONTEXT_IS_NULL(x) (NULL == (x))
 
-#define ATAPP_MESSAGE(x) ((const ::atapp::app::msg_t *)(x))
+#define ATAPP_MESSAGE(x) ((const ::atapp::app::message_t *)(x[1]))
 #define ATAPP_MESSAGE_IS_NULL(x) (NULL == (x))
+
+#define ATAPP_SENDER(x) ((const ::atapp::app::message_sender_t *)(x[0]))
 
 namespace detail {
     struct libatapp_c_on_msg_functor {
         libatapp_c_on_msg_functor(libatapp_c_on_msg_fn_t fn, void *priv_data) : callee_(fn), private_data_(priv_data) {}
 
-        int operator()(::atapp::app &self, const ::atapp::app::msg_t &msg, const void *buffer, size_t sz) {
+        int operator()(::atapp::app &self, const ::atapp::app::message_sender_t& source, const ::atapp::app::message_t &msg) {
             if (NULL == callee_) {
                 return 0;
             }
@@ -35,8 +37,9 @@ namespace detail {
             libatapp_c_message m;
 
             ctx = &self;
-            m = &msg;
-            return (*callee_)(ctx, m, buffer, static_cast<uint64_t>(sz), private_data_);
+            m[0] = &source;
+            m[1] = &msg;
+            return (*callee_)(ctx, m, msg.data, static_cast<uint64_t>(msg.data_size), private_data_);
         }
 
         libatapp_c_on_msg_fn_t callee_;
@@ -46,7 +49,7 @@ namespace detail {
     struct libatapp_c_on_send_fail_functor {
         libatapp_c_on_send_fail_functor(libatapp_c_on_send_fail_fn_t fn, void *priv_data) : callee_(fn), private_data_(priv_data) {}
 
-        int operator()(::atapp::app &self, ::atapp::app::app_id_t src_pd, ::atapp::app::app_id_t dst_pd, const ::atapp::app::msg_t &msg) {
+        int operator()(::atapp::app &self, const ::atapp::app::message_sender_t& source, const ::atapp::app::message_t &msg, int32_t) {
             if (NULL == callee_) {
                 return 0;
             }
@@ -55,8 +58,9 @@ namespace detail {
             libatapp_c_message m;
 
             ctx = &self;
-            m = &msg;
-            return (*callee_)(ctx, static_cast<uint64_t>(src_pd), static_cast<uint64_t>(dst_pd), m, private_data_);
+            m[0] = &source;
+            m[1] = &msg;
+            return (*callee_)(ctx, static_cast<uint64_t>(self.get_id()), static_cast<uint64_t>(source.id), m, private_data_);
         }
 
         libatapp_c_on_send_fail_fn_t callee_;
@@ -249,7 +253,7 @@ LIBATAPP_MACRO_API void __cdecl libatapp_c_set_on_msg_fn(libatapp_c_context cont
         return;
     }
 
-    ATAPP_CONTEXT(context)->set_evt_on_recv_msg(::detail::libatapp_c_on_msg_functor(fn, priv_data));
+    ATAPP_CONTEXT(context)->set_evt_on_forward_request(::detail::libatapp_c_on_msg_functor(fn, priv_data));
 }
 
 LIBATAPP_MACRO_API void __cdecl libatapp_c_set_on_forward_response_fn(libatapp_c_context context, libatapp_c_on_send_fail_fn_t fn, void *priv_data) {
@@ -526,45 +530,20 @@ LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_send_custom_msg(libatapp_c_context
     return ATAPP_CONTEXT(context)->get_bus_node()->send_custom_cmd(app_id, arr_buf, &szs[0], arr_count);
 }
 
-
-LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_msg_get_cmd(libatapp_c_message msg) {
-    if (ATAPP_MESSAGE_IS_NULL(msg)) {
-        return 0;
-    }
-
-    return ATAPP_MESSAGE(msg)->msg_body_case();
-}
-
 LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_msg_get_type(libatapp_c_message msg) {
     if (ATAPP_MESSAGE_IS_NULL(msg)) {
         return 0;
     }
 
-    return ATAPP_MESSAGE(msg)->head().type();
+    return ATAPP_MESSAGE(msg)->type;
 }
 
-LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_msg_get_ret(libatapp_c_message msg) {
+LIBATAPP_MACRO_API uint64_t __cdecl libatapp_c_msg_get_sequence(libatapp_c_message msg) {
     if (ATAPP_MESSAGE_IS_NULL(msg)) {
         return 0;
     }
 
-    return ATAPP_MESSAGE(msg)->head().ret();
-}
-
-LIBATAPP_MACRO_API uint32_t __cdecl libatapp_c_msg_get_sequence(libatapp_c_message msg) {
-    if (ATAPP_MESSAGE_IS_NULL(msg)) {
-        return 0;
-    }
-
-    return static_cast<uint32_t>(ATAPP_MESSAGE(msg)->head().sequence());
-}
-
-LIBATAPP_MACRO_API uint64_t __cdecl libatapp_c_msg_get_src_bus_id(libatapp_c_message msg) {
-    if (ATAPP_MESSAGE_IS_NULL(msg)) {
-        return 0;
-    }
-
-    return ATAPP_MESSAGE(msg)->head().src_bus_id();
+    return ATAPP_MESSAGE(msg)->msg_sequence;
 }
 
 LIBATAPP_MACRO_API uint64_t __cdecl libatapp_c_msg_get_forward_from(libatapp_c_message msg) {
@@ -572,37 +551,7 @@ LIBATAPP_MACRO_API uint64_t __cdecl libatapp_c_msg_get_forward_from(libatapp_c_m
         return 0;
     }
 
-    const atbus::protocol::forward_data* fwd_data = NULL;
-    if (atbus::protocol::msg::kDataTransformReq == ATAPP_MESSAGE(msg)->msg_body_case()) {
-        fwd_data = &ATAPP_MESSAGE(msg)->data_transform_req();
-    } else if (atbus::protocol::msg::kDataTransformRsp == ATAPP_MESSAGE(msg)->msg_body_case()) {
-        fwd_data = &ATAPP_MESSAGE(msg)->data_transform_rsp();
-    }
-
-    if (NULL == fwd_data) {
-        return 0;
-    }
-
-    return fwd_data->from();
-}
-
-LIBATAPP_MACRO_API uint64_t __cdecl libatapp_c_msg_get_forward_to(libatapp_c_message msg) {
-    if (ATAPP_MESSAGE_IS_NULL(msg)) {
-        return 0;
-    }
-
-    const atbus::protocol::forward_data* fwd_data = NULL;
-    if (atbus::protocol::msg::kDataTransformReq == ATAPP_MESSAGE(msg)->msg_body_case()) {
-        fwd_data = &ATAPP_MESSAGE(msg)->data_transform_req();
-    } else if (atbus::protocol::msg::kDataTransformRsp == ATAPP_MESSAGE(msg)->msg_body_case()) {
-        fwd_data = &ATAPP_MESSAGE(msg)->data_transform_rsp();
-    }
-
-    if (NULL == fwd_data) {
-        return 0;
-    }
-
-    return fwd_data->to();
+    return ATAPP_SENDER(msg)->id;
 }
 
 

@@ -61,7 +61,7 @@ namespace atapp {
 
         rpc_.is_actived = false;
 
-        if (rpc_.watcher_next_request_time > util::time::time_utility::now()) {
+        if (rpc_.watcher_next_request_time > util::time::time_utility::sys_now()) {
             return;
         }
 
@@ -76,7 +76,7 @@ namespace atapp {
             }
             if (!rpc_.rpc_opr_) {
                 FWLOGERROR("Etcd watcher {} create range request to {} failed", reinterpret_cast<const void *>(this), path_);
-                rpc_.watcher_next_request_time = util::time::time_utility::now() + rpc_.retry_interval;
+                rpc_.watcher_next_request_time = util::time::time_utility::sys_now() + rpc_.retry_interval;
                 return;
             }
 
@@ -101,7 +101,7 @@ namespace atapp {
             owner_->create_request_watch(path_, range_end_, rpc_.last_revision + 1, rpc_.enable_prev_kv, rpc_.enable_progress_notify);
         if (!rpc_.rpc_opr_) {
             FWLOGERROR("Etcd watcher {} create watch request to {} failed", reinterpret_cast<const void *>(this), path_);
-            rpc_.watcher_next_request_time = util::time::time_utility::now() + rpc_.retry_interval;
+            rpc_.watcher_next_request_time = util::time::time_utility::sys_now() + rpc_.retry_interval;
             return;
         }
 
@@ -144,7 +144,7 @@ namespace atapp {
             FWLOGERROR("Etcd watcher {} range request failed, error code: {}, http code: {}\n{}", reinterpret_cast<const void *>(self),
                        req.get_error_code(), req.get_response_code(), req.get_error_msg());
 
-            self->rpc_.watcher_next_request_time = util::time::time_utility::now() + self->rpc_.retry_interval;
+            self->rpc_.watcher_next_request_time = util::time::time_utility::sys_now() + self->rpc_.retry_interval;
 
             self->owner_->check_authorization_expired(req.get_response_code(), req.get_response_stream().str());
             return 0;
@@ -154,7 +154,7 @@ namespace atapp {
         if (self->rpc_.is_retry_mode) {
             self->rpc_.is_retry_mode = false;
             // reset request time to invoke watch request immediately
-            self->rpc_.watcher_next_request_time = util::time::time_utility::now();
+            self->rpc_.watcher_next_request_time = util::time::time_utility::sys_now();
 
             // 立刻开启下一次watch
             self->active();
@@ -169,7 +169,7 @@ namespace atapp {
         if (false == atapp::etcd_packer::parse_object(doc, http_content.c_str())) {
             FWLOGERROR("Etcd watcher {} got range response parse failed: {}", reinterpret_cast<const void *>(self), http_content);
 
-            self->rpc_.watcher_next_request_time = util::time::time_utility::now() + self->rpc_.retry_interval;
+            self->rpc_.watcher_next_request_time = util::time::time_utility::sys_now() + self->rpc_.retry_interval;
             self->active();
             return 0;
         }
@@ -187,7 +187,7 @@ namespace atapp {
         if (0 == header.revision) {
             FWLOGERROR("Etcd watcher {} got range response without header", reinterpret_cast<const void *>(self));
 
-            self->rpc_.watcher_next_request_time = util::time::time_utility::now() + self->rpc_.retry_interval;
+            self->rpc_.watcher_next_request_time = util::time::time_utility::sys_now() + self->rpc_.retry_interval;
             self->active();
             return 0;
         }
@@ -240,7 +240,7 @@ namespace atapp {
         }
 
         // reset request time to invoke watch request immediately
-        self->rpc_.watcher_next_request_time = util::time::time_utility::now();
+        self->rpc_.watcher_next_request_time = util::time::time_utility::sys_now();
 
         // 立刻开启下一次watch
         self->active();
@@ -266,12 +266,12 @@ namespace atapp {
                 FWLOGERROR("Etcd watcher {} watch request failed, error code: {}, http code: {}\n{}", reinterpret_cast<const void *>(self),
                            req.get_error_code(), req.get_response_code(), req.get_error_msg());
 
-                self->rpc_.watcher_next_request_time = util::time::time_utility::now() + self->rpc_.retry_interval;
+                self->rpc_.watcher_next_request_time = util::time::time_utility::sys_now() + self->rpc_.retry_interval;
 
             } else {
                 FWLOGDEBUG("Etcd watcher {} watch request finished, start another request later, msg: {}.",
                            reinterpret_cast<const void *>(self), req.get_error_msg());
-                self->rpc_.watcher_next_request_time = util::time::time_utility::now();
+                self->rpc_.watcher_next_request_time = util::time::time_utility::sys_now();
             }
 
             self->owner_->check_authorization_expired(req.get_response_code(), req.get_response_stream().str());
