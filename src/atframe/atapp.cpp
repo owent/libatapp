@@ -149,6 +149,10 @@ namespace atapp {
         stat_.last_checkpoint_min = 0;
 
         atbus_connector_ = add_connector<atapp_connector_atbus>();
+
+        // inner modules
+        inner_module_etcd_ = std::make_shared<atapp::etcd_module>();
+        add_module(inner_module_etcd_);
     }
 
     LIBATAPP_MACRO_API app::~app() {
@@ -255,12 +259,6 @@ namespace atapp {
         default: {
             return setup_result_ = 0;
         }
-        }
-
-        // inner modules
-        if (!inner_module_etcd_) {
-            inner_module_etcd_ = std::make_shared<atapp::etcd_module>();
-            add_module(inner_module_etcd_);
         }
 
         // step 6. setup log & signal

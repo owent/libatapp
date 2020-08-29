@@ -18,6 +18,12 @@ foreach(TOOLS_SRC_FILE IN LISTS TOOLS_SRC_LIST)
 
     add_executable(${TOOLS_SRC_BIN_NAME} ${TOOLS_SRC_FILE})
 
+    set_target_properties(${TOOLS_SRC_BIN_NAME} PROPERTIES
+        INSTALL_RPATH_USE_LINK_PATH YES
+        BUILD_WITH_INSTALL_RPATH NO
+        BUILD_RPATH_USE_ORIGIN YES
+    )
+
     target_include_directories(${TOOLS_SRC_BIN_NAME} 
         PRIVATE 
             "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>"

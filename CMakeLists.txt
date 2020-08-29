@@ -6,6 +6,8 @@ if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.13")
     cmake_policy(SET CMP0074 NEW)
 endif()
 
+enable_testing()
+
 project(libatapp)
 
 set(LIBATAPP_VERSION_MAJOR "0")
@@ -77,10 +79,10 @@ if (PROJECT_ENABLE_SAMPLE)
     add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/sample")
 endif()
 
-# if (PROJECT_ENABLE_UNITTEST)
-#     include ("${3RD_PARTY_ATFRAME_UTILS_PKG_DIR}/test/test.utils-macro.cmake")
-#     add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/test")
-# endif()
+if (PROJECT_ENABLE_UNITTEST)
+    include ("${3RD_PARTY_ATFRAME_UTILS_PKG_DIR}/test/test.utils-macro.cmake")
+    add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/test")
+endif()
 
 if (PROJECT_ENABLE_TOOLS)
     add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/tools")
