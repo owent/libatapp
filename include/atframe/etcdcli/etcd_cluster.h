@@ -142,11 +142,11 @@ namespace atapp {
         };
 
 #if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
-        using on_event_up_down_fn_t = std::function<void (etcd_cluster&)>;
+        using on_event_up_down_fn_t         = std::function<void(etcd_cluster &)>;
         using on_event_up_down_handle_set_t = std::list<on_event_up_down_fn_t>;
-        using on_event_up_down_handle_t = on_event_up_down_handle_set_t::const_iterator;
+        using on_event_up_down_handle_t     = on_event_up_down_handle_set_t::const_iterator;
 #else
-        typedef std::function<void (etcd_cluster&)> on_event_up_down_fn_t;
+        typedef std::function<void(etcd_cluster &)> on_event_up_down_fn_t;
         typedef std::list<on_event_up_down_fn_t> on_event_up_down_handle_set_t;
         typedef on_event_up_down_handle_set_t::const_iterator on_event_up_down_handle_t;
 #endif
@@ -352,10 +352,11 @@ namespace atapp {
         UTIL_FORCEINLINE int64_t get_lease() const { return conf_.lease; }
 
         LIBATAPP_MACRO_API on_event_up_down_handle_t add_on_event_up(on_event_up_down_fn_t fn, bool trigger_if_running = false);
-        LIBATAPP_MACRO_API void remove_on_event_up(on_event_up_down_handle_t& handle);
+        LIBATAPP_MACRO_API void remove_on_event_up(on_event_up_down_handle_t &handle);
 
         LIBATAPP_MACRO_API on_event_up_down_handle_t add_on_event_down(on_event_up_down_fn_t fn, bool trigger_if_not_running = false);
-        LIBATAPP_MACRO_API void remove_on_event_down(on_event_up_down_handle_t& handle);
+        LIBATAPP_MACRO_API void remove_on_event_down(on_event_up_down_handle_t &handle);
+
     private:
 #if defined(UTIL_CONFIG_COMPILER_CXX_RVALUE_REFERENCES) && UTIL_CONFIG_COMPILER_CXX_RVALUE_REFERENCES
         void remove_keepalive_path(etcd_keepalive_deletor *keepalive_deletor, bool delay_delete);

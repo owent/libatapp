@@ -42,14 +42,15 @@ public:
     virtual int tick() { return 0; }
 };
 
-static int app_handle_on_msg(atapp::app &, const atapp::app::message_sender_t& source, const atapp::app::message_t &msg) {
+static int app_handle_on_msg(atapp::app &, const atapp::app::message_sender_t &source, const atapp::app::message_t &msg) {
     std::string data;
     data.assign(reinterpret_cast<const char *>(msg.data), msg.data_size);
     FWLOGINFO("receive a message(from {:#x}, type={}) {}", source.id, msg.type, data);
     return 0;
 }
 
-static int app_handle_on_response(atapp::app &, const atapp::app::message_sender_t& source, const atapp::app::message_t &, int32_t error_code) {
+static int app_handle_on_response(atapp::app &, const atapp::app::message_sender_t &source, const atapp::app::message_t &,
+                                  int32_t error_code) {
     if (error_code < 0) {
         FWLOGERROR("send data to {:#x} failed, code: {}", source.id, error_code);
     } else {

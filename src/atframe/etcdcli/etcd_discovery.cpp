@@ -12,21 +12,21 @@
 
 namespace atapp {
 
-    static std::pair<uint64_t, uint64_t> consistent_hash_calc(const void* buf, size_t bufsz, uint32_t seed) {
+    static std::pair<uint64_t, uint64_t> consistent_hash_calc(const void *buf, size_t bufsz, uint32_t seed) {
         std::pair<uint64_t, uint64_t> ret;
         uint64_t out[2] = {0};
         ::util::hash::murmur_hash3_x64_128(buf, static_cast<int>(bufsz), seed, out);
-        ret.first = out[0];
+        ret.first  = out[0];
         ret.second = out[1];
 
         return ret;
     }
 
-    static bool consistent_hash_compare_find(const etcd_discovery_set::node_hash_t& l, const std::pair<uint64_t, uint64_t>& r) {
+    static bool consistent_hash_compare_find(const etcd_discovery_set::node_hash_t &l, const std::pair<uint64_t, uint64_t> &r) {
         return l.hash_code < r;
     }
 
-    static bool consistent_hash_compare_index(const etcd_discovery_set::node_hash_t& l, const etcd_discovery_set::node_hash_t& r) {
+    static bool consistent_hash_compare_index(const etcd_discovery_set::node_hash_t &l, const etcd_discovery_set::node_hash_t &r) {
         if (l.hash_code != r.hash_code) {
             return l.hash_code < r.hash_code;
         }
@@ -46,7 +46,7 @@ namespace atapp {
         return l.node->get_discovery_info().name() < r.node->get_discovery_info().name();
     }
 
-    static bool round_robin_compare_index(const etcd_discovery_node::ptr_t& l, const etcd_discovery_node::ptr_t& r) {
+    static bool round_robin_compare_index(const etcd_discovery_node::ptr_t &l, const etcd_discovery_node::ptr_t &r) {
         if (!l || !r) {
             return reinterpret_cast<uintptr_t>(l.get()) < reinterpret_cast<uintptr_t>(r.get());
         }
@@ -62,9 +62,9 @@ namespace atapp {
         return l->get_discovery_info().name() < r->get_discovery_info().name();
     }
 
-    LIBATAPP_MACRO_API etcd_discovery_node::etcd_discovery_node(): name_hash_(0, 0) {
-        private_data_ptr_ = NULL;
-        private_data_u64_ = 0;
+    LIBATAPP_MACRO_API etcd_discovery_node::etcd_discovery_node() : name_hash_(0, 0) {
+        private_data_ptr_  = NULL;
+        private_data_u64_  = 0;
         private_data_uptr_ = 0;
     }
 
@@ -74,26 +74,22 @@ namespace atapp {
         }
     }
 
-    LIBATAPP_MACRO_API void etcd_discovery_node::copy_from(const atapp::protocol::atapp_discovery& input) {
+    LIBATAPP_MACRO_API void etcd_discovery_node::copy_from(const atapp::protocol::atapp_discovery &input) {
         node_info_.CopyFrom(input);
 
         name_hash_ = consistent_hash_calc(input.name().c_str(), input.name().size(), 0);
     }
 
-    LIBATAPP_MACRO_API void etcd_discovery_node::set_on_destroy(on_destroy_fn_t fn) {
-        on_destroy_fn_ = fn;
-    }
+    LIBATAPP_MACRO_API void etcd_discovery_node::set_on_destroy(on_destroy_fn_t fn) { on_destroy_fn_ = fn; }
 
-    LIBATAPP_MACRO_API const etcd_discovery_node::on_destroy_fn_t& etcd_discovery_node::get_on_destroy() const {
-        return on_destroy_fn_;
-    }
+    LIBATAPP_MACRO_API const etcd_discovery_node::on_destroy_fn_t &etcd_discovery_node::get_on_destroy() const { return on_destroy_fn_; }
 
     LIBATAPP_MACRO_API etcd_discovery_set::etcd_discovery_set() {
         random_generator_.init_seed(static_cast<util::random::xoshiro256_starstar::result_type>(util::time::time_utility::get_now()));
         round_robin_index_ = 0;
     }
 
-    LIBATAPP_MACRO_API etcd_discovery_set::~etcd_discovery_set() { }
+    LIBATAPP_MACRO_API etcd_discovery_set::~etcd_discovery_set() {}
 
 
     LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_id(uint64_t id) const {
@@ -105,7 +101,7 @@ namespace atapp {
         return iter->second;
     }
 
-    LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_name(const std::string& name) const {
+    LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_name(const std::string &name) const {
         node_by_name_t::const_iterator iter = node_by_name_.find(name);
         if (iter == node_by_name_.end()) {
             return NULL;
@@ -114,13 +110,14 @@ namespace atapp {
         return iter->second;
     }
 
-    LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_consistent_hash(const void* buf, size_t bufsz) const {
+    LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_consistent_hash(const void *buf, size_t bufsz) const {
         if (hashing_cache_.empty()) {
             rebuild_cache();
         }
 
         std::pair<uint64_t, uint64_t> hash_key = consistent_hash_calc(buf, bufsz, 0);
-        std::vector<node_hash_t>::const_iterator hash_iter = std::lower_bound(hashing_cache_.begin(), hashing_cache_.end(), hash_key, consistent_hash_compare_find);
+        std::vector<node_hash_t>::const_iterator hash_iter =
+            std::lower_bound(hashing_cache_.begin(), hashing_cache_.end(), hash_key, consistent_hash_compare_find);
         if (hash_iter == hashing_cache_.end()) {
             return (*hashing_cache_.begin()).node;
         }
@@ -136,7 +133,7 @@ namespace atapp {
         return get_node_by_consistent_hash(&key, sizeof(key));
     }
 
-    LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_consistent_hash(const std::string& key) const {
+    LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_consistent_hash(const std::string &key) const {
         return get_node_by_consistent_hash(key.c_str(), key.size());
     }
 
@@ -165,10 +162,10 @@ namespace atapp {
             round_robin_index_ %= round_robin_cache_.size();
         }
 
-        return round_robin_cache_[round_robin_index_ ++];
+        return round_robin_cache_[round_robin_index_++];
     }
 
-    LIBATAPP_MACRO_API void etcd_discovery_set::add_node(const etcd_discovery_node::ptr_t& node) {
+    LIBATAPP_MACRO_API void etcd_discovery_set::add_node(const etcd_discovery_node::ptr_t &node) {
         if (!node) {
             return;
         }
@@ -182,7 +179,7 @@ namespace atapp {
             node_by_id_t::iterator iter_id = node_by_id_.find(node->get_discovery_info().id());
             if (iter_id == node_by_id_.end()) {
                 node_by_id_[node->get_discovery_info().id()] = node;
-                has_insert = true;
+                has_insert                                   = true;
             } else if (iter_id->second != node) {
                 // name change and remove node of old name
                 if (iter_id->second->get_discovery_info().name() != node->get_discovery_info().name()) {
@@ -192,7 +189,7 @@ namespace atapp {
                 // Remove old first, because directly change value of shared_ptr is not thread-safe
                 iter_id->second.reset();
                 iter_id->second = node;
-                has_insert = true;
+                has_insert      = true;
             }
         }
 
@@ -201,7 +198,7 @@ namespace atapp {
             node_by_name_t::iterator iter_name = node_by_name_.find(node->get_discovery_info().name());
             if (iter_name == node_by_name_.end()) {
                 node_by_name_[node->get_discovery_info().name()] = node;
-                has_insert = true;
+                has_insert                                       = true;
             } else if (iter_name->second != node) {
                 // id change and remove node of old id
                 if (iter_name->second->get_discovery_info().id() != node->get_discovery_info().id()) {
@@ -211,7 +208,7 @@ namespace atapp {
                 // Remove old first, because directly change value of shared_ptr is not thread-safe
                 iter_name->second.reset();
                 iter_name->second = node;
-                has_insert = true;
+                has_insert        = true;
             }
         }
 
@@ -234,7 +231,7 @@ namespace atapp {
         }
     }
 
-    LIBATAPP_MACRO_API void etcd_discovery_set::remove_node(const etcd_discovery_node::ptr_t& node) {
+    LIBATAPP_MACRO_API void etcd_discovery_set::remove_node(const etcd_discovery_node::ptr_t &node) {
         if (!node) {
             return;
         }
@@ -279,7 +276,7 @@ namespace atapp {
         clear_cache();
     }
 
-    LIBATAPP_MACRO_API void etcd_discovery_set::remove_node(const std::string& name) {
+    LIBATAPP_MACRO_API void etcd_discovery_set::remove_node(const std::string &name) {
         node_by_name_t::iterator iter_name = node_by_name_.find(name);
         if (iter_name == node_by_name_.end()) {
             return;
@@ -314,30 +311,30 @@ namespace atapp {
         hashing_cache_.reserve(max(node_by_id_.size(), node_by_name_.size()) * node_hash_t::HASH_POINT_PER_INS);
 
 
-        for(node_by_id_t::const_iterator iter = node_by_id_.begin(); iter != node_by_id_.end(); ++ iter) {
+        for (node_by_id_t::const_iterator iter = node_by_id_.begin(); iter != node_by_id_.end(); ++iter) {
             round_robin_cache_.push_back(iter->second);
 
-            for (size_t i = 0; i < node_hash_t::HASH_POINT_PER_INS / 2; ++ i) {
+            for (size_t i = 0; i < node_hash_t::HASH_POINT_PER_INS / 2; ++i) {
                 node_hash_t hash_node;
-                hash_node.node = iter->second;
-                uint64_t key = iter->second->get_discovery_info().id();
+                hash_node.node      = iter->second;
+                uint64_t key        = iter->second->get_discovery_info().id();
                 hash_node.hash_code = consistent_hash_calc(&key, sizeof(key), static_cast<uint32_t>(i));
 
                 hashing_cache_.push_back(hash_node);
             }
         }
 
-        for(node_by_name_t::const_iterator iter = node_by_name_.begin(); iter != node_by_name_.end(); ++ iter) {
+        for (node_by_name_t::const_iterator iter = node_by_name_.begin(); iter != node_by_name_.end(); ++iter) {
             // If already pushed by id, skip round robin cache
             if (0 == iter->second->get_discovery_info().id()) {
                 round_robin_cache_.push_back(iter->second);
             }
 
-            for (size_t i = 0; i < node_hash_t::HASH_POINT_PER_INS / 2; ++ i) {
+            for (size_t i = 0; i < node_hash_t::HASH_POINT_PER_INS / 2; ++i) {
                 node_hash_t hash_node;
-                hash_node.node = iter->second;
-                const std::string& name = iter->second->get_discovery_info().name();
-                hash_node.hash_code = consistent_hash_calc(name.c_str(), name.size(), static_cast<uint32_t>(i));
+                hash_node.node          = iter->second;
+                const std::string &name = iter->second->get_discovery_info().name();
+                hash_node.hash_code     = consistent_hash_calc(name.c_str(), name.size(), static_cast<uint32_t>(i));
 
                 hashing_cache_.push_back(hash_node);
             }
@@ -351,4 +348,4 @@ namespace atapp {
         hashing_cache_.clear();
         round_robin_cache_.clear();
     }
-}
+} // namespace atapp

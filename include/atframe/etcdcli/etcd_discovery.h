@@ -15,8 +15,8 @@
 #include <config/atframe_utils_build_feature.h>
 #include <config/compiler_features.h>
 
-#include <design_pattern/noncopyable.h>
 #include <design_pattern/nomovable.h>
+#include <design_pattern/noncopyable.h>
 
 #include <random/random_generator.h>
 
@@ -34,10 +34,10 @@ namespace atapp {
     class etcd_discovery_node {
     public:
 #if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
-        using on_destroy_fn_t = std::function<void (etcd_discovery_node&)>;
-        using ptr_t = std::shared_ptr<etcd_discovery_node>;
+        using on_destroy_fn_t = std::function<void(etcd_discovery_node &)>;
+        using ptr_t           = std::shared_ptr<etcd_discovery_node>;
 #else
-        typedef std::function<void (etcd_discovery_node&)> on_destroy_fn_t;
+        typedef std::function<void(etcd_discovery_node &)> on_destroy_fn_t;
         typedef std::shared_ptr<etcd_discovery_node> ptr_t;
 #endif
 
@@ -48,13 +48,13 @@ namespace atapp {
         LIBATAPP_MACRO_API etcd_discovery_node();
         LIBATAPP_MACRO_API ~etcd_discovery_node();
 
-        UTIL_FORCEINLINE const atapp::protocol::atapp_discovery& get_discovery_info() const { return node_info_; }
-        LIBATAPP_MACRO_API void copy_from(const atapp::protocol::atapp_discovery& input);
+        UTIL_FORCEINLINE const atapp::protocol::atapp_discovery &get_discovery_info() const { return node_info_; }
+        LIBATAPP_MACRO_API void copy_from(const atapp::protocol::atapp_discovery &input);
 
-        UTIL_FORCEINLINE const std::pair<uint64_t, uint64_t>& get_name_hash() const { return name_hash_; }
+        UTIL_FORCEINLINE const std::pair<uint64_t, uint64_t> &get_name_hash() const { return name_hash_; }
 
-        UTIL_FORCEINLINE void set_private_data_ptr(void* input) { private_data_ptr_ = input; }
-        UTIL_FORCEINLINE void* get_private_data_ptr() const { return private_data_ptr_; }
+        UTIL_FORCEINLINE void set_private_data_ptr(void *input) { private_data_ptr_ = input; }
+        UTIL_FORCEINLINE void *get_private_data_ptr() const { return private_data_ptr_; }
         UTIL_FORCEINLINE void set_private_data_u64(uint64_t input) { private_data_u64_ = input; }
         UTIL_FORCEINLINE uint64_t get_private_data_u64() const { return private_data_u64_; }
         UTIL_FORCEINLINE void set_private_data_i64(int64_t input) { private_data_i64_ = input; }
@@ -65,12 +65,13 @@ namespace atapp {
         UTIL_FORCEINLINE intptr_t get_private_data_iptr() const { return private_data_iptr_; }
 
         LIBATAPP_MACRO_API void set_on_destroy(on_destroy_fn_t fn);
-        LIBATAPP_MACRO_API const on_destroy_fn_t& get_on_destroy() const;
+        LIBATAPP_MACRO_API const on_destroy_fn_t &get_on_destroy() const;
+
     private:
         atapp::protocol::atapp_discovery node_info_;
         std::pair<uint64_t, uint64_t> name_hash_;
         union {
-            void* private_data_ptr_;
+            void *private_data_ptr_;
             uint64_t private_data_u64_;
             int64_t private_data_i64_;
             uintptr_t private_data_uptr_;
@@ -84,7 +85,7 @@ namespace atapp {
 #if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
         using node_by_name_t = LIBATFRAME_UTILS_AUTO_SELETC_MAP(std::string, etcd_discovery_node::ptr_t);
         using node_by_id_t   = LIBATFRAME_UTILS_AUTO_SELETC_MAP(uint64_t, etcd_discovery_node::ptr_t);
-        using ptr_t = std::shared_ptr<etcd_discovery_set>;
+        using ptr_t          = std::shared_ptr<etcd_discovery_set>;
 #else
         typedef LIBATFRAME_UTILS_AUTO_SELETC_MAP(std::string, etcd_discovery_node::ptr_t) node_by_name_t;
         typedef LIBATFRAME_UTILS_AUTO_SELETC_MAP(uint64_t, etcd_discovery_node::ptr_t) node_by_id_t;
@@ -92,11 +93,9 @@ namespace atapp {
 #endif
 
         struct node_hash_t {
-            enum {
-                HASH_POINT_PER_INS = 80
-            };
+            enum { HASH_POINT_PER_INS = 80 };
 
-            etcd_discovery_node::ptr_t    node;
+            etcd_discovery_node::ptr_t node;
             std::pair<uint64_t, uint64_t> hash_code;
         };
 
@@ -108,20 +107,20 @@ namespace atapp {
 
 
         LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_id(uint64_t id) const;
-        LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_name(const std::string& name) const;
+        LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_name(const std::string &name) const;
 
-        LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_consistent_hash(const void* buf, size_t bufsz) const;
+        LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_consistent_hash(const void *buf, size_t bufsz) const;
         LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_consistent_hash(uint64_t key) const;
         LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_consistent_hash(int64_t key) const;
-        LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_consistent_hash(const std::string& key) const;
+        LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_consistent_hash(const std::string &key) const;
 
         LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_random() const;
         LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_round_robin() const;
 
-        LIBATAPP_MACRO_API void add_node(const etcd_discovery_node::ptr_t& node);
-        LIBATAPP_MACRO_API void remove_node(const etcd_discovery_node::ptr_t& node);
+        LIBATAPP_MACRO_API void add_node(const etcd_discovery_node::ptr_t &node);
+        LIBATAPP_MACRO_API void remove_node(const etcd_discovery_node::ptr_t &node);
         LIBATAPP_MACRO_API void remove_node(uint64_t id);
-        LIBATAPP_MACRO_API void remove_node(const std::string& name);
+        LIBATAPP_MACRO_API void remove_node(const std::string &name);
 
     private:
         void rebuild_cache() const;
@@ -136,6 +135,6 @@ namespace atapp {
         mutable util::random::xoshiro256_starstar random_generator_;
         mutable size_t round_robin_index_;
     };
-}
+} // namespace atapp
 
 #endif

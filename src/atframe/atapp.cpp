@@ -49,14 +49,12 @@ namespace atapp {
         delete ptr;
     }
 
-    LIBATAPP_MACRO_API app::message_t::message_t(): type(0), msg_sequence(0), data(NULL), data_size(0), metadata(NULL) {}
+    LIBATAPP_MACRO_API app::message_t::message_t() : type(0), msg_sequence(0), data(NULL), data_size(0), metadata(NULL) {}
     LIBATAPP_MACRO_API app::message_t::~message_t() {}
 
-    LIBATAPP_MACRO_API app::message_t::message_t(const message_t & other) {
-        (*this) = other;
-    }
-    
-    LIBATAPP_MACRO_API app::message_t &app::message_t::operator=(const message_t & other) {
+    LIBATAPP_MACRO_API app::message_t::message_t(const message_t &other) { (*this) = other; }
+
+    LIBATAPP_MACRO_API app::message_t &app::message_t::operator=(const message_t &other) {
         type         = other.type;
         msg_sequence = other.msg_sequence;
         data         = other.data;
@@ -65,14 +63,12 @@ namespace atapp {
         return *this;
     }
 
-    LIBATAPP_MACRO_API app::message_sender_t::message_sender_t(): id(0), name(NULL), remote(NULL) {}
+    LIBATAPP_MACRO_API app::message_sender_t::message_sender_t() : id(0), name(NULL), remote(NULL) {}
     LIBATAPP_MACRO_API app::message_sender_t::~message_sender_t() {}
 
-    LIBATAPP_MACRO_API app::message_sender_t::message_sender_t(const message_sender_t & other) {
-        (*this) = other;
-    }
-    
-    LIBATAPP_MACRO_API app::message_sender_t & app::message_sender_t::operator=(const message_sender_t & other) {
+    LIBATAPP_MACRO_API app::message_sender_t::message_sender_t(const message_sender_t &other) { (*this) = other; }
+
+    LIBATAPP_MACRO_API app::message_sender_t &app::message_sender_t::operator=(const message_sender_t &other) {
         id     = other.id;
         name   = other.name;
         remote = other.remote;
@@ -905,9 +901,7 @@ namespace atapp {
     LIBATAPP_MACRO_API std::shared_ptr<atbus::node> app::get_bus_node() { return bus_node_; }
     LIBATAPP_MACRO_API const std::shared_ptr<atbus::node> app::get_bus_node() const { return bus_node_; }
 
-    LIBATAPP_MACRO_API util::time::time_utility::raw_time_t app::get_last_tick_time() const {
-        return tick_timer_.sec_update;
-    }
+    LIBATAPP_MACRO_API util::time::time_utility::raw_time_t app::get_last_tick_time() const { return tick_timer_.sec_update; }
 
     LIBATAPP_MACRO_API util::config::ini_loader &app::get_configure_loader() { return cfg_loader_; }
     LIBATAPP_MACRO_API const util::config::ini_loader &app::get_configure_loader() const { return cfg_loader_; }
@@ -935,15 +929,14 @@ namespace atapp {
     LIBATAPP_MACRO_API const atapp::protocol::atapp_configure &app::get_origin_configure() const { return conf_.origin; }
     LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata &app::get_metadata() const { return conf_.metadata; }
     LIBATAPP_MACRO_API util::time::time_utility::raw_time_t::duration app::get_configure_message_timeout() const {
-        const google::protobuf::Duration& dur = conf_.origin.timer().message_timeout();
+        const google::protobuf::Duration &dur = conf_.origin.timer().message_timeout();
         if (dur.seconds() <= 0 && dur.nanos() <= 0) {
             return std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::seconds(5));
         }
 
-        util::time::time_utility::raw_time_t::duration ret = std::chrono::duration_cast<std::chrono::system_clock::duration>(
-            std::chrono::nanoseconds(dur.seconds()));
-        ret += std::chrono::duration_cast<std::chrono::system_clock::duration>(
-            std::chrono::nanoseconds(dur.nanos()));
+        util::time::time_utility::raw_time_t::duration ret =
+            std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::nanoseconds(dur.seconds()));
+        ret += std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::nanoseconds(dur.nanos()));
         return ret;
     }
 
@@ -999,11 +992,9 @@ namespace atapp {
         }
     }
 
-    LIBATAPP_MACRO_API std::shared_ptr<::atapp::etcd_module> app::get_etcd_module() const {
-        return inner_module_etcd_;
-    }
+    LIBATAPP_MACRO_API std::shared_ptr< ::atapp::etcd_module> app::get_etcd_module() const { return inner_module_etcd_; }
 
-    LIBATAPP_MACRO_API uint32_t app::get_address_type(const std::string& address) const {
+    LIBATAPP_MACRO_API uint32_t app::get_address_type(const std::string &address) const {
         uint32_t ret = address_type_t::EN_ACAT_NONE;
 
         atbus::channel::channel_address_t addr;
@@ -1036,8 +1027,12 @@ namespace atapp {
     LIBATAPP_MACRO_API void app::set_evt_on_app_disconnected(callback_fn_on_disconnected_t fn) { evt_on_app_disconnected_ = fn; }
     LIBATAPP_MACRO_API void app::set_evt_on_all_module_inited(callback_fn_on_all_module_inited_t fn) { evt_on_all_module_inited_ = fn; }
 
-    LIBATAPP_MACRO_API const app::callback_fn_on_forward_request_t &app::get_evt_on_forward_request() const { return evt_on_forward_request_; }
-    LIBATAPP_MACRO_API const app::callback_fn_on_forward_response_t &app::get_evt_on_forward_response() const { return evt_on_forward_response_; }
+    LIBATAPP_MACRO_API const app::callback_fn_on_forward_request_t &app::get_evt_on_forward_request() const {
+        return evt_on_forward_request_;
+    }
+    LIBATAPP_MACRO_API const app::callback_fn_on_forward_response_t &app::get_evt_on_forward_response() const {
+        return evt_on_forward_response_;
+    }
     LIBATAPP_MACRO_API const app::callback_fn_on_connected_t &app::get_evt_on_app_connected() const { return evt_on_app_connected_; }
     LIBATAPP_MACRO_API const app::callback_fn_on_disconnected_t &app::get_evt_on_app_disconnected() const {
         return evt_on_app_disconnected_;
@@ -1046,7 +1041,8 @@ namespace atapp {
         return evt_on_all_module_inited_;
     }
 
-    LIBATAPP_MACRO_API bool app::add_endpoint_waker(util::time::time_utility::raw_time_t wakeup_time, const atapp_endpoint::weak_ptr_t& ep_watcher) {
+    LIBATAPP_MACRO_API bool app::add_endpoint_waker(util::time::time_utility::raw_time_t wakeup_time,
+                                                    const atapp_endpoint::weak_ptr_t &ep_watcher) {
         if (is_closing()) {
             return false;
         }
@@ -1078,7 +1074,7 @@ namespace atapp {
         // RAII destruction of res
     }
 
-    LIBATAPP_MACRO_API void app::remove_endpoint(const std::string& by_name) {
+    LIBATAPP_MACRO_API void app::remove_endpoint(const std::string &by_name) {
         endpoint_index_by_name_t::const_iterator iter_name = endpoint_index_by_name_.find(by_name);
         if (iter_name == endpoint_index_by_name_.end()) {
             return;
@@ -1101,7 +1097,7 @@ namespace atapp {
         // RAII destruction of res
     }
 
-    LIBATAPP_MACRO_API void app::remove_endpoint(const atapp_endpoint::ptr_t& enpoint) {
+    LIBATAPP_MACRO_API void app::remove_endpoint(const atapp_endpoint::ptr_t &enpoint) {
         if (!enpoint) {
             return;
         }
@@ -1127,7 +1123,7 @@ namespace atapp {
         }
     }
 
-    LIBATAPP_MACRO_API atapp_endpoint::ptr_t app::mutable_endpoint(const etcd_discovery_node::ptr_t& discovery) {
+    LIBATAPP_MACRO_API atapp_endpoint::ptr_t app::mutable_endpoint(const etcd_discovery_node::ptr_t &discovery) {
         if (is_closing()) {
             return NULL;
         }
@@ -1136,8 +1132,8 @@ namespace atapp {
             return NULL;
         }
 
-        uint64_t id = discovery->get_discovery_info().id();
-        const std::string& name = discovery->get_discovery_info().name();
+        uint64_t id             = discovery->get_discovery_info().id();
+        const std::string &name = discovery->get_discovery_info().name();
         atapp_endpoint::ptr_t ret;
         bool is_created = false;
         if (id != 0) {
@@ -1147,7 +1143,7 @@ namespace atapp {
             } else {
                 ret = atapp_endpoint::create(*this);
                 if (ret) {
-                    is_created = true;
+                    is_created                = true;
                     endpoint_index_by_id_[id] = ret;
                 }
             }
@@ -1169,7 +1165,7 @@ namespace atapp {
             } else if (!ret) {
                 ret = atapp_endpoint::create(*this);
                 if (ret) {
-                    is_created = true;
+                    is_created                    = true;
                     endpoint_index_by_name_[name] = ret;
                     ret->update_discovery(discovery);
                 }
@@ -1184,7 +1180,7 @@ namespace atapp {
         return ret;
     }
 
-    LIBATAPP_MACRO_API atapp_endpoint* app::get_endpoint(uint64_t by_id) {
+    LIBATAPP_MACRO_API atapp_endpoint *app::get_endpoint(uint64_t by_id) {
         endpoint_index_by_id_t::iterator iter_id = endpoint_index_by_id_.find(by_id);
         if (iter_id != endpoint_index_by_id_.end()) {
             return iter_id->second.get();
@@ -1193,7 +1189,7 @@ namespace atapp {
         return NULL;
     }
 
-    LIBATAPP_MACRO_API const atapp_endpoint* app::get_endpoint(uint64_t by_id) const {
+    LIBATAPP_MACRO_API const atapp_endpoint *app::get_endpoint(uint64_t by_id) const {
         endpoint_index_by_id_t::const_iterator iter_id = endpoint_index_by_id_.find(by_id);
         if (iter_id != endpoint_index_by_id_.end()) {
             return iter_id->second.get();
@@ -1202,7 +1198,7 @@ namespace atapp {
         return NULL;
     }
 
-    LIBATAPP_MACRO_API atapp_endpoint* app::get_endpoint(const std::string& by_name) {
+    LIBATAPP_MACRO_API atapp_endpoint *app::get_endpoint(const std::string &by_name) {
         endpoint_index_by_name_t::iterator iter_name = endpoint_index_by_name_.find(by_name);
         if (iter_name != endpoint_index_by_name_.end()) {
             return iter_name->second.get();
@@ -1211,7 +1207,7 @@ namespace atapp {
         return NULL;
     }
 
-    LIBATAPP_MACRO_API const atapp_endpoint* app::get_endpoint(const std::string& by_name) const {
+    LIBATAPP_MACRO_API const atapp_endpoint *app::get_endpoint(const std::string &by_name) const {
         endpoint_index_by_name_t::const_iterator iter_name = endpoint_index_by_name_.find(by_name);
         if (iter_name != endpoint_index_by_name_.end()) {
             return iter_name->second.get();
@@ -1467,7 +1463,7 @@ namespace atapp {
         }
     }
 
-    LIBATAPP_MACRO_API int app::trigger_event_on_forward_request(const message_sender_t& source, const message_t &msg) {
+    LIBATAPP_MACRO_API int app::trigger_event_on_forward_request(const message_sender_t &source, const message_t &msg) {
         if (evt_on_forward_request_) {
             return evt_on_forward_request_(std::ref(*this), source, msg);
         }
@@ -1475,7 +1471,8 @@ namespace atapp {
         return 0;
     }
 
-    LIBATAPP_MACRO_API int app::trigger_event_on_forward_response(const message_sender_t& source, const message_t &msg, int32_t error_code) {
+    LIBATAPP_MACRO_API int app::trigger_event_on_forward_response(const message_sender_t &source, const message_t &msg,
+                                                                  int32_t error_code) {
         if (evt_on_forward_response_) {
             return evt_on_forward_response_(std::ref(*this), source, msg, error_code);
         }
@@ -1483,8 +1480,10 @@ namespace atapp {
         return 0;
     }
 
-    LIBATAPP_MACRO_API void app::trigger_event_on_discovery_event(etcd_discovery_action_t::type action, const etcd_discovery_node::ptr_t & node) {
-        for (std::list<std::shared_ptr<atapp_connector_impl> >::const_iterator iter = connectors_.begin(); iter != connectors_.end(); ++ iter) {
+    LIBATAPP_MACRO_API void app::trigger_event_on_discovery_event(etcd_discovery_action_t::type action,
+                                                                  const etcd_discovery_node::ptr_t &node) {
+        for (std::list<std::shared_ptr<atapp_connector_impl> >::const_iterator iter = connectors_.begin(); iter != connectors_.end();
+             ++iter) {
             if (*iter) {
                 (*iter)->on_discovery_event(action, node);
             }
@@ -2394,16 +2393,16 @@ namespace atapp {
 
     int app::command_handler_disable_etcd(util::cli::callback_param params) {
         if (!inner_module_etcd_) {
-            const char* msg = "Etcd module is not initialized, skip command.";
+            const char *msg = "Etcd module is not initialized, skip command.";
             FWLOGERROR("{}", msg);
             add_custom_command_rsp(params, msg);
         } else if (inner_module_etcd_->is_etcd_enabled()) {
             inner_module_etcd_->disable_etcd();
-            const char* msg = "Etcd context is disabled now.";
+            const char *msg = "Etcd context is disabled now.";
             FWLOGINFO("{}", msg);
             add_custom_command_rsp(params, msg);
         } else {
-            const char* msg = "Etcd context is already disabled, skip command.";
+            const char *msg = "Etcd context is already disabled, skip command.";
             FWLOGERROR("{}", msg);
             add_custom_command_rsp(params, msg);
         }
@@ -2412,20 +2411,20 @@ namespace atapp {
 
     int app::command_handler_enable_etcd(util::cli::callback_param params) {
         if (!inner_module_etcd_) {
-            const char* msg = "Etcd module not initialized, skip command.";
+            const char *msg = "Etcd module not initialized, skip command.";
             FWLOGERROR("{}", msg);
             add_custom_command_rsp(params, msg);
         } else if (inner_module_etcd_->is_etcd_enabled()) {
-            const char* msg = "Etcd context is already enabled, skip command.";
+            const char *msg = "Etcd context is already enabled, skip command.";
             FWLOGERROR("{}", msg);
             add_custom_command_rsp(params, msg);
         } else {
             inner_module_etcd_->enable_etcd();
             if (inner_module_etcd_->is_etcd_enabled()) {
-                const char* msg = "Etcd context is enabled now.";
+                const char *msg = "Etcd context is enabled now.";
                 FWLOGINFO("{}", msg);
             } else {
-                const char* msg = "Etcd context can not be enabled, maybe need configure etcd.hosts.";
+                const char *msg = "Etcd context can not be enabled, maybe need configure etcd.hosts.";
                 FWLOGERROR("{}", msg);
                 add_custom_command_rsp(params, msg);
             }
@@ -2434,8 +2433,8 @@ namespace atapp {
         return 0;
     }
 
-    int app::bus_evt_callback_on_recv_msg(const atbus::node &, const atbus::endpoint *, const atbus::connection *, const atbus::protocol::msg &msg,
-                                          const void *buffer, size_t len) {
+    int app::bus_evt_callback_on_recv_msg(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
+                                          const atbus::protocol::msg &msg, const void *buffer, size_t len) {
         if (atbus::protocol::msg::kDataTransformReq != msg.msg_body_case() || 0 == msg.head().src_bus_id()) {
             FWLOGERROR("receive a message from unknown source {} or invalid body case", msg.head().src_bus_id());
             return EN_ATBUS_ERR_BAD_DATA;
@@ -2443,14 +2442,14 @@ namespace atapp {
 
         app_id_t from_id = msg.data_transform_req().from();
         app::message_t message;
-        message.data = reinterpret_cast<const void*>(msg.data_transform_req().content().c_str());
-        message.data_size = msg.data_transform_req().content().size();
-        message.metadata = NULL;
+        message.data         = buffer;
+        message.data_size    = len;
+        message.metadata     = NULL;
         message.msg_sequence = msg.head().sequence();
-        message.type = msg.head().type();
+        message.type         = msg.head().type();
 
         app::message_sender_t sender;
-        sender.id = from_id;
+        sender.id     = from_id;
         sender.remote = get_endpoint(from_id);
         if (NULL != sender.remote) {
             sender.name = &sender.remote->get_name();
@@ -2486,22 +2485,20 @@ namespace atapp {
         if (atbus_connector_) {
             atbus_connector_->on_receive_forward_response(
                 m->data_transform_rsp().from(), m->head().type(), m->head().sequence(), m->head().ret(),
-                reinterpret_cast<const void*>(m->data_transform_rsp().content().c_str()), m->data_transform_rsp().content().size(),
-                NULL
-            );
+                reinterpret_cast<const void *>(m->data_transform_rsp().content().c_str()), m->data_transform_rsp().content().size(), NULL);
             return 0;
         }
 
         app_id_t from_id = m->data_transform_rsp().from();
         app::message_t message;
-        message.data = reinterpret_cast<const void*>(m->data_transform_rsp().content().c_str());
-        message.data_size = m->data_transform_rsp().content().size();
-        message.metadata = NULL;
+        message.data         = reinterpret_cast<const void *>(m->data_transform_rsp().content().c_str());
+        message.data_size    = m->data_transform_rsp().content().size();
+        message.metadata     = NULL;
         message.msg_sequence = m->head().sequence();
-        message.type = m->head().type();
+        message.type         = m->head().type();
 
         app::message_sender_t sender;
-        sender.id = from_id;
+        sender.id     = from_id;
         sender.remote = get_endpoint(from_id);
         if (NULL != sender.remote) {
             sender.name = &sender.remote->get_name();
@@ -2718,11 +2715,11 @@ namespace atapp {
 
         // record all protocols
         for (atapp_connector_impl::protocol_set_t::const_iterator iter = connector->get_support_protocols().begin();
-            iter != connector->get_support_protocols().end(); ++ iter
-        ) {
+             iter != connector->get_support_protocols().end(); ++iter) {
             connector_protocol_map_t::const_iterator find_iter = connector_protocols_.find(*iter);
             if (find_iter != connector_protocols_.end()) {
-                FWLOGWARNING("protocol {} is already registered by {}, we will overwrite it with {}", *iter, find_iter->second->name(), connector->name());
+                FWLOGWARNING("protocol {} is already registered by {}, we will overwrite it with {}", *iter, find_iter->second->name(),
+                             connector->name());
             }
 
             connector_protocols_[*iter] = connector;

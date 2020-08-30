@@ -80,9 +80,9 @@ namespace atapp {
         struct message_t {
             int32_t type;
             uint64_t msg_sequence;
-            const void* data;
+            const void *data;
             size_t data_size;
-            const atapp::protocol::atapp_metadata* metadata;
+            const atapp::protocol::atapp_metadata *metadata;
 
             LIBATAPP_MACRO_API message_t();
             LIBATAPP_MACRO_API ~message_t();
@@ -91,9 +91,9 @@ namespace atapp {
         };
 
         struct message_sender_t {
-            app_id_t           id;
-            const std::string* name;
-            atapp_endpoint*    remote;
+            app_id_t id;
+            const std::string *name;
+            atapp_endpoint *remote;
             LIBATAPP_MACRO_API message_sender_t();
             LIBATAPP_MACRO_API ~message_sender_t();
             LIBATAPP_MACRO_API message_sender_t(const message_sender_t &);
@@ -136,7 +136,7 @@ namespace atapp {
 #if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
         // return > 0 means busy and will enter tick again as soon as possiable
         using tick_handler_t = std::function<int()>;
-        using timer_ptr_t = std::shared_ptr<timer_info_t>;
+        using timer_ptr_t    = std::shared_ptr<timer_info_t>;
 #else
         // return > 0 means busy and will enter tick again as soon as possiable
         typedef std::function<int()> tick_handler_t;
@@ -156,14 +156,14 @@ namespace atapp {
         //    const void* data, size_t data_size, const atapp::protocol::atapp_metadata* metadata)
 
 #if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
-        using callback_fn_on_forward_request_t   = std::function<int(app &, const message_sender_t&, const message_t &m)>;
-        using callback_fn_on_forward_response_t  = std::function<int(app &, const message_sender_t&, const message_t &m, int32_t)>;
+        using callback_fn_on_forward_request_t   = std::function<int(app &, const message_sender_t &, const message_t &m)>;
+        using callback_fn_on_forward_response_t  = std::function<int(app &, const message_sender_t &, const message_t &m, int32_t)>;
         using callback_fn_on_connected_t         = std::function<int(app &, atbus::endpoint &, int)>;
         using callback_fn_on_disconnected_t      = std::function<int(app &, atbus::endpoint &, int)>;
         using callback_fn_on_all_module_inited_t = std::function<int(app &)>;
 #else
-        typedef std::function<int(app &, const message_sender_t&, const message_t &m)> callback_fn_on_forward_request_t;
-        typedef std::function<int(app &, const message_sender_t&, const message_t &m, int32_t)> callback_fn_on_forward_response_t;
+        typedef std::function<int(app &, const message_sender_t &, const message_t &m)> callback_fn_on_forward_request_t;
+        typedef std::function<int(app &, const message_sender_t &, const message_t &m, int32_t)> callback_fn_on_forward_response_t;
         typedef std::function<int(app &, atbus::endpoint &, int)> callback_fn_on_connected_t;
         typedef std::function<int(app &, atbus::endpoint &, int)> callback_fn_on_disconnected_t;
         typedef std::function<int(app &)> callback_fn_on_all_module_inited_t;
@@ -304,9 +304,9 @@ namespace atapp {
 
         LIBATAPP_MACRO_API void pack(atapp::protocol::atapp_discovery &out) const;
 
-        LIBATAPP_MACRO_API std::shared_ptr<::atapp::etcd_module> get_etcd_module() const;
+        LIBATAPP_MACRO_API std::shared_ptr< ::atapp::etcd_module> get_etcd_module() const;
 
-        LIBATAPP_MACRO_API uint32_t get_address_type(const std::string& addr) const;
+        LIBATAPP_MACRO_API uint32_t get_address_type(const std::string &addr) const;
 
         /**
          * @brief add log sink maker, this function allow user to add custom log sink from the configure of atapp
@@ -325,17 +325,18 @@ namespace atapp {
         LIBATAPP_MACRO_API const callback_fn_on_disconnected_t &get_evt_on_app_disconnected() const;
         LIBATAPP_MACRO_API const callback_fn_on_all_module_inited_t &get_evt_on_all_module_inited() const;
 
-        LIBATAPP_MACRO_API bool add_endpoint_waker(util::time::time_utility::raw_time_t wakeup_time, const atapp_endpoint::weak_ptr_t& ep_watcher);
+        LIBATAPP_MACRO_API bool add_endpoint_waker(util::time::time_utility::raw_time_t wakeup_time,
+                                                   const atapp_endpoint::weak_ptr_t &ep_watcher);
         LIBATAPP_MACRO_API void remove_endpoint(uint64_t by_id);
-        LIBATAPP_MACRO_API void remove_endpoint(const std::string& by_name);
-        LIBATAPP_MACRO_API void remove_endpoint(const atapp_endpoint::ptr_t& enpoint);
-        LIBATAPP_MACRO_API atapp_endpoint::ptr_t mutable_endpoint(const etcd_discovery_node::ptr_t& discovery);
-        LIBATAPP_MACRO_API atapp_endpoint* get_endpoint(uint64_t by_id);
-        LIBATAPP_MACRO_API const atapp_endpoint* get_endpoint(uint64_t by_id) const;
-        LIBATAPP_MACRO_API atapp_endpoint* get_endpoint(const std::string& by_name);
-        LIBATAPP_MACRO_API const atapp_endpoint* get_endpoint(const std::string& by_name) const;
+        LIBATAPP_MACRO_API void remove_endpoint(const std::string &by_name);
+        LIBATAPP_MACRO_API void remove_endpoint(const atapp_endpoint::ptr_t &enpoint);
+        LIBATAPP_MACRO_API atapp_endpoint::ptr_t mutable_endpoint(const etcd_discovery_node::ptr_t &discovery);
+        LIBATAPP_MACRO_API atapp_endpoint *get_endpoint(uint64_t by_id);
+        LIBATAPP_MACRO_API const atapp_endpoint *get_endpoint(uint64_t by_id) const;
+        LIBATAPP_MACRO_API atapp_endpoint *get_endpoint(const std::string &by_name);
+        LIBATAPP_MACRO_API const atapp_endpoint *get_endpoint(const std::string &by_name) const;
 
-        template<class TCONNECTOR>
+        template <class TCONNECTOR>
         LIBATAPP_MACRO_API_HEAD_ONLY std::shared_ptr<TCONNECTOR> add_connector() {
             std::shared_ptr<TCONNECTOR> ret = std::make_shared<TCONNECTOR>(*this);
             if (ret) {
@@ -391,8 +392,8 @@ namespace atapp {
         /**
          * @brief get last instance
          * @note This API is not thread-safety and only usageful when there is only one app instance.
-         *       If libatapp is built as static library, this API should only be used when only linked into one executable or dynamic library.
-         *       You should build libatapp as dynamic library when linked into more than one target.
+         *       If libatapp is built as static library, this API should only be used when only linked into one executable or dynamic
+         * library. You should build libatapp as dynamic library when linked into more than one target.
          */
         static LIBATAPP_MACRO_API app *get_last_instance();
 
@@ -417,8 +418,8 @@ namespace atapp {
         int command_handler_enable_etcd(util::cli::callback_param params);
 
     private:
-        int bus_evt_callback_on_recv_msg(const atbus::node &, const atbus::endpoint *, const atbus::connection *, const atbus::protocol::msg &,
-                                         const void *, size_t);
+        int bus_evt_callback_on_recv_msg(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
+                                         const atbus::protocol::msg &, const void *, size_t);
         int bus_evt_callback_on_forward_response(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
                                                  const atbus::protocol::msg *m);
         int bus_evt_callback_on_error(const atbus::node &, const atbus::endpoint *, const atbus::connection *, int, int);
@@ -439,8 +440,8 @@ namespace atapp {
         static void _app_setup_signal_term(int signo);
 
     public:
-        LIBATAPP_MACRO_API int trigger_event_on_forward_request(const message_sender_t& source, const message_t &msg);
-        LIBATAPP_MACRO_API int trigger_event_on_forward_response(const message_sender_t& source, const message_t &msg, int32_t error_code);
+        LIBATAPP_MACRO_API int trigger_event_on_forward_request(const message_sender_t &source, const message_t &msg);
+        LIBATAPP_MACRO_API int trigger_event_on_forward_response(const message_sender_t &source, const message_t &msg, int32_t error_code);
         LIBATAPP_MACRO_API void trigger_event_on_discovery_event(etcd_discovery_action_t::type, const etcd_discovery_node::ptr_t &);
 
     private:

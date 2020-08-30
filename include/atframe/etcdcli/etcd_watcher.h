@@ -34,7 +34,6 @@ namespace atapp {
 
     class etcd_watcher {
     public:
-    
         struct LIBATAPP_MACRO_API_HEAD_ONLY event_t {
             etcd_watch_event::type evt_type;
             etcd_key_value kv;

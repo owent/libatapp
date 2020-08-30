@@ -27,9 +27,9 @@
 #include <atframe/atapp_module_impl.h>
 
 #include <atframe/etcdcli/etcd_cluster.h>
+#include <atframe/etcdcli/etcd_discovery.h>
 #include <atframe/etcdcli/etcd_keepalive.h>
 #include <atframe/etcdcli/etcd_watcher.h>
-#include <atframe/etcdcli/etcd_discovery.h>
 
 namespace atapp {
     class etcd_module : public ::atapp::module_impl {
@@ -151,10 +151,11 @@ namespace atapp {
         LIBATAPP_MACRO_API atapp::etcd_keepalive::ptr_t add_keepalive_actor(std::string &val, const std::string &node_path);
 
         LIBATAPP_MACRO_API node_event_callback_handle_t add_on_node_discovery_event(node_event_callback_t fn);
-        LIBATAPP_MACRO_API void remove_on_node_event(node_event_callback_handle_t& handle);
+        LIBATAPP_MACRO_API void remove_on_node_event(node_event_callback_handle_t &handle);
 
-        LIBATAPP_MACRO_API etcd_discovery_set& get_global_discovery();
-        LIBATAPP_MACRO_API const etcd_discovery_set& get_global_discovery() const;
+        LIBATAPP_MACRO_API etcd_discovery_set &get_global_discovery();
+        LIBATAPP_MACRO_API const etcd_discovery_set &get_global_discovery() const;
+
     private:
         static bool unpack(node_info_t &out, const std::string &path, const std::string &json, bool reset_data);
         static void pack(const node_info_t &out, std::string &json);
@@ -177,8 +178,9 @@ namespace atapp {
             void operator()(const ::atapp::etcd_response_header &header, const ::atapp::etcd_watcher::response_t &evt_data);
         };
 
-        bool update_inner_watcher_event(node_info_t& node);
+        bool update_inner_watcher_event(node_info_t &node);
         void reset_inner_watchers_and_keepalives();
+
     private:
         std::string conf_path_cache_;
         std::string custom_data_;
