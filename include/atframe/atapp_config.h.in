@@ -54,3 +54,5 @@
 #if !defined(LIBATAPP_MACRO_API_SYMBOL_HIDDEN)
 #define LIBATAPP_MACRO_API_SYMBOL_HIDDEN
 #endif
+
+#endif
