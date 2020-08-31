@@ -16,8 +16,7 @@ namespace atapp {
         LIBATAPP_MACRO_API virtual ~atapp_connector_atbus();
         LIBATAPP_MACRO_API virtual const char *name() UTIL_CONFIG_NOEXCEPT UTIL_CONFIG_OVERRIDE;
         LIBATAPP_MACRO_API virtual uint32_t get_address_type(const atbus::channel::channel_address_t &addr) const UTIL_CONFIG_OVERRIDE;
-        LIBATAPP_MACRO_API virtual int32_t on_start_listen(const etcd_discovery_node *discovery,
-                                                           const atbus::channel::channel_address_t &addr) UTIL_CONFIG_OVERRIDE;
+        LIBATAPP_MACRO_API virtual int32_t on_start_listen(const atbus::channel::channel_address_t &addr) UTIL_CONFIG_OVERRIDE;
         LIBATAPP_MACRO_API virtual int32_t on_start_connect(const etcd_discovery_node *discovery,
                                                             const atbus::channel::channel_address_t &addr,
                                                             const atapp_connection_handle::ptr_t &handle) UTIL_CONFIG_OVERRIDE;

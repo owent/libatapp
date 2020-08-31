@@ -62,7 +62,7 @@ namespace atapp {
         return l->get_discovery_info().name() < r->get_discovery_info().name();
     }
 
-    LIBATAPP_MACRO_API etcd_discovery_node::etcd_discovery_node() : name_hash_(0, 0) {
+    LIBATAPP_MACRO_API etcd_discovery_node::etcd_discovery_node() : name_hash_(0, 0), ingress_address_index_(0) {
         private_data_ptr_  = NULL;
         private_data_u64_  = 0;
         private_data_uptr_ = 0;
@@ -83,6 +83,33 @@ namespace atapp {
     LIBATAPP_MACRO_API void etcd_discovery_node::set_on_destroy(on_destroy_fn_t fn) { on_destroy_fn_ = fn; }
 
     LIBATAPP_MACRO_API const etcd_discovery_node::on_destroy_fn_t &etcd_discovery_node::get_on_destroy() const { return on_destroy_fn_; }
+
+    LIBATAPP_MACRO_API const std::string& etcd_discovery_node::next_ingress_address() const {
+        if (node_info_.gateway_size() > 0) {
+            if (ingress_address_index_ > node_info_.gateway_size()) {
+                ingress_address_index_ %= node_info_.gateway_size();
+            }
+            return node_info_.gateway(ingress_address_index_ ++);
+        }
+
+        if (node_info_.listen_size() > 0) {
+            if (ingress_address_index_ > node_info_.listen_size()) {
+                ingress_address_index_ %= node_info_.listen_size();
+            }
+            return node_info_.listen(ingress_address_index_ ++);
+        }
+
+        static std::string empty;
+        return empty;
+    }
+
+    LIBATAPP_MACRO_API int32_t etcd_discovery_node::get_ingress_size() const {
+        if (node_info_.gateway_size() > 0)  {
+            return node_info_.gateway_size();
+        }
+
+        return node_info_.listen_size();
+    }
 
     LIBATAPP_MACRO_API etcd_discovery_set::etcd_discovery_set() {
         random_generator_.init_seed(static_cast<util::random::xoshiro256_starstar::result_type>(util::time::time_utility::get_now()));

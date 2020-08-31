@@ -37,8 +37,7 @@ namespace atapp {
         return ret;
     }
 
-    LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_start_listen(const etcd_discovery_node *,
-                                                                      const atbus::channel::channel_address_t &addr) {
+    LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_start_listen(const atbus::channel::channel_address_t &addr) {
         if (NULL == get_owner()) {
             return EN_ATAPP_ERR_NOT_INITED;
         }

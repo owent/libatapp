@@ -7,6 +7,7 @@
 #include <string>
 
 #include <config/compiler_features.h>
+#include <config/compile_optimize.h>
 
 #include <design_pattern/nomovable.h>
 #include <design_pattern/noncopyable.h>
@@ -26,7 +27,12 @@ namespace atapp {
 
     class atapp_connector_impl;
 
-    struct atapp_connector_bind_helper;
+    struct atapp_connector_bind_helper {
+        // This API is used by inner system and will not be exported, do not call it directly
+        static LIBATAPP_MACRO_API_SYMBOL_HIDDEN void unbind(atapp_connection_handle &handle, atapp_connector_impl &connect);
+        // This API is used by inner system and will not be exported, do not call it directly
+        static LIBATAPP_MACRO_API_SYMBOL_HIDDEN void bind(atapp_connection_handle &handle, atapp_connector_impl &connect);
+    };
 
     class atapp_connection_handle {
     public:
@@ -138,8 +144,7 @@ namespace atapp {
          * @note just return non-zero when something wrong happend and this listen address will not be used
          * @return 0 or error code
          */
-        LIBATAPP_MACRO_API virtual int32_t on_start_listen(const etcd_discovery_node *discovery,
-                                                           const atbus::channel::channel_address_t &addr);
+        LIBATAPP_MACRO_API virtual int32_t on_start_listen(const atbus::channel::channel_address_t &addr);
 
         /**
          * @brief callback for listen

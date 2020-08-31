@@ -44,4 +44,13 @@
 
 #cmakedefine01 LIBATAPP_ENABLE_CUSTOM_COUNT_FOR_STD_LIST
 
+
+// ================ import/export: for compilers ================
+#if defined(__GNUC__) && !defined(__ibmxl__)
+#if __GNUC__ >= 4 && !(defined(_WIN32) || defined(__WIN32__) || defined(WIN32) || defined(__CYGWIN__))
+#define LIBATAPP_MACRO_API_SYMBOL_HIDDEN __attribute__((__visibility__("hidden")))
+#endif
+#endif
+#if !defined(LIBATAPP_MACRO_API_SYMBOL_HIDDEN)
+#define LIBATAPP_MACRO_API_SYMBOL_HIDDEN
 #endif

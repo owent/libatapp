@@ -7,38 +7,36 @@
 
 namespace atapp {
 
-    struct atapp_connector_bind_helper {
-        static void unbind(atapp_connection_handle &handle, atapp_connector_impl &connect) {
-            bool need_trigger = false;
-            if (handle.connector_ == &connect) {
-                handle.connector_ = NULL;
-                need_trigger      = true;
-            }
-            connect.handles_.erase(&handle);
+    LIBATAPP_MACRO_API_SYMBOL_HIDDEN void atapp_connector_bind_helper::unbind(atapp_connection_handle &handle, atapp_connector_impl &connect) {
+        bool need_trigger = false;
+        if (handle.connector_ == &connect) {
+            handle.connector_ = NULL;
+            need_trigger      = true;
+        }
+        connect.handles_.erase(&handle);
 
-            if (need_trigger) {
-                // It's safe to recall close after set handle.connector_ = NULL
-                handle.close();
+        if (need_trigger) {
+            // It's safe to recall close after set handle.connector_ = NULL
+            handle.close();
 
-                connect.on_close_connect(handle);
-            }
+            connect.on_close_connect(handle);
+        }
+    }
+
+    LIBATAPP_MACRO_API_SYMBOL_HIDDEN void atapp_connector_bind_helper::bind(atapp_connection_handle &handle, atapp_connector_impl &connect) {
+        if (handle.connector_ == &connect) {
+            return;
         }
 
-        static void bind(atapp_connection_handle &handle, atapp_connector_impl &connect) {
-            if (handle.connector_ == &connect) {
-                return;
-            }
-
-            if (NULL != handle.connector_) {
-                unbind(handle, *handle.connector_);
-            }
-
-            handle.connector_ = &connect;
-            connect.handles_.insert(&handle);
+        if (NULL != handle.connector_) {
+            unbind(handle, *handle.connector_);
         }
-    };
 
-    void atapp_endpoint_bind_helper::unbind(atapp_connection_handle &handle, atapp_endpoint &endpoint) {
+        handle.connector_ = &connect;
+        connect.handles_.insert(&handle);
+    }
+
+    LIBATAPP_MACRO_API_SYMBOL_HIDDEN void atapp_endpoint_bind_helper::unbind(atapp_connection_handle &handle, atapp_endpoint &endpoint) {
         if (endpoint.refer_connections_.erase(&handle) > 0) {
             if (endpoint.refer_connections_.empty()) {
                 if (NULL != endpoint.owner_) {
@@ -54,7 +52,7 @@ namespace atapp {
         }
     }
 
-    void atapp_endpoint_bind_helper::bind(atapp_connection_handle &handle, atapp_endpoint &endpoint) {
+    LIBATAPP_MACRO_API_SYMBOL_HIDDEN void atapp_endpoint_bind_helper::bind(atapp_connection_handle &handle, atapp_endpoint &endpoint) {
         if (handle.endpiont_ == &endpoint) {
             return;
         }
@@ -156,8 +154,7 @@ namespace atapp {
         support_protocols_.insert(name);
     }
 
-    LIBATAPP_MACRO_API int32_t atapp_connector_impl::on_start_listen(const etcd_discovery_node *,
-                                                                     const atbus::channel::channel_address_t &) {
+    LIBATAPP_MACRO_API int32_t atapp_connector_impl::on_start_listen(const atbus::channel::channel_address_t &) {
         return EN_ATBUS_ERR_CHANNEL_NOT_SUPPORT;
     }
 

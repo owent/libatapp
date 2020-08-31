@@ -32,9 +32,9 @@ namespace atapp {
 
     struct atapp_endpoint_bind_helper {
         // This API is used by inner system and will not be exported, do not call it directly
-        static void unbind(atapp_connection_handle &handle, atapp_endpoint &connect);
+        static LIBATAPP_MACRO_API_SYMBOL_HIDDEN void unbind(atapp_connection_handle &handle, atapp_endpoint &connect);
         // This API is used by inner system and will not be exported, do not call it directly
-        static void bind(atapp_connection_handle &handle, atapp_endpoint &connect);
+        static LIBATAPP_MACRO_API_SYMBOL_HIDDEN void bind(atapp_connection_handle &handle, atapp_endpoint &connect);
     };
 
     class atapp_endpoint {

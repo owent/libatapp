@@ -70,6 +70,7 @@ namespace atapp {
         EN_ATAPP_ERR_LOAD_CONFIGURE_FILE    = -1007,
         EN_ATAPP_ERR_SETUP_ATBUS            = -1101,
         EN_ATAPP_ERR_SEND_FAILED            = -1102,
+        EN_ATAPP_ERR_DISCOVERY_DISABLED     = -1103,
         EN_ATAPP_ERR_COMMAND_IS_NULL        = -1801,
         EN_ATAPP_ERR_NO_AVAILABLE_ADDRESS   = -1802,
         EN_ATAPP_ERR_CONNECT_ATAPP_FAILED   = -1803,

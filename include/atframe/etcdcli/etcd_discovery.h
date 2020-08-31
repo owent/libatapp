@@ -67,6 +67,8 @@ namespace atapp {
         LIBATAPP_MACRO_API void set_on_destroy(on_destroy_fn_t fn);
         LIBATAPP_MACRO_API const on_destroy_fn_t &get_on_destroy() const;
 
+        LIBATAPP_MACRO_API const std::string& next_ingress_address() const;
+        LIBATAPP_MACRO_API int32_t get_ingress_size() const;
     private:
         atapp::protocol::atapp_discovery node_info_;
         std::pair<uint64_t, uint64_t> name_hash_;
@@ -78,6 +80,7 @@ namespace atapp {
             intptr_t private_data_iptr_;
         };
         on_destroy_fn_t on_destroy_fn_;
+        mutable int32_t ingress_address_index_;
     };
 
     class etcd_discovery_set {
