@@ -63,6 +63,13 @@ namespace atapp {
 
         handle.endpiont_ = &endpoint;
         endpoint.refer_connections_.insert(&handle);
+
+        if (handle.is_ready()) {
+            app *owner = endpoint.get_owner();
+            if (NULL != owner) {
+                endpoint.add_waker(owner->get_last_tick_time());
+            }
+        }
     }
 
     LIBATAPP_MACRO_API atapp_connection_handle::atapp_connection_handle() : flags_(0), connector_(NULL), endpiont_(NULL) {

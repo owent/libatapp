@@ -901,6 +901,18 @@ namespace atapp {
     LIBATAPP_MACRO_API std::shared_ptr<atbus::node> app::get_bus_node() { return bus_node_; }
     LIBATAPP_MACRO_API const std::shared_ptr<atbus::node> app::get_bus_node() const { return bus_node_; }
 
+    LIBATAPP_MACRO_API void app::enable_fallback_to_atbus_connector() {
+        set_flag(flag_t::DISABLE_ATBUS_FALLBACK, false);
+    }
+
+    LIBATAPP_MACRO_API void app::disable_fallback_to_atbus_connector() {
+        set_flag(flag_t::DISABLE_ATBUS_FALLBACK, true);
+    }
+
+    LIBATAPP_MACRO_API bool app::is_fallback_to_atbus_connector_enabled() const {
+        return !check_flag(flag_t::DISABLE_ATBUS_FALLBACK);
+    }
+
     LIBATAPP_MACRO_API util::time::time_utility::raw_time_t app::get_last_tick_time() const { return tick_timer_.sec_update; }
 
     LIBATAPP_MACRO_API util::config::ini_loader &app::get_configure_loader() { return cfg_loader_; }
@@ -1065,10 +1077,13 @@ namespace atapp {
         } while (false);
 
         // Fallback to old atbus connector
+        if (check_flag(flag_t::DISABLE_ATBUS_FALLBACK)) {
+            return EN_ATBUS_ERR_ATNODE_NOT_FOUND;
+        }
         if (!bus_node_) {
             return EN_ATAPP_ERR_NOT_INITED;
         }
-        
+
         return bus_node_->send_data(target_node_id, type, data, data_size, msg_sequence);
     }
 
@@ -2135,7 +2150,7 @@ namespace atapp {
 
         // init listen
         for (int i = 0; i < conf_.origin.bus().listen_size(); ++i) {
-            res = connection_node->listen(conf_.origin.bus().listen(i).c_str());
+            res = listen(conf_.origin.bus().listen(i));
             if (res < 0) {
 #ifdef _WIN32
                 if (EN_ATBUS_ERR_SHM_GET_FAILED == res) {

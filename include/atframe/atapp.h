@@ -73,6 +73,7 @@ namespace atapp {
                 RESET_TIMER,
                 INITIALIZED,
                 STOPPED,
+                DISABLE_ATBUS_FALLBACK,
                 FLAG_MAX
             };
         };
@@ -276,6 +277,10 @@ namespace atapp {
 
         LIBATAPP_MACRO_API std::shared_ptr<atbus::node> get_bus_node();
         LIBATAPP_MACRO_API const std::shared_ptr<atbus::node> get_bus_node() const;
+
+        LIBATAPP_MACRO_API void enable_fallback_to_atbus_connector();
+        LIBATAPP_MACRO_API void disable_fallback_to_atbus_connector();
+        LIBATAPP_MACRO_API bool is_fallback_to_atbus_connector_enabled() const;
 
         LIBATAPP_MACRO_API util::time::time_utility::raw_time_t get_last_tick_time() const;
 

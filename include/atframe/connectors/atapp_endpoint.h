@@ -89,6 +89,7 @@ namespace atapp {
         LIBATAPP_MACRO_API int32_t retry_pending_messages(const util::time::time_utility::raw_time_t &tick_time, int32_t max_count = 0);
         LIBATAPP_MACRO_API void add_waker(util::time::time_utility::raw_time_t wakeup_time);
 
+        UTIL_FORCEINLINE app * get_owner() const UTIL_CONFIG_NOEXCEPT { return owner_; }
     private:
         void reset();
         void cancel_pending_messages();
