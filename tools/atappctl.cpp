@@ -24,22 +24,22 @@ static void _log_sink_stdout_handle(const util::log::log_wrapper::caller_info_t 
 
 class atappctl_module : public atapp::module_impl {
 public:
-    virtual int init() {
+    virtual int init() UTIL_CONFIG_OVERRIDE {
         WLOG_GETCAT(util::log::log_wrapper::categorize_t::DEFAULT)->add_sink(_log_sink_stdout_handle);
         WLOG_GETCAT(util::log::log_wrapper::categorize_t::DEFAULT)
             ->set_stacktrace_level(util::log::log_formatter::level_t::LOG_LW_DISABLED, util::log::log_formatter::level_t::LOG_LW_DISABLED);
         return 0;
     };
 
-    virtual int reload() { return 0; }
+    virtual int reload() UTIL_CONFIG_OVERRIDE { return 0; }
 
-    virtual int stop() { return 0; }
+    virtual int stop() UTIL_CONFIG_OVERRIDE { return 0; }
 
-    virtual int timeout() { return 0; }
+    virtual int timeout() UTIL_CONFIG_OVERRIDE { return 0; }
 
-    virtual const char *name() const { return "atappctl_module"; }
+    virtual const char *name() const UTIL_CONFIG_OVERRIDE { return "atappctl_module"; }
 
-    virtual int tick() { return 0; }
+    virtual int tick() UTIL_CONFIG_OVERRIDE { return 0; }
 };
 
 static int app_handle_on_msg(atapp::app &, const atapp::app::message_sender_t &source, const atapp::app::message_t &msg) {
