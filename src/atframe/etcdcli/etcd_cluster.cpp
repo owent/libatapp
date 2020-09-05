@@ -1676,6 +1676,10 @@ namespace atapp {
         handle = event_on_up_callbacks_.end();
     }
 
+    LIBATAPP_MACRO_API void etcd_cluster::reset_on_event_up_handle(on_event_up_down_handle_t &handle) {
+        handle = event_on_up_callbacks_.end();
+    }
+
     LIBATAPP_MACRO_API etcd_cluster::on_event_up_down_handle_t etcd_cluster::add_on_event_down(on_event_up_down_fn_t fn,
                                                                                                bool trigger_if_not_running) {
         if (!fn) {
@@ -1695,6 +1699,10 @@ namespace atapp {
         }
 
         event_on_down_callbacks_.erase(handle);
+        handle = event_on_down_callbacks_.end();
+    }
+
+    LIBATAPP_MACRO_API void etcd_cluster::reset_on_event_down_handle(on_event_up_down_handle_t &handle) {
         handle = event_on_down_callbacks_.end();
     }
 

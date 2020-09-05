@@ -357,9 +357,11 @@ namespace atapp {
 
         LIBATAPP_MACRO_API on_event_up_down_handle_t add_on_event_up(on_event_up_down_fn_t fn, bool trigger_if_running = false);
         LIBATAPP_MACRO_API void remove_on_event_up(on_event_up_down_handle_t &handle);
+        LIBATAPP_MACRO_API void reset_on_event_up_handle(on_event_up_down_handle_t &handle);
 
         LIBATAPP_MACRO_API on_event_up_down_handle_t add_on_event_down(on_event_up_down_fn_t fn, bool trigger_if_not_running = false);
         LIBATAPP_MACRO_API void remove_on_event_down(on_event_up_down_handle_t &handle);
+        LIBATAPP_MACRO_API void reset_on_event_down_handle(on_event_up_down_handle_t &handle);
 
     private:
 #if defined(UTIL_CONFIG_COMPILER_CXX_RVALUE_REFERENCES) && UTIL_CONFIG_COMPILER_CXX_RVALUE_REFERENCES
