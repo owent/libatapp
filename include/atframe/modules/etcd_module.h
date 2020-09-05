@@ -150,6 +150,8 @@ namespace atapp {
 
         LIBATAPP_MACRO_API atapp::etcd_keepalive::ptr_t add_keepalive_actor(std::string &val, const std::string &node_path);
 
+        LIBATAPP_MACRO_API bool remove_keepalive_actor(const atapp::etcd_keepalive::ptr_t &keepalive);
+
         LIBATAPP_MACRO_API node_event_callback_handle_t add_on_node_discovery_event(node_event_callback_t fn);
         LIBATAPP_MACRO_API void remove_on_node_event(node_event_callback_handle_t &handle);
 

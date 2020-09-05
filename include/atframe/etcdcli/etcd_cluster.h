@@ -95,6 +95,7 @@ namespace atapp {
             std::chrono::system_clock::time_point keepalive_next_update_time;
             std::chrono::system_clock::duration keepalive_timeout;
             std::chrono::system_clock::duration keepalive_interval;
+            size_t keepalive_retry_times;
 
             // SSL configure
             // @see https://github.com/etcd-io/etcd/blob/master/Documentation/op-guide/security.md for detail
@@ -211,6 +212,9 @@ namespace atapp {
         UTIL_FORCEINLINE void set_conf_keepalive_interval(std::chrono::system_clock::duration v) { conf_.keepalive_interval = v; }
         UTIL_FORCEINLINE void set_conf_keepalive_interval_sec(time_t v) { set_conf_keepalive_interval(std::chrono::seconds(v)); }
         UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_keepalive_interval() const { return conf_.keepalive_interval; }
+
+        UTIL_FORCEINLINE void set_conf_keepalive_retry_times(size_t v) { conf_.keepalive_retry_times = v; }
+        UTIL_FORCEINLINE size_t get_conf_keepalive_retry_times() const { return conf_.keepalive_retry_times; }
 
         UTIL_FORCEINLINE void set_conf_ssl_enable_alpn(bool v) { conf_.ssl_enable_alpn = v; }
         UTIL_FORCEINLINE bool get_conf_ssl_enable_alpn() const { return conf_.ssl_enable_alpn; }

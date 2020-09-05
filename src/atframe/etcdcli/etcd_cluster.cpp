@@ -193,6 +193,7 @@ namespace atapp {
         conf_.keepalive_next_update_time = std::chrono::system_clock::from_time_t(0);
         conf_.keepalive_timeout          = std::chrono::seconds(16);
         conf_.keepalive_interval         = std::chrono::seconds(5);
+        conf_.keepalive_retry_times      = 8;
 
         conf_.ssl_enable_alpn = true;
         conf_.ssl_verify_peer = false;
@@ -321,6 +322,7 @@ namespace atapp {
         conf_.keepalive_next_update_time = std::chrono::system_clock::from_time_t(0);
         conf_.keepalive_timeout          = std::chrono::seconds(16);
         conf_.keepalive_interval         = std::chrono::seconds(5);
+        conf_.keepalive_retry_times      = 8;
 
         conf_.ssl_enable_alpn = true;
         conf_.ssl_verify_peer = false;
@@ -657,60 +659,76 @@ namespace atapp {
             return;
         }
 
+        etcd_keepalive_deletor *delete_old_deletor = NULL;
+
         {
             etcd_keepalive_deletor_map_t::iterator iter = keepalive_deletors_.find(keepalive_deletor->path);
             if (iter != keepalive_deletors_.end()) {
-                etcd_keepalive_deletor *delete_deletor = iter->second;
-                keepalive_deletors_.erase(iter);
+                delete_old_deletor = iter->second;
 
-                delete_keepalive_deletor(delete_deletor, true);
+                if (delete_old_deletor == keepalive_deletor) {
+                    delete_old_deletor = NULL;
+                }
+
+                keepalive_deletors_.erase(iter);
             }
         }
 
-        if (delay_delete) {
-            // insert and retry later
-            keepalive_deletors_[keepalive_deletor->path] = keepalive_deletor;
-            return;
-        }
+        do {
+            if (delay_delete) {
+                // insert and retry later
+                keepalive_deletors_[keepalive_deletor->path] = keepalive_deletor;
+                break;
+            }
 
-        keepalive_deletor->owner = this;
+            keepalive_deletor->owner = this;
 
-        ++keepalive_deletor->retry_times;
-        // retry at most 5 times
-        if (keepalive_deletor->retry_times > 8) {
-            FWLOGERROR("Etcd cluster try to delete keepalive {} path {} too many times, skip to retry again.",
-                       keepalive_deletor->keepalive_addr, keepalive_deletor->path);
-            delete_keepalive_deletor(keepalive_deletor, true);
-            return;
-        }
+            ++keepalive_deletor->retry_times;
+            // retry at most 5 times
+            size_t max_retry_times = conf_.keepalive_retry_times;
+            if (0 == max_retry_times) {
+                max_retry_times = 8;
+            }
+            if (keepalive_deletor->retry_times > max_retry_times) {
+                FWLOGERROR("Etcd cluster try to delete keepalive {} path {} too many times, skip to retry again.",
+                           keepalive_deletor->keepalive_addr, keepalive_deletor->path);
+                delete_keepalive_deletor(keepalive_deletor, true);
+                break;
+            }
 
-        util::network::http_request::ptr_t rpc = create_request_kv_del(keepalive_deletor->path, "+1");
-        if (!rpc) {
-            FWLOGERROR("Etcd cluster create delete keepalive {} path request to {} failed", keepalive_deletor->keepalive_addr,
-                       keepalive_deletor->path);
+            util::network::http_request::ptr_t rpc = create_request_kv_del(keepalive_deletor->path, "+1");
+            if (!rpc) {
+                FWLOGERROR("Etcd cluster create delete keepalive {} path request to {} failed", keepalive_deletor->keepalive_addr,
+                           keepalive_deletor->path);
 
-            // insert and retry later
-            keepalive_deletors_[keepalive_deletor->path] = keepalive_deletor;
-            return;
-        }
+                // insert and retry later
+                keepalive_deletors_[keepalive_deletor->path] = keepalive_deletor;
+                break;
+            }
 
-        keepalive_deletor->rpc = rpc;
-        rpc->set_on_complete(etcd_cluster::libcurl_callback_on_remove_keepalive_path);
-        rpc->set_priv_data(keepalive_deletor);
+            keepalive_deletor->rpc = rpc;
+            rpc->set_on_complete(etcd_cluster::libcurl_callback_on_remove_keepalive_path);
+            rpc->set_priv_data(keepalive_deletor);
 
-        int res = rpc->start(util::network::http_request::method_t::EN_MT_POST, false);
-        if (res != 0) {
-            FWLOGERROR("Etcd cluster start delete keepalive {} request to {} failed, res: {}", reinterpret_cast<const void *>(this),
-                       rpc->get_url(), res);
-            rpc->set_on_complete(NULL);
-            rpc->set_priv_data(NULL);
-            keepalive_deletor->rpc.reset();
+            int res = rpc->start(util::network::http_request::method_t::EN_MT_POST, false);
+            if (res != 0) {
+                FWLOGERROR("Etcd cluster start delete keepalive {} request to {} failed, res: {}", reinterpret_cast<const void *>(this),
+                           rpc->get_url(), res);
+                rpc->set_on_complete(NULL);
+                rpc->set_priv_data(NULL);
+                keepalive_deletor->rpc.reset();
 
-            // insert and retry later
-            keepalive_deletors_[keepalive_deletor->path] = keepalive_deletor;
-        } else {
-            FWLOGDEBUG("Etcd cluster start delete keepalive {} request to {} success", reinterpret_cast<const void *>(this),
-                       rpc->get_url());
+                // insert and retry later
+                keepalive_deletors_[keepalive_deletor->path] = keepalive_deletor;
+            } else {
+                FWLOGDEBUG("Etcd cluster start delete keepalive {} request to {} success", reinterpret_cast<const void *>(this),
+                           rpc->get_url());
+            }
+
+        } while (false);
+
+        if (NULL != delete_old_deletor) {
+            delete_keepalive_deletor(delete_old_deletor, true);
         }
     } // namespace atapp
 

@@ -315,9 +315,6 @@ namespace atapp {
             return 0;
         }
 
-
-        // if (!watcher_by_name_callbacks_.empty()) {}
-        // if (!watcher_by_id_callbacks_.empty()) {}
         // 内置有按type id或按type name watch
         for (int i = 0; i < conf.watcher().by_type_id_size(); ++i) {
             uint64_t type_id = conf.watcher().by_type_id(i);
@@ -812,6 +809,14 @@ namespace atapp {
         }
 
         return ret;
+    }
+
+    LIBATAPP_MACRO_API bool etcd_module::remove_keepalive_actor(const atapp::etcd_keepalive::ptr_t &keepalive) {
+        if (!keepalive) {
+            return false;
+        }
+
+        return etcd_ctx_.remove_keepalive(keepalive);
     }
 
     LIBATAPP_MACRO_API etcd_module::node_event_callback_handle_t etcd_module::add_on_node_discovery_event(node_event_callback_t fn) {
