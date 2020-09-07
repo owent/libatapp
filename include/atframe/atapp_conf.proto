@@ -1,27 +1,38 @@
 syntax = "proto3";
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/descriptor.proto";
 
 import "libatbus_protocol.proto";
 
 package atapp.protocol;
 
+message atapp_configure_meta {
+    string default_value = 1;
+    string min_value     = 2;
+    string max_value     = 3;
+}
+
+extend google.protobuf.FieldOptions {
+    atapp_configure_meta CONFIGURE = 3270; // 自定义配置
+}
+
 message atbus_configure {
     repeated string listen                  = 101;
     repeated string subnets                 = 102;
     string          proxy                   = 103;
-    int32           loop_times              = 104;
-    int32           ttl                     = 105;
-    int32           backlog                 = 106;
+    int32           loop_times              = 104 [ (atapp.protocol.CONFIGURE) = {default_value : "1000"} ];
+    int32           ttl                     = 105 [ (atapp.protocol.CONFIGURE) = {default_value : "16"} ];
+    int32           backlog                 = 106 [ (atapp.protocol.CONFIGURE) = {default_value : "256"} ];
     uint64          access_token_max_number = 107;
     repeated string access_tokens           = 108;
     repeated string gateway                 = 109;
 
-    google.protobuf.Duration first_idle_timeout = 201;
-    google.protobuf.Duration ping_interval      = 202;
-    google.protobuf.Duration retry_interval     = 203;
+    google.protobuf.Duration first_idle_timeout = 201 [ (atapp.protocol.CONFIGURE) = {default_value : "30s"} ];
+    google.protobuf.Duration ping_interval      = 202 [ (atapp.protocol.CONFIGURE) = {default_value : "60s"} ];
+    google.protobuf.Duration retry_interval     = 203 [ (atapp.protocol.CONFIGURE) = {default_value : "3s"} ];
 
-    uint64 fault_tolerant     = 301;
+    uint64 fault_tolerant     = 301 [ (atapp.protocol.CONFIGURE) = {default_value : "3"} ];
     uint64 msg_size           = 302;
     uint64 recv_buffer_size   = 303;
     uint64 send_buffer_size   = 304;
@@ -29,9 +40,9 @@ message atbus_configure {
 }
 
 message atapp_timer {
-    google.protobuf.Duration stop_timeout    = 1;
-    google.protobuf.Duration tick_interval   = 2;
-    google.protobuf.Duration message_timeout = 3;
+    google.protobuf.Duration stop_timeout    = 1 [ (atapp.protocol.CONFIGURE) = {default_value : "10s"} ];
+    google.protobuf.Duration tick_interval   = 2 [ (atapp.protocol.CONFIGURE) = {default_value : "16ms"} ];
+    google.protobuf.Duration message_timeout = 3 [ (atapp.protocol.CONFIGURE) = {default_value : "8s"} ];
 }
 
 message atapp_log_level_range {
@@ -122,37 +133,37 @@ message atapp_etcd_ssl {
 }
 
 message atapp_etcd_cluster {
-    google.protobuf.Duration update_interval = 1;
-    google.protobuf.Duration retry_interval  = 2;
+    google.protobuf.Duration update_interval = 1 [ (atapp.protocol.CONFIGURE) = {default_value : "5m"} ];
+    google.protobuf.Duration retry_interval  = 2 [ (atapp.protocol.CONFIGURE) = {default_value : "1m"} ];
 }
 
 message atapp_etcd_keepalive {
-    google.protobuf.Duration timeout = 1;
-    google.protobuf.Duration ttl     = 2;
+    google.protobuf.Duration timeout = 1 [ (atapp.protocol.CONFIGURE) = {default_value : "31s"} ];
+    google.protobuf.Duration ttl     = 2 [ (atapp.protocol.CONFIGURE) = {default_value : "10s"} ];
 }
 
-message atapp_etcd_request { google.protobuf.Duration timeout = 1; }
+message atapp_etcd_request { google.protobuf.Duration timeout = 1 [ (atapp.protocol.CONFIGURE) = {default_value : "15s"} ]; }
 
 message atapp_etcd_init {
-    google.protobuf.Duration timeout       = 1;
-    google.protobuf.Duration tick_interval = 2;
+    google.protobuf.Duration timeout       = 1 [ (atapp.protocol.CONFIGURE) = {default_value : "5s"} ];
+    google.protobuf.Duration tick_interval = 2 [ (atapp.protocol.CONFIGURE) = {default_value : "256ms" min_value : "16ms"} ];
 }
 
 message atapp_etcd_watcher {
-    google.protobuf.Duration retry_interval  = 101;
-    google.protobuf.Duration request_timeout = 102;
+    google.protobuf.Duration retry_interval  = 101 [ (atapp.protocol.CONFIGURE) = {default_value : "15s"} ];
+    google.protobuf.Duration request_timeout = 102 [ (atapp.protocol.CONFIGURE) = {default_value : "30m"} ];
 
-    bool            by_id        = 201; // add watcher by id
-    bool            by_name      = 202; // add watcher by name
-    repeated uint64 by_type_id   = 203; // add watcher by type id
-    repeated string by_type_name = 204; // add watcher by type name
-    repeated string by_tag       = 205; // add watcher by tag
+    bool            by_id        = 201 [ (atapp.protocol.CONFIGURE) = {default_value : "false"} ]; // add watcher by id
+    bool            by_name      = 202 [ (atapp.protocol.CONFIGURE) = {default_value : "true"} ];  // add watcher by name
+    repeated uint64 by_type_id   = 203;                                                            // add watcher by type id
+    repeated string by_type_name = 204;                                                            // add watcher by type name
+    repeated string by_tag       = 205;                                                            // add watcher by tag
 }
 
 message atapp_etcd_report_alive {
-    bool            by_id   = 1;
-    bool            by_type = 2;
-    bool            by_name = 3;
+    bool            by_id   = 1 [ (atapp.protocol.CONFIGURE) = {default_value : "true"} ];
+    bool            by_type = 2 [ (atapp.protocol.CONFIGURE) = {default_value : "true"} ];
+    bool            by_name = 3 [ (atapp.protocol.CONFIGURE) = {default_value : "true"} ];
     repeated string by_tag  = 4;
 }
 

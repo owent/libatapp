@@ -17,9 +17,9 @@ atapp:
     backlog: 256 # tcp backlog
     access_token_max_number: 5 # max number of access tokens
     # access_tokens:           # access tokens
-    first_idle_timeout: 30 # first idle timeout when have new connection(second)
-    ping_interval: 60 # ping interval(second)
-    retry_interval: 3 # retry interval when error happen(second)
+    first_idle_timeout: 30s # first idle timeout when have new connection(second)
+    ping_interval: 60s # ping interval(second)
+    retry_interval: 3s # retry interval when error happen(second)
     fault_tolerant: 3 # how many errors will lead to kill connection
     msg_size: 262144 # max message size(256KB)
     recv_buffer_size: 8388608 # recv channel size(8MB), will be used to initialize (shared) memory channel size

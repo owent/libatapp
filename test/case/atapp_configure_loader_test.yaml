@@ -1,0 +1,81 @@
+atapp:
+  id: 0x00001234
+  id_mask: 8.8.8.8
+  name: "sample_echo_svr-1"
+  type_id: 1
+  type_name: "sample_echo_svr"
+
+  bus:
+    listen: "ipv6://:::21437"
+    subnets: "0/16"
+    proxy: ""
+    backlog: 256
+    access_token_max_number: 5
+    first_idle_timeout: 30s
+    ping_interval: 60s
+    retry_interval: 3s
+    fault_tolerant: 3
+    msg_size: 262144
+    recv_buffer_size: 8388608
+    send_buffer_size: 2097152
+    send_buffer_number: 0
+  timer:
+    tick_interval: 32ms
+    stop_timeout: 10s
+  etcd:
+    enable: false
+    hosts:
+      - http://127.0.0.1:2375
+      - http://127.0.0.1:2376
+      - http://127.0.0.1:2377
+    path: /atapp/services/astf4g/
+    authorization: ""
+    init:
+      # timeout: 5s
+      tick_interval: 1ms # test min bound
+
+  log:
+    level: debug
+    category:
+      - name: default
+        prefix: "[Log %L][%F %T.%f][%s:%n(%C)]: "
+        stacktrace:
+          min: error
+          max: fatal
+        sink:
+          - type: file
+            level:
+              min: fatal
+              max: warning
+            rotate:
+              number: 10
+              size: 10485760
+            file: "../log/sample_echo_svr.error.%N.log"
+            writing_alias: "../log/sample_echo_svr.error.log"
+            auto_flush: info
+            flush_interval: 1m
+          - type: file
+            level:
+              min: fatal
+              max: debug
+            rotate:
+              number: 10
+              size: 10485760
+            file: "../log/sample_echo_svr.all.%N.log"
+            writing_alias: "../log/sample_echo_svr.all.log"
+            auto_flush: info
+            flush_interval: 1m
+          - type: stderr
+            level:
+              min: fatal
+              max: debug
+          - type: stdout
+            level:
+              min: fatal
+              max: debug
+
+      - name: db
+        prefix: "[Log %L][%F %T.%f]: "
+        stacktrace:
+          min: disable
+          max: disable
