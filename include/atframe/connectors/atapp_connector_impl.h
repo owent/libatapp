@@ -100,7 +100,7 @@ namespace atapp {
         friend struct atapp_endpoint_bind_helper;
     };
 
-    class atapp_connector_impl {
+    class LIBATAPP_MACRO_API atapp_connector_impl {
     public:
 #if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
         using handle_set_t   = LIBATFRAME_UTILS_AUTO_SELETC_SET(atapp_connection_handle *);
