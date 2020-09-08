@@ -1,39 +1,47 @@
-#.rst:
-# libatapp-config.cmake
-# --------
-#
-# Find the native libatapp includes and library.
-#
-#
-# Result Variables
-# ^^^^^^^^^^^^^^^^
-#
-# This module defines the following variables:
-#
-# ::
-#
-#   Libatapp_INCLUDE_DIRS       - where to find atframe/atapp_config.h , etc.
-#   Libatapp_LIBRARY_DIRS       - where to find (lib)atapp.(a/so/lib/dll/dylib), etc.
-#   Libatapp_LIBRARIES          - List of libraries when using libatapp.
-#   Libatapp_C_LIBRARIES        - List of libraries when using libatapp_c (C binding).
-#   Libatapp_FOUND              - True if libatapp found.
-#   Libatapp_VERSION            - Full version of libatapp
-#
-# ::
-#
+#[=======================================================================[.rst:
+libatapp-config.cmake
+---------------------
 
-#=============================================================================
-# Copyright 2018 OWenT.
-#
-# Distributed under the OSI-approved BSD License (the "License");
-# see accompanying file Copyright.txt for details.
-#
-# This software is distributed WITHOUT ANY WARRANTY; without even the
-# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the License for more information.
-#=============================================================================
-# (To distribute this file outside of CMake, substitute the full
-#  License text for the above reference.)
+Find the native libatapp includes and library.
+
+
+This module defines the following variables:
+
+``Libatapp_INCLUDE_DIRS``
+  Where to find atframe/atapp_config.h , etc.
+``Libatapp_PROTOCOL_DIRS``
+  Where to find atframe/atapp_conf.proto , etc.
+``Libatapp_LIBRARY_DIRS``
+  Where to find (lib)atapp.(a/so/lib/dll/dylib), etc.
+``Libatapp_LIBRARIES``
+  List of libraries when using libatapp.
+``Libatapp_C_LIBRARIES``
+  List of libraries when using libatapp_c (C binding).
+``Libatapp_FOUND``
+  True if libatapp found.
+``Libatapp_VERSION``
+  Full version of libatapp
+
+The following :prop_tgt:`IMPORTED` targets are also defined:
+
+``atframework::atapp``
+  The libatapp library
+
+``atframework::atapp_c``
+  The libatapp library of C binding
+
+============================================================================
+Copyright 2020 OWenT.
+Distributed under the OSI-approved BSD License (the "License");
+see accompanying file Copyright.txt for details.
+This software is distributed WITHOUT ANY WARRANTY; without even the
+implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+See the License for more information.
+============================================================================
+(To distribute this file outside of CMake, substitute the full License text 
+for the above reference.)
+
+#]=======================================================================]
 
 set(Libatapp_VERSION "@LIBATAPP_VERSION@")
 
@@ -45,6 +53,7 @@ set(Libatapp_SOURCE_DIR "@PROJECT_SOURCE_DIR@")
 
 set_and_check(Libatapp_INCLUDE_DIRS "@PACKAGE_INCLUDE_INSTALL_DIR@")
 set_and_check(Libatapp_LIBRARY_DIRS "@PACKAGE_CMAKE_INSTALL_LIBDIR@")
+set_and_check(Libatapp_PROTOCOL_DIRS "@PACKAGE_INCLUDE_INSTALL_DIR@")
 
 include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_LIBATAPP_EXPORT_NAME@.cmake")
 if (EXISTS "${CMAKE_CURRENT_LIST_DIR}/@PROJECT_LIBATAPP_EXPORT_NAME@.cmake")

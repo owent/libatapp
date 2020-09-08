@@ -11,6 +11,7 @@ message atapp_configure_meta {
     string default_value = 1;
     string min_value     = 2;
     string max_value     = 3;
+    bool   size_mode     = 4;
 }
 
 extend google.protobuf.FieldOptions {
@@ -33,9 +34,9 @@ message atbus_configure {
     google.protobuf.Duration retry_interval     = 203 [ (atapp.protocol.CONFIGURE) = {default_value : "3s"} ];
 
     uint64 fault_tolerant     = 301 [ (atapp.protocol.CONFIGURE) = {default_value : "3"} ];
-    uint64 msg_size           = 302;
-    uint64 recv_buffer_size   = 303;
-    uint64 send_buffer_size   = 304;
+    uint64 msg_size           = 302 [ (atapp.protocol.CONFIGURE) = {size_mode : true} ];
+    uint64 recv_buffer_size   = 303 [ (atapp.protocol.CONFIGURE) = {size_mode : true} ];
+    uint64 send_buffer_size   = 304 [ (atapp.protocol.CONFIGURE) = {size_mode : true} ];
     uint64 send_buffer_number = 305;
 }
 
@@ -51,7 +52,7 @@ message atapp_log_level_range {
 }
 
 message atapp_log_sink_file_rotate {
-    uint64 size   = 1;
+    uint64 size   = 1 [ (atapp.protocol.CONFIGURE) = {size_mode : true} ];
     uint32 number = 2;
 }
 

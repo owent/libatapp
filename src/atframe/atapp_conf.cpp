@@ -314,7 +314,7 @@ namespace atapp {
             out = std::numeric_limits<Ty>::max();
         }
 
-        static inline void dump_pick_field_from_str(float &out, const std::string &input) {
+        static inline void dump_pick_field_from_str(float &out, const std::string &input, bool) {
             if (input.empty()) {
                 out = 0.0f;
                 return;
@@ -323,7 +323,7 @@ namespace atapp {
             out = static_cast<float>(strtod(input.c_str(), &end));
         }
 
-        static inline void dump_pick_field_from_str(double &out, const std::string &input) {
+        static inline void dump_pick_field_from_str(double &out, const std::string &input, bool) {
             if (input.empty()) {
                 out = 0.0;
                 return;
@@ -332,7 +332,7 @@ namespace atapp {
             out = strtod(input.c_str(), &end);
         }
 
-        static inline void dump_pick_field_from_str(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &out, const std::string &input) {
+        static inline void dump_pick_field_from_str(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &out, const std::string &input, bool) {
             if (input.empty()) {
                 out.set_seconds(0);
                 out.set_nanos(0);
@@ -340,7 +340,7 @@ namespace atapp {
             }
             pick_const_data(input, out);
         }
-        static inline void dump_pick_field_from_str(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp &out, const std::string &input) {
+        static inline void dump_pick_field_from_str(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp &out, const std::string &input, bool) {
             if (input.empty()) {
                 out.set_seconds(0);
                 out.set_nanos(0);
@@ -349,13 +349,89 @@ namespace atapp {
             pick_const_data(input, out);
         }
 
+        template <class Ty, size_t TSIZE>
+        struct scale_size_mode_t;
+
         template <class Ty>
-        static inline void dump_pick_field_from_str(Ty &out, const std::string &input) {
+        struct scale_size_mode_t<Ty, 1> {
+            static inline bool to_bytes(Ty &out, char c) { return false; }
+        };
+
+        template <class Ty>
+        struct scale_size_mode_t<Ty, 2> {
+            static inline bool to_bytes(Ty &out, char c) {
+                if ('k' == c) {
+                    out <<= 10;
+                    return true;
+                }
+                return false;
+            }
+        };
+
+        template <class Ty>
+        struct scale_size_mode_t<Ty, 4> {
+            static inline bool to_bytes(Ty &out, char c) {
+                if (scale_size_mode_t<Ty, 2>::to_bytes(out, c)) {
+                    return true;
+                }
+
+                if ('m' == c) {
+                    out <<= 20;
+                    return true;
+                }
+
+                if ('g' == c) {
+                    out <<= 30;
+                    return true;
+                }
+
+                return false;
+            }
+        };
+
+        template <class Ty>
+        struct scale_size_mode_t<Ty, 8> {
+            static inline bool to_bytes(Ty &out, char c) {
+                if (scale_size_mode_t<Ty, 4>::to_bytes(out, c)) {
+                    return true;
+                }
+
+                if ('t' == c) {
+                    out <<= 40;
+                    return true;
+                }
+
+                if ('p' == c) {
+                    out <<= 50;
+                    return true;
+                }
+
+                return false;
+            }
+        };
+
+        template <class Ty, size_t>
+        struct scale_size_mode_t {
+            static inline bool to_bytes(Ty &out, char c) { return scale_size_mode_t<Ty, 8>::to_bytes(out, c); }
+        };
+
+        template <class Ty>
+        static inline void dump_pick_field_from_str(Ty &out, const std::string &input, bool size_mode) {
             if (input.empty()) {
                 out = 0;
                 return;
             }
-            util::string::str2int(out, input.c_str());
+            const char *left = util::string::str2int(out, input.c_str());
+
+            if (size_mode) {
+                while (left && *left && util::string::is_space(*left)) {
+                    ++left;
+                }
+
+                if (left) {
+                    scale_size_mode_t<Ty, sizeof(Ty)>::to_bytes(out, util::string::tolower(*left));
+                }
+            }
         }
 
         static inline bool dump_pick_field_less(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &l,
@@ -389,22 +465,29 @@ namespace atapp {
             dump_pick_field_max(max_value);
             if (val.as_cpp_string(index).empty()) {
                 if (fds->options().HasExtension(atapp::protocol::CONFIGURE)) {
-                    const std::string &default_str = fds->options().GetExtension(atapp::protocol::CONFIGURE).default_value();
-                    dump_pick_field_from_str(value, default_str.c_str());
+                    const atapp::protocol::atapp_configure_meta &meta = fds->options().GetExtension(atapp::protocol::CONFIGURE);
+                    const std::string &default_str                    = meta.default_value();
+                    dump_pick_field_from_str(value, default_str, meta.size_mode());
                 } else {
-                    dump_pick_field_from_str(value, std::string());
+                    dump_pick_field_from_str(value, std::string(), false);
                 }
             } else {
-                dump_pick_field_from_str(value, val.as_cpp_string(index));
+                if (fds->options().HasExtension(atapp::protocol::CONFIGURE)) {
+                    const atapp::protocol::atapp_configure_meta &meta = fds->options().GetExtension(atapp::protocol::CONFIGURE);
+                    dump_pick_field_from_str(value, val.as_cpp_string(index), meta.size_mode());
+                } else {
+                    dump_pick_field_from_str(value, val.as_cpp_string(index), false);
+                }
             }
             if (fds->options().HasExtension(atapp::protocol::CONFIGURE)) {
-                const std::string &min_val_str = fds->options().GetExtension(atapp::protocol::CONFIGURE).min_value();
-                const std::string &max_val_str = fds->options().GetExtension(atapp::protocol::CONFIGURE).max_value();
+                const atapp::protocol::atapp_configure_meta &meta = fds->options().GetExtension(atapp::protocol::CONFIGURE);
+                const std::string &min_val_str                    = meta.min_value();
+                const std::string &max_val_str                    = meta.max_value();
                 if (!min_val_str.empty()) {
-                    dump_pick_field_from_str(min_value, min_val_str.c_str());
+                    dump_pick_field_from_str(min_value, min_val_str, meta.size_mode());
                 }
                 if (!max_val_str.empty()) {
-                    dump_pick_field_from_str(max_value, max_val_str.c_str());
+                    dump_pick_field_from_str(max_value, max_val_str, meta.size_mode());
                 }
             }
 
@@ -630,22 +713,29 @@ namespace atapp {
             dump_pick_field_max(max_value);
             if (!val.IsScalar() || val.Scalar().empty()) {
                 if (fds->options().HasExtension(atapp::protocol::CONFIGURE)) {
-                    const std::string &default_str = fds->options().GetExtension(atapp::protocol::CONFIGURE).default_value();
-                    dump_pick_field_from_str(value, default_str.c_str());
+                    const atapp::protocol::atapp_configure_meta &meta = fds->options().GetExtension(atapp::protocol::CONFIGURE);
+                    const std::string &default_str                    = meta.default_value();
+                    dump_pick_field_from_str(value, default_str, meta.size_mode());
                 } else {
-                    dump_pick_field_from_str(value, std::string());
+                    dump_pick_field_from_str(value, std::string(), false);
                 }
             } else {
-                dump_pick_field_from_str(value, val.Scalar());
+                if (fds->options().HasExtension(atapp::protocol::CONFIGURE)) {
+                    const atapp::protocol::atapp_configure_meta &meta = fds->options().GetExtension(atapp::protocol::CONFIGURE);
+                    dump_pick_field_from_str(value, val.Scalar(), meta.size_mode());
+                } else {
+                    dump_pick_field_from_str(value, val.Scalar(), false);
+                }
             }
             if (fds->options().HasExtension(atapp::protocol::CONFIGURE)) {
-                const std::string &min_val_str = fds->options().GetExtension(atapp::protocol::CONFIGURE).min_value();
-                const std::string &max_val_str = fds->options().GetExtension(atapp::protocol::CONFIGURE).max_value();
+                const atapp::protocol::atapp_configure_meta &meta = fds->options().GetExtension(atapp::protocol::CONFIGURE);
+                const std::string &min_val_str                    = meta.min_value();
+                const std::string &max_val_str                    = meta.max_value();
                 if (!min_val_str.empty()) {
-                    dump_pick_field_from_str(min_value, min_val_str.c_str());
+                    dump_pick_field_from_str(min_value, min_val_str, meta.size_mode());
                 }
                 if (!max_val_str.empty()) {
-                    dump_pick_field_from_str(max_value, max_val_str.c_str());
+                    dump_pick_field_from_str(max_value, max_val_str, meta.size_mode());
                 }
             }
 
