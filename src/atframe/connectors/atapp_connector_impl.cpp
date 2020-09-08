@@ -7,7 +7,8 @@
 
 namespace atapp {
 
-    LIBATAPP_MACRO_API_SYMBOL_HIDDEN void atapp_connector_bind_helper::unbind(atapp_connection_handle &handle, atapp_connector_impl &connect) {
+    LIBATAPP_MACRO_API_SYMBOL_HIDDEN void atapp_connector_bind_helper::unbind(atapp_connection_handle &handle,
+                                                                              atapp_connector_impl &connect) {
         bool need_trigger = false;
         if (handle.connector_ == &connect) {
             handle.connector_ = NULL;
@@ -23,7 +24,8 @@ namespace atapp {
         }
     }
 
-    LIBATAPP_MACRO_API_SYMBOL_HIDDEN void atapp_connector_bind_helper::bind(atapp_connection_handle &handle, atapp_connector_impl &connect) {
+    LIBATAPP_MACRO_API_SYMBOL_HIDDEN void atapp_connector_bind_helper::bind(atapp_connection_handle &handle,
+                                                                            atapp_connector_impl &connect) {
         if (handle.connector_ == &connect) {
             return;
         }
@@ -123,6 +125,11 @@ namespace atapp {
 
     LIBATAPP_MACRO_API const atapp_connection_handle::on_destroy_fn_t &atapp_connection_handle::get_on_destroy() const {
         return on_destroy_fn_;
+    }
+
+    LIBATAPP_MACRO_API void atapp_connection_handle::reset_on_destroy() {
+        on_destroy_fn_t empty;
+        on_destroy_fn_.swap(empty);
     }
 
     LIBATAPP_MACRO_API atapp_connector_impl::atapp_connector_impl(app &owner) : owner_(&owner) {}

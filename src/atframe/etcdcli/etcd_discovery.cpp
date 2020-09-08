@@ -84,19 +84,24 @@ namespace atapp {
 
     LIBATAPP_MACRO_API const etcd_discovery_node::on_destroy_fn_t &etcd_discovery_node::get_on_destroy() const { return on_destroy_fn_; }
 
-    LIBATAPP_MACRO_API const std::string& etcd_discovery_node::next_ingress_address() const {
+    LIBATAPP_MACRO_API void etcd_discovery_node::reset_on_destroy() {
+        on_destroy_fn_t empty;
+        on_destroy_fn_.swap(empty);
+    }
+
+    LIBATAPP_MACRO_API const std::string &etcd_discovery_node::next_ingress_address() const {
         if (node_info_.gateway_size() > 0) {
             if (ingress_address_index_ > node_info_.gateway_size()) {
                 ingress_address_index_ %= node_info_.gateway_size();
             }
-            return node_info_.gateway(ingress_address_index_ ++);
+            return node_info_.gateway(ingress_address_index_++);
         }
 
         if (node_info_.listen_size() > 0) {
             if (ingress_address_index_ > node_info_.listen_size()) {
                 ingress_address_index_ %= node_info_.listen_size();
             }
-            return node_info_.listen(ingress_address_index_ ++);
+            return node_info_.listen(ingress_address_index_++);
         }
 
         static std::string empty;
@@ -104,7 +109,7 @@ namespace atapp {
     }
 
     LIBATAPP_MACRO_API int32_t etcd_discovery_node::get_ingress_size() const {
-        if (node_info_.gateway_size() > 0)  {
+        if (node_info_.gateway_size() > 0) {
             return node_info_.gateway_size();
         }
 

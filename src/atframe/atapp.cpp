@@ -901,17 +901,11 @@ namespace atapp {
     LIBATAPP_MACRO_API std::shared_ptr<atbus::node> app::get_bus_node() { return bus_node_; }
     LIBATAPP_MACRO_API const std::shared_ptr<atbus::node> app::get_bus_node() const { return bus_node_; }
 
-    LIBATAPP_MACRO_API void app::enable_fallback_to_atbus_connector() {
-        set_flag(flag_t::DISABLE_ATBUS_FALLBACK, false);
-    }
+    LIBATAPP_MACRO_API void app::enable_fallback_to_atbus_connector() { set_flag(flag_t::DISABLE_ATBUS_FALLBACK, false); }
 
-    LIBATAPP_MACRO_API void app::disable_fallback_to_atbus_connector() {
-        set_flag(flag_t::DISABLE_ATBUS_FALLBACK, true);
-    }
+    LIBATAPP_MACRO_API void app::disable_fallback_to_atbus_connector() { set_flag(flag_t::DISABLE_ATBUS_FALLBACK, true); }
 
-    LIBATAPP_MACRO_API bool app::is_fallback_to_atbus_connector_enabled() const {
-        return !check_flag(flag_t::DISABLE_ATBUS_FALLBACK);
-    }
+    LIBATAPP_MACRO_API bool app::is_fallback_to_atbus_connector_enabled() const { return !check_flag(flag_t::DISABLE_ATBUS_FALLBACK); }
 
     LIBATAPP_MACRO_API util::time::time_utility::raw_time_t app::get_last_tick_time() const { return tick_timer_.sec_update; }
 
@@ -1025,7 +1019,23 @@ namespace atapp {
         return iter->second->get_address_type(addr);
     }
 
-    LIBATAPP_MACRO_API int32_t app::listen(const std::string& address) {
+    LIBATAPP_MACRO_API etcd_discovery_node::ptr_t app::get_discovery_node_by_id(uint64_t id) const {
+        if (!inner_module_etcd_) {
+            return NULL;
+        }
+
+        return inner_module_etcd_->get_global_discovery().get_node_by_id(id);
+    }
+
+    LIBATAPP_MACRO_API etcd_discovery_node::ptr_t app::get_discovery_node_by_name(const std::string &name) const {
+        if (!inner_module_etcd_) {
+            return NULL;
+        }
+
+        return inner_module_etcd_->get_global_discovery().get_node_by_name(name);
+    }
+
+    LIBATAPP_MACRO_API int32_t app::listen(const std::string &address) {
         atbus::channel::channel_address_t addr;
         atbus::channel::make_address(address.c_str(), addr);
         std::transform(addr.scheme.begin(), addr.scheme.end(), addr.scheme.begin(), ::util::string::tolower<char>);
@@ -1042,19 +1052,17 @@ namespace atapp {
         return iter->second->on_start_listen(addr);
     }
 
-    LIBATAPP_MACRO_API int32_t app::send_message(uint64_t target_node_id, int32_t type, 
-                                            const void *data, size_t data_size,
-                                            uint64_t *msg_sequence,
-                                            const atapp::protocol::atapp_metadata *metadata) {
+    LIBATAPP_MACRO_API int32_t app::send_message(uint64_t target_node_id, int32_t type, const void *data, size_t data_size,
+                                                 uint64_t *msg_sequence, const atapp::protocol::atapp_metadata *metadata) {
         // Find from cache
         do {
-            atapp_endpoint* cache = get_endpoint(target_node_id);
+            atapp_endpoint *cache = get_endpoint(target_node_id);
             if (NULL == cache) {
                 break;
             }
 
             uint64_t msg_seq = 0;
-            int32_t ret = cache->push_forward_message(type, msg_seq, data, data_size, metadata);
+            int32_t ret      = cache->push_forward_message(type, msg_seq, data, data_size, metadata);
             if (NULL != msg_sequence) {
                 *msg_sequence = msg_seq;
             }
@@ -1087,18 +1095,16 @@ namespace atapp {
         return bus_node_->send_data(target_node_id, type, data, data_size, msg_sequence);
     }
 
-    LIBATAPP_MACRO_API int32_t app::send_message(const std::string& target_node_name, int32_t type, 
-                                            const void *data, size_t data_size,
-                                            uint64_t *msg_sequence,
-                                            const atapp::protocol::atapp_metadata *metadata) {
+    LIBATAPP_MACRO_API int32_t app::send_message(const std::string &target_node_name, int32_t type, const void *data, size_t data_size,
+                                                 uint64_t *msg_sequence, const atapp::protocol::atapp_metadata *metadata) {
         do {
-            atapp_endpoint* cache = get_endpoint(target_node_name);
+            atapp_endpoint *cache = get_endpoint(target_node_name);
             if (NULL == cache) {
                 break;
             }
 
             uint64_t msg_seq = 0;
-            int32_t ret = cache->push_forward_message(type, msg_seq, data, data_size, metadata);
+            int32_t ret      = cache->push_forward_message(type, msg_seq, data, data_size, metadata);
             if (NULL != msg_sequence) {
                 *msg_sequence = msg_seq;
             }
@@ -1119,10 +1125,9 @@ namespace atapp {
         return send_message(node, type, data, data_size, msg_sequence, metadata);
     }
 
-    LIBATAPP_MACRO_API int32_t app::send_message(const etcd_discovery_node::ptr_t& target_node_discovery, int32_t type, 
-                                                const void *data, size_t data_size,
-                                                uint64_t *msg_sequence,
-                                                const atapp::protocol::atapp_metadata *metadata) {
+    LIBATAPP_MACRO_API int32_t app::send_message(const etcd_discovery_node::ptr_t &target_node_discovery, int32_t type, const void *data,
+                                                 size_t data_size, uint64_t *msg_sequence,
+                                                 const atapp::protocol::atapp_metadata *metadata) {
         if (!inner_module_etcd_) {
             return EN_ATBUS_ERR_PARAMS;
         }
@@ -1133,7 +1138,7 @@ namespace atapp {
         }
 
         uint64_t msg_seq = 0;
-        int32_t ret = endpoint->push_forward_message(type, msg_seq, data, data_size, metadata);
+        int32_t ret      = endpoint->push_forward_message(type, msg_seq, data, data_size, metadata);
         if (NULL != msg_sequence) {
             *msg_sequence = msg_seq;
         }
@@ -1142,54 +1147,52 @@ namespace atapp {
     }
 
 
-    LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(const void *hash_buf, size_t hash_bufsz, int32_t type, 
-                                            const void *data, size_t data_size,
-                                            uint64_t *msg_sequence,
-                                            const atapp::protocol::atapp_metadata *metadata) {
+    LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(const void *hash_buf, size_t hash_bufsz, int32_t type, const void *data,
+                                                                    size_t data_size, uint64_t *msg_sequence,
+                                                                    const atapp::protocol::atapp_metadata *metadata) {
         if (!inner_module_etcd_) {
             return EN_ATAPP_ERR_DISCOVERY_DISABLED;
         }
 
-        return send_message_by_consistent_hash(inner_module_etcd_->get_global_discovery(), hash_buf, hash_bufsz, type, data, data_size, msg_sequence, metadata);
+        return send_message_by_consistent_hash(inner_module_etcd_->get_global_discovery(), hash_buf, hash_bufsz, type, data, data_size,
+                                               msg_sequence, metadata);
     }
 
-    LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(uint64_t hash_key, int32_t type, 
-                                            const void *data, size_t data_size,
-                                            uint64_t *msg_sequence,
-                                            const atapp::protocol::atapp_metadata *metadata) {
+    LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(uint64_t hash_key, int32_t type, const void *data, size_t data_size,
+                                                                    uint64_t *msg_sequence,
+                                                                    const atapp::protocol::atapp_metadata *metadata) {
         if (!inner_module_etcd_) {
             return EN_ATAPP_ERR_DISCOVERY_DISABLED;
         }
 
-        return send_message_by_consistent_hash(inner_module_etcd_->get_global_discovery(), hash_key, type, data, data_size, msg_sequence, metadata);
+        return send_message_by_consistent_hash(inner_module_etcd_->get_global_discovery(), hash_key, type, data, data_size, msg_sequence,
+                                               metadata);
     }
 
-    LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(int64_t hash_key, int32_t type, 
-                                            const void *data, size_t data_size,
-                                            uint64_t *msg_sequence,
-                                            const atapp::protocol::atapp_metadata *metadata) {
+    LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(int64_t hash_key, int32_t type, const void *data, size_t data_size,
+                                                                    uint64_t *msg_sequence,
+                                                                    const atapp::protocol::atapp_metadata *metadata) {
         if (!inner_module_etcd_) {
             return EN_ATAPP_ERR_DISCOVERY_DISABLED;
         }
 
-        return send_message_by_consistent_hash(inner_module_etcd_->get_global_discovery(), hash_key, type, data, data_size, msg_sequence, metadata);
+        return send_message_by_consistent_hash(inner_module_etcd_->get_global_discovery(), hash_key, type, data, data_size, msg_sequence,
+                                               metadata);
     }
 
-    LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(const std::string &hash_key, int32_t type, 
-                                            const void *data, size_t data_size,
-                                            uint64_t *msg_sequence,
-                                            const atapp::protocol::atapp_metadata *metadata) {
+    LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(const std::string &hash_key, int32_t type, const void *data,
+                                                                    size_t data_size, uint64_t *msg_sequence,
+                                                                    const atapp::protocol::atapp_metadata *metadata) {
         if (!inner_module_etcd_) {
             return EN_ATAPP_ERR_DISCOVERY_DISABLED;
         }
 
-        return send_message_by_consistent_hash(inner_module_etcd_->get_global_discovery(), hash_key, type, data, data_size, msg_sequence, metadata);
+        return send_message_by_consistent_hash(inner_module_etcd_->get_global_discovery(), hash_key, type, data, data_size, msg_sequence,
+                                               metadata);
     }
 
-    LIBATAPP_MACRO_API int32_t app::send_message_by_random(int32_t type, 
-                                            const void *data, size_t data_size,
-                                            uint64_t *msg_sequence,
-                                            const atapp::protocol::atapp_metadata *metadata) {
+    LIBATAPP_MACRO_API int32_t app::send_message_by_random(int32_t type, const void *data, size_t data_size, uint64_t *msg_sequence,
+                                                           const atapp::protocol::atapp_metadata *metadata) {
         if (!inner_module_etcd_) {
             return EN_ATAPP_ERR_DISCOVERY_DISABLED;
         }
@@ -1197,10 +1200,8 @@ namespace atapp {
         return send_message_by_random(inner_module_etcd_->get_global_discovery(), type, data, data_size, msg_sequence, metadata);
     }
 
-    LIBATAPP_MACRO_API int32_t app::send_message_by_round_robin(int32_t type, 
-                                            const void *data, size_t data_size,
-                                            uint64_t *msg_sequence,
-                                            const atapp::protocol::atapp_metadata *metadata) {
+    LIBATAPP_MACRO_API int32_t app::send_message_by_round_robin(int32_t type, const void *data, size_t data_size, uint64_t *msg_sequence,
+                                                                const atapp::protocol::atapp_metadata *metadata) {
         if (!inner_module_etcd_) {
             return EN_ATAPP_ERR_DISCOVERY_DISABLED;
         }
@@ -1208,10 +1209,10 @@ namespace atapp {
         return send_message_by_round_robin(inner_module_etcd_->get_global_discovery(), type, data, data_size, msg_sequence, metadata);
     }
 
-    LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(const etcd_discovery_set& discovery_set, const void *hash_buf, size_t hash_bufsz, 
-                                            int32_t type, const void *data, size_t data_size,
-                                            uint64_t *msg_sequence,
-                                            const atapp::protocol::atapp_metadata *metadata) {
+    LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(const etcd_discovery_set &discovery_set, const void *hash_buf,
+                                                                    size_t hash_bufsz, int32_t type, const void *data, size_t data_size,
+                                                                    uint64_t *msg_sequence,
+                                                                    const atapp::protocol::atapp_metadata *metadata) {
         etcd_discovery_node::ptr_t node = discovery_set.get_node_by_consistent_hash(hash_buf, hash_bufsz);
         if (!node) {
             return EN_ATBUS_ERR_ATNODE_NOT_FOUND;
@@ -1220,10 +1221,10 @@ namespace atapp {
         return send_message(node, type, data, data_size, msg_sequence, metadata);
     }
 
-    LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(const etcd_discovery_set& discovery_set, uint64_t hash_key, int32_t type, 
-                                            const void *data, size_t data_size,
-                                            uint64_t *msg_sequence,
-                                            const atapp::protocol::atapp_metadata *metadata) {
+    LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(const etcd_discovery_set &discovery_set, uint64_t hash_key,
+                                                                    int32_t type, const void *data, size_t data_size,
+                                                                    uint64_t *msg_sequence,
+                                                                    const atapp::protocol::atapp_metadata *metadata) {
         etcd_discovery_node::ptr_t node = discovery_set.get_node_by_consistent_hash(hash_key);
         if (!node) {
             return EN_ATBUS_ERR_ATNODE_NOT_FOUND;
@@ -1232,10 +1233,9 @@ namespace atapp {
         return send_message(node, type, data, data_size, msg_sequence, metadata);
     }
 
-    LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(const etcd_discovery_set& discovery_set, int64_t hash_key, int32_t type, 
-                                            const void *data, size_t data_size,
-                                            uint64_t *msg_sequence,
-                                            const atapp::protocol::atapp_metadata *metadata) {
+    LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(const etcd_discovery_set &discovery_set, int64_t hash_key, int32_t type,
+                                                                    const void *data, size_t data_size, uint64_t *msg_sequence,
+                                                                    const atapp::protocol::atapp_metadata *metadata) {
         etcd_discovery_node::ptr_t node = discovery_set.get_node_by_consistent_hash(hash_key);
         if (!node) {
             return EN_ATBUS_ERR_ATNODE_NOT_FOUND;
@@ -1244,10 +1244,10 @@ namespace atapp {
         return send_message(node, type, data, data_size, msg_sequence, metadata);
     }
 
-    LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(const etcd_discovery_set& discovery_set, const std::string &hash_key, int32_t type, 
-                                            const void *data, size_t data_size,
-                                            uint64_t *msg_sequence,
-                                            const atapp::protocol::atapp_metadata *metadata) {
+    LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(const etcd_discovery_set &discovery_set, const std::string &hash_key,
+                                                                    int32_t type, const void *data, size_t data_size,
+                                                                    uint64_t *msg_sequence,
+                                                                    const atapp::protocol::atapp_metadata *metadata) {
         etcd_discovery_node::ptr_t node = discovery_set.get_node_by_consistent_hash(hash_key);
         if (!node) {
             return EN_ATBUS_ERR_ATNODE_NOT_FOUND;
@@ -1256,10 +1256,9 @@ namespace atapp {
         return send_message(node, type, data, data_size, msg_sequence, metadata);
     }
 
-    LIBATAPP_MACRO_API int32_t app::send_message_by_random(const etcd_discovery_set& discovery_set, int32_t type, 
-                                            const void *data, size_t data_size,
-                                            uint64_t *msg_sequence,
-                                            const atapp::protocol::atapp_metadata *metadata) {
+    LIBATAPP_MACRO_API int32_t app::send_message_by_random(const etcd_discovery_set &discovery_set, int32_t type, const void *data,
+                                                           size_t data_size, uint64_t *msg_sequence,
+                                                           const atapp::protocol::atapp_metadata *metadata) {
         etcd_discovery_node::ptr_t node = discovery_set.get_node_by_random();
         if (!node) {
             return EN_ATBUS_ERR_ATNODE_NOT_FOUND;
@@ -1268,10 +1267,9 @@ namespace atapp {
         return send_message(node, type, data, data_size, msg_sequence, metadata);
     }
 
-    LIBATAPP_MACRO_API int32_t app::send_message_by_round_robin(const etcd_discovery_set& discovery_set, int32_t type, 
-                                            const void *data, size_t data_size,
-                                            uint64_t *msg_sequence,
-                                            const atapp::protocol::atapp_metadata *metadata) {
+    LIBATAPP_MACRO_API int32_t app::send_message_by_round_robin(const etcd_discovery_set &discovery_set, int32_t type, const void *data,
+                                                                size_t data_size, uint64_t *msg_sequence,
+                                                                const atapp::protocol::atapp_metadata *metadata) {
         etcd_discovery_node::ptr_t node = discovery_set.get_node_by_round_robin();
         if (!node) {
             return EN_ATBUS_ERR_ATNODE_NOT_FOUND;
@@ -1446,7 +1444,7 @@ namespace atapp {
             atapp_connection_handle::ptr_t handle = std::make_shared<atapp_connection_handle>();
 
             int32_t gateway_size = discovery->get_ingress_size();
-            for (int32_t i = 0; handle && i < gateway_size; ++ i) {
+            for (int32_t i = 0; handle && i < gateway_size; ++i) {
                 atbus::channel::channel_address_t addr;
                 atbus::channel::make_address(discovery->next_ingress_address().c_str(), addr);
                 std::transform(addr.scheme.begin(), addr.scheme.end(), addr.scheme.begin(), ::util::string::tolower<char>);

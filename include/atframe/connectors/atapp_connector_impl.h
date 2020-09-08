@@ -6,8 +6,8 @@
 #include <list>
 #include <string>
 
-#include <config/compiler_features.h>
 #include <config/compile_optimize.h>
+#include <config/compiler_features.h>
 
 #include <design_pattern/nomovable.h>
 #include <design_pattern/noncopyable.h>
@@ -78,6 +78,7 @@ namespace atapp {
 
         LIBATAPP_MACRO_API void set_on_destroy(on_destroy_fn_t fn);
         LIBATAPP_MACRO_API const on_destroy_fn_t &get_on_destroy() const;
+        LIBATAPP_MACRO_API void reset_on_destroy();
 
         UTIL_FORCEINLINE atapp_connector_impl *get_connector() const UTIL_CONFIG_NOEXCEPT { return connector_; }
         UTIL_FORCEINLINE atapp_endpoint *get_endpoint() const UTIL_CONFIG_NOEXCEPT { return endpiont_; }
