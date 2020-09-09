@@ -123,6 +123,7 @@ namespace atapp {
 
     LIBATAPP_MACRO_API etcd_discovery_set::~etcd_discovery_set() {}
 
+    LIBATAPP_MACRO_API bool etcd_discovery_set::empty() const { return node_by_name_.empty() && node_by_id_.empty(); }
 
     LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_id(uint64_t id) const {
         node_by_id_t::const_iterator iter = node_by_id_.find(id);

@@ -110,6 +110,7 @@ namespace atapp {
         LIBATAPP_MACRO_API etcd_discovery_set();
         LIBATAPP_MACRO_API ~etcd_discovery_set();
 
+        LIBATAPP_MACRO_API bool empty() const;
 
         LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_id(uint64_t id) const;
         LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_name(const std::string &name) const;
