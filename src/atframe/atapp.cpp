@@ -933,7 +933,15 @@ namespace atapp {
     }
 
     LIBATAPP_MACRO_API const atapp::protocol::atapp_configure &app::get_origin_configure() const { return conf_.origin; }
+
     LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata &app::get_metadata() const { return conf_.metadata; }
+
+    LIBATAPP_MACRO_API atapp::protocol::atapp_metadata &app::get_metadata() { return conf_.metadata; }
+
+    LIBATAPP_MACRO_API const atapp::protocol::atapp_area &app::get_area() const { return conf_.origin.area(); }
+
+    LIBATAPP_MACRO_API atapp::protocol::atapp_area &app::get_area() { return *conf_.origin.mutable_area(); }
+
     LIBATAPP_MACRO_API util::time::time_utility::raw_time_t::duration app::get_configure_message_timeout() const {
         const google::protobuf::Duration &dur = conf_.origin.timer().message_timeout();
         if (dur.seconds() <= 0 && dur.nanos() <= 0) {
