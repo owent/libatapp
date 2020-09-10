@@ -62,6 +62,52 @@ namespace atapp {
         return l->get_discovery_info().name() < r->get_discovery_info().name();
     }
 
+    struct lower_upper_bound_pred_t {
+        uint64_t id;
+        const std::string *name;
+        std::pair<uint64_t, uint64_t> hash_code;
+    };
+
+    static bool lower_bound_compare_index(const etcd_discovery_node::ptr_t &l, const lower_upper_bound_pred_t &r) {
+        if (!l) {
+            return true;
+        }
+
+        if (l->get_discovery_info().id() != r.id) {
+            return l->get_discovery_info().id() < r.id;
+        }
+
+        if (!r.name) {
+            return false;
+        }
+
+        if (l->get_name_hash() != r.hash_code) {
+            return l->get_name_hash() < r.hash_code;
+        }
+
+        return l->get_discovery_info().name() < *r.name;
+    }
+
+    static bool upper_bound_compare_index(const lower_upper_bound_pred_t &l, const etcd_discovery_node::ptr_t &r) {
+        if (!r) {
+            return false;
+        }
+
+        if (l.id != r->get_discovery_info().id()) {
+            return l.id < r->get_discovery_info().id();
+        }
+
+        if (!l.name) {
+            return true;
+        }
+
+        if (l.hash_code != r->get_name_hash()) {
+            return l.hash_code < r->get_name_hash();
+        }
+
+        return *l.name < r->get_discovery_info().name();
+    }
+
     LIBATAPP_MACRO_API etcd_discovery_node::etcd_discovery_node() : name_hash_(0, 0), ingress_address_index_(0) {
         private_data_ptr_  = NULL;
         private_data_u64_  = 0;
@@ -196,6 +242,46 @@ namespace atapp {
         }
 
         return round_robin_cache_[round_robin_index_++];
+    }
+
+    LIBATAPP_MACRO_API const std::vector<etcd_discovery_node::ptr_t> &etcd_discovery_set::get_sorted_nodes() const {
+        if (round_robin_cache_.empty()) {
+            rebuild_cache();
+        }
+
+        return round_robin_cache_;
+    }
+
+    LIBATAPP_MACRO_API std::vector<etcd_discovery_node::ptr_t>::const_iterator
+    etcd_discovery_set::lower_bound_sorted_nodes(uint64_t id, const std::string &name) const {
+        const std::vector<etcd_discovery_node::ptr_t> &container = get_sorted_nodes();
+
+        lower_upper_bound_pred_t pred_val;
+        pred_val.id   = id;
+        pred_val.name = &name;
+        if (!name.empty()) {
+            pred_val.hash_code = consistent_hash_calc(name.c_str(), name.size(), 0);
+        } else {
+            pred_val.hash_code = std::pair<uint64_t, uint64_t>(0, 0);
+        }
+
+        return std::lower_bound(container.begin(), container.end(), pred_val, lower_bound_compare_index);
+    }
+
+    LIBATAPP_MACRO_API std::vector<etcd_discovery_node::ptr_t>::const_iterator
+    etcd_discovery_set::upper_bound_sorted_nodes(uint64_t id, const std::string &name) const {
+        const std::vector<etcd_discovery_node::ptr_t> &container = get_sorted_nodes();
+
+        lower_upper_bound_pred_t pred_val;
+        pred_val.id   = id;
+        pred_val.name = &name;
+        if (!name.empty()) {
+            pred_val.hash_code = consistent_hash_calc(name.c_str(), name.size(), 0);
+        } else {
+            pred_val.hash_code = std::pair<uint64_t, uint64_t>(0, 0);
+        }
+
+        return std::upper_bound(container.begin(), container.end(), pred_val, upper_bound_compare_index);
     }
 
     LIBATAPP_MACRO_API void etcd_discovery_set::add_node(const etcd_discovery_node::ptr_t &node) {

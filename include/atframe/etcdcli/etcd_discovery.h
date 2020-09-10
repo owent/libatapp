@@ -123,6 +123,12 @@ namespace atapp {
         LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_random() const;
         LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_round_robin() const;
 
+        LIBATAPP_MACRO_API const std::vector<etcd_discovery_node::ptr_t> &get_sorted_nodes() const;
+        LIBATAPP_MACRO_API std::vector<etcd_discovery_node::ptr_t>::const_iterator lower_bound_sorted_nodes(uint64_t id,
+                                                                                                            const std::string &name) const;
+        LIBATAPP_MACRO_API std::vector<etcd_discovery_node::ptr_t>::const_iterator upper_bound_sorted_nodes(uint64_t id,
+                                                                                                            const std::string &name) const;
+
         LIBATAPP_MACRO_API void add_node(const etcd_discovery_node::ptr_t &node);
         LIBATAPP_MACRO_API void remove_node(const etcd_discovery_node::ptr_t &node);
         LIBATAPP_MACRO_API void remove_node(uint64_t id);
