@@ -159,7 +159,7 @@ namespace atapp {
             uint64_t send_buffer_size   = owner_->get_origin_configure().bus().send_buffer_size();
             if (send_buffer_number > 0 &&
 #if defined(LIBATAPP_ENABLE_CUSTOM_COUNT_FOR_STD_LIST) && LIBATAPP_ENABLE_CUSTOM_COUNT_FOR_STD_LIST
-                    pending_message_count_ + 1 > send_buffer_number;
+                pending_message_count_ + 1 > send_buffer_number
 #else
                 pending_message_.size() + 1 > send_buffer_number
 #endif
