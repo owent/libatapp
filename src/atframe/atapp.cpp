@@ -917,9 +917,9 @@ namespace atapp {
 
     LIBATAPP_MACRO_API void app::parse_configures_into(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst, const std::string &path) const {
         if (!path.empty()) {
-            util::config::ini_value::node_type::const_iterator iter = cfg_loader_.get_root_node().get_children().find(path);
-            if (iter != cfg_loader_.get_root_node().get_children().end()) {
-                ini_loader_dump_to(iter->second, dst);
+            util::config::ini_value::ptr_t cfg_value = cfg_loader_.get_root_node().get_child_by_path(path);
+            if (cfg_value) {
+                ini_loader_dump_to(*cfg_value, dst);
             }
         } else {
             ini_loader_dump_to(cfg_loader_.get_root_node(), dst);

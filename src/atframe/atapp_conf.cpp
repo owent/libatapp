@@ -588,13 +588,13 @@ namespace atapp {
                     for (uint32_t j = 0;; ++j) {
                         std::string idx                                             = LOG_WRAPPER_FWAPI_FORMAT("{}", j);
                         util::config::ini_value::node_type::const_iterator idx_iter = val.get_children().find(idx);
-                        if (idx_iter == val.get_children().end()) {
+                        if (idx_iter == val.get_children().end() || !idx_iter->second) {
                             break;
                         }
 
                         ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *submsg = dst.GetReflection()->AddMessage(&dst, fds);
                         if (NULL != submsg) {
-                            ini_loader_dump_to(idx_iter->second, *submsg);
+                            ini_loader_dump_to(*idx_iter->second, *submsg);
                         }
                     }
                     break;
@@ -695,14 +695,17 @@ namespace atapp {
                 return;
             }
 
+            if (!child_iter->second) {
+                return;
+            }
+
             if (fds->is_repeated() && fds->cpp_type() != ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_MESSAGE) {
-                size_t arrsz = child_iter->second.size();
+                size_t arrsz = child_iter->second->size();
                 for (size_t i = 0; i < arrsz; ++i) {
-                    dump_pick_field(child_iter->second, dst, fds, i);
+                    dump_pick_field(*child_iter->second, dst, fds, i);
                 }
             } else {
-
-                dump_pick_field(child_iter->second, dst, fds, 0);
+                dump_pick_field(*child_iter->second, dst, fds, 0);
             }
         }
 
@@ -1058,6 +1061,9 @@ namespace atapp {
 
         for (util::config::ini_value::node_type::const_iterator iter = src.get_children().begin(); iter != src.get_children().end();
              ++iter) {
+            if (!iter->second) {
+                continue;
+            }
             // First level skip fields already in ::atapp::protocol::atapp_log_sink
             if (prefix.empty()) {
                 const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds =
@@ -1068,7 +1074,7 @@ namespace atapp {
             }
 
             std::string sub_prefix = prefix.empty() ? iter->first : LOG_WRAPPER_FWAPI_FORMAT("{}.{}", prefix, iter->first);
-            ini_loader_dump_to(iter->second, dst, sub_prefix);
+            ini_loader_dump_to(*iter->second, dst, sub_prefix);
         }
     }
 
