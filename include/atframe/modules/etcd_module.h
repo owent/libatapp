@@ -78,14 +78,14 @@ namespace atapp {
         using watcher_one_callback_t       = std::function<void(watcher_sender_one_t &)>;
         using node_event_callback_t        = std::function<void(node_action_t::type, const etcd_discovery_node::ptr_t &)>;
         using node_event_callback_list_t   = std::list<node_event_callback_t>;
-        using node_event_callback_handle_t = node_event_callback_list_t::const_iterator;
+        using node_event_callback_handle_t = node_event_callback_list_t::iterator;
         using atapp_discovery_ptr_t        = std::shared_ptr<atapp::protocol::atapp_discovery>;
 #else
         typedef std::function<void(watcher_sender_list_t &)> watcher_list_callback_t;
         typedef std::function<void(watcher_sender_one_t &)> watcher_one_callback_t;
         typedef std::function<void(node_action_t::type, const etcd_discovery_node::ptr_t &)> node_event_callback_t;
         typedef std::list<node_event_callback_t> node_event_callback_list_t;
-        typedef node_event_callback_list_t::const_iterator node_event_callback_handle_t;
+        typedef node_event_callback_list_t::iterator node_event_callback_handle_t;
         typedef std::shared_ptr<atapp::protocol::atapp_discovery> atapp_discovery_ptr_t;
 #endif
 

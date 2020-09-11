@@ -145,11 +145,11 @@ namespace atapp {
 #if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
         using on_event_up_down_fn_t         = std::function<void(etcd_cluster &)>;
         using on_event_up_down_handle_set_t = std::list<on_event_up_down_fn_t>;
-        using on_event_up_down_handle_t     = on_event_up_down_handle_set_t::const_iterator;
+        using on_event_up_down_handle_t     = on_event_up_down_handle_set_t::iterator;
 #else
         typedef std::function<void(etcd_cluster &)> on_event_up_down_fn_t;
         typedef std::list<on_event_up_down_fn_t> on_event_up_down_handle_set_t;
-        typedef on_event_up_down_handle_set_t::const_iterator on_event_up_down_handle_t;
+        typedef on_event_up_down_handle_set_t::iterator on_event_up_down_handle_t;
 #endif
 
     public:
