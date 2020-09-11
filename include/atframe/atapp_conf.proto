@@ -95,7 +95,7 @@ message atapp_area {
     // region -> district -> zone
     string region   = 1;
     string district = 2;
-    uint64 zone_id  = 3;
+    uint64 zone_id  = 3; // Such as postal zone/zip code
 }
 
 message atapp_etcd_http {

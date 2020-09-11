@@ -1069,12 +1069,14 @@ namespace atapp {
                 break;
             }
 
-            uint64_t msg_seq = 0;
-            int32_t ret      = cache->push_forward_message(type, msg_seq, data, data_size, metadata);
-            if (NULL != msg_sequence) {
-                *msg_sequence = msg_seq;
-            }
+            int32_t ret;
+            if (NULL == msg_sequence) {
+                ret = cache->push_forward_message(type, *msg_sequence, data, data_size, metadata);
+            } else {
+                uint64_t msg_seq = 0;
 
+                ret = cache->push_forward_message(type, msg_seq, data, data_size, metadata);
+            }
             return ret;
         } while (false);
 
@@ -1111,12 +1113,14 @@ namespace atapp {
                 break;
             }
 
-            uint64_t msg_seq = 0;
-            int32_t ret      = cache->push_forward_message(type, msg_seq, data, data_size, metadata);
-            if (NULL != msg_sequence) {
-                *msg_sequence = msg_seq;
-            }
+            int32_t ret;
+            if (NULL == msg_sequence) {
+                ret = cache->push_forward_message(type, *msg_sequence, data, data_size, metadata);
+            } else {
+                uint64_t msg_seq = 0;
 
+                ret = cache->push_forward_message(type, msg_seq, data, data_size, metadata);
+            }
             return ret;
         } while (false);
 
@@ -1140,17 +1144,19 @@ namespace atapp {
             return EN_ATBUS_ERR_PARAMS;
         }
 
-        atapp_endpoint::ptr_t endpoint = mutable_endpoint(target_node_discovery);
-        if (!endpoint) {
+        atapp_endpoint::ptr_t cache = mutable_endpoint(target_node_discovery);
+        if (!cache) {
             return EN_ATBUS_ERR_ATNODE_NOT_FOUND;
         }
 
-        uint64_t msg_seq = 0;
-        int32_t ret      = endpoint->push_forward_message(type, msg_seq, data, data_size, metadata);
-        if (NULL != msg_sequence) {
-            *msg_sequence = msg_seq;
-        }
+        int32_t ret;
+        if (NULL == msg_sequence) {
+            ret = cache->push_forward_message(type, *msg_sequence, data, data_size, metadata);
+        } else {
+            uint64_t msg_seq = 0;
 
+            ret = cache->push_forward_message(type, msg_seq, data, data_size, metadata);
+        }
         return ret;
     }
 
