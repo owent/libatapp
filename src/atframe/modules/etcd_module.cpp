@@ -1037,15 +1037,6 @@ namespace atapp {
                     global_discovery_.add_node(new_inst);
                 }
             }
-
-            if (has_event && new_inst) {
-                for (node_event_callback_list_t::iterator iter = node_event_callbacks_.begin(); iter != node_event_callbacks_.end();
-                     ++iter) {
-                    if (!(*iter)) {
-                        (*iter)(node.action, new_inst);
-                    }
-                }
-            }
         }
 
         // remove endpoint if got DELETE event
@@ -1064,10 +1055,28 @@ namespace atapp {
                 // notify all connector discovery event
                 if (new_inst) {
                     owner->trigger_event_on_discovery_event(node.action, new_inst);
+                    for (node_event_callback_list_t::iterator iter = node_event_callbacks_.begin(); iter != node_event_callbacks_.end();
+                         ++iter) {
+                        if (!(*iter)) {
+                            (*iter)(node.action, new_inst);
+                        }
+                    }
                 } else if (local_cache_by_name) {
                     owner->trigger_event_on_discovery_event(node.action, local_cache_by_name);
+                    for (node_event_callback_list_t::iterator iter = node_event_callbacks_.begin(); iter != node_event_callbacks_.end();
+                         ++iter) {
+                        if (!(*iter)) {
+                            (*iter)(node.action, local_cache_by_name);
+                        }
+                    }
                 } else {
                     owner->trigger_event_on_discovery_event(node.action, local_cache_by_id);
+                    for (node_event_callback_list_t::iterator iter = node_event_callbacks_.begin(); iter != node_event_callbacks_.end();
+                         ++iter) {
+                        if (!(*iter)) {
+                            (*iter)(node.action, local_cache_by_id);
+                        }
+                    }
                 }
             }
         }

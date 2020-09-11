@@ -1150,7 +1150,7 @@ namespace atapp {
                 key.assign(old_begin, begin);
 
                 if (*begin) {
-                    begin = detail::skip_space(path.c_str());
+                    begin = detail::skip_space(begin);
                     if ('.' == *begin) {
                         begin = detail::skip_space(begin + 1);
                     }

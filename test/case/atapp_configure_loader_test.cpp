@@ -16,7 +16,7 @@
 #include "frame/test_macros.h"
 
 
-static void check_configure(atapp::app &app) {
+static void check_configure(atapp::app &app, atapp::protocol::atapp_etcd sub_cfg) {
     CASE_EXPECT_EQ(app.get_id(), 0x1234);
     CASE_EXPECT_EQ(app.get_origin_configure().id_mask(), "8.8.8.8");
     CASE_EXPECT_EQ(app.convert_app_id_by_string("1.2.3.4"), 0x01020304);
@@ -44,6 +44,17 @@ static void check_configure(atapp::app &app) {
     CASE_EXPECT_EQ("", app.get_origin_configure().etcd().authorization());
     CASE_EXPECT_EQ(0, app.get_origin_configure().etcd().init().tick_interval().seconds());
     CASE_EXPECT_EQ(16000000, app.get_origin_configure().etcd().init().tick_interval().nanos());
+
+    CASE_EXPECT_EQ(3, sub_cfg.hosts_size());
+    if (3 == sub_cfg.hosts_size()) {
+        CASE_EXPECT_EQ("http://127.0.0.1:2375", sub_cfg.hosts(0));
+        CASE_EXPECT_EQ("http://127.0.0.1:2376", sub_cfg.hosts(1));
+        CASE_EXPECT_EQ("http://127.0.0.1:2377", sub_cfg.hosts(2));
+    }
+    CASE_EXPECT_EQ("/atapp/services/astf4g/", sub_cfg.path());
+    CASE_EXPECT_EQ("", sub_cfg.authorization());
+    CASE_EXPECT_EQ(0, sub_cfg.init().tick_interval().seconds());
+    CASE_EXPECT_EQ(16000000, sub_cfg.init().tick_interval().nanos());
 }
 
 CASE_TEST(atapp_configure, load_yaml) {
@@ -61,7 +72,9 @@ CASE_TEST(atapp_configure, load_yaml) {
     app.init(NULL, 4, argv);
     app.reload();
 
-    check_configure(app);
+    atapp::protocol::atapp_etcd sub_cfg;
+    app.parse_configures_into(sub_cfg, "atapp.etcd");
+    check_configure(app, sub_cfg);
 
     WLOG_GETCAT(0)->clear_sinks();
     WLOG_GETCAT(1)->clear_sinks();
@@ -82,7 +95,9 @@ CASE_TEST(atapp_configure, load_conf) {
     app.init(NULL, 4, argv);
     app.reload();
 
-    check_configure(app);
+    atapp::protocol::atapp_etcd sub_cfg;
+    app.parse_configures_into(sub_cfg, "atapp.etcd");
+    check_configure(app, sub_cfg);
 
     WLOG_GETCAT(0)->clear_sinks();
     WLOG_GETCAT(1)->clear_sinks();

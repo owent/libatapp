@@ -1786,6 +1786,19 @@ namespace atapp {
 
     LIBATAPP_MACRO_API void app::trigger_event_on_discovery_event(etcd_discovery_action_t::type action,
                                                                   const etcd_discovery_node::ptr_t &node) {
+        if (node) {
+            const atapp::protocol::atapp_discovery &discovery_info = node->get_discovery_info();
+            if (action == etcd_discovery_action_t::EN_NAT_PUT) {
+                FWLOGINFO("app {}({}, type={}:{}) got a PUT discovery event({}({}, type={}:{}))", get_app_name(), get_id(), get_type_id(),
+                          get_type_name(), discovery_info.name(), discovery_info.id(), discovery_info.type_id(),
+                          discovery_info.type_name());
+            } else {
+                FWLOGINFO("app {}({}, type={}:{}) got a DELETE discovery event({}({}, type={}:{})", get_app_name(), get_id(), get_type_id(),
+                          get_type_name(), discovery_info.name(), discovery_info.id(), discovery_info.type_id(),
+                          discovery_info.type_name());
+            }
+        }
+
         for (std::list<std::shared_ptr<atapp_connector_impl> >::const_iterator iter = connectors_.begin(); iter != connectors_.end();
              ++iter) {
             if (*iter) {

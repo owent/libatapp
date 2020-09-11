@@ -397,9 +397,9 @@ namespace atapp {
         LIBATAPP_MACRO_API atapp_endpoint *get_endpoint(const std::string &by_name);
         LIBATAPP_MACRO_API const atapp_endpoint *get_endpoint(const std::string &by_name) const;
 
-        template <class TCONNECTOR>
-        LIBATAPP_MACRO_API_HEAD_ONLY std::shared_ptr<TCONNECTOR> add_connector() {
-            std::shared_ptr<TCONNECTOR> ret = std::make_shared<TCONNECTOR>(*this);
+        template <class TCONNECTOR, class... TARGS>
+        LIBATAPP_MACRO_API_HEAD_ONLY std::shared_ptr<TCONNECTOR> add_connector(TARGS &&... args) {
+            std::shared_ptr<TCONNECTOR> ret = std::make_shared<TCONNECTOR>(*this, std::forward<TARGS>(args)...);
             if (ret) {
                 add_connector_inner(std::static_pointer_cast<atapp_connector_impl>(ret));
             }
