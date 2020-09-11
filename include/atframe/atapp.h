@@ -495,7 +495,7 @@ namespace atapp {
         int bus_evt_callback_on_custom_rsp(const atbus::node &, const atbus::endpoint *, const atbus::connection *, app_id_t,
                                            const std::vector<std::pair<const void *, size_t> > &, uint64_t);
 
-        void add_connector_inner(std::shared_ptr<atapp_connector_impl> connector);
+        LIBATAPP_MACRO_API void add_connector_inner(std::shared_ptr<atapp_connector_impl> connector);
 
         /** this function should always not be used outside atapp.cpp **/
         static void _app_setup_signal_term(int signo);

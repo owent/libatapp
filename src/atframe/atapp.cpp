@@ -3025,7 +3025,7 @@ namespace atapp {
         return 0;
     }
 
-    void app::add_connector_inner(std::shared_ptr<atapp_connector_impl> connector) {
+    LIBATAPP_MACRO_API void app::add_connector_inner(std::shared_ptr<atapp_connector_impl> connector) {
         if (!connector) {
             return;
         }
