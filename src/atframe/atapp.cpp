@@ -2112,49 +2112,50 @@ namespace atapp {
             bus_node_.reset();
         }
 
-        std::shared_ptr<atbus::node> connection_node = atbus::node::create();
-        if (!connection_node) {
+        bus_node_ = atbus::node::create();
+        if (!bus_node_) {
             FWLOGERROR("create bus node failed.");
             return EN_ATAPP_ERR_SETUP_ATBUS;
         }
 
-        ret = connection_node->init(conf_.id, &conf_.bus_conf);
+        ret = bus_node_->init(conf_.id, &conf_.bus_conf);
         if (ret < 0) {
             FWLOGERROR("init bus node failed. ret: {}", ret);
+            bus_node_.reset();
             return EN_ATAPP_ERR_SETUP_ATBUS;
         }
 
         // setup all callbacks
-        connection_node->set_on_recv_handle(std::bind(&app::bus_evt_callback_on_recv_msg, this, std::placeholders::_1,
-                                                      std::placeholders::_2, std::placeholders::_3, std::placeholders::_4,
-                                                      std::placeholders::_5, std::placeholders::_6));
+        bus_node_->set_on_recv_handle(std::bind(&app::bus_evt_callback_on_recv_msg, this, std::placeholders::_1, std::placeholders::_2,
+                                                std::placeholders::_3, std::placeholders::_4, std::placeholders::_5,
+                                                std::placeholders::_6));
 
-        connection_node->set_on_forward_response_handle(std::bind(&app::bus_evt_callback_on_forward_response, this, std::placeholders::_1,
-                                                                  std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
+        bus_node_->set_on_forward_response_handle(std::bind(&app::bus_evt_callback_on_forward_response, this, std::placeholders::_1,
+                                                            std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 
-        connection_node->set_on_error_handle(std::bind(&app::bus_evt_callback_on_error, this, std::placeholders::_1, std::placeholders::_2,
-                                                       std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
+        bus_node_->set_on_error_handle(std::bind(&app::bus_evt_callback_on_error, this, std::placeholders::_1, std::placeholders::_2,
+                                                 std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
 
-        connection_node->set_on_register_handle(std::bind(&app::bus_evt_callback_on_reg, this, std::placeholders::_1, std::placeholders::_2,
-                                                          std::placeholders::_3, std::placeholders::_4));
+        bus_node_->set_on_register_handle(std::bind(&app::bus_evt_callback_on_reg, this, std::placeholders::_1, std::placeholders::_2,
+                                                    std::placeholders::_3, std::placeholders::_4));
 
-        connection_node->set_on_shutdown_handle(
+        bus_node_->set_on_shutdown_handle(
             std::bind(&app::bus_evt_callback_on_shutdown, this, std::placeholders::_1, std::placeholders::_2));
 
-        connection_node->set_on_available_handle(
+        bus_node_->set_on_available_handle(
             std::bind(&app::bus_evt_callback_on_available, this, std::placeholders::_1, std::placeholders::_2));
 
-        connection_node->set_on_invalid_connection_handle(std::bind(&app::bus_evt_callback_on_invalid_connection, this,
-                                                                    std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+        bus_node_->set_on_invalid_connection_handle(std::bind(&app::bus_evt_callback_on_invalid_connection, this, std::placeholders::_1,
+                                                              std::placeholders::_2, std::placeholders::_3));
 
-        connection_node->set_on_custom_cmd_handle(std::bind(&app::bus_evt_callback_on_custom_cmd, this, std::placeholders::_1,
-                                                            std::placeholders::_2, std::placeholders::_3, std::placeholders::_4,
-                                                            std::placeholders::_5, std::placeholders::_6));
-        connection_node->set_on_add_endpoint_handle(
+        bus_node_->set_on_custom_cmd_handle(std::bind(&app::bus_evt_callback_on_custom_cmd, this, std::placeholders::_1,
+                                                      std::placeholders::_2, std::placeholders::_3, std::placeholders::_4,
+                                                      std::placeholders::_5, std::placeholders::_6));
+        bus_node_->set_on_add_endpoint_handle(
             std::bind(&app::bus_evt_callback_on_add_endpoint, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
-        connection_node->set_on_remove_endpoint_handle(std::bind(&app::bus_evt_callback_on_remove_endpoint, this, std::placeholders::_1,
-                                                                 std::placeholders::_2, std::placeholders::_3));
+        bus_node_->set_on_remove_endpoint_handle(std::bind(&app::bus_evt_callback_on_remove_endpoint, this, std::placeholders::_1,
+                                                           std::placeholders::_2, std::placeholders::_3));
 
 
         // TODO if not in resume mode, destroy shm
@@ -2195,24 +2196,26 @@ namespace atapp {
 
         if (ret < 0) {
             FWLOGERROR("bus node listen failed");
+            bus_node_.reset();
             return ret;
         }
 
         // start
-        ret = connection_node->start();
+        ret = bus_node_->start();
         if (ret < 0) {
             FWLOGERROR("bus node start failed, ret: {}", ret);
+            bus_node_.reset();
             return ret;
         }
 
         // if has father node, block and connect to father node
-        if (atbus::node::state_t::CONNECTING_PARENT == connection_node->get_state() ||
-            atbus::node::state_t::LOST_PARENT == connection_node->get_state()) {
+        if (atbus::node::state_t::CONNECTING_PARENT == bus_node_->get_state() ||
+            atbus::node::state_t::LOST_PARENT == bus_node_->get_state()) {
             // setup timeout and waiting for parent connected
             if (!tick_timer_.timeout_timer) {
                 timer_ptr_t timer = std::make_shared<timer_info_t>();
 
-                uv_timer_init(connection_node->get_evloop(), &timer->timer);
+                uv_timer_init(bus_node_->get_evloop(), &timer->timer);
                 timer->timer.data = this;
 
                 res = uv_timer_start(&timer->timer, ev_stop_timeout,
@@ -2227,7 +2230,7 @@ namespace atapp {
                     uv_close(reinterpret_cast<uv_handle_t *>(&timer->timer), _app_close_timer_handle);
                 }
 
-                while (NULL == connection_node->get_parent_endpoint()) {
+                while (NULL == bus_node_->get_parent_endpoint()) {
                     if (check_flag(flag_t::TIMEOUT)) {
                         FWLOGERROR("connection to parent node {} timeout", conf_.bus_conf.parent_address);
                         ret = -1;
@@ -2236,7 +2239,7 @@ namespace atapp {
 
                     {
                         flag_guard_t in_callback_guard(*this, flag_t::IN_CALLBACK);
-                        uv_run(connection_node->get_evloop(), UV_RUN_ONCE);
+                        uv_run(bus_node_->get_evloop(), UV_RUN_ONCE);
                     }
                 }
 
@@ -2245,12 +2248,11 @@ namespace atapp {
 
                 if (ret < 0) {
                     FWLOGERROR("connect to parent node failed");
+                    bus_node_.reset();
                     return ret;
                 }
             }
         }
-
-        bus_node_ = connection_node;
 
         return 0;
     }
