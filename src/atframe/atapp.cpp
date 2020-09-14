@@ -142,7 +142,13 @@ namespace atapp {
         tick_timer_.sec        = 0;
         tick_timer_.usec       = 0;
 
-        stat_.last_checkpoint_min = 0;
+        stat_.last_checkpoint_min                  = 0;
+        stat_.inner_etcd.sum_error_requests        = 0;
+        stat_.inner_etcd.continue_error_requests   = 0;
+        stat_.inner_etcd.sum_success_requests      = 0;
+        stat_.inner_etcd.continue_success_requests = 0;
+        stat_.inner_etcd.sum_create_requests       = 0;
+
 
         atbus_connector_ = add_connector<atapp_connector_atbus>();
 
@@ -595,6 +601,10 @@ namespace atapp {
                     mod->reload();
                 }
             }
+
+            if (inner_module_etcd_) {
+                inner_module_etcd_->set_maybe_update_keepalive_value();
+            }
         }
 
         // step 8. if running and tick interval changed, reset timer
@@ -729,7 +739,7 @@ namespace atapp {
 
                     std::pair<uint64_t, const char *> max_rss = make_size_showup(last_usage.ru_maxrss);
 #ifdef WIN32
-                    FWLOGINFO("[STAT]: {} CPU usage: user {:02.3}%, sys {:02.3}%, max rss: {}{}, page faults: {}", get_app_name(),
+                    FWLOGINFO("[STATISTICS]: {} CPU usage: user {:02.3}%, sys {:02.3}%, max rss: {}{}, page faults: {}", get_app_name(),
                               offset_usr / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f), // usec and add %
                               offset_sys / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f), // usec and add %
                               static_cast<unsigned long long>(max_rss.first), max_rss.second,
@@ -738,20 +748,38 @@ namespace atapp {
                     std::pair<uint64_t, const char *> ru_ixrss = make_size_showup(last_usage.ru_ixrss);
                     std::pair<uint64_t, const char *> ru_idrss = make_size_showup(last_usage.ru_idrss);
                     std::pair<uint64_t, const char *> ru_isrss = make_size_showup(last_usage.ru_isrss);
-                    FWLOGINFO("[STAT]: {} CPU usage: user {:02.3}%, sys {:02.3}%, max rss: {}{}, shared size: {}{}, unshared data size: "
-                              "{}{}, unshared "
-                              "stack size: {}{}, page faults: {}",
-                              get_app_name(),
-                              offset_usr / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f), // usec and add %
-                              offset_sys / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f), // usec and add %
-                              static_cast<unsigned long long>(max_rss.first), max_rss.second,
-                              static_cast<unsigned long long>(ru_ixrss.first), ru_ixrss.second,
-                              static_cast<unsigned long long>(ru_idrss.first), ru_idrss.second,
-                              static_cast<unsigned long long>(ru_isrss.first), ru_isrss.second,
-                              static_cast<unsigned long long>(last_usage.ru_majflt));
+                    FWLOGINFO(
+                        "[STATISTICS]: {} CPU usage: user {:02.3}%, sys {:02.3}%, max rss: {}{}, shared size: {}{}, unshared data size: "
+                        "{}{}, unshared "
+                        "stack size: {}{}, page faults: {}",
+                        get_app_name(),
+                        offset_usr / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f), // usec and add %
+                        offset_sys / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f), // usec and add %
+                        static_cast<unsigned long long>(max_rss.first), max_rss.second, static_cast<unsigned long long>(ru_ixrss.first),
+                        ru_ixrss.second, static_cast<unsigned long long>(ru_idrss.first), ru_idrss.second,
+                        static_cast<unsigned long long>(ru_isrss.first), ru_isrss.second,
+                        static_cast<unsigned long long>(last_usage.ru_majflt));
+                    if (inner_module_etcd_) {
+                        const ::atapp::etcd_cluster::stats_t &current = inner_module_etcd_->get_raw_etcd_ctx().get_stats();
+                        FWLOGINFO("\tetcd module(last minite): request count: {}, error request: {}, continue error: {}, success request: "
+                                  "{}, continue success request {}",
+                                  current.sum_create_requests - stat_.inner_etcd.sum_create_requests,
+                                  current.sum_error_requests - stat_.inner_etcd.sum_error_requests,
+                                  current.continue_error_requests - stat_.inner_etcd.continue_error_requests,
+                                  current.sum_success_requests - stat_.inner_etcd.sum_success_requests,
+                                  current.continue_success_requests - stat_.inner_etcd.continue_success_requests);
+                        FWLOGINFO("\tetcd module(sum): request count: {}, error request: {}, continue error: {}, success request: "
+                                  "{}, continue success request {}",
+                                  current.sum_create_requests, current.sum_error_requests, current.continue_error_requests,
+                                  current.sum_success_requests, current.continue_success_requests);
+                        stat_.inner_etcd = current;
+                    }
 #endif
                 } else {
                     uv_getrusage(&stat_.last_checkpoint_usage);
+                    if (inner_module_etcd_) {
+                        stat_.inner_etcd = inner_module_etcd_->get_raw_etcd_ctx().get_stats();
+                    }
                 }
 
                 if (bus_node_ && NULL != bus_node_->get_evloop()) {
@@ -936,11 +964,21 @@ namespace atapp {
 
     LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata &app::get_metadata() const { return conf_.metadata; }
 
-    LIBATAPP_MACRO_API atapp::protocol::atapp_metadata &app::get_metadata() { return conf_.metadata; }
+    LIBATAPP_MACRO_API atapp::protocol::atapp_metadata &app::mutable_metadata() {
+        if (inner_module_etcd_) {
+            inner_module_etcd_->set_maybe_update_keepalive_value();
+        }
+        return conf_.metadata;
+    }
 
     LIBATAPP_MACRO_API const atapp::protocol::atapp_area &app::get_area() const { return conf_.origin.area(); }
 
-    LIBATAPP_MACRO_API atapp::protocol::atapp_area &app::get_area() { return *conf_.origin.mutable_area(); }
+    LIBATAPP_MACRO_API atapp::protocol::atapp_area &app::mutable_area() {
+        if (inner_module_etcd_) {
+            inner_module_etcd_->set_maybe_update_keepalive_value();
+        }
+        return *conf_.origin.mutable_area();
+    }
 
     LIBATAPP_MACRO_API util::time::time_utility::raw_time_t::duration app::get_configure_message_timeout() const {
         const google::protobuf::Duration &dur = conf_.origin.timer().message_timeout();

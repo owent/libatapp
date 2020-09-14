@@ -135,12 +135,14 @@ namespace atapp {
     LIBATAPP_MACRO_API atapp_connector_impl::atapp_connector_impl(app &owner) : owner_(&owner) {}
 
     LIBATAPP_MACRO_API atapp_connector_impl::~atapp_connector_impl() {
-        handle_set_t handles;
-        handles.swap(handles_);
+        while (!handles_.empty()) {
+            handle_set_t handles;
+            handles.swap(handles_);
 
-        for (handle_set_t::const_iterator iter = handles.begin(); iter != handles.end(); ++iter) {
-            if (*iter) {
-                atapp_connector_bind_helper::unbind(**iter, *this);
+            for (handle_set_t::const_iterator iter = handles.begin(); iter != handles.end(); ++iter) {
+                if (*iter) {
+                    atapp_connector_bind_helper::unbind(**iter, *this);
+                }
             }
         }
     }

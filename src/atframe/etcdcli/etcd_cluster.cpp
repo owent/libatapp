@@ -1718,7 +1718,7 @@ namespace atapp {
         stats_.continue_error_requests = 0;
     }
 
-    void etcd_cluster::add_stats_create_request() { stats_.sum_create_requests = 0; }
+    void etcd_cluster::add_stats_create_request() { ++stats_.sum_create_requests; }
 
     bool etcd_cluster::check_authorization() const {
         if (conf_.authorization.empty()) {

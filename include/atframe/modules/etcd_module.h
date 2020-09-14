@@ -99,7 +99,8 @@ namespace atapp {
         LIBATAPP_MACRO_API virtual int init() UTIL_CONFIG_OVERRIDE;
 
     private:
-        int init_keepalives(std::vector<atapp::etcd_keepalive::ptr_t> &keepalive_actors, std::string &keepalive_val);
+        void update_keepalive_value();
+        int init_keepalives();
         int init_watchers();
 
     public:
@@ -119,6 +120,7 @@ namespace atapp {
         LIBATAPP_MACRO_API bool is_etcd_enabled() const;
         LIBATAPP_MACRO_API void enable_etcd();
         LIBATAPP_MACRO_API void disable_etcd();
+        LIBATAPP_MACRO_API void set_maybe_update_keepalive_value();
 
         LIBATAPP_MACRO_API const util::network::http_request::curl_m_bind_ptr_t &get_shared_curl_multi_context() const;
 
@@ -189,9 +191,14 @@ namespace atapp {
         util::network::http_request::curl_m_bind_ptr_t curl_multi_;
         util::network::http_request::ptr_t cleanup_request_;
         bool etcd_ctx_enabled_;
+        bool maybe_update_inner_keepalive_value_;
         util::time::time_utility::raw_time_t tick_next_timepoint_;
         std::chrono::system_clock::duration tick_interval_;
         ::atapp::etcd_cluster etcd_ctx_;
+
+        std::list<etcd_keepalive::ptr_t> inner_keepalive_actors_;
+        std::string inner_keepalive_value_;
+
         std::list<watcher_list_callback_t> watcher_by_id_callbacks_;
         std::list<watcher_list_callback_t> watcher_by_name_callbacks_;
 

@@ -31,6 +31,8 @@
 
 #include "connectors/atapp_connector_atbus.h"
 
+#include "etcdcli/etcd_cluster.h"
+
 namespace atbus {
     namespace protocol {
         class msg;
@@ -305,9 +307,9 @@ namespace atapp {
 
         LIBATAPP_MACRO_API const atapp::protocol::atapp_configure &get_origin_configure() const;
         LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata &get_metadata() const;
-        LIBATAPP_MACRO_API atapp::protocol::atapp_metadata &get_metadata();
+        LIBATAPP_MACRO_API atapp::protocol::atapp_metadata &mutable_metadata();
         LIBATAPP_MACRO_API const atapp::protocol::atapp_area &get_area() const;
-        LIBATAPP_MACRO_API atapp::protocol::atapp_area &get_area();
+        LIBATAPP_MACRO_API atapp::protocol::atapp_area &mutable_area();
         LIBATAPP_MACRO_API util::time::time_utility::raw_duration_t get_configure_message_timeout() const;
 
         LIBATAPP_MACRO_API void pack(atapp::protocol::atapp_discovery &out) const;
@@ -538,6 +540,8 @@ namespace atapp {
         struct stat_data_t {
             uv_rusage_t last_checkpoint_usage;
             time_t last_checkpoint_min;
+
+            ::atapp::etcd_cluster::stats_t inner_etcd;
         };
         stat_data_t stat_;
 
