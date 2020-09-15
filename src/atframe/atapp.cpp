@@ -143,6 +143,7 @@ namespace atapp {
         tick_timer_.usec       = 0;
 
         stat_.last_checkpoint_min                  = 0;
+        stat_.endpoint_wake_count                  = 0;
         stat_.inner_etcd.sum_error_requests        = 0;
         stat_.inner_etcd.continue_error_requests   = 0;
         stat_.inner_etcd.sum_success_requests      = 0;
@@ -695,6 +696,8 @@ namespace atapp {
             while (!endpoint_waker_.empty() && endpoint_waker_.begin()->first <= tick_timer_.sec_update) {
                 atapp_endpoint::ptr_t ep = endpoint_waker_.begin()->second.lock();
                 endpoint_waker_.erase(endpoint_waker_.begin());
+                ++stat_.endpoint_wake_count;
+
                 if (ep) {
                     res = ep->retry_pending_messages(tick_timer_.sec_update, conf_.origin.bus().loop_times());
                     if (res > 0) {
@@ -778,6 +781,11 @@ namespace atapp {
                                   current.sum_success_requests, current.continue_success_requests);
                         stat_.inner_etcd = current;
                     }
+
+                    FWLOGINFO("\tendpoint wake count: {}, by_id index size: {}, by_name inde size: {}, waker size: {}",
+                              stat_.endpoint_wake_count, endpoint_index_by_id_.size(), endpoint_index_by_name_.size(),
+                              endpoint_waker_.size());
+                    stat_.endpoint_wake_count = 0;
 #endif
                 } else {
                     uv_getrusage(&stat_.last_checkpoint_usage);
@@ -1507,10 +1515,12 @@ namespace atapp {
 
                 connector_protocol_map_t::const_iterator iter = connector_protocols_.find(addr.scheme);
                 if (iter == connector_protocols_.end()) {
+                    FWLOGDEBUG("atapp endpoint {}({}) skip unsupported address {}", ret->get_id(), ret->get_name(), addr.address);
                     continue;
                 }
 
                 if (!iter->second) {
+                    FWLOGDEBUG("atapp endpoint {}({}) skip unsupported address {}", ret->get_id(), ret->get_name(), addr.address);
                     continue;
                 }
 
@@ -1518,7 +1528,13 @@ namespace atapp {
                 if (0 == res && handle.use_count() > 1) {
                     atapp_connector_bind_helper::bind(*handle, *iter->second);
                     atapp_endpoint_bind_helper::bind(*handle, *ret);
+
+                    FWLOGINFO("atapp endpoint {}({}) connect address {} success and use handle {}", ret->get_id(), ret->get_name(),
+                              addr.address, reinterpret_cast<const void *>(handle.get()));
                     break;
+                } else {
+                    FWLOGINFO("atapp endpoint {}({}) skip address {} with handle {}", ret->get_id(), ret->get_name(), addr.address,
+                              reinterpret_cast<const void *>(handle.get()));
                 }
             }
         }

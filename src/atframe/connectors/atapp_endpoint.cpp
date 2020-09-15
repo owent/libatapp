@@ -27,11 +27,16 @@ namespace atapp {
         ptr_t ret = std::make_shared<atapp_endpoint>(owner, helper);
         if (ret) {
             ret->watcher_ = ret;
+
+            FWLOGINFO("create atapp endpoint {}", reinterpret_cast<const void *>(ret.get()));
         }
         return ret;
     }
 
-    LIBATAPP_MACRO_API atapp_endpoint::~atapp_endpoint() { reset(); }
+    LIBATAPP_MACRO_API atapp_endpoint::~atapp_endpoint() {
+        reset();
+        FWLOGINFO("destroy atapp endpoint {}", reinterpret_cast<const void *>(this));
+    }
 
     void atapp_endpoint::reset() {
         if (closing_) {
@@ -104,6 +109,11 @@ namespace atapp {
         }
 
         discovery_ = discovery;
+
+        if (discovery) {
+            FWLOGINFO("update atapp endpoint {} with {}({})", reinterpret_cast<const void *>(this), discovery->get_discovery_info().id(),
+                      discovery->get_discovery_info().name());
+        }
     }
 
     LIBATAPP_MACRO_API int32_t atapp_endpoint::push_forward_message(int32_t type, uint64_t &msg_sequence, const void *data,

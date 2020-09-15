@@ -78,9 +78,13 @@ namespace atapp {
         private_data_ptr_  = NULL;
         private_data_u64_  = 0;
         private_data_uptr_ = 0;
+
+        FWLOGDEBUG("atapp handle {} created", reinterpret_cast<const void *>(this));
     }
 
     LIBATAPP_MACRO_API atapp_connection_handle::~atapp_connection_handle() {
+        FWLOGDEBUG("atapp handle {} destroying", reinterpret_cast<const void *>(this));
+
         close();
         if (on_destroy_fn_) {
             on_destroy_fn_(*this);

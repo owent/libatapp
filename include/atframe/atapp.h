@@ -544,6 +544,7 @@ namespace atapp {
             uv_rusage_t last_checkpoint_usage;
             time_t last_checkpoint_min;
 
+            size_t endpoint_wake_count;
             ::atapp::etcd_cluster::stats_t inner_etcd;
         };
         stat_data_t stat_;
