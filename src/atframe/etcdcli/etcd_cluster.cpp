@@ -1061,8 +1061,13 @@ namespace atapp {
             }
             self->add_stats_error_request();
 
-            FWLOGERROR("Etcd user get failed, error code: {}, http code: {}\n{}", req.get_error_code(), req.get_response_code(),
-                       req.get_error_msg());
+            if (ETCD_API_V3_ERROR_HTTP_CODE_AUTH == req.get_response_code()) {
+                FWLOGINFO("Etcd user get failed with authentication code expired, we will try to obtain a new one.{}", req.get_error_msg());
+            } else {
+                FWLOGERROR("Etcd user get failed, error code: {}, http code: {}\n{}", req.get_error_code(), req.get_response_code(),
+                           req.get_error_msg());
+            }
+
             self->check_authorization_expired(req.get_response_code(), req.get_response_stream().str());
             return 0;
         }

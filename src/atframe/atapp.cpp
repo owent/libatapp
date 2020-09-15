@@ -238,6 +238,10 @@ namespace atapp {
         if (mode_t::INFO == mode_) {
             return 0;
         }
+        if (mode_t::HELP == mode_) {
+            print_help();
+            return 0;
+        }
 
         util::cli::shell_stream ss(std::cerr);
         // step 4. load options from cmd line
@@ -2187,6 +2191,9 @@ namespace atapp {
         bus_node_->set_on_error_handle(std::bind(&app::bus_evt_callback_on_error, this, std::placeholders::_1, std::placeholders::_2,
                                                  std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
 
+        bus_node_->set_on_info_log_handle(std::bind(&app::bus_evt_callback_on_info_log, this, std::placeholders::_1, std::placeholders::_2,
+                                                    std::placeholders::_3, std::placeholders::_4));
+
         bus_node_->set_on_register_handle(std::bind(&app::bus_evt_callback_on_reg, this, std::placeholders::_1, std::placeholders::_2,
                                                     std::placeholders::_3, std::placeholders::_4));
 
@@ -2547,19 +2554,9 @@ namespace atapp {
 
     LIBATAPP_MACRO_API app *app::get_last_instance() { return last_instance_; }
 
-    int app::prog_option_handler_help(util::cli::callback_param /*params*/, util::cli::cmd_option *opt_mgr,
-                                      util::cli::cmd_option_ci *cmd_mgr) {
-        assert(opt_mgr);
-        mode_ = mode_t::INFO;
-        util::cli::shell_stream shls(std::cout);
-
-        shls() << util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW << util::cli::shell_font_style::SHELL_FONT_SPEC_BOLD
-               << "Usage: " << conf_.execute_path << " <options> <command> [command paraters...]" << std::endl;
-        shls() << opt_mgr->get_help_msg() << std::endl << std::endl;
-
-        shls() << util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW << util::cli::shell_font_style::SHELL_FONT_SPEC_BOLD
-               << "Custom command help:" << std::endl;
-        shls() << cmd_mgr->get_help_msg() << std::endl;
+    int app::prog_option_handler_help(util::cli::callback_param /*params*/, util::cli::cmd_option * /*opt_mgr*/,
+                                      util::cli::cmd_option_ci * /*cmd_mgr*/) {
+        mode_ = mode_t::HELP;
         return 0;
     }
 
@@ -2790,6 +2787,37 @@ namespace atapp {
         return 0;
     }
 
+    int app::command_handler_list_discovery(util::cli::callback_param params) {
+        if (!inner_module_etcd_) {
+            const char *msg = "Etcd module not initialized.";
+            add_custom_command_rsp(params, msg);
+        } else {
+            size_t start_idx = 0;
+            size_t end_idx   = 0;
+            if (params.get_params_number() > 0) {
+                start_idx = static_cast<size_t>(params[0]->to_uint64());
+            }
+            if (params.get_params_number() > 1) {
+                end_idx = static_cast<size_t>(params[1]->to_uint64());
+            }
+
+            const std::vector<etcd_discovery_node::ptr_t> &nodes = inner_module_etcd_->get_global_discovery().get_sorted_nodes();
+            for (size_t i = start_idx; i < nodes.size() && (0 == end_idx || i < end_idx); ++i) {
+                if (!nodes[i]) {
+                    continue;
+                }
+                const atapp::protocol::atapp_discovery &node_info = nodes[i]->get_discovery_info();
+                add_custom_command_rsp(params, LOG_WRAPPER_FWAPI_FORMAT("node -> private data: {}, destroy event: {}, hash: {:x}{:x}, {}",
+                                                                        reinterpret_cast<const void *>(nodes[i]->get_private_data_ptr()),
+                                                                        (nodes[i]->get_on_destroy() ? "ON" : "OFF"),
+                                                                        nodes[i]->get_name_hash().first, nodes[i]->get_name_hash().second,
+                                                                        rapidsjon_loader_stringify(node_info)));
+            }
+        }
+
+        return 0;
+    }
+
     int app::bus_evt_callback_on_recv_msg(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
                                           const atbus::protocol::msg &msg, const void *buffer, size_t len) {
         if (atbus::protocol::msg::kDataTransformReq != msg.msg_body_case() || 0 == msg.head().src_bus_id()) {
@@ -2892,11 +2920,11 @@ namespace atapp {
 
         if (NULL != conn) {
             if (NULL != ep) {
-                FWLOGERROR("bus node {:#x} endpoint {:#x} connection {} error, status: {}, error code: {}", n.get_id(), ep->get_id(),
-                           conn->get_address().address, status, errcode);
+                FWLOGERROR("bus node {:#x} endpoint {:#x} connection {}({}) error, status: {}, error code: {}", n.get_id(), ep->get_id(),
+                           reinterpret_cast<const void *>(conn), conn->get_address().address, status, errcode);
             } else {
-                FWLOGERROR("bus node {:#x} connection {} error, status: {}, error code: {}", n.get_id(), conn->get_address().address,
-                           status, errcode);
+                FWLOGERROR("bus node {:#x} connection {}({}) error, status: {}, error code: {}", n.get_id(),
+                           reinterpret_cast<const void *>(conn), conn->get_address().address, status, errcode);
             }
 
         } else {
@@ -2907,6 +2935,13 @@ namespace atapp {
             }
         }
 
+        return 0;
+    }
+
+    int app::bus_evt_callback_on_info_log(const atbus::node &n, const atbus::endpoint *ep, const atbus::connection *conn, const char *msg) {
+        FWLOGINFO("bus node {:#x} endpoint {:#x}({}) connection {}({}) message: {}", n.get_id(), (NULL == ep ? 0 : ep->get_id()),
+                  reinterpret_cast<const void *>(ep), (NULL == conn ? "" : conn->get_address().address.c_str()),
+                  reinterpret_cast<const void *>(conn), (NULL == msg ? "" : msg));
         return 0;
     }
 
@@ -2957,8 +2992,13 @@ namespace atapp {
                         "bus node {:#x} make a invalid connection {}({}) when closing, all unfinished connection will be aborted. res: {}",
                         n.get_id(), reinterpret_cast<const void *>(conn), conn->get_address().address, res);
                 } else {
-                    FWLOGWARNING("bus node {:#x} make a invalid connection {}({}), maybe it's a temporary connection. res: {}", n.get_id(),
-                                 reinterpret_cast<const void *>(conn), conn->get_address().address, res);
+                    if (conn->check_flag(atbus::connection::flag_t::TEMPORARY)) {
+                        FWLOGWARNING("bus node {:#x} temporary connection {}({}) expired. res: {}", n.get_id(),
+                                     reinterpret_cast<const void *>(conn), conn->get_address().address, res);
+                    } else {
+                        FWLOGERROR("bus node {:#x} make a invalid connection {}({}). res: {}", n.get_id(),
+                                   reinterpret_cast<const void *>(conn), conn->get_address().address, res);
+                    }
                 }
             }
         }
@@ -3085,11 +3125,6 @@ namespace atapp {
 
     void app::setup_command() {
         util::cli::cmd_option_ci::ptr_type cmd_mgr = get_command_manager();
-        // dump all connected nodes to default log collector
-        // cmd_mgr->bind_cmd("dump");
-        // dump all nodes to default log collector
-        // cmd_mgr->bind_cmd("dump");
-        // dump state
 
         // start server
         cmd_mgr->bind_cmd("start", &app::app::command_handler_start, this);
@@ -3104,6 +3139,9 @@ namespace atapp {
         // disable etcd
         cmd_mgr->bind_cmd("disable-etcd", &app::command_handler_disable_etcd, this)
             ->set_help_msg("disable-etcd                           disable etcd discovery module.");
+
+        cmd_mgr->bind_cmd("list-discovery", &app::command_handler_list_discovery, this)
+            ->set_help_msg("list-discovery [start:0] [end]         list all discovery node.");
 
         // invalid command
         cmd_mgr->bind_cmd("@OnError", &app::command_handler_invalid, this);

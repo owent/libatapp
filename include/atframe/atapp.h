@@ -123,6 +123,7 @@ namespace atapp {
                 STOP,       // send a stop command
                 RELOAD,     // send a reload command
                 INFO,       // show information and exit
+                HELP,       // show help and exit
                 MODE_MAX
             };
         };
@@ -479,6 +480,7 @@ namespace atapp {
         int command_handler_invalid(util::cli::callback_param params);
         int command_handler_disable_etcd(util::cli::callback_param params);
         int command_handler_enable_etcd(util::cli::callback_param params);
+        int command_handler_list_discovery(util::cli::callback_param params);
 
     private:
         int bus_evt_callback_on_recv_msg(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
@@ -486,6 +488,7 @@ namespace atapp {
         int bus_evt_callback_on_forward_response(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
                                                  const atbus::protocol::msg *m);
         int bus_evt_callback_on_error(const atbus::node &, const atbus::endpoint *, const atbus::connection *, int, int);
+        int bus_evt_callback_on_info_log(const atbus::node &, const atbus::endpoint *, const atbus::connection *, const char *);
         int bus_evt_callback_on_reg(const atbus::node &, const atbus::endpoint *, const atbus::connection *, int);
         int bus_evt_callback_on_shutdown(const atbus::node &, int);
         int bus_evt_callback_on_available(const atbus::node &, int);
