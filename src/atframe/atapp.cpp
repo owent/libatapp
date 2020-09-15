@@ -782,7 +782,7 @@ namespace atapp {
                         stat_.inner_etcd = current;
                     }
 
-                    FWLOGINFO("\tendpoint wake count: {}, by_id index size: {}, by_name inde size: {}, waker size: {}",
+                    FWLOGINFO("\tendpoint wake count: {}, by_id index size: {}, by_name index size: {}, waker size: {}",
                               stat_.endpoint_wake_count, endpoint_index_by_id_.size(), endpoint_index_by_name_.size(),
                               endpoint_waker_.size());
                     stat_.endpoint_wake_count = 0;
@@ -1465,41 +1465,55 @@ namespace atapp {
         uint64_t id             = discovery->get_discovery_info().id();
         const std::string &name = discovery->get_discovery_info().name();
         atapp_endpoint::ptr_t ret;
-        bool is_created = false;
-        if (id != 0) {
+        bool is_created             = false;
+        bool need_update_id_index   = false;
+        bool need_update_name_index = false;
+        do {
+            if (0 == id) {
+                break;
+            }
+
             endpoint_index_by_id_t::const_iterator iter_id = endpoint_index_by_id_.find(id);
             if (iter_id != endpoint_index_by_id_.end()) {
                 ret = iter_id->second;
-            } else {
-                ret = atapp_endpoint::create(*this);
-                if (ret) {
-                    is_created                = true;
-                    endpoint_index_by_id_[id] = ret;
-                }
             }
-            if (ret) {
-                ret->update_discovery(discovery);
-            }
-        }
 
-        if (!name.empty()) {
+            need_update_id_index = !ret;
+        } while (false);
+
+        do {
+            if (name.empty()) {
+                break;
+            }
+
             endpoint_index_by_name_t::const_iterator iter_name = endpoint_index_by_name_.find(name);
             if (iter_name != endpoint_index_by_name_.end()) {
-                if (iter_name->second == ret) {
-                    return ret;
+                if (ret && iter_name->second == ret) {
+                    break;
                 }
-                ret = iter_name->second;
                 if (ret) {
-                    ret->update_discovery(discovery);
+                    remove_endpoint(id);
+                    need_update_id_index = true;
                 }
-            } else if (!ret) {
-                ret = atapp_endpoint::create(*this);
-                if (ret) {
-                    is_created                    = true;
-                    endpoint_index_by_name_[name] = ret;
-                    ret->update_discovery(discovery);
-                }
+                ret                    = iter_name->second;
+                need_update_name_index = !ret;
+            } else {
+                need_update_name_index = true;
             }
+        } while (false);
+
+        if (!ret) {
+            ret        = atapp_endpoint::create(*this);
+            is_created = !!ret;
+        }
+        if (ret) {
+            if (need_update_id_index) {
+                endpoint_index_by_id_[id] = ret;
+            }
+            if (need_update_name_index) {
+                endpoint_index_by_name_[name] = ret;
+            }
+            ret->update_discovery(discovery);
         }
 
         // Wake and maybe it's should be cleanup if it's a new endpoint
