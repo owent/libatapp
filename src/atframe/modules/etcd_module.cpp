@@ -587,7 +587,7 @@ namespace atapp {
     LIBATAPP_MACRO_API const std::string &etcd_module::get_conf_custom_data() const { return custom_data_; }
     LIBATAPP_MACRO_API void etcd_module::set_conf_custom_data(const std::string &v) { custom_data_ = v; }
 
-    LIBATAPP_MACRO_API bool etcd_module::is_etcd_enabled() const { return etcd_ctx_enabled_ && etcd_ctx_.get_conf_hosts().empty(); }
+    LIBATAPP_MACRO_API bool etcd_module::is_etcd_enabled() const { return etcd_ctx_enabled_ && !etcd_ctx_.get_conf_hosts().empty(); }
     LIBATAPP_MACRO_API void etcd_module::enable_etcd() { etcd_ctx_enabled_ = true; }
     LIBATAPP_MACRO_API void etcd_module::disable_etcd() { etcd_ctx_enabled_ = false; }
 
