@@ -2807,6 +2807,7 @@ namespace atapp {
             if (inner_module_etcd_->is_etcd_enabled()) {
                 const char *msg = "Etcd context is enabled now.";
                 FWLOGINFO("{}", msg);
+                add_custom_command_rsp(params, msg);
             } else {
                 const char *msg = "Etcd context can not be enabled, maybe need configure etcd.hosts.";
                 FWLOGERROR("{}", msg);

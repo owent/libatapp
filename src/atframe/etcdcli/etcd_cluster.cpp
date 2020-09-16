@@ -1894,9 +1894,7 @@ namespace atapp {
             if (!conf_.proxy_user_name.empty()) {
                 req->set_opt_string(CURLOPT_PROXYUSERNAME, &conf_.proxy_user_name[0]);
             }
-#endif
 
-#if LIBCURL_VERSION_NUM >= 0x071301
             if (!conf_.proxy_password.empty()) {
                 req->set_opt_string(CURLOPT_PROXYPASSWORD, &conf_.proxy_password[0]);
             }
@@ -1933,40 +1931,53 @@ namespace atapp {
                 req->set_opt_string(CURLOPT_CAINFO, &conf_.ssl_ca_cert[0]);
             }
 
+#if LIBCURL_VERSION_NUM >= 0x071504
+            if (!conf_.ssl_proxy_tlsauth_username.empty()) {
+                req->set_opt_string(CURLOPT_TLSAUTH_TYPE,
+                                    "SRP"); // @see https://curl.haxx.se/libcurl/c/CURLOPT_TLSAUTH_TYPE.html
+                req->set_opt_string(CURLOPT_TLSAUTH_USERNAME, &conf_.ssl_client_tlsauth_username[0]);
+                req->set_opt_string(CURLOPT_TLSAUTH_PASSWORD, &conf_.ssl_client_tlsauth_password[0]);
+            }
+#endif
             // proxy cert and key
 
 #if LIBCURL_VERSION_NUM >= 0x072400
             req->set_opt_bool(CURLOPT_SSL_ENABLE_ALPN, conf_.ssl_enable_alpn);
 #endif
+
+#if LIBCURL_VERSION_NUM >= 0x073400
             if (!conf_.ssl_proxy_cert.empty()) {
                 req->set_opt_string(CURLOPT_PROXY_SSLCERT, &conf_.ssl_proxy_cert[0]);
             }
-#if LIBCURL_VERSION_NUM >= 0x070903
+
             if (!conf_.ssl_proxy_cert_type.empty()) {
                 req->set_opt_string(CURLOPT_PROXY_SSLCERTTYPE, &conf_.ssl_proxy_cert_type[0]);
             }
-#endif
+
             if (!conf_.ssl_proxy_key.empty()) {
                 req->set_opt_string(CURLOPT_PROXY_SSLKEY, &conf_.ssl_proxy_key[0]);
             }
+
             if (!conf_.ssl_proxy_key_type.empty()) {
                 req->set_opt_string(CURLOPT_PROXY_SSLKEYTYPE, &conf_.ssl_proxy_key_type[0]);
             }
-#if LIBCURL_VERSION_NUM >= 0x071004
+
             if (!conf_.ssl_proxy_key_passwd.empty()) {
                 req->set_opt_string(CURLOPT_PROXY_KEYPASSWD, &conf_.ssl_proxy_key_passwd[0]);
             }
-#elif LIBCURL_VERSION_NUM >= 0x070902
-            if (!conf_.ssl_proxy_key_passwd.empty()) {
-                req->set_opt_string(CURLOPT_PROXY_SSLCERTPASSWD, &conf_.ssl_proxy_key_passwd[0]);
-            }
-#endif
+
             if (!conf_.ssl_proxy_ca_cert.empty()) {
                 req->set_opt_string(CURLOPT_PROXY_CAINFO, &conf_.ssl_proxy_ca_cert[0]);
             }
 
+            if (!conf_.ssl_proxy_tlsauth_username.empty()) {
+                req->set_opt_string(CURLOPT_PROXY_TLSAUTH_TYPE,
+                                    "SRP"); // @see https://curl.haxx.se/libcurl/c/CURLOPT_PROXY_TLSAUTH_TYPE.html
+                req->set_opt_string(CURLOPT_PROXY_TLSAUTH_USERNAME, &conf_.ssl_proxy_tlsauth_username[0]);
+                req->set_opt_string(CURLOPT_PROXY_TLSAUTH_PASSWORD, &conf_.ssl_proxy_tlsauth_password[0]);
+            }
+#endif
             // ssl cipher
-
             if (!conf_.ssl_cipher_list.empty()) {
                 req->set_opt_string(CURLOPT_SSL_CIPHER_LIST, &conf_.ssl_cipher_list[0]);
             }

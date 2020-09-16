@@ -113,19 +113,23 @@ namespace atapp {
             std::string proxy_user_name; // curl 7.19.1 CURLOPT_PROXYUSERNAME
             std::string proxy_password;  // curl 7.19.1 CURLOPT_PROXYPASSWORD
 
-            std::string ssl_client_cert;       // CURLOPT_SSLCERT
-            std::string ssl_client_cert_type;  // curl 7.9.3 CURLOPT_SSLCERTTYPE, PEM or DER, PEM for default
-            std::string ssl_client_key;        // CURLOPT_SSLKEY
-            std::string ssl_client_key_type;   // CURLOPT_SSLKEYTYPE: PEM, DER or ENG
-            std::string ssl_client_key_passwd; // curl 7.16.4 CURLOPT_SSLKEYPASSWD , curl 7.9.2 CURLOPT_SSLCERTPASSWD
-            std::string ssl_ca_cert;           // CURLOPT_CAINFO
+            std::string ssl_client_cert;             // CURLOPT_SSLCERT
+            std::string ssl_client_cert_type;        // curl 7.9.3 CURLOPT_SSLCERTTYPE, PEM or DER, PEM for default
+            std::string ssl_client_key;              // CURLOPT_SSLKEY
+            std::string ssl_client_key_type;         // CURLOPT_SSLKEYTYPE: PEM, DER or ENG
+            std::string ssl_client_key_passwd;       // curl 7.16.4 CURLOPT_SSLKEYPASSWD , curl 7.9.2 CURLOPT_SSLCERTPASSWD
+            std::string ssl_ca_cert;                 // CURLOPT_CAINFO
+            std::string ssl_client_tlsauth_username; // CURLOPT_TLSAUTH_USERNAME
+            std::string ssl_client_tlsauth_password; // CURLOPT_TLSAUTH_PASSWORD
 
-            std::string ssl_proxy_cert;       // CURLOPT_PROXY_SSLCERT
-            std::string ssl_proxy_cert_type;  // curl 7.9.3 CURLOPT_PROXY_SSLCERTTYPE, PEM or DER, PEM for default
-            std::string ssl_proxy_key;        // CURLOPT_PROXY_SSLKEY
-            std::string ssl_proxy_key_type;   // CURLOPT_PROXY_SSLKEYTYPE: PEM, DER or ENG
-            std::string ssl_proxy_key_passwd; // curl 7.16.4 CURLOPT_PROXY_KEYPASSWD , curl 7.9.2 CURLOPT_PROXY_SSLCERTPASSWD
-            std::string ssl_proxy_ca_cert;    // CURLOPT_PROXY_CAINFO
+            std::string ssl_proxy_cert;             // CURLOPT_PROXY_SSLCERT
+            std::string ssl_proxy_cert_type;        // curl 7.9.3 CURLOPT_PROXY_SSLCERTTYPE, PEM or DER, PEM for default
+            std::string ssl_proxy_key;              // CURLOPT_PROXY_SSLKEY
+            std::string ssl_proxy_key_type;         // CURLOPT_PROXY_SSLKEYTYPE: PEM, DER or ENG
+            std::string ssl_proxy_key_passwd;       // curl 7.16.4 CURLOPT_PROXY_KEYPASSWD , curl 7.9.2 CURLOPT_PROXY_SSLCERTPASSWD
+            std::string ssl_proxy_ca_cert;          // CURLOPT_PROXY_CAINFO
+            std::string ssl_proxy_tlsauth_username; // CURLOPT_PROXY_TLSAUTH_USERNAME
+            std::string ssl_proxy_tlsauth_password; // CURLOPT_PROXY_TLSAUTH_PASSWORD
 
 
             std::string ssl_cipher_list;       // CURLOPT_SSL_CIPHER_LIST, @see https://curl.haxx.se/docs/ssl-ciphers.html
@@ -261,6 +265,12 @@ namespace atapp {
         UTIL_FORCEINLINE void set_conf_ssl_ca_cert(const std::string &v) { conf_.ssl_ca_cert = v; }
         UTIL_FORCEINLINE const std::string &get_conf_ssl_ca_cert() const { return conf_.ssl_ca_cert; }
 
+        UTIL_FORCEINLINE void set_conf_ssl_client_tlsauth_username(const std::string &v) { conf_.ssl_client_tlsauth_username = v; }
+        UTIL_FORCEINLINE const std::string &get_conf_ssl_client_tlsauth_username() const { return conf_.ssl_client_tlsauth_username; }
+
+        UTIL_FORCEINLINE void set_conf_ssl_client_tlsauth_password(const std::string &v) { conf_.ssl_client_tlsauth_password = v; }
+        UTIL_FORCEINLINE const std::string &get_conf_ssl_client_tlsauth_password() const { return conf_.ssl_client_tlsauth_password; }
+
         UTIL_FORCEINLINE void set_conf_ssl_proxy_cert(const std::string &v) { conf_.ssl_proxy_cert = v; }
         UTIL_FORCEINLINE const std::string &get_conf_ssl_proxy_cert() const { return conf_.ssl_proxy_cert; }
 
@@ -275,6 +285,12 @@ namespace atapp {
 
         UTIL_FORCEINLINE void set_conf_ssl_proxy_key_passwd(const std::string &v) { conf_.ssl_proxy_key_passwd = v; }
         UTIL_FORCEINLINE const std::string &get_conf_ssl_proxy_key_passwd() const { return conf_.ssl_proxy_key_passwd; }
+
+        UTIL_FORCEINLINE void set_conf_ssl_proxy_tlsauth_username(const std::string &v) { conf_.ssl_proxy_tlsauth_username = v; }
+        UTIL_FORCEINLINE const std::string &get_conf_ssl_proxy_tlsauth_username() const { return conf_.ssl_proxy_tlsauth_username; }
+
+        UTIL_FORCEINLINE void set_conf_ssl_proxy_tlsauth_password(const std::string &v) { conf_.ssl_proxy_tlsauth_password = v; }
+        UTIL_FORCEINLINE const std::string &get_conf_ssl_proxy_tlsauth_password() const { return conf_.ssl_proxy_tlsauth_password; }
 
         UTIL_FORCEINLINE void set_conf_ssl_proxy_ca_cert(const std::string &v) { conf_.ssl_proxy_ca_cert = v; }
         UTIL_FORCEINLINE const std::string &get_conf_ssl_proxy_ca_cert() const { return conf_.ssl_proxy_ca_cert; }
