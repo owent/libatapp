@@ -160,6 +160,8 @@ namespace atapp {
             if (0 != ret) {
                 connector->on_receive_forward_response(handle, type, msg_sequence, ret, data, data_size, metadata);
             }
+
+            return ret;
         } while (false);
 
         // Failed to add to pending
