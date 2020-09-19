@@ -2772,11 +2772,11 @@ namespace atapp {
         std::stringstream args;
         for (util::cli::cmd_option_list::cmd_array_type::const_iterator iter = params.get_cmd_array().begin();
              iter != params.get_cmd_array().end(); ++iter) {
-            args << '"' << iter->first << '"';
+            args << " \"" << iter->first << '"';
         }
         for (size_t i = 0; i < params.get_params_number(); ++i) {
             if (params[i]) {
-                args << '"' << params[i]->to_cpp_string() << '"';
+                args << " \"" << params[i]->to_cpp_string() << '"';
             }
         }
         LOG_WRAPPER_FWAPI_FORMAT_TO_N(msg, sizeof(msg), "receive invalid command :{}", args.str());
