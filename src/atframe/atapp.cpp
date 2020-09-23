@@ -768,14 +768,15 @@ namespace atapp {
                         static_cast<unsigned long long>(last_usage.ru_majflt));
                     if (inner_module_etcd_) {
                         const ::atapp::etcd_cluster::stats_t &current = inner_module_etcd_->get_raw_etcd_ctx().get_stats();
-                        FWLOGINFO("\tetcd module(last minite): request count: {}, error request: {}, continue error: {}, success request: "
-                                  "{}, continue success request {}",
-                                  current.sum_create_requests - stat_.inner_etcd.sum_create_requests,
-                                  current.sum_error_requests - stat_.inner_etcd.sum_error_requests,
-                                  current.continue_error_requests - stat_.inner_etcd.continue_error_requests,
-                                  current.sum_success_requests - stat_.inner_etcd.sum_success_requests,
-                                  current.continue_success_requests - stat_.inner_etcd.continue_success_requests);
-                        FWLOGINFO("\tetcd module(sum): request count: {}, error request: {}, continue error: {}, success request: "
+                        FWLOGINFO(
+                            "\tetcd module(last minite): request count: {}, failed request: {}, continue failed: {}, success request: "
+                            "{}, continue success request {}",
+                            current.sum_create_requests - stat_.inner_etcd.sum_create_requests,
+                            current.sum_error_requests - stat_.inner_etcd.sum_error_requests,
+                            current.continue_error_requests - stat_.inner_etcd.continue_error_requests,
+                            current.sum_success_requests - stat_.inner_etcd.sum_success_requests,
+                            current.continue_success_requests - stat_.inner_etcd.continue_success_requests);
+                        FWLOGINFO("\tetcd module(sum): request count: {}, failed request: {}, continue failed: {}, success request: "
                                   "{}, continue success request {}",
                                   current.sum_create_requests, current.sum_error_requests, current.continue_error_requests,
                                   current.sum_success_requests, current.continue_success_requests);
