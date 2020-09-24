@@ -32,25 +32,8 @@
 /include/atframe/atapp_conf.pb.h
 /src/atframe/atapp_conf.pb.cc
 
-## yaml-cpp
-/3rd_party/yaml-cpp/pkg
-/3rd_party/yaml-cpp/prebuilt
+# packages and installed
+/3rd_party/packages
+/3rd_party/install
 
-## libressl
-/3rd_party/libressl/pkg
-/3rd_party/libressl/prebuilt
-
-## openssl
-/3rd_party/openssl/pkg
-/3rd_party/openssl/prebuilt
-
-## mbedtls
-/3rd_party/mbedtls/pkg
-/3rd_party/mbedtls/prebuilt
-
-## rapidjson
-/3rd_party/rapidjson/repo
-
-## libcurl
-/3rd_party/libcurl/pkg
-/3rd_party/libcurl/prebuilt
+.mako_modules-*

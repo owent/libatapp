@@ -136,6 +136,10 @@ namespace atapp {
     }
 
     LIBATAPP_MACRO_API const std::string &etcd_discovery_node::next_ingress_address() const {
+        if (ingress_address_index_ < 0) {
+            ingress_address_index_ = 0;
+        }
+
         if (node_info_.gateway_size() > 0) {
             if (ingress_address_index_ > node_info_.gateway_size()) {
                 ingress_address_index_ %= node_info_.gateway_size();

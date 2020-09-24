@@ -16,6 +16,8 @@ endif ()
 
 set (PROJECT_3RD_PARTY_ROOT_DIR ${CMAKE_CURRENT_LIST_DIR})
 
+include("${PROJECT_3RD_PARTY_ROOT_DIR}/zlib/zlib.cmake")
+
 if (LIBATBUS_ROOT AND EXISTS "${LIBATBUS_ROOT}/3rd_party/protobuf/protobuf.cmake")
     include("${LIBATBUS_ROOT}/3rd_party/protobuf/protobuf.cmake")
 endif ()
@@ -30,6 +32,10 @@ include("${PROJECT_3RD_PARTY_ROOT_DIR}/ssl/port.cmake")
 
 # =========== 3rd_party - libcurl ===========
 include("${PROJECT_3RD_PARTY_ROOT_DIR}/libcurl/libcurl.cmake")
+
+# =========== 3rd_party - grpc ===========
+# Must be imported after ssl,protobuf,zlib
+include("${PROJECT_3RD_PARTY_ROOT_DIR}/grpc/import.cmake")
 
 include("${PROJECT_3RD_PARTY_ROOT_DIR}/atframe_utils/libatframe_utils.cmake")
 include("${PROJECT_3RD_PARTY_ROOT_DIR}/libatbus/libatbus.cmake")
