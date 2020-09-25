@@ -141,14 +141,14 @@ namespace atapp {
         }
 
         if (node_info_.gateway_size() > 0) {
-            if (ingress_address_index_ > node_info_.gateway_size()) {
+            if (ingress_address_index_ >= node_info_.gateway_size()) {
                 ingress_address_index_ %= node_info_.gateway_size();
             }
             return node_info_.gateway(ingress_address_index_++);
         }
 
         if (node_info_.listen_size() > 0) {
-            if (ingress_address_index_ > node_info_.listen_size()) {
+            if (ingress_address_index_ >= node_info_.listen_size()) {
                 ingress_address_index_ %= node_info_.listen_size();
             }
             return node_info_.listen(ingress_address_index_++);
@@ -241,7 +241,7 @@ namespace atapp {
             return NULL;
         }
 
-        if (round_robin_index_ > round_robin_cache_.size()) {
+        if (round_robin_index_ >= round_robin_cache_.size()) {
             round_robin_index_ %= round_robin_cache_.size();
         }
 
