@@ -11,7 +11,7 @@ if (NOT 3RD_PARTY_RAPIDJSON_INC_DIR)
         set(RAPIDJSON_ROOT ${Rapidjson_ROOT})
     endif()
 
-    find_package(Rapidjson)
+    find_package(Rapidjson QUIET)
     if(NOT Rapidjson_FOUND)
         project_git_clone_3rd_party(
             URL "https://github.com/Tencent/rapidjson.git"
@@ -38,5 +38,7 @@ if (NOT 3RD_PARTY_RAPIDJSON_INC_DIR)
 
 
     set (3RD_PARTY_RAPIDJSON_INC_DIR ${Rapidjson_INCLUDE_DIRS})
-    list(APPEND 3RD_PARTY_PUBLIC_INCLUDE_DIRS ${3RD_PARTY_RAPIDJSON_INC_DIR})
+    list(APPEND PROJECT_LIBATAPP_PUBLIC_LINK_NAMES ${3RD_PARTY_RAPIDJSON_INC_DIR})
+else()
+    list(APPEND PROJECT_LIBATAPP_PUBLIC_LINK_NAMES ${3RD_PARTY_RAPIDJSON_INC_DIR})
 endif()

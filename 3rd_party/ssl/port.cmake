@@ -1,5 +1,9 @@
 # copy from atframework/libatframe_utils/repo/project/cmake/ProjectBuildOption.cmake
 
+if (NOT PROJECT_LIBATAPP_CRYPT_LINK_NAME AND 3RD_PARTY_CRYPT_LINK_NAME)
+    set(PROJECT_LIBATAPP_CRYPT_LINK_NAME ${3RD_PARTY_CRYPT_LINK_NAME})
+endif ()
+
 set (OPENSSL_USE_STATIC_LIBS TRUE)
 if (CRYPTO_USE_OPENSSL OR CRYPTO_USE_LIBRESSL OR CRYPTO_USE_BORINGSSL)
     if (CRYPTO_USE_OPENSSL)
@@ -47,7 +51,6 @@ endif()
 if (NOT CRYPTO_DISABLED)
     find_package(Libsodium QUIET)
     if (Libsodium_FOUND)
-        list(APPEND 3RD_PARTY_PUBLIC_LINK_NAMES ${Libsodium_LIBRARIES})
-        list(APPEND 3RD_PARTY_CRYPT_LINK_NAME ${Libsodium_LIBRARIES})
+        list(APPEND PROJECT_LIBATAPP_PUBLIC_LINK_NAMES ${Libsodium_LIBRARIES})
     endif()
 endif()
