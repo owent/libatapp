@@ -10,7 +10,7 @@ macro(PROJECT_LIBATAPP_ZLIB_IMPORT)
         EchoWithColor(COLOR GREEN "-- Dependency: zlib found.(${ZLIB_LIBRARIES})")
 
         if (ZLIB_INCLUDE_DIRS)
-            list(APPEND PROJECT_LIBATAPP_PUBLIC_LINK_NAMES ${ZLIB_INCLUDE_DIRS})
+            list(APPEND PROJECT_LIBATAPP_PUBLIC_INCLUDE_DIRS ${ZLIB_INCLUDE_DIRS})
         endif ()
 
         if(ZLIB_LIBRARIES)
