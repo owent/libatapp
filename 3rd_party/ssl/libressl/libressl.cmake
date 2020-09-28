@@ -30,6 +30,10 @@ macro(PROJECT_LIBATAPP_LIBRESSL_IMPORT)
                 list(APPEND PROJECT_LIBATAPP_PUBLIC_LINK_NAMES ${LIBRESSL_LIBRARIES})
             endif()
         endif ()
+
+        if (NOT CRYPTO_USE_LIBRESSL)
+            set(CRYPTO_USE_LIBRESSL TRUE CACHE BOOL "Cache ssl selector and directly use libressl next time")
+        endif()
     endif ()
 endmacro()
 

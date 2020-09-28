@@ -16,7 +16,7 @@ endif ()
 
 set (PROJECT_3RD_PARTY_ROOT_DIR ${CMAKE_CURRENT_LIST_DIR})
 
-include("${PROJECT_3RD_PARTY_ROOT_DIR}/zlib/zlib.cmake")
+include("${PROJECT_3RD_PARTY_ROOT_DIR}/compression/import.cmake")
 
 if (LIBATBUS_ROOT AND EXISTS "${LIBATBUS_ROOT}/3rd_party/protobuf/protobuf.cmake")
     include("${LIBATBUS_ROOT}/3rd_party/protobuf/protobuf.cmake")
