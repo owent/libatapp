@@ -18,8 +18,8 @@ macro(PROJECT_LIBATAPP_LIBCURL_IMPORT)
                 list(APPEND PROJECT_LIBATAPP_PUBLIC_INCLUDE_DIRS ${CURL_INCLUDE_DIRS})
             endif ()
 
-            if(PROJECT_LIBCOPP_LIBCURL_STATIC_LINK_NAMES)
-                list(APPEND PROJECT_LIBATAPP_PUBLIC_LINK_NAMES ${PROJECT_LIBCOPP_LIBCURL_STATIC_LINK_NAMES})
+            if(PROJECT_LIBATAPP_LIBCURL_STATIC_LINK_NAMES)
+                list(APPEND PROJECT_LIBATAPP_PUBLIC_LINK_NAMES ${PROJECT_LIBATAPP_LIBCURL_STATIC_LINK_NAMES})
             endif()
         endif ()
 
@@ -86,7 +86,7 @@ if (NOT CURL_EXECUTABLE)
             message(FATAL_ERROR "libcurl not found")
         endif()
 
-        unset(PROJECT_LIBCOPP_LIBCURL_STATIC_LINK_NAMES)
+        unset(PROJECT_LIBATAPP_LIBCURL_STATIC_LINK_NAMES)
         if (TARGET CURL::libcurl)
             EchoWithColor(COLOR GREEN "-- Libcurl: use target CURL::libcurl")
         else()
@@ -122,14 +122,14 @@ if (NOT CURL_EXECUTABLE)
                 EchoWithColor(COLOR YELLOW "-- Libcurl: Dynamic symbol test in ${CURL_LIBRARIES} failed, try static symbols")
                 if(MSVC)
                     if (ZLIB_FOUND)
-                        list(APPEND PROJECT_LIBCOPP_LIBCURL_STATIC_LINK_NAMES ${ZLIB_LIBRARIES})
+                        list(APPEND PROJECT_LIBATAPP_LIBCURL_STATIC_LINK_NAMES ${ZLIB_LIBRARIES})
                     endif()
 
                     try_compile(3RD_PARTY_LIBCURL_TRY_COMPILE_RESULT
                         ${CMAKE_BINARY_DIR} "${CMAKE_BINARY_DIR}/try_run_libcurl_test.c"
                         CMAKE_FLAGS -DINCLUDE_DIRECTORIES=${CURL_INCLUDE_DIRS}
                         COMPILE_DEFINITIONS /D CURL_STATICLIB
-                        LINK_LIBRARIES ${CURL_LIBRARIES} ${PROJECT_LIBCOPP_LIBCURL_STATIC_LINK_NAMES}
+                        LINK_LIBRARIES ${CURL_LIBRARIES} ${PROJECT_LIBATAPP_LIBCURL_STATIC_LINK_NAMES}
                         OUTPUT_VARIABLE 3RD_PARTY_LIBCURL_TRY_COMPILE_STA_MSG
                     )
                 else()
@@ -137,19 +137,19 @@ if (NOT CURL_EXECUTABLE)
                     find_package(PkgConfig)
                     if (PKG_CONFIG_FOUND AND EXISTS "${3RD_PARTY_LIBCURL_LIBDIR}/pkgconfig/libcurl.pc")
                         pkg_check_modules(LIBCURL "${3RD_PARTY_LIBCURL_LIBDIR}/pkgconfig/libcurl.pc")
-                        list(APPEND PROJECT_LIBCOPP_LIBCURL_STATIC_LINK_NAMES ${LIBCURL_STATIC_LIBRARIES})
-                        list(REMOVE_ITEM PROJECT_LIBCOPP_LIBCURL_STATIC_LINK_NAMES curl)
-                        message(STATUS "Libcurl use static link with ${PROJECT_LIBCOPP_LIBCURL_STATIC_LINK_NAMES} in ${3RD_PARTY_LIBCURL_LIBDIR}")
+                        list(APPEND PROJECT_LIBATAPP_LIBCURL_STATIC_LINK_NAMES ${LIBCURL_STATIC_LIBRARIES})
+                        list(REMOVE_ITEM PROJECT_LIBATAPP_LIBCURL_STATIC_LINK_NAMES curl)
+                        message(STATUS "Libcurl use static link with ${PROJECT_LIBATAPP_LIBCURL_STATIC_LINK_NAMES} in ${3RD_PARTY_LIBCURL_LIBDIR}")
                     else()
                         if (OPENSSL_FOUND)
-                            list(APPEND PROJECT_LIBCOPP_LIBCURL_STATIC_LINK_NAMES ${OPENSSL_LIBRARIES})
+                            list(APPEND PROJECT_LIBATAPP_LIBCURL_STATIC_LINK_NAMES ${OPENSSL_LIBRARIES})
                         else ()
-                            list(APPEND PROJECT_LIBCOPP_LIBCURL_STATIC_LINK_NAMES ssl crypto)
+                            list(APPEND PROJECT_LIBATAPP_LIBCURL_STATIC_LINK_NAMES ssl crypto)
                         endif()
                         if (ZLIB_FOUND)
-                            list(APPEND PROJECT_LIBCOPP_LIBCURL_STATIC_LINK_NAMES ${ZLIB_LIBRARIES})
+                            list(APPEND PROJECT_LIBATAPP_LIBCURL_STATIC_LINK_NAMES ${ZLIB_LIBRARIES})
                         else ()
-                            list(APPEND PROJECT_LIBCOPP_LIBCURL_STATIC_LINK_NAMES z)
+                            list(APPEND PROJECT_LIBATAPP_LIBCURL_STATIC_LINK_NAMES z)
                         endif()
                     endif ()
                     
@@ -157,11 +157,11 @@ if (NOT CURL_EXECUTABLE)
                         ${CMAKE_BINARY_DIR} "${CMAKE_BINARY_DIR}/try_run_libcurl_test.c"
                         CMAKE_FLAGS -DCMAKE_INCLUDE_DIRECTORIES_BEFORE=${CURL_INCLUDE_DIRS}
                         COMPILE_DEFINITIONS -DCURL_STATICLIB
-                        LINK_LIBRARIES ${CURL_LIBRARIES} ${PROJECT_LIBCOPP_LIBCURL_STATIC_LINK_NAMES} -lpthread
+                        LINK_LIBRARIES ${CURL_LIBRARIES} ${PROJECT_LIBATAPP_LIBCURL_STATIC_LINK_NAMES} -lpthread
                         COMPILE_OUTPUT_VARIABLE 3RD_PARTY_LIBCURL_TRY_COMPILE_STA_MSG
                         RUN_OUTPUT_VARIABLE 3RD_PARTY_LIBCURL_TRY_RUN_OUT
                     )
-                    list(APPEND PROJECT_LIBCOPP_LIBCURL_STATIC_LINK_NAMES pthread)
+                    list(APPEND PROJECT_LIBATAPP_LIBCURL_STATIC_LINK_NAMES pthread)
                 endif()
                 if (NOT 3RD_PARTY_LIBCURL_TRY_COMPILE_RESULT)
                     message(STATUS ${3RD_PARTY_LIBCURL_TRY_COMPILE_DYN_MSG})
@@ -180,7 +180,7 @@ if (NOT CURL_EXECUTABLE)
                     set_target_properties(CURL::libcurl PROPERTIES
                         IMPORTED_LINK_INTERFACE_LANGUAGES "C;CXX"
                         IMPORTED_LOCATION ${CURL_LIBRARIES}
-                        INTERFACE_LINK_LIBRARIES ${PROJECT_LIBCOPP_LIBCURL_STATIC_LINK_NAMES}
+                        INTERFACE_LINK_LIBRARIES ${PROJECT_LIBATAPP_LIBCURL_STATIC_LINK_NAMES}
                     )
                 endif()
             else()
