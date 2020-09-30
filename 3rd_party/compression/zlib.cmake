@@ -7,7 +7,7 @@ endif()
 macro(PROJECT_LIBATAPP_ZLIB_IMPORT)
     if (ZLIB_FOUND)
         # find static library first
-        EchoWithColor(COLOR GREEN "-- Dependency: zlib found.(${ZLIB_LIBRARIES})")
+        EchoWithColor(COLOR GREEN "-- Dependency(${PROJECT_NAME}): zlib found.(${ZLIB_LIBRARIES})")
 
         if (ZLIB_INCLUDE_DIRS)
             list(APPEND PROJECT_LIBATAPP_PUBLIC_INCLUDE_DIRS ${ZLIB_INCLUDE_DIRS})
@@ -31,7 +31,7 @@ if (NOT ZLIB_FOUND)
 
         FindConfigurePackage(
             PACKAGE ZLIB
-            BUILD_WITH_CMAKE
+            BUILD_WITH_CMAKE CMAKE_INHIRT_BUILD_ENV CMAKE_INHIRT_BUILD_ENV_DISABLE_CXX_FLAGS
             CMAKE_FLAGS "-DCMAKE_POSITION_INDEPENDENT_CODE=YES" "-DBUILD_SHARED_LIBS=OFF"
             MAKE_FLAGS "-j8"
             WORKING_DIRECTORY "${PROJECT_3RD_PARTY_PACKAGE_DIR}"
