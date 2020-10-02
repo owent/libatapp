@@ -1264,6 +1264,12 @@ namespace atapp {
                 return 0;
             }
 
+            if (!members->value.IsArray()) {
+                FWLOGERROR("Etcd members is not a array");
+                self->add_stats_error_request();
+                return 0;
+            }
+
             self->conf_.hosts.clear();
             bool need_select_node                       = true;
             rapidjson::Document::ConstArray all_members = members->value.GetArray();

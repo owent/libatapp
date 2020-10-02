@@ -354,7 +354,7 @@ namespace atapp {
 
         template <class Ty>
         struct scale_size_mode_t<Ty, 1> {
-            static inline bool to_bytes(Ty &out, char c) { return false; }
+            static inline bool to_bytes(Ty &, char) { return false; }
         };
 
         template <class Ty>

@@ -580,6 +580,7 @@ LIBATAPP_MACRO_API void __cdecl libatapp_c_module_get_name(libatapp_c_module mod
         if (NULL != namebuf) {
             *namebuf = NULL;
         }
+        return;
     }
 
     if (NULL != bufsz) {

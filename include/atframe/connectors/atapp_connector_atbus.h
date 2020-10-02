@@ -29,6 +29,7 @@ namespace atapp {
                                                            const etcd_discovery_node::ptr_t &) UTIL_CONFIG_OVERRIDE;
 
 
+        using atapp_connector_impl::on_receive_forward_response;
         LIBATAPP_MACRO_API void on_receive_forward_response(uint64_t app_id, int32_t type, uint64_t msg_sequence, int32_t error_code,
                                                             const void *data, size_t data_size,
                                                             const atapp::protocol::atapp_metadata *metadata);

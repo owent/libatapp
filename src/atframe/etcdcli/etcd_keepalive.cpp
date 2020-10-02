@@ -191,6 +191,12 @@ namespace atapp {
                     return 0;
                 }
 
+                if (!kvs->value.IsArray()) {
+                    FWLOGERROR("Etcd keepalive {} get data count={}, but kvs is not array", reinterpret_cast<const void *>(self), count);
+                    self->owner_->add_retry_keepalive(self->shared_from_this());
+                    return 0;
+                }
+
                 rapidjson::Document::ConstArray all_kvs = kvs->value.GetArray();
                 if (all_kvs.Begin() != all_kvs.End()) {
                     etcd_key_value kv;

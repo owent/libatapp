@@ -14,7 +14,9 @@ namespace atapp {
         register_protocol("dns");
     }
 
-    LIBATAPP_MACRO_API atapp_connector_atbus::~atapp_connector_atbus() {}
+    LIBATAPP_MACRO_API atapp_connector_atbus::~atapp_connector_atbus() {
+        cleanup();
+    }
 
     LIBATAPP_MACRO_API const char *atapp_connector_atbus::name() UTIL_CONFIG_NOEXCEPT { return "atapp::connector.atapp"; }
 

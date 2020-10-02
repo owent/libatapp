@@ -1121,11 +1121,10 @@ namespace atapp {
             }
 
             int32_t ret;
-            if (NULL == msg_sequence) {
+            if (NULL != msg_sequence) {
                 ret = cache->push_forward_message(type, *msg_sequence, data, data_size, metadata);
             } else {
                 uint64_t msg_seq = 0;
-
                 ret = cache->push_forward_message(type, msg_seq, data, data_size, metadata);
             }
             return ret;
@@ -1165,11 +1164,10 @@ namespace atapp {
             }
 
             int32_t ret;
-            if (NULL == msg_sequence) {
+            if (NULL != msg_sequence) {
                 ret = cache->push_forward_message(type, *msg_sequence, data, data_size, metadata);
             } else {
                 uint64_t msg_seq = 0;
-
                 ret = cache->push_forward_message(type, msg_seq, data, data_size, metadata);
             }
             return ret;
@@ -1201,11 +1199,10 @@ namespace atapp {
         }
 
         int32_t ret;
-        if (NULL == msg_sequence) {
+        if (NULL != msg_sequence) {
             ret = cache->push_forward_message(type, *msg_sequence, data, data_size, metadata);
         } else {
             uint64_t msg_seq = 0;
-
             ret = cache->push_forward_message(type, msg_seq, data, data_size, metadata);
         }
         return ret;

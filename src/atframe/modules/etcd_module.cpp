@@ -767,10 +767,11 @@ namespace atapp {
 
     LIBATAPP_MACRO_API atapp::etcd_watcher::ptr_t etcd_module::add_watcher_by_custom_path(const std::string &custom_path,
                                                                                           watcher_one_callback_t fn) {
-        if (custom_path.size() < get_configure_path().size() ||
-            0 != UTIL_STRFUNC_STRNCMP(custom_path.c_str(), get_configure_path().c_str(), get_configure_path().size())) {
+        const std::string& configure_path = get_configure_path();
+        if (custom_path.size() < configure_path.size() ||
+            0 != UTIL_STRFUNC_STRNCMP(custom_path.c_str(), configure_path.c_str(), configure_path.size())) {
 
-            FWLOGERROR("create etcd_watcher by custom path {} failed. path must has prefix of {}.", custom_path, get_configure_path());
+            FWLOGERROR("create etcd_watcher by custom path {} failed. path must has prefix of {}.", custom_path, configure_path);
             return NULL;
         }
 
