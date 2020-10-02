@@ -10,7 +10,7 @@ endif()
 # =========== 3rdparty abseil-cpp ==================
 macro(PROJECT_LIBATAPP_ABSEIL_IMPORT)
     if (absl_FOUND)
-        message(STATUS "abseil-cpp found.")
+        message(STATUS "Dependency(${PROJECT_NAME}): abseil-cpp found.")
     endif()
 endmacro()
 
