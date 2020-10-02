@@ -42,7 +42,16 @@
 #define LIBATAPP_MACRO_API_HEAD_ONLY UTIL_SYMBOL_VISIBLE
 #define LIBATAPP_MACRO_API_C(R) extern "C" LIBATAPP_MACRO_API R __cdecl
 
+
+#if defined(_GLIBCXX_USE_CXX11_ABI)
+    #if !(_GLIBCXX_USE_CXX11_ABI)
+        #define LIBATAPP_ENABLE_CUSTOM_COUNT_FOR_STD_LIST 1
+    #endif
+#endif
+
+#ifndef LIBATAPP_ENABLE_CUSTOM_COUNT_FOR_STD_LIST
 #cmakedefine01 LIBATAPP_ENABLE_CUSTOM_COUNT_FOR_STD_LIST
+#endif
 
 
 // ================ import/export: for compilers ================

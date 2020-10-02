@@ -20,13 +20,16 @@ namespace atapp {
             // It's safe to recall close after set handle.connector_ = NULL
             handle.close();
 
-            connect.on_close_connect(handle);
+            // child shoud call cleanup() to trigger on_close_connect event
+            if (!connect.is_destroying_) {
+                connect.on_close_connect(handle);
+            }
         }
     }
 
     LIBATAPP_MACRO_API_SYMBOL_HIDDEN void atapp_connector_bind_helper::bind(atapp_connection_handle &handle,
                                                                             atapp_connector_impl &connect) {
-        if (handle.connector_ == &connect) {
+        if (handle.connector_ == &connect || connect.is_destroying_) {
             return;
         }
 
@@ -136,19 +139,11 @@ namespace atapp {
         on_destroy_fn_.swap(empty);
     }
 
-    LIBATAPP_MACRO_API atapp_connector_impl::atapp_connector_impl(app &owner) : owner_(&owner) {}
+    LIBATAPP_MACRO_API atapp_connector_impl::atapp_connector_impl(app &owner) : owner_(&owner), is_destroying_(false) {}
 
     LIBATAPP_MACRO_API atapp_connector_impl::~atapp_connector_impl() {
-        while (!handles_.empty()) {
-            handle_set_t handles;
-            handles.swap(handles_);
-
-            for (handle_set_t::const_iterator iter = handles.begin(); iter != handles.end(); ++iter) {
-                if (*iter) {
-                    atapp_connector_bind_helper::unbind(**iter, *this);
-                }
-            }
-        }
+        is_destroying_ = true;
+        cleanup();
     }
 
     LIBATAPP_MACRO_API const char *atapp_connector_impl::name() UTIL_CONFIG_NOEXCEPT {
@@ -172,6 +167,19 @@ namespace atapp {
         std::string name = protocol_name;
         std::transform(name.begin(), name.end(), name.begin(), ::util::string::tolower<char>);
         support_protocols_.insert(name);
+    }
+
+    LIBATAPP_MACRO_API void atapp_connector_impl::cleanup() {
+        while (!handles_.empty()) {
+            handle_set_t handles;
+            handles.swap(handles_);
+
+            for (handle_set_t::const_iterator iter = handles.begin(); iter != handles.end(); ++iter) {
+                if (*iter) {
+                    atapp_connector_bind_helper::unbind(**iter, *this);
+                }
+            }
+        }
     }
 
     LIBATAPP_MACRO_API int32_t atapp_connector_impl::on_start_listen(const atbus::channel::channel_address_t &) {

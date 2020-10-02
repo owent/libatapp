@@ -127,6 +127,8 @@ namespace atapp {
 
         LIBATAPP_MACRO_API void register_protocol(const std::string &protocol_name);
 
+        LIBATAPP_MACRO_API void cleanup();
+
     public:
         LIBATAPP_MACRO_API virtual ~atapp_connector_impl();
         LIBATAPP_MACRO_API virtual const char *name() UTIL_CONFIG_NOEXCEPT;
@@ -176,6 +178,7 @@ namespace atapp {
 
     private:
         app *owner_;
+        bool is_destroying_;
         handle_set_t handles_;
         protocol_set_t support_protocols_;
         mutable std::unique_ptr<util::scoped_demangled_name> auto_demangled_name_;
