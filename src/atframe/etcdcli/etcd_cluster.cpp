@@ -1938,7 +1938,7 @@ namespace atapp {
             }
 
 #if LIBCURL_VERSION_NUM >= 0x071504
-            if (!conf_.ssl_proxy_tlsauth_username.empty()) {
+            if (!conf_.ssl_client_tlsauth_username.empty()) {
                 req->set_opt_string(CURLOPT_TLSAUTH_TYPE,
                                     "SRP"); // @see https://curl.haxx.se/libcurl/c/CURLOPT_TLSAUTH_TYPE.html
                 req->set_opt_string(CURLOPT_TLSAUTH_USERNAME, &conf_.ssl_client_tlsauth_username[0]);
