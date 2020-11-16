@@ -5,7 +5,7 @@ endif()
 # =========== 3rdparty zlib ==================
 # force to use prebuilt when using mingw
 macro(PROJECT_LIBATAPP_ZLIB_IMPORT)
-    if (ZLIB_FOUND)
+    if (TARGET ZLIB::ZLIB)
         # find static library first
         EchoWithColor(COLOR GREEN "-- Dependency(${PROJECT_NAME}): zlib found.(${ZLIB_LIBRARIES})")
 
@@ -19,13 +19,13 @@ macro(PROJECT_LIBATAPP_ZLIB_IMPORT)
     endif()
 endmacro()
 
-if (NOT ZLIB_FOUND)
+if (NOT TARGET ZLIB::ZLIB)
     if (VCPKG_TOOLCHAIN)
         find_package(ZLIB QUIET)
         PROJECT_LIBATAPP_ZLIB_IMPORT()
     endif ()
 
-    if (NOT ZLIB_FOUND)
+    if (NOT TARGET ZLIB::ZLIB)
         set (3RD_PARTY_ZLIB_DEFAULT_VERSION "v1.2.11")
         set(ZLIB_ROOT ${PROJECT_3RD_PARTY_INSTALL_DIR})
 
@@ -43,7 +43,7 @@ if (NOT ZLIB_FOUND)
             GIT_URL "https://github.com/madler/zlib.git"
         )
 
-        if(NOT ZLIB_FOUND)
+        if(NOT TARGET ZLIB::ZLIB)
             EchoWithColor(COLOR RED "-- Dependency: zlib is required")
             message(FATAL_ERROR "zlib not found")
         endif()
