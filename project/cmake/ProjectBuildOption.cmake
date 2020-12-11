@@ -13,3 +13,5 @@ option(PROJECT_RESET_DENPEND_REPOSITORIES "Reset depended repositories if it's a
 option(PROJECT_GIT_CLONE_REMOTE_ORIGIN_DISABLE_SSH "Do not try to use ssh url when clone dependency." OFF)
 
 option(ATFRAMEWORK_USE_DYNAMIC_LIBRARY "Build and linking with dynamic libraries." OFF)
+
+set(LIBATAPP_MACRO_HASH_MAGIC_NUMBER "0x01000193U" CACHE STRING "Magic number of libatapp")

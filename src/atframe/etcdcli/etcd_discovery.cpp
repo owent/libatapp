@@ -123,7 +123,7 @@ namespace atapp {
     LIBATAPP_MACRO_API void etcd_discovery_node::copy_from(const atapp::protocol::atapp_discovery &input) {
         node_info_.CopyFrom(input);
 
-        name_hash_ = consistent_hash_calc(input.name().c_str(), input.name().size(), 0);
+        name_hash_ = consistent_hash_calc(input.name().c_str(), input.name().size(), LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
     }
 
     LIBATAPP_MACRO_API void etcd_discovery_node::set_on_destroy(on_destroy_fn_t fn) { on_destroy_fn_ = fn; }
@@ -198,7 +198,7 @@ namespace atapp {
             rebuild_cache();
         }
 
-        std::pair<uint64_t, uint64_t> hash_key = consistent_hash_calc(buf, bufsz, 0);
+        std::pair<uint64_t, uint64_t> hash_key = consistent_hash_calc(buf, bufsz, LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
         std::vector<node_hash_t>::const_iterator hash_iter =
             std::lower_bound(hashing_cache_.begin(), hashing_cache_.end(), hash_key, consistent_hash_compare_find);
         if (hash_iter == hashing_cache_.end()) {
@@ -264,7 +264,7 @@ namespace atapp {
         pred_val.id   = id;
         pred_val.name = &name;
         if (!name.empty()) {
-            pred_val.hash_code = consistent_hash_calc(name.c_str(), name.size(), 0);
+            pred_val.hash_code = consistent_hash_calc(name.c_str(), name.size(), LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
         } else {
             pred_val.hash_code = std::pair<uint64_t, uint64_t>(0, 0);
         }
@@ -280,7 +280,7 @@ namespace atapp {
         pred_val.id   = id;
         pred_val.name = &name;
         if (!name.empty()) {
-            pred_val.hash_code = consistent_hash_calc(name.c_str(), name.size(), 0);
+            pred_val.hash_code = consistent_hash_calc(name.c_str(), name.size(), LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
         } else {
             pred_val.hash_code = std::pair<uint64_t, uint64_t>(0, 0);
         }

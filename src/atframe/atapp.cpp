@@ -1125,7 +1125,7 @@ namespace atapp {
                 ret = cache->push_forward_message(type, *msg_sequence, data, data_size, metadata);
             } else {
                 uint64_t msg_seq = 0;
-                ret = cache->push_forward_message(type, msg_seq, data, data_size, metadata);
+                ret              = cache->push_forward_message(type, msg_seq, data, data_size, metadata);
             }
             return ret;
         } while (false);
@@ -1168,7 +1168,7 @@ namespace atapp {
                 ret = cache->push_forward_message(type, *msg_sequence, data, data_size, metadata);
             } else {
                 uint64_t msg_seq = 0;
-                ret = cache->push_forward_message(type, msg_seq, data, data_size, metadata);
+                ret              = cache->push_forward_message(type, msg_seq, data, data_size, metadata);
             }
             return ret;
         } while (false);
@@ -1203,7 +1203,7 @@ namespace atapp {
             ret = cache->push_forward_message(type, *msg_sequence, data, data_size, metadata);
         } else {
             uint64_t msg_seq = 0;
-            ret = cache->push_forward_message(type, msg_seq, data, data_size, metadata);
+            ret              = cache->push_forward_message(type, msg_seq, data, data_size, metadata);
         }
         return ret;
     }
@@ -1648,12 +1648,9 @@ namespace atapp {
 
         {
             uint64_t hash_out[2];
-            ::util::hash::murmur_hash3_x64_128(conf_.origin.name().c_str(), static_cast<int>(conf_.origin.name().size()), 0x01000193U,
-                                               hash_out);
-            char hash_code_str[40] = {0};
-            UTIL_STRFUNC_SNPRINTF(hash_code_str, sizeof(hash_code_str), "%016llX%016llX", static_cast<unsigned long long>(hash_out[0]),
-                                  static_cast<unsigned long long>(hash_out[1]));
-            conf_.hash_code = &hash_code_str[0];
+            ::util::hash::murmur_hash3_x64_128(conf_.origin.name().c_str(), static_cast<int>(conf_.origin.name().size()),
+                                               LIBATAPP_MACRO_HASH_MAGIC_NUMBER, hash_out);
+            conf_.hash_code = LOG_WRAPPER_FWAPI_FORMAT("{:016X}{:016X}", hash_out[0], hash_out[1]);
         }
 
         // Changing hostname is not allowed
@@ -2846,11 +2843,11 @@ namespace atapp {
                     continue;
                 }
                 const atapp::protocol::atapp_discovery &node_info = nodes[i]->get_discovery_info();
-                add_custom_command_rsp(params, LOG_WRAPPER_FWAPI_FORMAT("node -> private data: {}, destroy event: {}, hash: {:x}{:x}, {}",
-                                                                        reinterpret_cast<const void *>(nodes[i]->get_private_data_ptr()),
-                                                                        (nodes[i]->get_on_destroy() ? "ON" : "OFF"),
-                                                                        nodes[i]->get_name_hash().first, nodes[i]->get_name_hash().second,
-                                                                        rapidsjon_loader_stringify(node_info)));
+                add_custom_command_rsp(
+                    params, LOG_WRAPPER_FWAPI_FORMAT("node -> private data: {}, destroy event: {}, hash: {:016x}{:016x}, {}",
+                                                     reinterpret_cast<const void *>(nodes[i]->get_private_data_ptr()),
+                                                     (nodes[i]->get_on_destroy() ? "ON" : "OFF"), nodes[i]->get_name_hash().first,
+                                                     nodes[i]->get_name_hash().second, rapidsjon_loader_stringify(node_info)));
             }
         }
 
