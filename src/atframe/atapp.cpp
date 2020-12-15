@@ -31,6 +31,10 @@
 
 #include <atframe/modules/etcd_module.h>
 
+#ifdef module
+#undef module
+#endif
+
 #define ATAPP_DEFAULT_STOP_TIMEOUT 30000
 #define ATAPP_DEFAULT_TICK_INTERVAL 16
 
@@ -169,6 +173,7 @@ namespace atapp {
 
         owent_foreach(module_ptr_t & mod, modules_) {
             if (mod && mod->owner_ == this) {
+                mod->on_unbind();
                 mod->owner_ = NULL;
             }
         }
@@ -819,9 +824,11 @@ namespace atapp {
         }
 
         assert(NULL == module->owner_);
-
-        modules_.push_back(module);
-        module->owner_ = this;
+        if (NULL == module->owner_) {
+            modules_.push_back(module);
+            module->owner_ = this;
+            module->on_bind();
+        }
     }
 
     LIBATAPP_MACRO_API util::cli::cmd_option_ci::ptr_type app::get_command_manager() {

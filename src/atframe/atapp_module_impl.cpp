@@ -11,7 +11,15 @@
 
 namespace atapp {
     LIBATAPP_MACRO_API module_impl::module_impl() : enabled_(true), owner_(NULL) {}
-    LIBATAPP_MACRO_API module_impl::~module_impl() {}
+    LIBATAPP_MACRO_API module_impl::~module_impl() {
+        if (NULL != owner_) {
+            on_unbind();
+        }
+    }
+
+    LIBATAPP_MACRO_API void module_impl::on_bind() { }
+
+    LIBATAPP_MACRO_API void module_impl::on_unbind() { }
 
     LIBATAPP_MACRO_API int module_impl::reload() { return 0; }
 

@@ -33,12 +33,35 @@ namespace atapp {
         UTIL_DESIGN_PATTERN_NOMOVABLE(module_impl)
 
     public:
+        /**
+         * @brief Call this callback when a module is added into atapp for the first time
+         * @note Custom commands or options can be set up here
+         */
+        virtual void on_bind();
+
+        /**
+         * @brief Call this callback when a module is removed from atapp
+         * @note If custom commands or options are set up on on_bind(), the related resource should be clear here
+         */
+        virtual void on_unbind();
+
+        /**
+         * @brief This callback is called to initialize a module
+         * @note This function will be called before init when startup
+         * @return error code or 0
+         */
         virtual int init() = 0;
+
+        /**
+         * @brief This callback is called after configure is reloaded
+         * @note This function will be called before init when startup
+         * @return error code or 0, return error code on startup will stop atapp to run
+         */
         virtual int reload();
 
         /**
          * @brief where to setup custom log sink
-         * @note this will be called only once and before reload and init
+         * @note This function will be called only once and before reload and init
          * @return error code or 0
          */
         virtual int setup_log();
