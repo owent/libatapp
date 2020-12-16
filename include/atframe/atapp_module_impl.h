@@ -53,6 +53,12 @@ namespace atapp {
         virtual int init() = 0;
 
         /**
+         * @brief This callback is called after all modules are initialized successfully and the atapp is ready to run
+         * @note module can call get_app()->stop() to stop running.
+         */
+        virtual void ready();
+
+        /**
          * @brief This callback is called after configure is reloaded
          * @note This function will be called before init when startup
          * @return error code or 0, return error code on startup will stop atapp to run

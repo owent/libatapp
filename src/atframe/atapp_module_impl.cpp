@@ -17,9 +17,11 @@ namespace atapp {
         }
     }
 
-    LIBATAPP_MACRO_API void module_impl::on_bind() { }
+    LIBATAPP_MACRO_API void module_impl::on_bind() {}
 
-    LIBATAPP_MACRO_API void module_impl::on_unbind() { }
+    LIBATAPP_MACRO_API void module_impl::on_unbind() {}
+
+    LIBATAPP_MACRO_API void module_impl::ready() {}
 
     LIBATAPP_MACRO_API int module_impl::reload() { return 0; }
 

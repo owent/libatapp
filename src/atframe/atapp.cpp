@@ -363,6 +363,13 @@ namespace atapp {
         set_flag(flag_t::INITIALIZED, true);
         set_flag(flag_t::RUNNING, true);
 
+        // Step 10. notify all module to get ready
+        for (inited_mod_idx = 0; inited_mod_idx < modules_.size(); ++inited_mod_idx) {
+            if (modules_[inited_mod_idx]->is_enabled()) {
+                modules_[inited_mod_idx]->ready();
+            }
+        }
+
         return EN_ATAPP_ERR_SUCCESS;
     } // namespace atapp
 
