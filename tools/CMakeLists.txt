@@ -1,40 +1,37 @@
 ﻿
-
-EchoWithColor(COLOR GREEN "-- Configure Tools ${CMAKE_CURRENT_LIST_DIR}")
+echowithcolor(COLOR GREEN "-- Configure Tools ${CMAKE_CURRENT_LIST_DIR}")
 
 # ============ TOOLS - [...] ============
 
-file(GLOB TOOLS_SRC_LIST
-    ${CMAKE_CURRENT_LIST_DIR}/*.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/*.cc
-    ${CMAKE_CURRENT_LIST_DIR}/*.c
-    ${CMAKE_CURRENT_LIST_DIR}/*.cxx
-)
+file(GLOB TOOLS_SRC_LIST ${CMAKE_CURRENT_LIST_DIR}/*.cpp ${CMAKE_CURRENT_LIST_DIR}/*.cc ${CMAKE_CURRENT_LIST_DIR}/*.c
+     ${CMAKE_CURRENT_LIST_DIR}/*.cxx)
 
 # set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/tools")
 
 foreach(TOOLS_SRC_FILE IN LISTS TOOLS_SRC_LIST)
-    get_filename_component(TOOLS_SRC_BIN_NAME "${TOOLS_SRC_FILE}" NAME_WE)
+  get_filename_component(TOOLS_SRC_BIN_NAME "${TOOLS_SRC_FILE}" NAME_WE)
 
-    add_executable(${TOOLS_SRC_BIN_NAME} ${TOOLS_SRC_FILE})
+  add_executable(${TOOLS_SRC_BIN_NAME} ${TOOLS_SRC_FILE})
 
-    set_target_properties(${TOOLS_SRC_BIN_NAME} PROPERTIES
-        INSTALL_RPATH_USE_LINK_PATH YES
-        BUILD_WITH_INSTALL_RPATH NO
-        BUILD_RPATH_USE_ORIGIN YES
-    )
+  set_target_properties(
+    ${TOOLS_SRC_BIN_NAME}
+    PROPERTIES INSTALL_RPATH_USE_LINK_PATH YES
+               BUILD_WITH_INSTALL_RPATH NO
+               BUILD_RPATH_USE_ORIGIN YES)
 
-    target_include_directories(${TOOLS_SRC_BIN_NAME} 
-        PRIVATE 
-            "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>"
-    )
+  target_include_directories(${TOOLS_SRC_BIN_NAME} PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>")
 
-    target_link_libraries(${TOOLS_SRC_BIN_NAME} atapp)
+  target_link_libraries(${TOOLS_SRC_BIN_NAME} atapp)
 
-	install(TARGETS "${TOOLS_SRC_BIN_NAME}"
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    )
+  if(MSVC)
+    set_property(TARGET ${TOOLS_SRC_BIN_NAME} PROPERTY FOLDER "atframework/tools")
+    add_target_properties(${TOOLS_SRC_BIN_NAME} LINK_FLAGS /NODEFAULTLIB:library)
+  endif()
+
+  install(
+    TARGETS "${TOOLS_SRC_BIN_NAME}"
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 endforeach()

@@ -37,6 +37,7 @@ set_target_properties(atapp_unit_test PROPERTIES
 
 if (MSVC)
     set_property(TARGET atapp_unit_test PROPERTY FOLDER "atframework/test")
+    add_target_properties(atapp_unit_test LINK_FLAGS /NODEFAULTLIB:library)
 endif ()
 
 add_test(test atapp_unit_test)
