@@ -89,6 +89,7 @@ namespace atapp {
             std::chrono::system_clock::time_point etcd_members_next_update_time;
             std::chrono::system_clock::duration etcd_members_update_interval;
             std::chrono::system_clock::duration etcd_members_retry_interval;
+            std::chrono::system_clock::duration etcd_members_init_retry_interval;
 
             // generated data for lease
             int64_t lease;

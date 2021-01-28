@@ -180,14 +180,15 @@ namespace atapp {
     } // namespace details
 
     LIBATAPP_MACRO_API etcd_cluster::etcd_cluster() : flags_(0) {
-        conf_.authorization_next_update_time = std::chrono::system_clock::from_time_t(0);
-        conf_.authorization_retry_interval   = std::chrono::seconds(5);
-        conf_.auth_user_get_next_update_time = std::chrono::system_clock::from_time_t(0);
-        conf_.auth_user_get_retry_interval   = std::chrono::minutes(2);
-        conf_.http_cmd_timeout               = std::chrono::seconds(10);
-        conf_.etcd_members_next_update_time  = std::chrono::system_clock::from_time_t(0);
-        conf_.etcd_members_update_interval   = std::chrono::minutes(5);
-        conf_.etcd_members_retry_interval    = std::chrono::minutes(1);
+        conf_.authorization_next_update_time   = std::chrono::system_clock::from_time_t(0);
+        conf_.authorization_retry_interval     = std::chrono::seconds(5);
+        conf_.auth_user_get_next_update_time   = std::chrono::system_clock::from_time_t(0);
+        conf_.auth_user_get_retry_interval     = std::chrono::minutes(2);
+        conf_.http_cmd_timeout                 = std::chrono::seconds(10);
+        conf_.etcd_members_next_update_time    = std::chrono::system_clock::from_time_t(0);
+        conf_.etcd_members_update_interval     = std::chrono::minutes(5);
+        conf_.etcd_members_retry_interval      = std::chrono::minutes(1);
+        conf_.etcd_members_init_retry_interval = std::chrono::seconds(3);
 
         conf_.lease                      = 0;
         conf_.keepalive_next_update_time = std::chrono::system_clock::from_time_t(0);
@@ -314,9 +315,10 @@ namespace atapp {
         conf_.auth_user_get_next_update_time = std::chrono::system_clock::from_time_t(0);
         conf_.auth_user_get_retry_interval   = std::chrono::minutes(2);
         conf_.path_node.clear();
-        conf_.etcd_members_next_update_time = std::chrono::system_clock::from_time_t(0);
-        conf_.etcd_members_update_interval  = std::chrono::minutes(5);
-        conf_.etcd_members_retry_interval   = std::chrono::minutes(1);
+        conf_.etcd_members_next_update_time    = std::chrono::system_clock::from_time_t(0);
+        conf_.etcd_members_update_interval     = std::chrono::minutes(5);
+        conf_.etcd_members_retry_interval      = std::chrono::minutes(1);
+        conf_.etcd_members_init_retry_interval = std::chrono::seconds(3);
 
         conf_.lease                      = 0;
         conf_.keepalive_next_update_time = std::chrono::system_clock::from_time_t(0);
@@ -1148,8 +1150,14 @@ namespace atapp {
             }
         }
 
-        if (util::time::time_utility::sys_now() + conf_.etcd_members_retry_interval < conf_.etcd_members_next_update_time) {
-            conf_.etcd_members_next_update_time = util::time::time_utility::sys_now() + conf_.etcd_members_retry_interval;
+        std::chrono::system_clock::duration retry_interval = conf_.etcd_members_retry_interval;
+        if (!check_flag(flag_t::RUNNING) && conf_.etcd_members_init_retry_interval > std::chrono::system_clock::duration::zero()) {
+            retry_interval = conf_.etcd_members_init_retry_interval;
+        } else if (retry_interval <= std::chrono::system_clock::duration::zero()) {
+            retry_interval = std::chrono::seconds(1);
+        }
+        if (util::time::time_utility::sys_now() + retry_interval < conf_.etcd_members_next_update_time) {
+            conf_.etcd_members_next_update_time = util::time::time_utility::sys_now() + retry_interval;
             return false;
         }
 
@@ -1298,6 +1306,12 @@ namespace atapp {
             }
 
             self->add_stats_success_request();
+
+            if (std::chrono::system_clock::duration::zero() >= self->conf_.etcd_members_update_interval) {
+                self->conf_.etcd_members_next_update_time = util::time::time_utility::sys_now() + std::chrono::seconds(1);
+            } else {
+                self->conf_.etcd_members_next_update_time = util::time::time_utility::sys_now() + self->conf_.etcd_members_update_interval;
+            }
 
             // 触发一次tick
             self->tick();
