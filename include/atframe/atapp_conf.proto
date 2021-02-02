@@ -138,8 +138,9 @@ message atapp_etcd_ssl {
 }
 
 message atapp_etcd_cluster {
-    google.protobuf.Duration update_interval = 1 [ (atapp.protocol.CONFIGURE) = {default_value : "5m"} ];
-    google.protobuf.Duration retry_interval  = 2 [ (atapp.protocol.CONFIGURE) = {default_value : "1m"} ];
+    bool                     auto_update     = 1 [ (atapp.protocol.CONFIGURE) = {default_value : "true"} ];
+    google.protobuf.Duration update_interval = 2 [ (atapp.protocol.CONFIGURE) = {default_value : "5m"} ];
+    google.protobuf.Duration retry_interval  = 3 [ (atapp.protocol.CONFIGURE) = {default_value : "1m"} ];
 }
 
 message atapp_etcd_keepalive {
