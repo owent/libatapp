@@ -196,9 +196,10 @@ namespace atapp {
         conf_.keepalive_interval         = std::chrono::seconds(5);
         conf_.keepalive_retry_times      = 8;
 
-        conf_.ssl_enable_alpn = true;
-        conf_.ssl_verify_peer = false;
-        conf_.http_debug_mode = false;
+        conf_.ssl_enable_alpn   = true;
+        conf_.ssl_verify_peer   = false;
+        conf_.http_debug_mode   = false;
+        conf_.auto_update_hosts = true;
 
         conf_.ssl_min_version = ssl_version_t::DISABLED;
         conf_.user_agent.clear();
@@ -326,9 +327,10 @@ namespace atapp {
         conf_.keepalive_interval         = std::chrono::seconds(5);
         conf_.keepalive_retry_times      = 8;
 
-        conf_.ssl_enable_alpn = true;
-        conf_.ssl_verify_peer = false;
-        conf_.http_debug_mode = false;
+        conf_.ssl_enable_alpn   = true;
+        conf_.ssl_verify_peer   = false;
+        conf_.http_debug_mode   = false;
+        conf_.auto_update_hosts = true;
 
         conf_.ssl_min_version = ssl_version_t::DISABLED;
         conf_.user_agent.clear();
@@ -1131,7 +1133,9 @@ namespace atapp {
     }
 
     bool etcd_cluster::retry_request_member_update(const std::string &bad_url) {
-        if (!conf_.path_node.empty() && 0 == UTIL_STRFUNC_STRNCASE_CMP(conf_.path_node.c_str(), bad_url.c_str(), conf_.path_node.size())) {
+        if (conf_.path_node.empty()) {
+            select_cluster_member();
+        } else if (0 == UTIL_STRFUNC_STRNCASE_CMP(conf_.path_node.c_str(), bad_url.c_str(), conf_.path_node.size())) {
             for (size_t i = 0; i < conf_.hosts.size(); ++i) {
                 if (conf_.hosts[i] != conf_.path_node) {
                     continue;
@@ -1143,11 +1147,7 @@ namespace atapp {
                 conf_.hosts.pop_back();
             }
 
-            if (!conf_.hosts.empty()) {
-                conf_.path_node = conf_.hosts[random_generator_.random_between<size_t>(0, conf_.hosts.size())];
-            } else {
-                conf_.path_node.clear();
-            }
+            select_cluster_member();
         }
 
         std::chrono::system_clock::duration retry_interval = conf_.etcd_members_retry_interval;
@@ -1189,6 +1189,15 @@ namespace atapp {
             conf_.etcd_members_next_update_time = util::time::time_utility::sys_now() + std::chrono::seconds(1);
         } else {
             conf_.etcd_members_next_update_time = util::time::time_utility::sys_now() + conf_.etcd_members_update_interval;
+        }
+
+        // Trust etcd ingress and do not use cluster member to keep healthy
+        if (!conf_.auto_update_hosts && !conf_.conf_hosts.empty()) {
+            if (conf_.hosts.empty()) {
+                conf_.hosts = conf_.conf_hosts;
+                select_cluster_member();
+            }
+            return false;
         }
 
         std::string *selected_host;
@@ -1300,9 +1309,8 @@ namespace atapp {
                 }
             }
 
-            if (!self->conf_.hosts.empty() && need_select_node) {
-                self->conf_.path_node = self->conf_.hosts[self->random_generator_.random_between<size_t>(0, self->conf_.hosts.size())];
-                FWLOGINFO("Etcd cluster using node {}", self->conf_.path_node);
+            if (need_select_node) {
+                self->select_cluster_member();
             }
 
             self->add_stats_success_request();
@@ -1787,6 +1795,22 @@ namespace atapp {
                 delete_keepalive_deletor(iter->second, true);
             }
         }
+    }
+
+    bool etcd_cluster::select_cluster_member() {
+        if (!conf_.hosts.empty()) {
+            if (1 == conf_.hosts.size()) {
+                conf_.path_node = conf_.hosts[0];
+            } else {
+                conf_.path_node = conf_.hosts[random_generator_.random_between<size_t>(0, conf_.hosts.size())];
+            }
+
+            FWLOGINFO("Etcd cluster {} using node {}", reinterpret_cast<const void *>(this), conf_.path_node);
+        } else {
+            conf_.path_node.clear();
+        }
+
+        return !conf_.path_node.empty();
     }
 
     LIBATAPP_MACRO_API void etcd_cluster::check_authorization_expired(int http_code, const std::string &content) {

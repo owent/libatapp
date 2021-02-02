@@ -381,6 +381,7 @@ namespace atapp {
 
         etcd_ctx_.set_conf_authorization(conf.authorization());
         etcd_ctx_.set_conf_http_timeout(detail::convert_to_chrono(conf.request().timeout(), 10000));
+        etcd_ctx_.set_conf_etcd_members_auto_update_hosts(conf.cluster().auto_update());
         etcd_ctx_.set_conf_etcd_members_update_interval(detail::convert_to_chrono(conf.cluster().update_interval(), 300000));
         etcd_ctx_.set_conf_etcd_members_retry_interval(detail::convert_to_chrono(conf.cluster().retry_interval(), 60000));
 
@@ -767,7 +768,7 @@ namespace atapp {
 
     LIBATAPP_MACRO_API atapp::etcd_watcher::ptr_t etcd_module::add_watcher_by_custom_path(const std::string &custom_path,
                                                                                           watcher_one_callback_t fn) {
-        const std::string& configure_path = get_configure_path();
+        const std::string &configure_path = get_configure_path();
         if (custom_path.size() < configure_path.size() ||
             0 != UTIL_STRFUNC_STRNCMP(custom_path.c_str(), configure_path.c_str(), configure_path.size())) {
 

@@ -100,10 +100,11 @@ namespace atapp {
 
             // SSL configure
             // @see https://github.com/etcd-io/etcd/blob/master/Documentation/op-guide/security.md for detail
-            bool ssl_enable_alpn; // curl 7.36.0 CURLOPT_SSL_ENABLE_ALPN
-            bool ssl_verify_peer; // CURLOPT_SSL_VERIFYPEER, CURLOPT_SSL_VERIFYHOST, CURLOPT_SSL_VERIFYSTATUS and
-                                  // CURLOPT_PROXY_SSL_VERIFYPEER, CURLOPT_PROXY_SSL_VERIFYHOST
-            bool http_debug_mode; // print verbose information
+            bool ssl_enable_alpn;   // curl 7.36.0 CURLOPT_SSL_ENABLE_ALPN
+            bool ssl_verify_peer;   // CURLOPT_SSL_VERIFYPEER, CURLOPT_SSL_VERIFYHOST, CURLOPT_SSL_VERIFYSTATUS and
+                                    // CURLOPT_PROXY_SSL_VERIFYPEER, CURLOPT_PROXY_SSL_VERIFYHOST
+            bool http_debug_mode;   // print verbose information
+            bool auto_update_hosts; // auto update cluster member
 
             ssl_version_t::type
                 ssl_min_version; // CURLOPT_SSLVERSION and CURLOPT_PROXY_SSLVERSION @see ssl_version_t, SSLv3/TLSv1/TLSv1.1/TLSv1.2/TLSv1.3
@@ -229,6 +230,9 @@ namespace atapp {
 
         UTIL_FORCEINLINE void set_conf_http_debug_mode(bool v) { conf_.http_debug_mode = v; }
         UTIL_FORCEINLINE bool get_conf_http_debug_mode() const { return conf_.http_debug_mode; }
+
+        UTIL_FORCEINLINE void set_conf_etcd_members_auto_update_hosts(bool v) { conf_.auto_update_hosts = v; }
+        UTIL_FORCEINLINE bool get_conf_etcd_members_auto_update_hosts() const { return conf_.auto_update_hosts; }
 
         UTIL_FORCEINLINE void set_conf_ssl_min_version(ssl_version_t::type v) { conf_.ssl_min_version = v; }
         UTIL_FORCEINLINE ssl_version_t::type get_conf_ssl_min_version() const { return conf_.ssl_min_version; }
@@ -413,6 +417,7 @@ namespace atapp {
 
         static void delete_keepalive_deletor(etcd_keepalive_deletor *in, bool close_rpc);
         void cleanup_keepalive_deletors();
+        bool select_cluster_member();
 
     public:
         /**
