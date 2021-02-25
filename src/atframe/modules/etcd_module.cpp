@@ -212,7 +212,13 @@ namespace atapp {
                 if (etcd_ctx_.get_stats().continue_error_requests > retry_times) {
                     retry_times = etcd_ctx_.get_stats().continue_error_requests;
                 }
-                FWLOGERROR("etcd_keepalive request {} timeout, retry {} times (with {} ticks).", (*iter)->get_path(), retry_times, ticks);
+                if ((*iter)->is_check_passed()) {
+                    FWLOGWARNING("etcd_keepalive request {} timeout, retry {} times (with {} ticks), check passed, has data: {}.",
+                                 (*iter)->get_path(), retry_times, ticks, (*iter)->has_data() ? "true" : "false");
+                } else {
+                    FWLOGERROR("etcd_keepalive request {} timeout, retry {} times (with {} ticks), check unpassed, has data: {}.",
+                               (*iter)->get_path(), retry_times, ticks, (*iter)->has_data() ? "true" : "false");
+                }
             }
         }
 
@@ -270,7 +276,7 @@ namespace atapp {
             }
 
             inner_keepalive_actors_.push_back(actor);
-            FWLOGINFO("create etcd_keepalive for by_id index {} success", get_by_id_path());
+            FWLOGINFO("create etcd_keepalive {} for by_id index {} success", reinterpret_cast<const void *>(actor.get()), get_by_id_path());
         }
 
         if (conf.report_alive().by_type()) {
@@ -280,7 +286,8 @@ namespace atapp {
                 return -1;
             }
             inner_keepalive_actors_.push_back(actor);
-            FWLOGINFO("create etcd_keepalive for by_type_id index {} success", get_by_type_id_path());
+            FWLOGINFO("create etcd_keepalive {} for by_type_id index {} success", reinterpret_cast<const void *>(actor.get()),
+                      get_by_type_id_path());
 
             actor = add_keepalive_actor(inner_keepalive_value_, get_by_type_name_path());
             if (!actor) {
@@ -289,7 +296,8 @@ namespace atapp {
             }
             inner_keepalive_actors_.push_back(actor);
 
-            FWLOGINFO("create etcd_keepalive for by_type_name index {} success", get_by_type_name_path());
+            FWLOGINFO("create etcd_keepalive {} for by_type_name index {} success", reinterpret_cast<const void *>(actor.get()),
+                      get_by_type_name_path());
         }
 
         if (conf.report_alive().by_name()) {
@@ -300,7 +308,8 @@ namespace atapp {
             }
 
             inner_keepalive_actors_.push_back(actor);
-            FWLOGINFO("create etcd_keepalive for by_name index {} success", get_by_name_path());
+            FWLOGINFO("create etcd_keepalive {} for by_name index {} success", reinterpret_cast<const void *>(actor.get()),
+                      get_by_name_path());
         }
 
         for (int i = 0; i < conf.report_alive().by_tag_size(); ++i) {
@@ -317,7 +326,8 @@ namespace atapp {
             }
 
             inner_keepalive_actors_.push_back(actor);
-            FWLOGINFO("create etcd_keepalive for by_tag index {} success", get_by_tag_path(tag_name));
+            FWLOGINFO("create etcd_keepalive {} for by_tag index {} success", reinterpret_cast<const void *>(actor.get()),
+                      get_by_tag_path(tag_name));
         }
 
         return 0;

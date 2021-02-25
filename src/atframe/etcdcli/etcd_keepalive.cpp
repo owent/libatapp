@@ -242,7 +242,7 @@ namespace atapp {
         }
 
         self->rpc_.has_data = true;
-        FWLOGTRACE("Etcd keepalive {} set data http response: {}", reinterpret_cast<const void *>(self), req.get_response_stream().str());
+        FWLOGDEBUG("Etcd keepalive {} set data http response: {}", reinterpret_cast<const void *>(self), req.get_response_stream().str());
         self->active();
         return 0;
     }
