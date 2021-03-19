@@ -575,7 +575,7 @@ namespace atapp {
         ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration old_tick_interval = conf_.origin.timer().tick_interval();
         util::cli::shell_stream ss(std::cerr);
 
-        FWLOGINFO("============ start to load configure ============");
+        FWLOGWARNING("============ start to load configure ============");
         // step 1. reset configure
         cfg_loader_.clear();
         yaml_loader_.clear();
@@ -634,15 +634,15 @@ namespace atapp {
             }
         }
 
-        FWLOGINFO("------------ load configure done ------------");
+        FWLOGWARNING("------------ load configure done ------------");
         return 0;
     }
 
     LIBATAPP_MACRO_API int app::stop() {
         if (check_flag(flag_t::STOPING)) {
-            FWLOGINFO("============= recall stop after some event action(s) finished =============");
+            FWLOGWARNING("============= recall stop after some event action(s) finished =============");
         } else {
-            FWLOGINFO("============ receive stop signal and ready to stop all modules ============");
+            FWLOGWARNING("============ receive stop signal and ready to stop all modules ============");
         }
         // step 1. set stop flag.
         // bool is_stoping = set_flag(flag_t::STOPING, true);
@@ -3321,6 +3321,11 @@ namespace atapp {
 
         // step 4. waiting for connect success
         while (NULL == ep) {
+            // If there is no connection timer, it means connecting is arleady failed.
+            if (0 == bus_node_->get_connection_timer_size()) {
+                break;
+            }
+
             flag_guard_t in_callback_guard(*this, flag_t::IN_CALLBACK);
             uv_run(ev_loop, UV_RUN_ONCE);
 
