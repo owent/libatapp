@@ -26,9 +26,6 @@ atapp:
     send_buffer_size: 2097152 # send buffer size, will be used to initialize io_stream channel write queue
     send_buffer_number: 0 # send message number limit, will be used to initialize io_stream channel write queue, 0 for dynamic buffer
     gateways:
-      match_labels:
-        key1: value1
-        key2: value2
     #   - address: "ipv6://:::21437"
     #     match_namespaces:
     #       -
