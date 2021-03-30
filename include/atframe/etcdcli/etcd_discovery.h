@@ -68,7 +68,7 @@ namespace atapp {
         LIBATAPP_MACRO_API const on_destroy_fn_t &get_on_destroy() const;
         LIBATAPP_MACRO_API void reset_on_destroy();
 
-        LIBATAPP_MACRO_API const std::string &next_ingress_address() const;
+        LIBATAPP_MACRO_API const atapp::protocol::atapp_gateway &next_ingress_gateway() const;
         LIBATAPP_MACRO_API int32_t get_ingress_size() const;
 
     private:
@@ -82,7 +82,8 @@ namespace atapp {
             intptr_t private_data_iptr_;
         };
         on_destroy_fn_t on_destroy_fn_;
-        mutable int32_t ingress_address_index_;
+        mutable int32_t ingress_index_;
+        mutable atapp::protocol::atapp_gateway ingress_for_listen_;
     };
 
     class etcd_discovery_set {

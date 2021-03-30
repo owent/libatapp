@@ -410,6 +410,8 @@ namespace atapp {
             return ret;
         }
 
+        LIBATAPP_MACRO_API bool match_gateway(const atapp::protocol::atapp_gateway &checked) const;
+
     private:
         static void ev_stop_timeout(uv_timer_t *handle);
 
@@ -440,6 +442,10 @@ namespace atapp {
         bool write_pidfile();
         bool cleanup_pidfile();
         void print_help();
+
+        bool match_gateway_hosts(const atapp::protocol::atapp_gateway &checked) const;
+        bool match_gateway_namespace(const atapp::protocol::atapp_gateway &checked) const;
+        bool match_gateway_labels(const atapp::protocol::atapp_gateway &checked) const;
 
         // ============ inner functional handlers ============
 

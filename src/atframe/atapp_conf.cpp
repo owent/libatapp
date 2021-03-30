@@ -458,12 +458,12 @@ namespace atapp {
         }
 
         template <class TRET>
-        static TRET dump_pick_field_with_extensions(const util::config::ini_value &val,
-                                                    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds, size_t index) {
+        static TRET dump_pick_field_with_extensions(const std::string &val_str,
+                                                    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds) {
             TRET value, min_value, max_value;
             dump_pick_field_min(min_value);
             dump_pick_field_max(max_value);
-            if (val.as_cpp_string(index).empty()) {
+            if (val_str.empty()) {
                 if (fds->options().HasExtension(atapp::protocol::CONFIGURE)) {
                     const atapp::protocol::atapp_configure_meta &meta = fds->options().GetExtension(atapp::protocol::CONFIGURE);
                     const std::string &default_str                    = meta.default_value();
@@ -474,9 +474,9 @@ namespace atapp {
             } else {
                 if (fds->options().HasExtension(atapp::protocol::CONFIGURE)) {
                     const atapp::protocol::atapp_configure_meta &meta = fds->options().GetExtension(atapp::protocol::CONFIGURE);
-                    dump_pick_field_from_str(value, val.as_cpp_string(index), meta.size_mode());
+                    dump_pick_field_from_str(value, val_str, meta.size_mode());
                 } else {
-                    dump_pick_field_from_str(value, val.as_cpp_string(index), false);
+                    dump_pick_field_from_str(value, val_str, false);
                 }
             }
             if (fds->options().HasExtension(atapp::protocol::CONFIGURE)) {
@@ -499,6 +499,73 @@ namespace atapp {
             }
 
             return value;
+        }
+
+        template <class TRET>
+        static inline TRET dump_pick_field_with_extensions(const util::config::ini_value &val,
+                                                           const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds, size_t index) {
+            return dump_pick_field_with_extensions<TRET>(val.as_cpp_string(index), fds);
+        }
+
+        static inline bool dump_pick_logic_bool(std::string &trans) {
+            std::transform(trans.begin(), trans.end(), trans.begin(), util::string::tolower<char>);
+
+            if ("0" == trans || "false" == trans || "no" == trans || "disable" == trans || "disabled" == trans || "" == trans) {
+                return false;
+            }
+
+            return true;
+        }
+
+        static void dump_pick_map_key_field(const std::string &val_str, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
+                                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds) {
+            if (NULL == fds) {
+                return;
+            }
+
+            if (fds->is_repeated()) {
+                return;
+            }
+
+            switch (fds->cpp_type()) {
+            case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_INT32: {
+                int32_t value = dump_pick_field_with_extensions<int32_t>(val_str, fds);
+                dst.GetReflection()->SetInt32(&dst, fds, value);
+                break;
+            };
+            case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_INT64: {
+                int64_t value = dump_pick_field_with_extensions<int64_t>(val_str, fds);
+                dst.GetReflection()->SetInt64(&dst, fds, value);
+                break;
+            };
+            case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_UINT32: {
+                uint32_t value = dump_pick_field_with_extensions<uint32_t>(val_str, fds);
+                dst.GetReflection()->SetUInt32(&dst, fds, value);
+                break;
+            };
+            case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_UINT64: {
+                uint64_t value = dump_pick_field_with_extensions<uint64_t>(val_str, fds);
+                dst.GetReflection()->SetUInt64(&dst, fds, value);
+                break;
+            };
+            case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_STRING: {
+                dst.GetReflection()->SetString(&dst, fds, val_str);
+                break;
+            };
+            case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_BOOL: {
+                std::string trans = val_str;
+                bool jval         = dump_pick_logic_bool(trans);
+
+                dst.GetReflection()->SetBool(&dst, fds, jval);
+                break;
+            };
+            default: {
+                // See https://developers.google.com/protocol-buffers/docs/proto3#maps
+                // key_type can be any integral or string type (so, any scalar type except for floating point types and bytes).
+                FWLOGERROR("{} in {} with type={} is not supported now", fds->name(), dst.GetDescriptor()->full_name(), fds->type_name());
+                break;
+            }
+            }
         }
 
         static void dump_pick_field(const util::config::ini_value &val, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
@@ -583,7 +650,30 @@ namespace atapp {
                     break;
                 }
 
-                if (fds->is_repeated()) {
+                if (fds->is_map()) {
+                    if (NULL == fds->message_type()) {
+                        break;
+                    }
+                    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *key_fds   = fds->message_type()->map_key();
+                    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *value_fds = fds->message_type()->map_value();
+                    if (NULL == key_fds || NULL == value_fds) {
+                        break;
+                    }
+
+                    util::config::ini_value::node_type::const_iterator iter = val.get_children().begin();
+                    for (; iter != val.get_children().end(); ++iter) {
+                        if (!iter->second) {
+                            continue;
+                        }
+
+                        ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *submsg = dst.GetReflection()->AddMessage(&dst, fds);
+                        if (NULL == submsg) {
+                            break;
+                        }
+                        dump_pick_map_key_field(iter->first, *submsg, key_fds);
+                        dump_pick_field(*iter->second, *submsg, value_fds, 0);
+                    }
+                } else if (fds->is_repeated()) {
                     // repeated message is unpack by PARENT.0.field = XXX
                     for (uint32_t j = 0;; ++j) {
                         std::string idx                                             = LOG_WRAPPER_FWAPI_FORMAT("{}", j);
@@ -626,7 +716,6 @@ namespace atapp {
                 break;
             };
             case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_BOOL: {
-                bool jval = true;
                 std::string trans;
                 if (val.as_cpp_string(index).empty()) {
                     if (fds->options().HasExtension(atapp::protocol::CONFIGURE)) {
@@ -635,11 +724,7 @@ namespace atapp {
                 } else {
                     trans = val.as_cpp_string(index);
                 }
-                std::transform(trans.begin(), trans.end(), trans.begin(), util::string::tolower<char>);
-
-                if ("0" == trans || "false" == trans || "no" == trans || "disable" == trans || "disabled" == trans || "" == trans) {
-                    jval = false;
-                }
+                bool jval = dump_pick_logic_bool(trans);
 
                 if (fds->is_repeated()) {
                     dst.GetReflection()->AddBool(&dst, fds, jval);
@@ -855,12 +940,36 @@ namespace atapp {
 
                     if (val.IsMap()) {
                         ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *submsg;
-                        if (fds->is_repeated()) {
+                        if (fds->is_map()) {
+                            if (NULL == fds->message_type()) {
+                                break;
+                            }
+                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *key_fds   = fds->message_type()->map_key();
+                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *value_fds = fds->message_type()->map_value();
+                            if (NULL == key_fds || NULL == value_fds) {
+                                break;
+                            }
+
+                            YAML::Node::const_iterator iter = val.begin();
+                            for (; iter != val.end(); ++iter) {
+                                submsg = dst.GetReflection()->AddMessage(&dst, fds);
+                                if (NULL == submsg) {
+                                    break;
+                                }
+                                dump_pick_field(iter->first, *submsg, key_fds);
+                                dump_pick_field(iter->second, *submsg, value_fds);
+                            }
+                        } else if (fds->is_repeated()) {
                             submsg = dst.GetReflection()->AddMessage(&dst, fds);
+                            if (NULL == submsg) {
+                                break;
+                            }
+                            dump_message_item(val, *submsg);
                         } else {
                             submsg = dst.GetReflection()->MutableMessage(&dst, fds);
-                        }
-                        if (NULL != submsg) {
+                            if (NULL == submsg) {
+                                break;
+                            }
                             dump_message_item(val, *submsg);
                         }
                     }

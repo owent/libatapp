@@ -1033,9 +1033,12 @@ namespace atapp {
         }
         out.set_version(get_app_version());
         // out.set_custom_data(get_conf_custom_data());
-        out.mutable_gateway()->Reserve(conf_.origin.bus().gateway().size());
-        for (int i = 0; i < conf_.origin.bus().gateway().size(); ++i) {
-            out.add_gateway(conf_.origin.bus().gateway(i));
+        out.mutable_gateways()->Reserve(conf_.origin.bus().gateways().size());
+        for (int i = 0; i < conf_.origin.bus().gateways().size(); ++i) {
+            atapp::protocol::atapp_gateway *gateway = out.add_gateways();
+            if (NULL != gateway) {
+                gateway->CopyFrom(conf_.origin.bus().gateways(i));
+            }
         }
 
         out.mutable_metadata()->CopyFrom(get_metadata());
@@ -1536,7 +1539,12 @@ namespace atapp {
             int32_t gateway_size = discovery->get_ingress_size();
             for (int32_t i = 0; handle && i < gateway_size; ++i) {
                 atbus::channel::channel_address_t addr;
-                atbus::channel::make_address(discovery->next_ingress_address().c_str(), addr);
+                const atapp::protocol::atapp_gateway &gateway = discovery->next_ingress_gateway();
+                if (!match_gateway(gateway)) {
+                    FWLOGDEBUG("atapp endpoint {}({}) skip unmatched gateway {}", ret->get_id(), ret->get_name(), gateway.address());
+                    continue;
+                }
+                atbus::channel::make_address(gateway.address().c_str(), addr);
                 std::transform(addr.scheme.begin(), addr.scheme.end(), addr.scheme.begin(), ::util::string::tolower<char>);
 
                 connector_protocol_map_t::const_iterator iter = connector_protocols_.find(addr.scheme);
@@ -1602,6 +1610,26 @@ namespace atapp {
         }
 
         return NULL;
+    }
+
+    LIBATAPP_MACRO_API bool app::match_gateway(const atapp::protocol::atapp_gateway &checked) const {
+        if (checked.address().empty()) {
+            return false;
+        }
+
+        if (checked.match_hosts_size() > 0 && !match_gateway_hosts(checked)) {
+            return false;
+        }
+
+        if (checked.match_namespaces_size() && !match_gateway_namespace(checked)) {
+            return false;
+        }
+
+        if (checked.match_labels_size() > 0 && !match_gateway_labels(checked)) {
+            return false;
+        }
+
+        return true;
     }
 
     void app::ev_stop_timeout(uv_timer_t *handle) {
@@ -2469,6 +2497,54 @@ namespace atapp {
                    << "Custom command help:" << std::endl;
             shls() << get_command_manager()->get_help_msg() << std::endl;
         }
+    }
+
+    bool app::match_gateway_hosts(const atapp::protocol::atapp_gateway &checked) const {
+        bool has_matched_value = false;
+        bool has_valid_conf    = false;
+        for (int i = 0; !has_matched_value && i < checked.match_hosts_size(); ++i) {
+            if (checked.match_hosts(i).empty()) {
+                continue;
+            }
+            has_valid_conf    = true;
+            has_matched_value = checked.match_hosts(i) == atbus::node::get_hostname();
+        }
+
+        return !has_valid_conf || has_matched_value;
+    }
+
+    bool app::match_gateway_namespace(const atapp::protocol::atapp_gateway &checked) const {
+        bool has_matched_value = false;
+        bool has_valid_conf    = false;
+        for (int i = 0; !has_matched_value && i < checked.match_namespaces_size(); ++i) {
+            if (checked.match_namespaces(i).empty()) {
+                continue;
+            }
+            has_valid_conf    = true;
+            has_matched_value = checked.match_namespaces(i) == get_metadata().namespace_name();
+        }
+
+        return !has_valid_conf || has_matched_value;
+    }
+
+    bool app::match_gateway_labels(const atapp::protocol::atapp_gateway &checked) const {
+        ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Map<std::string, std::string>::const_iterator iter = checked.match_labels().begin();
+        for (; iter != checked.match_labels().end(); ++iter) {
+            if (iter->first.empty() || iter->second.empty()) {
+                continue;
+            }
+
+            ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Map<std::string, std::string>::const_iterator self_label_iter =
+                get_metadata().labels().find(iter->first);
+            if (self_label_iter == get_metadata().labels().end()) {
+                return false;
+            }
+            if (self_label_iter->second != iter->second) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     LIBATAPP_MACRO_API app::custom_command_sender_t app::get_custom_command_sender(util::cli::callback_param params) {

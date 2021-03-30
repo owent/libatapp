@@ -916,7 +916,37 @@ namespace atapp {
             return false;
         }
 
-        return atapp::rapidsjon_loader_parse(out.node_discovery, json);
+        rapidjson::Document doc;
+        if (!atapp::rapidsjon_loader_unstringify(doc, json)) {
+            return false;
+        }
+
+        rapidsjon_loader_dump_to(doc, out.node_discovery);
+        if (out.node_discovery.gateways_size() > 0 || !doc.IsObject()) {
+            return true;
+        }
+
+        // FIXME(owent): remove deprecated gateway field
+        rapidjson::Value::ConstMemberIterator old_gateway_iter = doc.FindMember("gateway");
+        if (old_gateway_iter == doc.MemberEnd()) {
+            return true;
+        }
+        if (!old_gateway_iter->value.IsArray()) {
+            return true;
+        }
+
+        for (rapidjson::SizeType i = 0; i < old_gateway_iter->value.Size(); ++i) {
+            if (!old_gateway_iter->value[i].IsString()) {
+                continue;
+            }
+
+            atapp::protocol::atapp_gateway *gateway = out.node_discovery.add_gateways();
+            if (NULL != gateway) {
+                gateway->set_address(old_gateway_iter->value[i].GetString(), old_gateway_iter->value[i].GetStringLength());
+            }
+        }
+
+        return true;
     }
 
     void etcd_module::pack(const node_info_t &src, std::string &json) { json = atapp::rapidsjon_loader_stringify(src.node_discovery); }

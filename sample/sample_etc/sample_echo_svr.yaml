@@ -25,8 +25,16 @@ atapp:
     recv_buffer_size: 8388608 # recv channel size(8MB), will be used to initialize (shared) memory channel size
     send_buffer_size: 2097152 # send buffer size, will be used to initialize io_stream channel write queue
     send_buffer_number: 0 # send message number limit, will be used to initialize io_stream channel write queue, 0 for dynamic buffer
-    # gateway:
-    #   -
+    gateways:
+      match_labels:
+        key1: value1
+        key2: value2
+    #   - address: "ipv6://:::21437"
+    #     match_namespaces:
+    #       -
+    #     match_labels: {}
+    #     match_hosts:
+    #       -
   # =========== timer ===========
   timer:
     tick_interval: 32ms # 32ms for tick active

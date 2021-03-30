@@ -108,7 +108,7 @@ namespace atapp {
         return *l.name < r->get_discovery_info().name();
     }
 
-    LIBATAPP_MACRO_API etcd_discovery_node::etcd_discovery_node() : name_hash_(0, 0), ingress_address_index_(0) {
+    LIBATAPP_MACRO_API etcd_discovery_node::etcd_discovery_node() : name_hash_(0, 0), ingress_index_(0) {
         private_data_ptr_  = NULL;
         private_data_u64_  = 0;
         private_data_uptr_ = 0;
@@ -135,32 +135,33 @@ namespace atapp {
         on_destroy_fn_.swap(empty);
     }
 
-    LIBATAPP_MACRO_API const std::string &etcd_discovery_node::next_ingress_address() const {
-        if (ingress_address_index_ < 0) {
-            ingress_address_index_ = 0;
+    LIBATAPP_MACRO_API const atapp::protocol::atapp_gateway &etcd_discovery_node::next_ingress_gateway() const {
+        if (ingress_index_ < 0) {
+            ingress_index_ = 0;
         }
 
-        if (node_info_.gateway_size() > 0) {
-            if (ingress_address_index_ >= node_info_.gateway_size()) {
-                ingress_address_index_ %= node_info_.gateway_size();
+        if (node_info_.gateways_size() > 0) {
+            if (ingress_index_ >= node_info_.gateways_size()) {
+                ingress_index_ %= node_info_.gateways_size();
             }
-            return node_info_.gateway(ingress_address_index_++);
+            return node_info_.gateways(ingress_index_++);
         }
 
         if (node_info_.listen_size() > 0) {
-            if (ingress_address_index_ >= node_info_.listen_size()) {
-                ingress_address_index_ %= node_info_.listen_size();
+            if (ingress_index_ >= node_info_.listen_size()) {
+                ingress_index_ %= node_info_.listen_size();
             }
-            return node_info_.listen(ingress_address_index_++);
+            ingress_for_listen_.set_address(node_info_.listen(ingress_index_++));
+            return ingress_for_listen_;
         }
 
-        static std::string empty;
-        return empty;
+        // if none of gateways or listen found, ingress_for_listen_ will always be empty
+        return ingress_for_listen_;
     }
 
     LIBATAPP_MACRO_API int32_t etcd_discovery_node::get_ingress_size() const {
-        if (node_info_.gateway_size() > 0) {
-            return node_info_.gateway_size();
+        if (node_info_.gateways_size() > 0) {
+            return node_info_.gateways_size();
         }
 
         return node_info_.listen_size();
