@@ -3413,7 +3413,7 @@ namespace atapp {
 
         if (NULL == ep) {
             close_timer(tick_timer_.timeout_timer);
-            ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "connect to " << use_addr.address << " timeout." << std::endl;
+            ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "connect to " << use_addr.address << " failed or timeout." << std::endl;
             return EN_ATAPP_ERR_CONNECT_ATAPP_FAILED;
         }
 
