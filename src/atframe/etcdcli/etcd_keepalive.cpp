@@ -7,6 +7,7 @@
 #include <atframe/etcdcli/etcd_cluster.h>
 #include <atframe/etcdcli/etcd_keepalive.h>
 
+
 namespace atapp {
 
     etcd_keepalive::default_checker_t::default_checker_t(const std::string &checked) : data(checked) {}
@@ -177,7 +178,7 @@ namespace atapp {
         rapidjson::Document doc;
 
         if (atapp::etcd_packer::parse_object(doc, http_content.c_str())) {
-            rapidjson::Value root = doc.GetObject();
+            rapidjson::Value& root = doc;
 
             // Run check function
             int64_t count = 0;

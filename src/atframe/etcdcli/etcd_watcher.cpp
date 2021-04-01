@@ -357,7 +357,7 @@ namespace atapp {
                 continue;
             }
 
-            rapidjson::Value root          = doc.GetObject();
+            rapidjson::Value& root          = doc;
             const rapidjson::Value *result = &root;
             {
                 rapidjson::Document::ConstMemberIterator res = root.FindMember("result");
