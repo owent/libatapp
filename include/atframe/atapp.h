@@ -509,7 +509,9 @@ namespace atapp {
         LIBATAPP_MACRO_API void add_connector_inner(std::shared_ptr<atapp_connector_impl> connector);
 
         /** this function should always not be used outside atapp.cpp **/
-        static void _app_setup_signal_term(int signo);
+        static void _app_setup_signal_handle(int signo);
+        void process_signals();
+        void process_signal(int signo);
 
     public:
         LIBATAPP_MACRO_API int trigger_event_on_forward_request(const message_sender_t &source, const message_t &msg);
@@ -524,6 +526,14 @@ namespace atapp {
         util::cli::cmd_option_ci::ptr_type cmd_handler_;
         std::vector<std::string> last_command_;
         int setup_result_;
+
+        enum inner_options_t {
+        // POSIX: _POSIX_SIGQUEUE_MAX on most platform is 32
+        // RLIMIT_SIGPENDING on most linux distributions is 11
+        // We use 32 here
+        MAX_SIGNAL_COUNT = 32,
+        };
+        int pending_signals_[MAX_SIGNAL_COUNT];
         uint64_t last_proc_event_count_;
 
         app_conf conf_;

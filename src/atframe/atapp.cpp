@@ -138,6 +138,8 @@ namespace atapp {
         }
 
         last_instance_     = this;
+
+        memset(pending_signals_, 0, sizeof(pending_signals_));
         conf_.id           = 0;
         conf_.execute_path = NULL;
         conf_.resume_mode  = false;
@@ -1766,6 +1768,10 @@ namespace atapp {
                 setup_timer();
             }
 
+            if (0 != pending_signals_[0]) {
+                process_signals();
+            }
+
             if (check_flag(flag_t::STOPING)) {
                 set_flag(flag_t::STOPPED, true);
 
@@ -1869,10 +1875,56 @@ namespace atapp {
         return 0;
     }
 
-    // graceful Exits
-    void app::_app_setup_signal_term(int /*signo*/) {
-        if (NULL != app::last_instance_) {
-            app::last_instance_->stop();
+    void app::_app_setup_signal_handle(int signo) {
+        // Signal handle has a limited stack can process signal on next proc to keep signal safety
+        app* current = app::last_instance_;
+        if (NULL == current) {
+            return;
+        }
+
+        for (int i = 0; i < MAX_SIGNAL_COUNT; ++ i) {
+            if (0 == current->pending_signals_[i]) {
+                current->pending_signals_[i] = signo;
+                break;
+            }
+        }
+
+        if (current->bus_node_ && NULL != current->bus_node_->get_evloop()) {
+            uv_stop(current->bus_node_->get_evloop());
+        }
+    }
+
+    void app::process_signals() {
+        if (0 == pending_signals_[0]) {
+            return;
+        }
+
+        int signals[MAX_SIGNAL_COUNT] = {0};
+        memcpy(signals, pending_signals_, sizeof(pending_signals_));
+        memset(pending_signals_, 0, sizeof(pending_signals_));
+
+        for (int i = 0; i < MAX_SIGNAL_COUNT; ++ i) {
+            if (0 == signals[i]) {
+                break;
+            }
+
+            process_signal(signals[i]);
+        }
+    }
+
+    void app::process_signal(int signo) {
+        switch (signo) {
+#ifndef WIN32
+        case SIGSTOP:
+#endif
+        case SIGTERM: {
+            stop();
+            break;
+        }
+
+        default: {
+            break;
+        }
         }
     }
 
@@ -1919,11 +1971,11 @@ namespace atapp {
     int app::setup_signal() {
         // block signals
         app::last_instance_ = this;
-        signal(SIGTERM, _app_setup_signal_term);
+        signal(SIGTERM, _app_setup_signal_handle);
         signal(SIGINT, SIG_IGN);
 
 #ifndef WIN32
-        signal(SIGSTOP, _app_setup_signal_term);
+        signal(SIGSTOP, _app_setup_signal_handle);
         signal(SIGQUIT, SIG_IGN);
         signal(SIGHUP, SIG_IGN);  // lost parent process
         signal(SIGPIPE, SIG_IGN); // close stdin, stdout or stderr
