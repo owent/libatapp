@@ -1,35 +1,37 @@
 # libatapp
 
-基于[libatbus](https://github.com/atframework/libatbus)（树形结构进程间通信库）的服务器应用框架库
+用于搭建高性能、全异步(a)、树形结构(t)的BUS消息系统的跨平台框架库
 
-> Build & Run Unit Test in |  Linux+OSX(clang+gcc) | Windows+MinGW(vc+gcc) |
-> -------------------------|--------|---------|
-> Status |  暂未配置CI | 暂未配置CI |
-> Compilers | linux-gcc-4.4 <br /> linux-gcc-4.6 <br /> linux-gcc-4.9 <br /> linux-gcc-6 <br /> linux-clang-3.5 <br /> osx-apple-clang-6.0 <br /> | MSVC 12(Visual Studio 2013) <br /> MSVC 14(Visual Studio 2015) <br />Mingw32-gcc <br /> Mingw64-gcc
->
+[![ci-badge]][ci-link]
 
-Gitter
-------
-[![Gitter](https://badges.gitter.im/atframework/common.svg)](https://gitter.im/atframework/common?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
+[ci-badge]: https://github.com/atframework/libatapp/actions/workflows/main.yml/badge.svg "Github action build status"
+[ci-link]:  https://github.com/atframework/libatapp/actions/workflows/main.yml "Github action build status"
 
-依赖
-------
+## CI Job Matrix
+
+| Target System | Toolchain          | Note                  |
+| ------------- | ------------------ | --------------------- |
+| Linux         | GCC                |
+| Linux         | Clang              | With libc++           |
+| Linux         | GCC 4.8            |
+| MinGW64       | GCC                | Dynamic linking       |
+| Windows       | Visual Studio 2019 | Dynamic linking       |
+| Windows       | Visual Studio 2017 | Legacy,Static linking |
+| macOS         | AppleClang         | With libc++           |
+
+## 依赖
 
 + 支持c++0x或c++11的编译器(为了代码尽量简洁,特别是少做无意义的平台兼容，依赖部分 C11和C++11的功能，所以不支持过低版本的编译器)
-> + GCC: 4.4 及以上（建议gcc 4.8.1及以上）
-> + Clang: 3.7 及以上
-> + VC: 12 及以上 （建议VC 14及以上）
+  > + GCC: 4.8 及以上
+  > + Clang: 3.8 及以上
+  > + VC: 12 及以上
 
-+ [cmake](https://cmake.org/download/) 3.7.0 以上
-+ [msgpack](https://github.com/msgpack/msgpack-c)（用于协议打解包,仅使用头文件）
-+ [libuv](http://libuv.org/)（用于网络通道）
-+ [atframe_utils](https://github.com/atframework/atframe_utils)（基础公共代码）
-+ [libatbus](https://github.com/atframework/libatbus)（树形结构进程间通信库）
-+ [libiniloader](https://github.com/owt5008137/libiniloader)（ini读取）
++ [cmake](https://cmake.org/download/) 3.16.0 以上
 
-GET START
-------
+## GET START
+
 ### 最小化服务器
+
 ```cpp
 #include <cstdio>
 #include <cstdlib>
@@ -111,6 +113,7 @@ int main(int argc, char *argv[]) {
 ```
 
 ### 设置自定义远程命令
+
 ```cpp
 // ...
 #include <sstream>
@@ -142,6 +145,7 @@ int main(int argc, char *argv[]) {
 ```
 
 ### 自定义模块
+
 ```cpp
 // ...
 

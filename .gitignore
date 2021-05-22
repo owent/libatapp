@@ -27,30 +27,15 @@
 *.out
 *.app
 
-
+# generated file
 /include/atframe/atapp_config.h
 /include/atframe/atapp_conf.pb.h
 /src/atframe/atapp_conf.pb.cc
 
-## yaml-cpp
-/3rd_party/yaml-cpp/pkg
-/3rd_party/yaml-cpp/prebuilt
+# /atframework/cmake-toolset
+# /atframework/atframe_utils
+# /atframework/libatbus
 
-## libressl
-/3rd_party/libressl/pkg
-/3rd_party/libressl/prebuilt
-
-## openssl
-/3rd_party/openssl/pkg
-/3rd_party/openssl/prebuilt
-
-## mbedtls
-/3rd_party/mbedtls/pkg
-/3rd_party/mbedtls/prebuilt
-
-## rapidjson
-/3rd_party/rapidjson/repo
-
-## libcurl
-/3rd_party/libcurl/pkg
-/3rd_party/libcurl/prebuilt
+# prebuilt directory
+/third_party/install
+/third_party/packages
