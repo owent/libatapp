@@ -25,8 +25,7 @@ echowithcolor(COLOR GREEN "-- Build Type: ${CMAKE_BUILD_TYPE}")
 unset(PROJECT_LIBATAPP_PRIVATE_COMPILE_OPTIONS)
 unset(PROJECT_LIBATAPP_PUBLIC_INCLUDE_DIRS)
 unset(PROJECT_LIBATAPP_PUBLIC_LINK_NAMES)
-unset(PROJECT_LIBATAPP_INTERFACE_LINK_NAMES)
-unset(PROJECT_LIBATAPP_EXPORT_TARGETS)
+
 # ######################################################################################################################
 # 导入项目配置 导入所有 macro 定义
 include("${CMAKE_CURRENT_LIST_DIR}/include/include.macro.cmake")
