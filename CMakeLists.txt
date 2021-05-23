@@ -7,26 +7,28 @@ cmake_policy(SET CMP0091 NEW)
 
 enable_testing()
 
-project(libatapp)
+project(
+  libatapp
+  VERSION "0.8.0"
+  HOMEPAGE_URL "https://github.com/atframework/libatapp"
+  LANGUAGES C CXX)
 
-set(LIBATAPP_VERSION_MAJOR "0")
-set(LIBATAPP_VERSION_MINOR "8")
-set(LIBATAPP_VERSION_PATCH "0")
-set(LIBATAPP_VERSION "${LIBATAPP_VERSION_MAJOR}.${LIBATAPP_VERSION_MINOR}.${LIBATAPP_VERSION_PATCH}")
+set(LIBATAPP_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
+set(LIBATAPP_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
+set(LIBATAPP_VERSION_PATCH "${PROJECT_VERSION_PATCH}")
+set(LIBATAPP_VERSION "${PROJECT_VERSION}")
 
-# ######################################################################################################################
-# CMake 模块 (递归包含模块, 带颜色输出模块, 平台检测模块)
 include("${CMAKE_CURRENT_LIST_DIR}/project/cmake/ProjectBuildOption.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/third_party/Repository.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/atframework/Repository.cmake")
 
-# ######################################################################################################################
-# 导入编译器和编译选项配置
 echowithcolor(COLOR GREEN "-- Build Type: ${CMAKE_BUILD_TYPE}")
 
 unset(PROJECT_LIBATAPP_PRIVATE_COMPILE_OPTIONS)
 unset(PROJECT_LIBATAPP_PUBLIC_INCLUDE_DIRS)
 unset(PROJECT_LIBATAPP_PUBLIC_LINK_NAMES)
 
-# ######################################################################################################################
+# ##################################################################################################
 # 导入项目配置 导入所有 macro 定义
 include("${CMAKE_CURRENT_LIST_DIR}/include/include.macro.cmake")
 
@@ -89,14 +91,17 @@ write_basic_package_version_file(
   VERSION ${LIBATAPP_VERSION}
   COMPATIBILITY SameMajorVersion)
 
-install(FILES "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/cmake/${PROJECT_NAME}/${PROJECT_NAME}-config.cmake"
-              "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/cmake/${PROJECT_NAME}/${PROJECT_NAME}-config-version.cmake"
-        DESTINATION ${CMAKE_INSTALL_CMAKEDIR})
+install(
+  FILES
+    "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/cmake/${PROJECT_NAME}/${PROJECT_NAME}-config.cmake"
+    "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/cmake/${PROJECT_NAME}/${PROJECT_NAME}-config-version.cmake"
+  DESTINATION ${CMAKE_INSTALL_CMAKEDIR})
 
 export(
   EXPORT ${PROJECT_LIBATAPP_EXPORT_NAME}
   NAMESPACE atframework::
-  FILE "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/cmake/${PROJECT_NAME}/${PROJECT_LIBATAPP_EXPORT_NAME}.cmake")
+  FILE "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/cmake/${PROJECT_NAME}/${PROJECT_LIBATAPP_EXPORT_NAME}.cmake"
+)
 
 install(
   EXPORT ${PROJECT_LIBATAPP_EXPORT_NAME}
