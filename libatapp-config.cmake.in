@@ -47,7 +47,7 @@ set(${CMAKE_FIND_PACKAGE_NAME}_VERSION "@LIBATAPP_VERSION@")
 
 @PACKAGE_INIT@
 
-# ######################################################################################################################
+# #############################################################################
 # libatapp source dir
 set(${CMAKE_FIND_PACKAGE_NAME}_SOURCE_DIR "@PROJECT_SOURCE_DIR@")
 
@@ -63,7 +63,8 @@ endif()
 set(${CMAKE_FIND_PACKAGE_NAME}_LIBRARIES atframework::atapp)
 set(${CMAKE_FIND_PACKAGE_NAME}_C_LIBRARIES atframework::atapp_c)
 
-# handle the QUIETLY and REQUIRED arguments and set LIBATAPP_FOUND to TRUE if all listed variables are TRUE
+# handle the QUIETLY and REQUIRED arguments and set LIBATAPP_FOUND to TRUE if all listed variables
+# are TRUE
 include("FindPackageHandleStandardArgs")
 find_package_handle_standard_args(
   ${CMAKE_FIND_PACKAGE_NAME}

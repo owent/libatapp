@@ -16,44 +16,44 @@
 #include "atapp_config.h"
 
 namespace atapp {
-    namespace protocol {
-        class atapp_log;
-        class atapp_log_category;
-        class atapp_log_sink;
-    } // namespace protocol
-} // namespace atapp
+namespace protocol {
+class atapp_log;
+class atapp_log_category;
+class atapp_log_sink;
+}  // namespace protocol
+}  // namespace atapp
 
 namespace atapp {
-    class log_sink_maker {
-    public:
+class log_sink_maker {
+ public:
 #if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
-        using log_reg_t = std::function<util::log::log_wrapper::log_handler_t(
-            util::log::log_wrapper &, int32_t, const ::atapp::protocol::atapp_log &, const ::atapp::protocol::atapp_log_category &,
-            const ::atapp::protocol::atapp_log_sink &)>;
+  using log_reg_t = std::function<util::log::log_wrapper::log_handler_t(
+      util::log::log_wrapper &, int32_t, const ::atapp::protocol::atapp_log &,
+      const ::atapp::protocol::atapp_log_category &, const ::atapp::protocol::atapp_log_sink &)>;
 #else
-        typedef std::function<util::log::log_wrapper::log_handler_t(util::log::log_wrapper &, int32_t, const ::atapp::protocol::atapp_log &,
-                                                                    const ::atapp::protocol::atapp_log_category &,
-                                                                    const ::atapp::protocol::atapp_log_sink &)>
-            log_reg_t;
+  typedef std::function<util::log::log_wrapper::log_handler_t(
+      util::log::log_wrapper &, int32_t, const ::atapp::protocol::atapp_log &,
+      const ::atapp::protocol::atapp_log_category &, const ::atapp::protocol::atapp_log_sink &)>
+      log_reg_t;
 #endif
 
-    private:
-        log_sink_maker();
-        ~log_sink_maker();
+ private:
+  log_sink_maker();
+  ~log_sink_maker();
 
-    public:
-        static LIBATAPP_MACRO_API const std::string &get_file_sink_name();
+ public:
+  static LIBATAPP_MACRO_API const std::string &get_file_sink_name();
 
-        static LIBATAPP_MACRO_API log_reg_t get_file_sink_reg();
+  static LIBATAPP_MACRO_API log_reg_t get_file_sink_reg();
 
-        static LIBATAPP_MACRO_API const std::string &get_stdout_sink_name();
+  static LIBATAPP_MACRO_API const std::string &get_stdout_sink_name();
 
-        static LIBATAPP_MACRO_API log_reg_t get_stdout_sink_reg();
+  static LIBATAPP_MACRO_API log_reg_t get_stdout_sink_reg();
 
-        static LIBATAPP_MACRO_API const std::string &get_stderr_sink_name();
+  static LIBATAPP_MACRO_API const std::string &get_stderr_sink_name();
 
-        static LIBATAPP_MACRO_API log_reg_t get_stderr_sink_reg();
-    };
-} // namespace atapp
+  static LIBATAPP_MACRO_API log_reg_t get_stderr_sink_reg();
+};
+}  // namespace atapp
 
 #endif

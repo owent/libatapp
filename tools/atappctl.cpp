@@ -17,83 +17,86 @@
 
 static int exit_code = 0;
 
-static void _log_sink_stdout_handle(const util::log::log_wrapper::caller_info_t &, const char *content, size_t content_size) {
-    std::cout.write(content, content_size);
-    std::cout << std::endl;
+static void _log_sink_stdout_handle(const util::log::log_wrapper::caller_info_t &, const char *content,
+                                    size_t content_size) {
+  std::cout.write(content, content_size);
+  std::cout << std::endl;
 }
 
 class atappctl_module : public atapp::module_impl {
-public:
-    virtual int init() UTIL_CONFIG_OVERRIDE {
-        WLOG_GETCAT(util::log::log_wrapper::categorize_t::DEFAULT)->add_sink(_log_sink_stdout_handle);
-        WLOG_GETCAT(util::log::log_wrapper::categorize_t::DEFAULT)
-            ->set_stacktrace_level(util::log::log_formatter::level_t::LOG_LW_DISABLED, util::log::log_formatter::level_t::LOG_LW_DISABLED);
-        return 0;
-    };
+ public:
+  virtual int init() UTIL_CONFIG_OVERRIDE {
+    WLOG_GETCAT(util::log::log_wrapper::categorize_t::DEFAULT)->add_sink(_log_sink_stdout_handle);
+    WLOG_GETCAT(util::log::log_wrapper::categorize_t::DEFAULT)
+        ->set_stacktrace_level(util::log::log_formatter::level_t::LOG_LW_DISABLED,
+                               util::log::log_formatter::level_t::LOG_LW_DISABLED);
+    return 0;
+  };
 
-    virtual int reload() UTIL_CONFIG_OVERRIDE { return 0; }
+  virtual int reload() UTIL_CONFIG_OVERRIDE { return 0; }
 
-    virtual int stop() UTIL_CONFIG_OVERRIDE { return 0; }
+  virtual int stop() UTIL_CONFIG_OVERRIDE { return 0; }
 
-    virtual int timeout() UTIL_CONFIG_OVERRIDE { return 0; }
+  virtual int timeout() UTIL_CONFIG_OVERRIDE { return 0; }
 
-    virtual const char *name() const UTIL_CONFIG_OVERRIDE { return "atappctl_module"; }
+  virtual const char *name() const UTIL_CONFIG_OVERRIDE { return "atappctl_module"; }
 
-    virtual int tick() UTIL_CONFIG_OVERRIDE { return 0; }
+  virtual int tick() UTIL_CONFIG_OVERRIDE { return 0; }
 };
 
-static int app_handle_on_msg(atapp::app &, const atapp::app::message_sender_t &source, const atapp::app::message_t &msg) {
-    std::string data;
-    data.assign(reinterpret_cast<const char *>(msg.data), msg.data_size);
-    FWLOGINFO("receive a message(from {:#x}, type={}) {}", source.id, msg.type, data);
-    return 0;
+static int app_handle_on_msg(atapp::app &, const atapp::app::message_sender_t &source,
+                             const atapp::app::message_t &msg) {
+  std::string data;
+  data.assign(reinterpret_cast<const char *>(msg.data), msg.data_size);
+  FWLOGINFO("receive a message(from {:#x}, type={}) {}", source.id, msg.type, data);
+  return 0;
 }
 
-static int app_handle_on_response(atapp::app &, const atapp::app::message_sender_t &source, const atapp::app::message_t &,
-                                  int32_t error_code) {
-    if (error_code < 0) {
-        FWLOGERROR("send data to {:#x} failed, code: {}", source.id, error_code);
-    } else {
-        FWLOGINFO("send data to {:#x} finished", source.id);
-    }
-    exit_code = 1;
-    return 0;
+static int app_handle_on_response(atapp::app &, const atapp::app::message_sender_t &source,
+                                  const atapp::app::message_t &, int32_t error_code) {
+  if (error_code < 0) {
+    FWLOGERROR("send data to {:#x} failed, code: {}", source.id, error_code);
+  } else {
+    FWLOGINFO("send data to {:#x} finished", source.id);
+  }
+  exit_code = 1;
+  return 0;
 }
 
 static int app_handle_on_connected(atapp::app &, atbus::endpoint &ep, int status) {
-    WLOGINFO("app 0x%llx connected, status: %d", static_cast<unsigned long long>(ep.get_id()), status);
-    return 0;
+  WLOGINFO("app 0x%llx connected, status: %d", static_cast<unsigned long long>(ep.get_id()), status);
+  return 0;
 }
 
 static int app_handle_on_disconnected(atapp::app &, atbus::endpoint &ep, int status) {
-    WLOGINFO("app 0x%llx disconnected, status: %d", static_cast<unsigned long long>(ep.get_id()), status);
-    return 0;
+  WLOGINFO("app 0x%llx disconnected, status: %d", static_cast<unsigned long long>(ep.get_id()), status);
+  return 0;
 }
 
 int main(int argc, char *argv[]) {
-    atapp::app app;
+  atapp::app app;
 
-    // project directory
-    {
-        std::string proj_dir;
-        util::file_system::dirname(__FILE__, 0, proj_dir, 2);
-        util::log::log_formatter::set_project_directory(proj_dir.c_str(), proj_dir.size());
-    }
+  // project directory
+  {
+    std::string proj_dir;
+    util::file_system::dirname(__FILE__, 0, proj_dir, 2);
+    util::log::log_formatter::set_project_directory(proj_dir.c_str(), proj_dir.size());
+  }
 
-    // setup module
-    app.add_module(std::make_shared<atappctl_module>());
+  // setup module
+  app.add_module(std::make_shared<atappctl_module>());
 
-    // setup handle
-    app.set_evt_on_forward_request(app_handle_on_msg);
-    app.set_evt_on_forward_response(app_handle_on_response);
-    app.set_evt_on_app_connected(app_handle_on_connected);
-    app.set_evt_on_app_disconnected(app_handle_on_disconnected);
+  // setup handle
+  app.set_evt_on_forward_request(app_handle_on_msg);
+  app.set_evt_on_forward_response(app_handle_on_response);
+  app.set_evt_on_app_connected(app_handle_on_connected);
+  app.set_evt_on_app_disconnected(app_handle_on_disconnected);
 
-    // run
-    int ret = app.run(uv_default_loop(), argc, (const char **)argv, NULL);
-    if (0 == ret) {
-        return exit_code;
-    }
+  // run
+  int ret = app.run(uv_default_loop(), argc, (const char **)argv, NULL);
+  if (0 == ret) {
+    return exit_code;
+  }
 
-    return ret;
+  return ret;
 }
