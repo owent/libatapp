@@ -27,6 +27,9 @@
 *.out
 *.app
 
+# Editor
+.vscode
+
 # generated file
 /include/atframe/atapp_config.h
 /include/atframe/atapp_conf.pb.h
@@ -39,3 +42,7 @@
 # prebuilt directory
 /third_party/install
 /third_party/packages
+
+# build directorys
+/build
+/build_jobs_*
