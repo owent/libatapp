@@ -3,8 +3,6 @@ name: "main"
 on: # @see https://help.github.com/en/articles/events-that-trigger-workflows#webhook-events
   push:
     branches: # Array of patterns that match refs/heads
-      - master # Push events on master branch
-      - dev
       - main
   pull_request:
     branches: [ main ]
@@ -127,38 +125,38 @@ jobs:
           BUILD_SHARED_LIBS: ${{ matrix.build_shared_libs }}
         run: |
           C:/msys64/msys2_shell.cmd -mingw64 -defterm -no-start -here -lc "ci/do_ci.sh msys2.mingw.test"
-  coverage: # job id, can be any string
-    name: Coverage
-    # This job runs on Linux
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            triplet: x64-linux
-            cc: gcc
-            gcov_flags: "--coverage -fprofile-arcs -ftest-coverage"
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Generate coverage
-        shell: bash
-        env:
-          USE_CC: ${{ matrix.cc }}
-          VCPKG_TARGET_TRIPLET: ${{ matrix.triplet }}
-          USE_SSL: ${{ matrix.ssl }}
-          GCOV_FLAGS: "${{ matrix.gcov_flags }}"
-        run: |
-          bash ci/do_ci.sh coverage ;
-      - name: Uploaded code coverage
-        uses: codecov/codecov-action@v1
-        with:
-          # token: ${{secrets.CODECOV_TOKEN}} # not required for public repos
-          fail_ci_if_error: true
-          gcov_args: '-lp'
-      - name: Cache packages
-        uses: actions/cache@v2
-        with:
-          path: |
-            /usr/local/share/vcpkg/installed
-          key: ${{ runner.os }}-${{ hashFiles('/usr/local/share/vcpkg/installed/**') }}
+  # coverage: # job id, can be any string
+  #   name: Coverage
+  #   # This job runs on Linux
+  #   strategy:
+  #     matrix:
+  #       include:
+  #         - os: ubuntu-latest
+  #           triplet: x64-linux
+  #           cc: gcc
+  #           gcov_flags: "--coverage -fprofile-arcs -ftest-coverage"
+  #   runs-on: ${{ matrix.os }}
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v2
+  #     - name: Generate coverage
+  #       shell: bash
+  #       env:
+  #         USE_CC: ${{ matrix.cc }}
+  #         VCPKG_TARGET_TRIPLET: ${{ matrix.triplet }}
+  #         USE_SSL: ${{ matrix.ssl }}
+  #         GCOV_FLAGS: "${{ matrix.gcov_flags }}"
+  #       run: |
+  #         bash ci/do_ci.sh coverage ;
+  #     - name: Uploaded code coverage
+  #       uses: codecov/codecov-action@v1
+  #       with:
+  #         # token: ${{secrets.CODECOV_TOKEN}} # not required for public repos
+  #         fail_ci_if_error: true
+  #         gcov_args: '-lp'
+  #     - name: Cache packages
+  #       uses: actions/cache@v2
+  #       with:
+  #         path: |
+  #           /usr/local/share/vcpkg/installed
+  #         key: ${{ runner.os }}-${{ hashFiles('/usr/local/share/vcpkg/installed/**') }}
