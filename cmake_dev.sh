@@ -152,7 +152,7 @@ else
 fi
 
 if [[ "x$NINJA_BIN" != "x" ]]; then
-    ${CMAKE_BIN[@]} .. -G Ninja -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE $CMAKE_OPTIONS "$@";
+    cmake .. -G Ninja -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE $CMAKE_OPTIONS "$@";
 elif [[ "$CHECK_MSYS" == "mingw" ]]; then
     cmake --help | grep '^[[:space:]]*MinGW Makefiles' > /dev/null 2>&1 ;
     if [[ $? -eq 0 ]]; then

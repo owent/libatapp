@@ -1,7 +1,3 @@
-#include <algorithm>
-#include <limits>
-#include <sstream>
-
 #include "libatbus.h"
 
 #include <common/string_oprs.h>
@@ -9,17 +5,6 @@
 #include <config/ini_loader.h>
 #include <log/log_wrapper.h>
 #include <time/time_utility.h>
-
-#include <config/compiler/protobuf_prefix.h>
-
-#include "yaml-cpp/yaml.h"
-
-#include <google/protobuf/duration.pb.h>
-#include <google/protobuf/message.h>
-#include <google/protobuf/repeated_field.h>
-#include <google/protobuf/timestamp.pb.h>
-
-#include <config/compiler/protobuf_suffix.h>
 
 #include <atframe/atapp_conf.h>
 
@@ -34,6 +19,21 @@
 #ifdef min
 #  undef min
 #endif
+
+#include <config/compiler/protobuf_prefix.h>
+
+#include "yaml-cpp/yaml.h"
+
+#include <google/protobuf/duration.pb.h>
+#include <google/protobuf/message.h>
+#include <google/protobuf/repeated_field.h>
+#include <google/protobuf/timestamp.pb.h>
+
+#include <config/compiler/protobuf_suffix.h>
+
+#include <algorithm>
+#include <limits>
+#include <sstream>
 
 namespace atapp {
 namespace detail {
@@ -356,7 +356,7 @@ struct scale_size_mode_t;
 
 template <class Ty>
 struct scale_size_mode_t<Ty, 1> {
-  static inline bool to_bytes(Ty &out, char c) { return false; }
+  static inline bool to_bytes(Ty &, char) { return false; }
 };
 
 template <class Ty>
