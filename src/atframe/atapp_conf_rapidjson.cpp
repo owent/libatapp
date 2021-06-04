@@ -1,8 +1,3 @@
-#include <assert.h>
-
-#include <numeric>
-#include <vector>
-
 #include <config/compiler/protobuf_prefix.h>
 
 #include <rapidjson/stringbuffer.h>
@@ -19,7 +14,12 @@
 
 #include <atframe/atapp_conf_rapidjson.h>
 
-#ifdef max
+#include <assert.h>
+
+#include <numeric>
+#include <vector>
+
+#if defined(max)
 #  undef max
 #endif
 

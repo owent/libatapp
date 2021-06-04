@@ -2,6 +2,7 @@
 #define LIBATAPP_ATAPP_CONF_RAPIDJSON_H
 
 #pragma once
+
 #include <stdint.h>
 #include <cstddef>
 #include <cstring>

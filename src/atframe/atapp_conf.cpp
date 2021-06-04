@@ -1,4 +1,22 @@
-#include "libatbus.h"
+#if defined(_WIN32)
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
+#endif
+
+#include <config/compiler/protobuf_prefix.h>
+
+#include <yaml-cpp/yaml.h>
+
+#include <google/protobuf/duration.pb.h>
+#include <google/protobuf/message.h>
+#include <google/protobuf/repeated_field.h>
+#include <google/protobuf/timestamp.pb.h>
+
+#include <config/compiler/protobuf_suffix.h>
 
 #include <common/string_oprs.h>
 #include <config/atframe_utils_build_feature.h>
@@ -8,32 +26,21 @@
 
 #include <atframe/atapp_conf.h>
 
-#ifdef GetMessage
-#  undef GetMessage
-#endif
-
-#ifdef max
-#  undef max
-#endif
-
-#ifdef min
-#  undef min
-#endif
-
-#include <config/compiler/protobuf_prefix.h>
-
-#include "yaml-cpp/yaml.h"
-
-#include <google/protobuf/duration.pb.h>
-#include <google/protobuf/message.h>
-#include <google/protobuf/repeated_field.h>
-#include <google/protobuf/timestamp.pb.h>
-
-#include <config/compiler/protobuf_suffix.h>
-
 #include <algorithm>
 #include <limits>
 #include <sstream>
+
+#if defined(GetMessage)
+#  undef GetMessage
+#endif
+
+#if defined(max)
+#  undef max
+#endif
+
+#if defined(min)
+#  undef min
+#endif
 
 namespace atapp {
 namespace detail {
