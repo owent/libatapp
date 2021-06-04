@@ -210,12 +210,12 @@ int etcd_watcher::libcurl_callback_on_range_completed(util::network::http_reques
     rapidjson::Document::ConstMemberIterator res = doc.FindMember("kvs");
 
     if (doc.MemberEnd() != res) {
-      size_t reverse_sz = 0;
+      uint64_t reverse_sz = 0;
       etcd_packer::unpack_int(doc, "count", reverse_sz);
       if (0 == reverse_sz) {
         reverse_sz = 64;
       }
-      response.events.reserve(reverse_sz);
+      response.events.reserve(static_cast<size_t>(reverse_sz));
 
       if (res->value.IsArray()) {
         rapidjson::Document::ConstArray all_events = res->value.GetArray();
