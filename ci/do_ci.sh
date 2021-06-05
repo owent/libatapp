@@ -67,7 +67,7 @@ elif [[ "$1" == "coverage" ]]; then
     "-DCMAKE_EXE_LINKER_FLAGS=$GCOV_FLAGS" -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake                           \
     -DVCPKG_TARGET_TRIPLET=$VCPKG_TARGET_TRIPLET -DATBUS_MACRO_ABORT_ON_PROTECTED_ERROR=ON "-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_LOW_MEMORY_MODE=ON" ;
   cd build_jobs_coverage ;
-  cmake --build . -j ;
+  cmake --build . -j2 || cmake --build .;
   ctest . -V ;
 elif [[ "$1" == "ssl.openssl" ]]; then
   CRYPTO_OPTIONS="-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_CRYPTO_USE_OPENSSL=ON" ;
@@ -76,19 +76,19 @@ elif [[ "$1" == "ssl.openssl" ]]; then
     -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake -DATBUS_MACRO_ABORT_ON_PROTECTED_ERROR=ON  \
     "-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_LOW_MEMORY_MODE=ON" ;
   cd build_jobs_ci ;
-  cmake --build . -j ;
+  cmake --build . -j2 || cmake --build .;
   ctest . -V ;
 elif [[ "$1" == "gcc.legacy.test" ]]; then
   bash cmake_dev.sh -lus -b Debug -r build_jobs_ci -c $USE_CC -- "-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_LOW_MEMORY_MODE=ON" ;
   cd build_jobs_ci ;
-  cmake --build . -j ;
+  cmake --build . -j2 || cmake --build .;
   ctest . -V ;
 elif [[ "$1" == "clang.test" ]]; then
   CRYPTO_OPTIONS="-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_CRYPTO_USE_OPENSSL=ON" ;
   bash cmake_dev.sh -lus -b Debug -r build_jobs_ci -c $USE_CC -- $CRYPTO_OPTIONS -DATBUS_MACRO_ABORT_ON_PROTECTED_ERROR=ON  \
     "-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_LOW_MEMORY_MODE=ON" ;
   cd build_jobs_ci ;
-  cmake --build . -j ;
+  cmake --build . -j2 || cmake --build .;
   ctest . -V ;
 elif [[ "$1" == "msys2.mingw.test" ]]; then
   pacman -S --needed --noconfirm mingw-w64-x86_64-cmake git m4 curl wget tar autoconf automake  \
@@ -99,7 +99,7 @@ elif [[ "$1" == "msys2.mingw.test" ]]; then
   cd build_jobs_ci ;
   cmake .. -G 'MinGW Makefiles' "-DBUILD_SHARED_LIBS=$BUILD_SHARED_LIBS" -DPROJECT_ENABLE_UNITTEST=ON -DPROJECT_ENABLE_SAMPLE=ON    \
     -DPROJECT_ENABLE_TOOLS=ON -DATBUS_MACRO_ABORT_ON_PROTECTED_ERROR=ON "-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_LOW_MEMORY_MODE=ON" ;
-  cmake --build . -j ;
+  cmake --build . -j2 || cmake --build . ;
   # for EXT_PATH in $(find ../third_party/install/ -name "*.dll" | xargs dirname | sort -u); do
   #   export PATH="$PWD/$EXT_PATH:$PATH"
   # done
