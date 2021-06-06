@@ -9,10 +9,8 @@ set(ATFRAMEWORK_LIBATBUS_REPO_DIR
 macro(ATFRAMEWORK_ATFRAME_UTILS_POPULATE)
   if(NOT EXISTS "${ATFRAMEWORK_ATFRAME_UTILS_REPO_DIR}/CMakeLists.txt")
     execute_process(
-      COMMAND ${GIT_EXECUTABLE} submodule update --depth 100 --recommend-shallow -f --init --
-              atframework/atframe_utils
-      WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-                        ${ATFRAMEWORK_CMAKE_TOOLSET_EXECUTE_PROCESS_OUTPUT_OPTIONS})
+      COMMAND ${GIT_EXECUTABLE} submodule update --depth 100 --recommend-shallow -f --init -- atframework/atframe_utils
+      WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}" ${ATFRAMEWORK_CMAKE_TOOLSET_EXECUTE_PROCESS_OUTPUT_OPTIONS})
     set(ATFRAMEWORK_ATFRAME_UTILS_REPO_DIR
         "${PROJECT_SOURCE_DIR}/atframework/atframe_utils"
         CACHE PATH "PATH to atframe_utils" FORCE)
@@ -36,10 +34,8 @@ endif()
 macro(ATFRAMEWORK_LIBATBUS_POPULATE)
   if(NOT EXISTS "${ATFRAMEWORK_LIBATBUS_REPO_DIR}/CMakeLists.txt")
     execute_process(
-      COMMAND ${GIT_EXECUTABLE} submodule update --depth 100 --recommend-shallow -f --init --
-              atframework/libatbus
-      WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-                        ${ATFRAMEWORK_CMAKE_TOOLSET_EXECUTE_PROCESS_OUTPUT_OPTIONS})
+      COMMAND ${GIT_EXECUTABLE} submodule update --depth 100 --recommend-shallow -f --init -- atframework/libatbus
+      WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}" ${ATFRAMEWORK_CMAKE_TOOLSET_EXECUTE_PROCESS_OUTPUT_OPTIONS})
     set(ATFRAMEWORK_LIBATBUS_REPO_DIR
         "${PROJECT_SOURCE_DIR}/atframework/libatbus"
         CACHE PATH "PATH to libatbus" FORCE)

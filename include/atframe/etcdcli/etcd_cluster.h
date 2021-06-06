@@ -346,8 +346,8 @@ class etcd_cluster {
    * @param key	        key is the first key for the range. If range_end is not given, the request only looks up key.
    * @param range_end	    range_end is the upper bound on the requested range [key, range_end). just like
    * etcd_packer::pack_key_range
-   * @param limit	        limit is a limit on the number of keys returned for the request. When limit is set to 0, it
-   * is treated as no limit.
+   * @param limit	        limit is a limit on the number of keys returned for the request. When limit is set to 0,
+   * it is treated as no limit.
    * @param revision	    revision is the point-in-time of the key-value store to use for the range. If revision is
    * less or equal to zero, the range is over the newest key-value store. If the revision has been compacted,
    * ErrCompacted is returned as a response.
@@ -365,10 +365,10 @@ class etcd_cluster {
    * indicates no lease.
    * @param prev_kv	    If prev_kv is set, etcd gets the previous key-value pair before changing it. The previous
    * key-value pair will be returned in the put response.
-   * @param ignore_value	If ignore_value is set, etcd updates the key using its current value. Returns an error if the
-   * key does not exist.
-   * @param ignore_lease	If ignore_lease is set, etcd updates the key using its current lease. Returns an error if the
-   * key does not exist.
+   * @param ignore_value	If ignore_value is set, etcd updates the key using its current value. Returns an error if
+   * the key does not exist.
+   * @param ignore_lease	If ignore_lease is set, etcd updates the key using its current lease. Returns an error if
+   * the key does not exist.
    * @return http request
    */
   LIBATAPP_MACRO_API util::network::http_request::ptr_t create_request_kv_set(
@@ -394,8 +394,8 @@ class etcd_cluster {
    * key.
    * @param range_end	        range_end is the upper bound on the requested range [key, range_end). just like
    * etcd_packer::pack_key_range
-   * @param start_revision	start_revision is an optional revision to watch from (inclusive). No start_revision or 0 is
-   * "now".
+   * @param start_revision	start_revision is an optional revision to watch from (inclusive). No start_revision or 0
+   * is "now".
    * @param prev_kv	        If prev_kv is set, created watcher gets the previous KV before the event happens. If the
    * previous KV is already compacted, nothing will be returned.
    * @param progress_notify   progress_notify is set so that the etcd server will periodically send a WatchResponse with

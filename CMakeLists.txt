@@ -28,7 +28,7 @@ unset(PROJECT_LIBATAPP_PRIVATE_COMPILE_OPTIONS)
 unset(PROJECT_LIBATAPP_PUBLIC_INCLUDE_DIRS)
 unset(PROJECT_LIBATAPP_PUBLIC_LINK_NAMES)
 
-# ##################################################################################################
+# ######################################################################################################################
 # 导入项目配置 导入所有 macro 定义
 include("${CMAKE_CURRENT_LIST_DIR}/include/include.macro.cmake")
 
@@ -91,17 +91,14 @@ write_basic_package_version_file(
   VERSION ${LIBATAPP_VERSION}
   COMPATIBILITY SameMajorVersion)
 
-install(
-  FILES
-    "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/cmake/${PROJECT_NAME}/${PROJECT_NAME}-config.cmake"
-    "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/cmake/${PROJECT_NAME}/${PROJECT_NAME}-config-version.cmake"
-  DESTINATION ${CMAKE_INSTALL_CMAKEDIR})
+install(FILES "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/cmake/${PROJECT_NAME}/${PROJECT_NAME}-config.cmake"
+              "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/cmake/${PROJECT_NAME}/${PROJECT_NAME}-config-version.cmake"
+        DESTINATION ${CMAKE_INSTALL_CMAKEDIR})
 
 export(
   EXPORT ${PROJECT_LIBATAPP_EXPORT_NAME}
   NAMESPACE atframework::
-  FILE "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/cmake/${PROJECT_NAME}/${PROJECT_LIBATAPP_EXPORT_NAME}.cmake"
-)
+  FILE "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/cmake/${PROJECT_NAME}/${PROJECT_LIBATAPP_EXPORT_NAME}.cmake")
 
 install(
   EXPORT ${PROJECT_LIBATAPP_EXPORT_NAME}
