@@ -10,8 +10,7 @@ endif()
 # =========== 3rdparty grpc ==================
 macro(PROJECT_LIBATAPP_GRPC_IMPORT)
   if(TARGET gRPC::grpc++_alts)
-    message(
-      STATUS "grpc using target(${PROJECT_NAME}): gRPC::grpc++_alts (version: ${gRPC_VERSION})")
+    message(STATUS "grpc using target(${PROJECT_NAME}): gRPC::grpc++_alts (version: ${gRPC_VERSION})")
     set(3RD_PARTY_GRPC_LINK_NAME gRPC::grpc++_alts)
   elseif(TARGET gRPC::grpc++)
     message(STATUS "grpc using target(${PROJECT_NAME}): gRPC::grpc++ (version: ${gRPC_VERSION})")

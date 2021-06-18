@@ -3,33 +3,42 @@ echowithcolor(COLOR GREEN "-- Configure ${CMAKE_CURRENT_LIST_DIR}")
 set(PROJECT_LIBATAPP_ROOT_SRC_DIR ${CMAKE_CURRENT_LIST_DIR})
 
 list(APPEND PROJECT_LIBATAPP_PUBLIC_INCLUDE_DIRS ${PROJECT_LIBATAPP_ROOT_INC_DIR})
-file(RELATIVE_PATH PROJECT_ROOT_RELINC_DIR ${CMAKE_CURRENT_LIST_DIR} ${PROJECT_LIBATAPP_ROOT_INC_DIR})
 
-unset(PROJECT_LIB_SRC_LIST)
-file(
-  GLOB_RECURSE
-  PROJECT_LIB_SRC_LIST
-  ${PROJECT_ROOT_RELINC_DIR}/*.h
-  ${PROJECT_ROOT_RELINC_DIR}/*.hpp
-  ${PROJECT_ROOT_RELINC_DIR}/*.hxx
-  ${PROJECT_LIBATAPP_ROOT_SRC_DIR}/*.h
-  ${PROJECT_LIBATAPP_ROOT_SRC_DIR}/*.hpp
-  ${PROJECT_LIBATAPP_ROOT_SRC_DIR}/*.c
-  ${PROJECT_LIBATAPP_ROOT_SRC_DIR}/*.cpp
-  ${PROJECT_LIBATAPP_ROOT_SRC_DIR}/*.cc
-  ${PROJECT_LIBATAPP_ROOT_SRC_DIR}/*.cxx)
-unset(PROJECT_LIBATAPP_SRC_LIST)
-foreach(SRC_FILE ${PROJECT_LIB_SRC_LIST})
-  get_filename_component(SRC_FILE_EXT ${SRC_FILE} EXT)
-  if(NOT SRC_FILE_EXT STREQUAL ".pb.h" AND NOT SRC_FILE_EXT STREQUAL ".pb.cc")
-    list(APPEND PROJECT_LIBATAPP_SRC_LIST ${SRC_FILE})
-  endif()
-endforeach()
-
-source_group_by_dir(PROJECT_LIB_SRC_LIST)
+set(PROJECT_LIBATAPP_SRC_LIST
+    "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp.h"
+    "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_conf.h"
+    "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_config.h"
+    "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_conf_rapidjson.h"
+    "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_log_sink_maker.h"
+    "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_module_impl.h"
+    "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/connectors/atapp_connector_atbus.h"
+    "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/connectors/atapp_connector_impl.h"
+    "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/connectors/atapp_endpoint.h"
+    "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/etcdcli/etcd_cluster.h"
+    "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/etcdcli/etcd_def.h"
+    "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/etcdcli/etcd_discovery.h"
+    "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/etcdcli/etcd_keepalive.h"
+    "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/etcdcli/etcd_packer.h"
+    "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/etcdcli/etcd_watcher.h"
+    "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/modules/etcd_module.h"
+    "${CMAKE_CURRENT_LIST_DIR}/atframe/atapp.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/atframe/atapp_conf.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/atframe/atapp_conf_rapidjson.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/atframe/atapp_log_sink_maker.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/atframe/atapp_module_impl.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/atframe/connectors/atapp_connector_atbus.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/atframe/connectors/atapp_connector_impl.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/atframe/connectors/atapp_endpoint.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/atframe/etcdcli/etcd_cluster.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/atframe/etcdcli/etcd_discovery.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/atframe/etcdcli/etcd_keepalive.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/atframe/etcdcli/etcd_packer.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/atframe/etcdcli/etcd_watcher.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/atframe/modules/etcd_module.cpp")
+source_group_by_dir(PROJECT_LIBATAPP_SRC_LIST)
 
 set(PROJECT_LIBATAPP_PROTOCOL_SRC_LIST "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_conf.pb.h"
-                                       "${PROJECT_LIBATAPP_ROOT_SRC_DIR}/atframe/atapp_conf.pb.cc")
+                                       "${CMAKE_CURRENT_LIST_DIR}/atframe/atapp_conf.pb.cc")
 
 # ============ libatapp - src ============
 add_custom_command(
@@ -53,10 +62,8 @@ set_target_properties(
              CXX_VISIBILITY_PRESET "default"
              VERSION ${LIBATAPP_VERSION}
              WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
-target_link_libraries(
-  "${PROJECT_LIBATAPP_LIB_LINK}-protocol"
-  # INTERFACE ${ATFRAMEWORK_LIBATBUS_PROTOCOL_LINK_NAME}
-  PUBLIC ${ATFRAMEWORK_LIBATBUS_PROTOCOL_LINK_NAME} ${ATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_PROTOBUF_LINK_NAME})
+target_link_libraries("${PROJECT_LIBATAPP_LIB_LINK}-protocol"
+                      PUBLIC ${ATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_PROTOBUF_LINK_NAME})
 
 target_include_directories(
   "${PROJECT_LIBATAPP_LIB_LINK}-protocol"

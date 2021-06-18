@@ -20,3 +20,7 @@ set(BOOST_ROOT
 option(PROJECT_TEST_ENABLE_BOOST_UNIT_TEST "Enable boost unit test." OFF)
 
 option(ATFRAMEWORK_USE_DYNAMIC_LIBRARY "Build and linking with dynamic libraries." OFF)
+
+set(LIBATAPP_MACRO_HASH_MAGIC_NUMBER
+    "0x01000193U"
+    CACHE STRING "Magic number of libatapp")

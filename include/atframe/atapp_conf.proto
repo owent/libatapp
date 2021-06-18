@@ -3,8 +3,6 @@ syntax = "proto3";
 import "google/protobuf/duration.proto";
 import "google/protobuf/descriptor.proto";
 
-import "libatbus_protocol.proto";
-
 package atapp.protocol;
 
 option optimize_for = SPEED;
@@ -44,6 +42,11 @@ message atapp_gateway {
   map<string, string> match_labels = 22;  // match all labels
 }
 
+message atbus_subnet_range {
+  uint64 id_prefix = 1;
+  uint32 mask_bits = 2;  // suffix
+}
+
 message atbus_configure {
   repeated string listen = 101;
   repeated string subnets = 102;
@@ -56,12 +59,9 @@ message atbus_configure {
   // repeated string        gateway                 = 109 [ deprecated = true ];
   repeated atapp_gateway gateways = 110;
 
-  google.protobuf.Duration first_idle_timeout = 201
-      [(atapp.protocol.CONFIGURE) = { default_value: "30s" }];
-  google.protobuf.Duration ping_interval = 202
-      [(atapp.protocol.CONFIGURE) = { default_value: "60s" }];
-  google.protobuf.Duration retry_interval = 203
-      [(atapp.protocol.CONFIGURE) = { default_value: "3s" }];
+  google.protobuf.Duration first_idle_timeout = 201 [(atapp.protocol.CONFIGURE) = { default_value: "30s" }];
+  google.protobuf.Duration ping_interval = 202 [(atapp.protocol.CONFIGURE) = { default_value: "60s" }];
+  google.protobuf.Duration retry_interval = 203 [(atapp.protocol.CONFIGURE) = { default_value: "3s" }];
 
   uint64 fault_tolerant = 301 [(atapp.protocol.CONFIGURE) = { default_value: "3" }];
   uint64 msg_size = 302 [(atapp.protocol.CONFIGURE) = { size_mode: true }];
@@ -72,10 +72,8 @@ message atbus_configure {
 
 message atapp_timer {
   google.protobuf.Duration stop_timeout = 1 [(atapp.protocol.CONFIGURE) = { default_value: "10s" }];
-  google.protobuf.Duration tick_interval = 2
-      [(atapp.protocol.CONFIGURE) = { default_value: "16ms" }];
-  google.protobuf.Duration message_timeout = 3
-      [(atapp.protocol.CONFIGURE) = { default_value: "8s" }];
+  google.protobuf.Duration tick_interval = 2 [(atapp.protocol.CONFIGURE) = { default_value: "16ms" }];
+  google.protobuf.Duration message_timeout = 3 [(atapp.protocol.CONFIGURE) = { default_value: "8s" }];
 }
 
 message atapp_log_level_range {
@@ -126,10 +124,9 @@ message atapp_log {
 message atapp_etcd_http {
   bool debug = 1;
 
-  string user_agent = 301;  // CURLOPT_USERAGENT
-  string proxy =
-      302;  // CURLOPT_HTTPPROXYTUNNEL, CURLOPT_PROXY: [SCHEME]://HOST[:PORT], SCHEME is one of
-            // http,https,socks4,socks4a,socks5,socks5h. PORT's default value is 1080
+  string user_agent = 301;       // CURLOPT_USERAGENT
+  string proxy = 302;            // CURLOPT_HTTPPROXYTUNNEL, CURLOPT_PROXY: [SCHEME]://HOST[:PORT], SCHEME is one of
+                                 // http,https,socks4,socks4a,socks5,socks5h. PORT's default value is 1080
   string no_proxy = 303;         // curl 7.19.4 CURLOPT_NOPROXY
   string proxy_user_name = 304;  // curl 7.19.1 CURLOPT_PROXYUSERNAME
   string proxy_password = 305;   // curl 7.19.1 CURLOPT_PROXYPASSWORD
@@ -152,12 +149,12 @@ message atapp_etcd_ssl {
   string ssl_client_tlsauth_username = 117;  // CURLOPT_TLSAUTH_USERNAME
   string ssl_client_tlsauth_password = 118;  // CURLOPT_TLSAUTH_PASSWORD
 
-  string ssl_proxy_cert = 121;        // CURLOPT_PROXY_SSLCERT
-  string ssl_proxy_cert_type = 122;   // CURLOPT_PROXY_SSLCERTTYPE: PEM or DER
-  string ssl_proxy_key = 123;         // CURLOPT_PROXY_SSLKEY
-  string ssl_proxy_key_type = 124;    // CURLOPT_PROXY_SSLKEYTYPE: PEM, DER or ENG
-  string ssl_proxy_key_passwd = 125;  // CURLOPT_PROXY_KEYPASSWD or CURLOPT_PROXY_SSLCERTPASSWD
-  string ssl_proxy_ca_cert = 126;     // CURLOPT_PROXY_CAINFO
+  string ssl_proxy_cert = 121;              // CURLOPT_PROXY_SSLCERT
+  string ssl_proxy_cert_type = 122;         // CURLOPT_PROXY_SSLCERTTYPE: PEM or DER
+  string ssl_proxy_key = 123;               // CURLOPT_PROXY_SSLKEY
+  string ssl_proxy_key_type = 124;          // CURLOPT_PROXY_SSLKEYTYPE: PEM, DER or ENG
+  string ssl_proxy_key_passwd = 125;        // CURLOPT_PROXY_KEYPASSWD or CURLOPT_PROXY_SSLCERTPASSWD
+  string ssl_proxy_ca_cert = 126;           // CURLOPT_PROXY_CAINFO
   string ssl_proxy_tlsauth_username = 127;  // CURLOPT_PROXY_TLSAUTH_USERNAME
   string ssl_proxy_tlsauth_password = 128;  // CURLOPT_PROXY_TLSAUTH_PASSWORD
 
@@ -167,10 +164,8 @@ message atapp_etcd_ssl {
 
 message atapp_etcd_cluster {
   bool auto_update = 1 [(atapp.protocol.CONFIGURE) = { default_value: "true" }];
-  google.protobuf.Duration update_interval = 2
-      [(atapp.protocol.CONFIGURE) = { default_value: "5m" }];
-  google.protobuf.Duration retry_interval = 3
-      [(atapp.protocol.CONFIGURE) = { default_value: "1m" }];
+  google.protobuf.Duration update_interval = 2 [(atapp.protocol.CONFIGURE) = { default_value: "5m" }];
+  google.protobuf.Duration retry_interval = 3 [(atapp.protocol.CONFIGURE) = { default_value: "1m" }];
 }
 
 message atapp_etcd_keepalive {
@@ -189,17 +184,14 @@ message atapp_etcd_init {
 }
 
 message atapp_etcd_watcher {
-  google.protobuf.Duration retry_interval = 101
-      [(atapp.protocol.CONFIGURE) = { default_value: "15s" }];
-  google.protobuf.Duration request_timeout = 102
-      [(atapp.protocol.CONFIGURE) = { default_value: "30m" }];
+  google.protobuf.Duration retry_interval = 101 [(atapp.protocol.CONFIGURE) = { default_value: "15s" }];
+  google.protobuf.Duration request_timeout = 102 [(atapp.protocol.CONFIGURE) = { default_value: "30m" }];
 
-  bool by_id = 201 [(atapp.protocol.CONFIGURE) = { default_value: "false" }];  // add watcher by id
-  bool by_name = 202
-      [(atapp.protocol.CONFIGURE) = { default_value: "true" }];  // add watcher by name
-  repeated uint64 by_type_id = 203;                              // add watcher by type id
-  repeated string by_type_name = 204;                            // add watcher by type name
-  repeated string by_tag = 205;                                  // add watcher by tag
+  bool by_id = 201 [(atapp.protocol.CONFIGURE) = { default_value: "false" }];   // add watcher by id
+  bool by_name = 202 [(atapp.protocol.CONFIGURE) = { default_value: "true" }];  // add watcher by name
+  repeated uint64 by_type_id = 203;                                             // add watcher by type id
+  repeated string by_type_name = 204;                                           // add watcher by type name
+  repeated string by_tag = 205;                                                 // add watcher by tag
 }
 
 message atapp_etcd_report_alive {
@@ -290,11 +282,11 @@ message atapp_discovery {
   string version = 10;
   string custom_data = 11;
   // repeated string gateway                       = 12 [ deprecated = true ];
-  repeated atbus.protocol.subnet_range subnets = 13;
   repeated atapp_gateway gateways = 14;
 
   uint64 atbus_protocol_version = 21;
   uint64 atbus_protocol_min_version = 22;
+  repeated atbus_subnet_range atbus_subnets = 23;
 
   // just like in kubernetes
   atapp_metadata metadata = 61;

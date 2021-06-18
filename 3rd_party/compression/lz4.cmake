@@ -13,13 +13,11 @@ macro(PROJECT_LIBATAPP_LZ4_IMPORT)
 
   if(TARGET lz4::lz4cli)
     project_build_tools_get_imported_location(3RD_PARTY_LZ4_BIN lz4::lz4cli)
-    echowithcolor(COLOR GREEN
-                  "-- Dependency(${PROJECT_NAME}): lz4 found exec: ${3RD_PARTY_LZ4_BIN}")
+    echowithcolor(COLOR GREEN "-- Dependency(${PROJECT_NAME}): lz4 found exec: ${3RD_PARTY_LZ4_BIN}")
   endif()
   if(TARGET lz4::lz4c)
     project_build_tools_get_imported_location(3RD_PARTY_LZ4C_BIN lz4::lz4c)
-    echowithcolor(COLOR GREEN
-                  "-- Dependency(${PROJECT_NAME}): lz4 found exec: ${3RD_PARTY_LZ4C_BIN}")
+    echowithcolor(COLOR GREEN "-- Dependency(${PROJECT_NAME}): lz4 found exec: ${3RD_PARTY_LZ4C_BIN}")
   endif()
 endmacro()
 
