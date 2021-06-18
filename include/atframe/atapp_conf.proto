@@ -7,237 +7,295 @@ import "libatbus_protocol.proto";
 
 package atapp.protocol;
 
+option optimize_for = SPEED;
+// option optimize_for = LITE_RUNTIME;
+// option optimize_for = CODE_SIZE;
+// --cpp_out=lite:,--cpp_out=
+option cc_enable_arenas = true;
+
 message atapp_configure_meta {
-    string default_value = 1;
-    string min_value     = 2;
-    string max_value     = 3;
-    bool   size_mode     = 4;
+  string default_value = 1;
+  string min_value = 2;
+  string max_value = 3;
+  bool size_mode = 4;
 }
 
 extend google.protobuf.FieldOptions {
-    atapp_configure_meta CONFIGURE = 3270; // 自定义配置
+  atapp_configure_meta CONFIGURE = 3270;  // 自定义配置
+}
+
+message atapp_area {
+  // region -> district -> zone
+  string region = 1;
+  string district = 2;
+  uint64 zone_id = 3;  // Such as postal zone/zip code
+}
+
+message atapp_gateway {
+  string address = 1;
+
+  repeated string match_hosts = 11;  // match atapp_configure.hostname with "In" operator
+
+  // Just like NetworkPolicyPeer in
+  // https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/api/networking/v1/generated.proto
+  // See also LabelSelector in
+  // https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto
+  repeated string match_namespaces = 21;  // match atapp_metadata.namespace_name with "In" operator
+  map<string, string> match_labels = 22;  // match all labels
 }
 
 message atbus_configure {
-    repeated string listen                  = 101;
-    repeated string subnets                 = 102;
-    string          proxy                   = 103;
-    int32           loop_times              = 104 [ (atapp.protocol.CONFIGURE) = {default_value : "1000"} ];
-    int32           ttl                     = 105 [ (atapp.protocol.CONFIGURE) = {default_value : "16"} ];
-    int32           backlog                 = 106 [ (atapp.protocol.CONFIGURE) = {default_value : "256"} ];
-    uint64          access_token_max_number = 107;
-    repeated string access_tokens           = 108;
-    repeated string gateway                 = 109;
+  repeated string listen = 101;
+  repeated string subnets = 102;
+  string proxy = 103;
+  int32 loop_times = 104 [(atapp.protocol.CONFIGURE) = { default_value: "1000" }];
+  int32 ttl = 105 [(atapp.protocol.CONFIGURE) = { default_value: "16" }];
+  int32 backlog = 106 [(atapp.protocol.CONFIGURE) = { default_value: "256" }];
+  uint64 access_token_max_number = 107;
+  repeated string access_tokens = 108;
+  // repeated string        gateway                 = 109 [ deprecated = true ];
+  repeated atapp_gateway gateways = 110;
 
-    google.protobuf.Duration first_idle_timeout = 201 [ (atapp.protocol.CONFIGURE) = {default_value : "30s"} ];
-    google.protobuf.Duration ping_interval      = 202 [ (atapp.protocol.CONFIGURE) = {default_value : "60s"} ];
-    google.protobuf.Duration retry_interval     = 203 [ (atapp.protocol.CONFIGURE) = {default_value : "3s"} ];
+  google.protobuf.Duration first_idle_timeout = 201
+      [(atapp.protocol.CONFIGURE) = { default_value: "30s" }];
+  google.protobuf.Duration ping_interval = 202
+      [(atapp.protocol.CONFIGURE) = { default_value: "60s" }];
+  google.protobuf.Duration retry_interval = 203
+      [(atapp.protocol.CONFIGURE) = { default_value: "3s" }];
 
-    uint64 fault_tolerant     = 301 [ (atapp.protocol.CONFIGURE) = {default_value : "3"} ];
-    uint64 msg_size           = 302 [ (atapp.protocol.CONFIGURE) = {size_mode : true} ];
-    uint64 recv_buffer_size   = 303 [ (atapp.protocol.CONFIGURE) = {size_mode : true} ];
-    uint64 send_buffer_size   = 304 [ (atapp.protocol.CONFIGURE) = {size_mode : true} ];
-    uint64 send_buffer_number = 305;
+  uint64 fault_tolerant = 301 [(atapp.protocol.CONFIGURE) = { default_value: "3" }];
+  uint64 msg_size = 302 [(atapp.protocol.CONFIGURE) = { size_mode: true }];
+  uint64 recv_buffer_size = 303 [(atapp.protocol.CONFIGURE) = { size_mode: true }];
+  uint64 send_buffer_size = 304 [(atapp.protocol.CONFIGURE) = { size_mode: true }];
+  uint64 send_buffer_number = 305;
 }
 
 message atapp_timer {
-    google.protobuf.Duration stop_timeout    = 1 [ (atapp.protocol.CONFIGURE) = {default_value : "10s"} ];
-    google.protobuf.Duration tick_interval   = 2 [ (atapp.protocol.CONFIGURE) = {default_value : "16ms"} ];
-    google.protobuf.Duration message_timeout = 3 [ (atapp.protocol.CONFIGURE) = {default_value : "8s"} ];
+  google.protobuf.Duration stop_timeout = 1 [(atapp.protocol.CONFIGURE) = { default_value: "10s" }];
+  google.protobuf.Duration tick_interval = 2
+      [(atapp.protocol.CONFIGURE) = { default_value: "16ms" }];
+  google.protobuf.Duration message_timeout = 3
+      [(atapp.protocol.CONFIGURE) = { default_value: "8s" }];
 }
 
 message atapp_log_level_range {
-    string min = 1;
-    string max = 2;
+  string min = 1;
+  string max = 2;
 }
 
 message atapp_log_sink_file_rotate {
-    uint64 size   = 1 [ (atapp.protocol.CONFIGURE) = {size_mode : true} ];
-    uint32 number = 2;
+  uint64 size = 1 [(atapp.protocol.CONFIGURE) = { size_mode: true }];
+  uint32 number = 2;
 }
 
 message atapp_log_sink_file {
-    string                     file           = 1;
-    atapp_log_sink_file_rotate rotate         = 2;
-    string                     auto_flush     = 3;
-    google.protobuf.Duration   flush_interval = 4;
-    string                     writing_alias  = 5;
+  string file = 1;
+  atapp_log_sink_file_rotate rotate = 2;
+  string auto_flush = 3;
+  google.protobuf.Duration flush_interval = 4;
+  string writing_alias = 5;
 }
 
 message atapp_log_sink_std {}
 
 message atapp_log_sink {
-    string                type  = 1;
-    atapp_log_level_range level = 2;
+  string type = 1;
+  atapp_log_level_range level = 2;
 
-    oneof backend {
-        atapp_log_sink_file log_backend_file   = 21;
-        atapp_log_sink_std  log_backend_stdout = 22;
-        atapp_log_sink_std  log_backend_stderr = 23;
-    }
+  oneof backend {
+    atapp_log_sink_file log_backend_file = 21;
+    atapp_log_sink_std log_backend_stdout = 22;
+    atapp_log_sink_std log_backend_stderr = 23;
+  }
 
-    map<string, string> unresolved_key_values = 101;
+  map<string, string> unresolved_key_values = 101;
 }
 
 message atapp_log_category {
-    string                  name       = 1;
-    string                  prefix     = 2;
-    atapp_log_level_range   stacktrace = 3;
-    repeated atapp_log_sink sink       = 4;
+  string name = 1;
+  string prefix = 2;
+  atapp_log_level_range stacktrace = 3;
+  repeated atapp_log_sink sink = 4;
 }
 
 message atapp_log {
-    string                      level    = 1;
-    repeated atapp_log_category category = 2;
-}
-
-message atapp_area {
-    // region -> district -> zone
-    string region   = 1;
-    string district = 2;
-    uint64 zone_id  = 3; // Such as postal zone/zip code
+  string level = 1;
+  repeated atapp_log_category category = 2;
 }
 
 message atapp_etcd_http {
-    bool debug = 1;
+  bool debug = 1;
 
-    string user_agent      = 301; // CURLOPT_USERAGENT
-    string proxy           = 302; // CURLOPT_HTTPPROXYTUNNEL, CURLOPT_PROXY: [SCHEME]://HOST[:PORT], SCHEME is one of http,https,socks4,socks4a,socks5,socks5h. PORT's default value is 1080
-    string no_proxy        = 303; // curl 7.19.4 CURLOPT_NOPROXY
-    string proxy_user_name = 304; // curl 7.19.1 CURLOPT_PROXYUSERNAME
-    string proxy_password  = 305; // curl 7.19.1 CURLOPT_PROXYPASSWORD
+  string user_agent = 301;  // CURLOPT_USERAGENT
+  string proxy =
+      302;  // CURLOPT_HTTPPROXYTUNNEL, CURLOPT_PROXY: [SCHEME]://HOST[:PORT], SCHEME is one of
+            // http,https,socks4,socks4a,socks5,socks5h. PORT's default value is 1080
+  string no_proxy = 303;         // curl 7.19.4 CURLOPT_NOPROXY
+  string proxy_user_name = 304;  // curl 7.19.1 CURLOPT_PROXYUSERNAME
+  string proxy_password = 305;   // curl 7.19.1 CURLOPT_PROXYPASSWORD
 }
 
 message atapp_etcd_ssl {
-    // @see https://curl.haxx.se/libcurl/c/curl_easy_setopt.html
-    bool enable_alpn = 1; // CURLOPT_SSL_ENABLE_ALPN
-    bool verify_peer = 2; // CURLOPT_SSL_VERIFYPEER, CURLOPT_SSL_VERIFYHOST, CURLOPT_SSL_VERIFYSTATUS and CURLOPT_PROXY_SSL_VERIFYPEER, CURLOPT_PROXY_SSL_VERIFYHOST
+  // @see https://curl.haxx.se/libcurl/c/curl_easy_setopt.html
+  bool enable_alpn = 1;  // CURLOPT_SSL_ENABLE_ALPN
+  bool verify_peer = 2;  // CURLOPT_SSL_VERIFYPEER, CURLOPT_SSL_VERIFYHOST, CURLOPT_SSL_VERIFYSTATUS
+                         // and CURLOPT_PROXY_SSL_VERIFYPEER, CURLOPT_PROXY_SSL_VERIFYHOST
 
-    string ssl_min_version = 101; // CURLOPT_SSLVERSION and CURLOPT_PROXY_SSLVERSION
+  string ssl_min_version = 101;  // CURLOPT_SSLVERSION and CURLOPT_PROXY_SSLVERSION
 
-    string ssl_client_cert             = 111; // CURLOPT_SSLCERT
-    string ssl_client_cert_type        = 112; // CURLOPT_SSLCERTTYPE: PEM or DER
-    string ssl_client_key              = 113; // CURLOPT_SSLKEY
-    string ssl_client_key_type         = 114; // CURLOPT_SSLKEYTYPE: PEM, DER or ENG
-    string ssl_client_key_passwd       = 115; // CURLOPT_KEYPASSWD or CURLOPT_SSLCERTPASSWD
-    string ssl_ca_cert                 = 116; // CURLOPT_CAINFO
-    string ssl_client_tlsauth_username = 117; // CURLOPT_TLSAUTH_USERNAME
-    string ssl_client_tlsauth_password = 118; // CURLOPT_TLSAUTH_PASSWORD
+  string ssl_client_cert = 111;              // CURLOPT_SSLCERT
+  string ssl_client_cert_type = 112;         // CURLOPT_SSLCERTTYPE: PEM or DER
+  string ssl_client_key = 113;               // CURLOPT_SSLKEY
+  string ssl_client_key_type = 114;          // CURLOPT_SSLKEYTYPE: PEM, DER or ENG
+  string ssl_client_key_passwd = 115;        // CURLOPT_KEYPASSWD or CURLOPT_SSLCERTPASSWD
+  string ssl_ca_cert = 116;                  // CURLOPT_CAINFO
+  string ssl_client_tlsauth_username = 117;  // CURLOPT_TLSAUTH_USERNAME
+  string ssl_client_tlsauth_password = 118;  // CURLOPT_TLSAUTH_PASSWORD
 
-    string ssl_proxy_cert             = 121; // CURLOPT_PROXY_SSLCERT
-    string ssl_proxy_cert_type        = 122; // CURLOPT_PROXY_SSLCERTTYPE: PEM or DER
-    string ssl_proxy_key              = 123; // CURLOPT_PROXY_SSLKEY
-    string ssl_proxy_key_type         = 124; // CURLOPT_PROXY_SSLKEYTYPE: PEM, DER or ENG
-    string ssl_proxy_key_passwd       = 125; // CURLOPT_PROXY_KEYPASSWD or CURLOPT_PROXY_SSLCERTPASSWD
-    string ssl_proxy_ca_cert          = 126; // CURLOPT_PROXY_CAINFO
-    string ssl_proxy_tlsauth_username = 127; // CURLOPT_PROXY_TLSAUTH_USERNAME
-    string ssl_proxy_tlsauth_password = 128; // CURLOPT_PROXY_TLSAUTH_PASSWORD
+  string ssl_proxy_cert = 121;        // CURLOPT_PROXY_SSLCERT
+  string ssl_proxy_cert_type = 122;   // CURLOPT_PROXY_SSLCERTTYPE: PEM or DER
+  string ssl_proxy_key = 123;         // CURLOPT_PROXY_SSLKEY
+  string ssl_proxy_key_type = 124;    // CURLOPT_PROXY_SSLKEYTYPE: PEM, DER or ENG
+  string ssl_proxy_key_passwd = 125;  // CURLOPT_PROXY_KEYPASSWD or CURLOPT_PROXY_SSLCERTPASSWD
+  string ssl_proxy_ca_cert = 126;     // CURLOPT_PROXY_CAINFO
+  string ssl_proxy_tlsauth_username = 127;  // CURLOPT_PROXY_TLSAUTH_USERNAME
+  string ssl_proxy_tlsauth_password = 128;  // CURLOPT_PROXY_TLSAUTH_PASSWORD
 
-    string ssl_cipher_list       = 201; // CURLOPT_SSL_CIPHER_LIST
-    string ssl_cipher_list_tls13 = 202; // CURLOPT_TLS13_CIPHERS
+  string ssl_cipher_list = 201;        // CURLOPT_SSL_CIPHER_LIST
+  string ssl_cipher_list_tls13 = 202;  // CURLOPT_TLS13_CIPHERS
 }
 
 message atapp_etcd_cluster {
-    google.protobuf.Duration update_interval = 1 [ (atapp.protocol.CONFIGURE) = {default_value : "5m"} ];
-    google.protobuf.Duration retry_interval  = 2 [ (atapp.protocol.CONFIGURE) = {default_value : "1m"} ];
+  bool auto_update = 1 [(atapp.protocol.CONFIGURE) = { default_value: "true" }];
+  google.protobuf.Duration update_interval = 2
+      [(atapp.protocol.CONFIGURE) = { default_value: "5m" }];
+  google.protobuf.Duration retry_interval = 3
+      [(atapp.protocol.CONFIGURE) = { default_value: "1m" }];
 }
 
 message atapp_etcd_keepalive {
-    google.protobuf.Duration timeout = 1 [ (atapp.protocol.CONFIGURE) = {default_value : "31s"} ];
-    google.protobuf.Duration ttl     = 2 [ (atapp.protocol.CONFIGURE) = {default_value : "10s"} ];
+  google.protobuf.Duration timeout = 1 [(atapp.protocol.CONFIGURE) = { default_value: "31s" }];
+  google.protobuf.Duration ttl = 2 [(atapp.protocol.CONFIGURE) = { default_value: "10s" }];
 }
 
-message atapp_etcd_request { google.protobuf.Duration timeout = 1 [ (atapp.protocol.CONFIGURE) = {default_value : "15s"} ]; }
+message atapp_etcd_request {
+  google.protobuf.Duration timeout = 1 [(atapp.protocol.CONFIGURE) = { default_value: "15s" }];
+}
 
 message atapp_etcd_init {
-    google.protobuf.Duration timeout       = 1 [ (atapp.protocol.CONFIGURE) = {default_value : "5s"} ];
-    google.protobuf.Duration tick_interval = 2 [ (atapp.protocol.CONFIGURE) = {default_value : "256ms" min_value : "16ms"} ];
+  google.protobuf.Duration timeout = 1 [(atapp.protocol.CONFIGURE) = { default_value: "5s" }];
+  google.protobuf.Duration tick_interval = 2
+      [(atapp.protocol.CONFIGURE) = { default_value: "256ms" min_value: "16ms" }];
 }
 
 message atapp_etcd_watcher {
-    google.protobuf.Duration retry_interval  = 101 [ (atapp.protocol.CONFIGURE) = {default_value : "15s"} ];
-    google.protobuf.Duration request_timeout = 102 [ (atapp.protocol.CONFIGURE) = {default_value : "30m"} ];
+  google.protobuf.Duration retry_interval = 101
+      [(atapp.protocol.CONFIGURE) = { default_value: "15s" }];
+  google.protobuf.Duration request_timeout = 102
+      [(atapp.protocol.CONFIGURE) = { default_value: "30m" }];
 
-    bool            by_id        = 201 [ (atapp.protocol.CONFIGURE) = {default_value : "false"} ]; // add watcher by id
-    bool            by_name      = 202 [ (atapp.protocol.CONFIGURE) = {default_value : "true"} ];  // add watcher by name
-    repeated uint64 by_type_id   = 203;                                                            // add watcher by type id
-    repeated string by_type_name = 204;                                                            // add watcher by type name
-    repeated string by_tag       = 205;                                                            // add watcher by tag
+  bool by_id = 201 [(atapp.protocol.CONFIGURE) = { default_value: "false" }];  // add watcher by id
+  bool by_name = 202
+      [(atapp.protocol.CONFIGURE) = { default_value: "true" }];  // add watcher by name
+  repeated uint64 by_type_id = 203;                              // add watcher by type id
+  repeated string by_type_name = 204;                            // add watcher by type name
+  repeated string by_tag = 205;                                  // add watcher by tag
 }
 
 message atapp_etcd_report_alive {
-    bool            by_id   = 1 [ (atapp.protocol.CONFIGURE) = {default_value : "true"} ];
-    bool            by_type = 2 [ (atapp.protocol.CONFIGURE) = {default_value : "true"} ];
-    bool            by_name = 3 [ (atapp.protocol.CONFIGURE) = {default_value : "true"} ];
-    repeated string by_tag  = 4;
+  bool by_id = 1 [(atapp.protocol.CONFIGURE) = { default_value: "true" }];
+  bool by_type = 2 [(atapp.protocol.CONFIGURE) = { default_value: "true" }];
+  bool by_name = 3 [(atapp.protocol.CONFIGURE) = { default_value: "true" }];
+  repeated string by_tag = 4;
 }
 
 message atapp_etcd {
-    bool                    enable        = 1;
-    repeated string         hosts         = 2;
-    string                  path          = 3;
-    string                  authorization = 4;
-    atapp_etcd_http         http          = 5;
-    atapp_etcd_ssl          ssl           = 6;
-    atapp_etcd_cluster      cluster       = 7;
-    atapp_etcd_keepalive    keepalive     = 8;
-    atapp_etcd_request      request       = 9;
-    atapp_etcd_init         init          = 10;
-    atapp_etcd_watcher      watcher       = 11;
-    atapp_etcd_report_alive report_alive  = 12;
+  bool enable = 1;
+  repeated string hosts = 2;
+  string path = 3;
+  string authorization = 4;
+  atapp_etcd_http http = 5;
+  atapp_etcd_ssl ssl = 6;
+  atapp_etcd_cluster cluster = 7;
+  atapp_etcd_keepalive keepalive = 8;
+  atapp_etcd_request request = 9;
+  atapp_etcd_init init = 10;
+  atapp_etcd_watcher watcher = 11;
+  atapp_etcd_report_alive report_alive = 12;
+}
+
+message atapp_grpc_stub_options {}
+message atapp_grpc_credentials_options {
+  bool insecure = 1;  // Using InsecureChannelCredentials
+
+  string pem_root_certs = 11;   // PEM content of CA certificate
+  string pem_private_key = 12;  // PEM content of private key
+  string pem_cert_chain = 13;   // PEM content of certificate
+}
+
+message atapp_grpc {
+  atapp_grpc_credentials_options ssl = 11;
+  atapp_grpc_stub_options stub = 12;
+}
+
+// Just like PodSandboxConfig in
+// https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/cri-api/pkg/apis/runtime/v1/api.proto
+message atapp_metadata {
+  string namespace_name = 1;
+  string api_version = 2;
+  string kind = 3;
+  string group = 4;
+
+  // string service_name    = 21; // Just use atapp_discovery.name
+  // string service_version = 22; // Just use atapp_discovery.version
+  // `service_subset` is similar to Destination in
+  // https://istio.io/latest/docs/reference/config/networking/virtual-service/#Destination
+  string service_subset = 23;
+
+  // https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#syntax-and-character-set
+  // https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/cri-api/pkg/apis/runtime/v1/api.proto
+  map<string, string> labels = 24;
+  map<string, string> annotations = 25;
 }
 
 message atapp_configure {
-    // bus configure
-    string     id        = 101; // maybe hex or a.b.c.d
-    string     id_mask   = 102; // convert a.b.c.d -> id
-    string     name      = 103;
-    uint64     type_id   = 104;
-    string     type_name = 105;
-    atapp_area area      = 106; // Some service is splited by area
+  // bus configure
+  string id = 101;       // maybe hex or a.b.c.d
+  string id_mask = 102;  // convert a.b.c.d -> id
+  string name = 103;
+  uint64 type_id = 104;
+  string type_name = 105;
+  atapp_area area = 106;  // Some service is splited by area
 
-    string hostname = 121;
+  string hostname = 121;
 
-    bool        remove_pidfile_after_exit = 201;
-    atapp_timer timer                     = 202;
+  bool remove_pidfile_after_exit = 201;
+  atapp_timer timer = 202;
 
-    atbus_configure bus = 301;
+  atbus_configure bus = 301;
 
-    atapp_etcd etcd = 401;
-}
-
-message atapp_metadata {
-    string namespace_name = 1;
-    string api_version    = 2;
-    string kind           = 3;
-    string group          = 4;
-
-    // string service_name    = 21; // Just use atapp_discovery.name
-    // string service_version = 22; // Just use atapp_discovery.version
-    string service_subset = 23;
-
-    map<string, string> label = 24;
-    map<string, string> spec  = 25;
+  atapp_etcd etcd = 401;
 }
 
 message atapp_discovery {
-    uint64          id                           = 1;
-    string          name                         = 2;
-    string          hostname                     = 3;
-    int32           pid                          = 4;
-    repeated string listen                       = 5;
-    string          hash_code                    = 6;
-    uint64          type_id                      = 7;
-    string          type_name                    = 8;
-    atapp_area      area                         = 9; // Some service is splited by area
-    string          version                      = 10;
-    string          custom_data                  = 11;
-    repeated string gateway                      = 12;
-    repeated atbus.protocol.subnet_range subnets = 13;
+  uint64 id = 1;
+  string name = 2;
+  string hostname = 3;
+  int32 pid = 4;
+  repeated string listen = 5;
+  string hash_code = 6;
+  uint64 type_id = 7;
+  string type_name = 8;
+  atapp_area area = 9;  // Some service is splited by area
+  string version = 10;
+  string custom_data = 11;
+  // repeated string gateway                       = 12 [ deprecated = true ];
+  repeated atbus.protocol.subnet_range subnets = 13;
+  repeated atapp_gateway gateways = 14;
 
-    uint64 atbus_protocol_version     = 21;
-    uint64 atbus_protocol_min_version = 22;
+  uint64 atbus_protocol_version = 21;
+  uint64 atbus_protocol_min_version = 22;
 
-    // just like in kubernetes
-    atapp_metadata metadata = 61;
+  // just like in kubernetes
+  atapp_metadata metadata = 61;
 }
