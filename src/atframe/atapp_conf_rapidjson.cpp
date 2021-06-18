@@ -1,4 +1,11 @@
-#include "atframe/atapp_conf_rapidjson.h"
+#if defined(_WIN32)
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
+#endif
 
 #include <config/compiler/protobuf_prefix.h>
 
@@ -10,6 +17,9 @@
 #include <google/protobuf/repeated_field.h>
 
 #include <config/compiler/protobuf_suffix.h>
+
+// Must include protobuf first, or MinGW will redefine GetMessage -> GetMessageA
+#include "atframe/atapp_conf_rapidjson.h"
 
 #include <common/string_oprs.h>
 #include <string/tquerystring.h>

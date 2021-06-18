@@ -7,8 +7,6 @@
 #  endif
 #endif
 
-#include <atframe/atapp_conf.h>
-
 #include <config/compiler/protobuf_prefix.h>
 
 #include <yaml-cpp/yaml.h>
@@ -19,6 +17,9 @@
 #include <google/protobuf/timestamp.pb.h>
 
 #include <config/compiler/protobuf_suffix.h>
+
+// Must include protobuf first, or MinGW will redefine GetMessage -> GetMessageA
+#include <atframe/atapp_conf.h>
 
 #include <libatbus.h>
 
