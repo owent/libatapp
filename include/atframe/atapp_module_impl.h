@@ -1,7 +1,7 @@
 ﻿/**
  * atapp_module_impl.h
  *
- *  Created on: 2016年05月18日
+ *  Created on: 2016-05-18
  *      Author: owent
  */
 #ifndef LIBATAPP_ATAPP_MODULE_IMPL_H
@@ -12,13 +12,13 @@
 #include <design_pattern/nomovable.h>
 #include <design_pattern/noncopyable.h>
 
-#include "config/compiler_features.h"
-#include "std/explicit_declare.h"
-#include "std/smart_ptr.h"
+#include <config/compiler_features.h>
+#include <std/explicit_declare.h>
+#include <std/smart_ptr.h>
 
 #include <common/demangle.h>
 
-#include "atapp_config.h"
+#include "atframe/atapp_config.h"
 
 namespace atapp {
 class app;

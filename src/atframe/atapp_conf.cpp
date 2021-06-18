@@ -7,9 +7,7 @@
 #  endif
 #endif
 
-#include "atframe/atapp_conf.h"
-
-#include <libatbus.h>
+#include <atframe/atapp_conf.h>
 
 #include <config/compiler/protobuf_prefix.h>
 
@@ -21,6 +19,8 @@
 #include <google/protobuf/timestamp.pb.h>
 
 #include <config/compiler/protobuf_suffix.h>
+
+#include <libatbus.h>
 
 #include <common/string_oprs.h>
 #include <config/atframe_utils_build_feature.h>

@@ -18,6 +18,7 @@
 
 #include <cli/shell_font.h>
 
+#include <atframe/atapp_conf_rapidjson.h>
 #include <atframe/modules/etcd_module.h>
 
 #include <assert.h>
@@ -27,10 +28,6 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
-
-#ifdef module
-#  undef module
-#endif
 
 #define ATAPP_DEFAULT_STOP_TIMEOUT 30000
 #define ATAPP_DEFAULT_TICK_INTERVAL 16
@@ -828,16 +825,16 @@ LIBATAPP_MACRO_API std::string app::convert_app_id_to_string(app_id_t id_in, boo
   return convert_app_id_to_string(id_in, conf_.id_mask, hex);
 }
 
-LIBATAPP_MACRO_API void app::add_module(module_ptr_t module) {
-  if (this == module->owner_) {
+LIBATAPP_MACRO_API void app::add_module(module_ptr_t app_module) {
+  if (this == app_module->owner_) {
     return;
   }
 
-  assert(NULL == module->owner_);
-  if (NULL == module->owner_) {
-    modules_.push_back(module);
-    module->owner_ = this;
-    module->on_bind();
+  assert(NULL == app_module->owner_);
+  if (NULL == app_module->owner_) {
+    modules_.push_back(app_module);
+    app_module->owner_ = this;
+    app_module->on_bind();
   }
 }
 

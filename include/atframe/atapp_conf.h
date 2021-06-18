@@ -1,7 +1,7 @@
 ﻿/**
  * atapp_conf.h
  *
- *  Created on: 2016年04月23日
+ *  Created on: 2016-04-23
  *      Author: owent
  */
 #ifndef LIBATAPP_ATAPP_CONF_H
@@ -17,21 +17,21 @@
 #include <type_traits>
 #include <vector>
 
-#include "libatbus.h"
-
-#include "atapp_config.h"
-
 #include <config/compiler/protobuf_prefix.h>
 
-#include "yaml-cpp/yaml.h"
+#include <yaml-cpp/yaml.h>
 
-#include "atapp_conf.pb.h"
+#include <atframe/atapp_conf.pb.h>
+#include <google/protobuf/duration.pb.h>
+#include <google/protobuf/timestamp.pb.h>
 
 #include <config/compiler/protobuf_suffix.h>
 
 #include <libatbus_protocol.h>
 
-#include "atapp_conf_rapidjson.h"
+#include <libatbus.h>
+
+#include "atframe/atapp_config.h"
 
 namespace util {
 namespace config {

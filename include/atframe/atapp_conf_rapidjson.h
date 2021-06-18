@@ -10,8 +10,6 @@
 #include <string>
 #include <type_traits>
 
-#include "libatbus.h"
-
 #include <config/compiler/protobuf_prefix.h>
 
 #include <rapidjson/document.h>
@@ -20,7 +18,9 @@
 
 #include <log/log_wrapper.h>
 
-#include "atapp_config.h"
+#include <libatbus.h>
+
+#include "atframe/atapp_config.h"
 
 namespace google {
 namespace protobuf {

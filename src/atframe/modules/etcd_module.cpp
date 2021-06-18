@@ -13,6 +13,7 @@
 
 #include <atframe/atapp.h>
 
+#include <atframe/atapp_conf_rapidjson.h>
 #include <atframe/etcdcli/etcd_cluster.h>
 #include <atframe/etcdcli/etcd_keepalive.h>
 #include <atframe/etcdcli/etcd_watcher.h>
@@ -931,11 +932,11 @@ bool etcd_module::unpack(node_info_t &out, const std::string &path, const std::s
   }
 
   rapidjson::Document doc;
-  if (!atapp::rapidsjon_loader_unstringify(doc, json)) {
+  if (!::atapp::rapidsjon_loader_unstringify(doc, json)) {
     return false;
   }
 
-  rapidsjon_loader_dump_to(doc, out.node_discovery);
+  ::atapp::rapidsjon_loader_dump_to(doc, out.node_discovery);
   if (out.node_discovery.gateways_size() > 0 || !doc.IsObject()) {
     return true;
   }
@@ -964,7 +965,7 @@ bool etcd_module::unpack(node_info_t &out, const std::string &path, const std::s
 }
 
 void etcd_module::pack(const node_info_t &src, std::string &json) {
-  json = atapp::rapidsjon_loader_stringify(src.node_discovery);
+  json = ::atapp::rapidsjon_loader_stringify(src.node_discovery);
 }
 
 int etcd_module::http_callback_on_etcd_closed(util::network::http_request &req) {

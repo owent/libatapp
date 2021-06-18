@@ -1,7 +1,7 @@
 ﻿/**
  * atapp_log_sink_maker.h
  *
- *  Created on: 2016年05月21日
+ *  Created on: 2016-05-21
  *      Author: owent
  */
 #ifndef LIBATAPP_ATAPP_LOG_SINK_MAKER_H
@@ -11,9 +11,9 @@
 
 #include <string>
 
-#include "log/log_wrapper.h"
+#include <log/log_wrapper.h>
 
-#include "atapp_config.h"
+#include "atframe/atapp_config.h"
 
 namespace atapp {
 namespace protocol {

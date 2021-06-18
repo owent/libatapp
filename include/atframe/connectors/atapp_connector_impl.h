@@ -21,7 +21,7 @@
 #include <atframe/atapp_config.h>
 #include <atframe/etcdcli/etcd_discovery.h>
 
-#include "atapp_endpoint.h"
+#include "atframe/connectors/atapp_endpoint.h"
 
 namespace atapp {
 

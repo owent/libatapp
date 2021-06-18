@@ -26,7 +26,7 @@
 
 #include <detail/libatbus_config.h>
 
-#include "etcd_packer.h"
+#include "atframe/etcdcli/etcd_packer.h"
 
 namespace atapp {
 class etcd_keepalive;
@@ -370,10 +370,10 @@ class etcd_cluster {
    * indicates no lease.
    * @param prev_kv	    If prev_kv is set, etcd gets the previous key-value pair before changing it. The previous
    * key-value pair will be returned in the put response.
-   * @param ignore_value	If ignore_value is set, etcd updates the key using its current value. Returns an error if
-   * the key does not exist.
-   * @param ignore_lease	If ignore_lease is set, etcd updates the key using its current lease. Returns an error if
-   * the key does not exist.
+   * @param ignore_value	If ignore_value is set, etcd updates the key using its current value. Returns an error
+   * if the key does not exist.
+   * @param ignore_lease	If ignore_lease is set, etcd updates the key using its current lease. Returns an error
+   * if the key does not exist.
    * @return http request
    */
   LIBATAPP_MACRO_API util::network::http_request::ptr_t create_request_kv_set(

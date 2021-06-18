@@ -21,7 +21,7 @@
 
 #include <network/http_request.h>
 
-#include "etcd_def.h"
+#include "atframe/etcdcli/etcd_def.h"
 
 namespace atapp {
 class etcd_cluster;

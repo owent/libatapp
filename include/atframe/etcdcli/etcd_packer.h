@@ -14,11 +14,11 @@
 
 #include <config/compiler/template_prefix.h>
 
-#include "rapidjson/document.h"
+#include <rapidjson/document.h>
 
 #include <config/compiler/template_suffix.h>
 
-#include "etcd_def.h"
+#include "atframe/etcdcli/etcd_def.h"
 
 namespace atapp {
 
