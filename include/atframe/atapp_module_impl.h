@@ -23,7 +23,7 @@
 namespace atapp {
 class app;
 
-class module_impl {
+class LIBATAPP_MACRO_API_SYMBOL_VISIBLE module_impl {
  protected:
   LIBATAPP_MACRO_API module_impl();
   LIBATAPP_MACRO_API virtual ~module_impl();
@@ -137,10 +137,10 @@ class module_impl {
   LIBATAPP_MACRO_API bool disable();
 
  private:
-  bool enabled_;
-  app *owner_;
+  LIBATAPP_MACRO_API_SYMBOL_HIDDEN bool enabled_;
+  LIBATAPP_MACRO_API_SYMBOL_HIDDEN app *owner_;
 
-  mutable std::unique_ptr<util::scoped_demangled_name> auto_demangled_name_;
+  LIBATAPP_MACRO_API_SYMBOL_HIDDEN mutable std::unique_ptr<util::scoped_demangled_name> auto_demangled_name_;
 
   friend class app;
 };

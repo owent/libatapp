@@ -105,7 +105,7 @@ class etcd_module : public ::atapp::module_impl {
  public:
   LIBATAPP_MACRO_API void reset();
 
-  LIBATAPP_MACRO_API virtual int init() UTIL_CONFIG_OVERRIDE;
+  LIBATAPP_MACRO_API int init() UTIL_CONFIG_OVERRIDE;
 
  private:
   void update_keepalive_value();
@@ -113,15 +113,15 @@ class etcd_module : public ::atapp::module_impl {
   int init_watchers();
 
  public:
-  LIBATAPP_MACRO_API virtual int reload() UTIL_CONFIG_OVERRIDE;
+  LIBATAPP_MACRO_API int reload() UTIL_CONFIG_OVERRIDE;
 
-  LIBATAPP_MACRO_API virtual int stop() UTIL_CONFIG_OVERRIDE;
+  LIBATAPP_MACRO_API int stop() UTIL_CONFIG_OVERRIDE;
 
-  LIBATAPP_MACRO_API virtual int timeout() UTIL_CONFIG_OVERRIDE;
+  LIBATAPP_MACRO_API int timeout() UTIL_CONFIG_OVERRIDE;
 
-  LIBATAPP_MACRO_API virtual const char *name() const UTIL_CONFIG_OVERRIDE;
+  LIBATAPP_MACRO_API const char *name() const UTIL_CONFIG_OVERRIDE;
 
-  LIBATAPP_MACRO_API virtual int tick() UTIL_CONFIG_OVERRIDE;
+  LIBATAPP_MACRO_API int tick() UTIL_CONFIG_OVERRIDE;
 
   LIBATAPP_MACRO_API const std::string &get_conf_custom_data() const;
   LIBATAPP_MACRO_API void set_conf_custom_data(const std::string &v);

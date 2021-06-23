@@ -34,7 +34,7 @@ struct atapp_connector_bind_helper {
   static LIBATAPP_MACRO_API_SYMBOL_HIDDEN void bind(atapp_connection_handle &handle, atapp_connector_impl &connect);
 };
 
-class atapp_connection_handle {
+class LIBATAPP_MACRO_API_SYMBOL_VISIBLE atapp_connection_handle {
  public:
 #if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
   using ptr_t = std::shared_ptr<atapp_connection_handle>;
@@ -84,17 +84,17 @@ class atapp_connection_handle {
   UTIL_FORCEINLINE atapp_endpoint *get_endpoint() const UTIL_CONFIG_NOEXCEPT { return endpiont_; }
 
  private:
-  uint32_t flags_;
-  union {
+  LIBATAPP_MACRO_API_SYMBOL_HIDDEN uint32_t flags_;
+  union LIBATAPP_MACRO_API_SYMBOL_HIDDEN {
     void *private_data_ptr_;
     uint64_t private_data_u64_;
     int64_t private_data_i64_;
     uintptr_t private_data_uptr_;
     intptr_t private_data_iptr_;
   };
-  atapp_connector_impl *connector_;
-  atapp_endpoint *endpiont_;
-  on_destroy_fn_t on_destroy_fn_;
+  LIBATAPP_MACRO_API_SYMBOL_HIDDEN atapp_connector_impl *connector_;
+  LIBATAPP_MACRO_API_SYMBOL_HIDDEN atapp_endpoint *endpiont_;
+  LIBATAPP_MACRO_API_SYMBOL_HIDDEN on_destroy_fn_t on_destroy_fn_;
 
   friend struct atapp_connector_bind_helper;
   friend struct atapp_endpoint_bind_helper;
