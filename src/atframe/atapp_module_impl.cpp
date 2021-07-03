@@ -9,7 +9,7 @@
 #include "cli/shell_font.h"
 
 namespace atapp {
-LIBATAPP_MACRO_API module_impl::module_impl() : enabled_(true), owner_(NULL) {}
+LIBATAPP_MACRO_API module_impl::module_impl() : enabled_(true), actived_(false), owner_(NULL) {}
 LIBATAPP_MACRO_API module_impl::~module_impl() {
   if (NULL != owner_) {
     on_unbind();
@@ -19,6 +19,8 @@ LIBATAPP_MACRO_API module_impl::~module_impl() {
 LIBATAPP_MACRO_API void module_impl::on_bind() {}
 
 LIBATAPP_MACRO_API void module_impl::on_unbind() {}
+
+LIBATAPP_MACRO_API int module_impl::setup(app_conf &) { return 0; }
 
 LIBATAPP_MACRO_API void module_impl::ready() {}
 
@@ -67,6 +69,8 @@ LIBATAPP_MACRO_API uint64_t module_impl::get_app_type_id() const {
   return owner_->get_type_id();
 }
 
+LIBATAPP_MACRO_API bool module_impl::is_actived() const { return actived_; }
+
 LIBATAPP_MACRO_API bool module_impl::is_enabled() const { return enabled_; }
 
 LIBATAPP_MACRO_API bool module_impl::enable() {
@@ -78,6 +82,20 @@ LIBATAPP_MACRO_API bool module_impl::enable() {
 LIBATAPP_MACRO_API bool module_impl::disable() {
   bool ret = enabled_;
   enabled_ = false;
+
+  deactive();
+  return ret;
+}
+
+LIBATAPP_MACRO_API bool module_impl::active() {
+  bool ret = actived_;
+  actived_ = true;
+  return ret;
+}
+
+LIBATAPP_MACRO_API bool module_impl::deactive() {
+  bool ret = actived_;
+  actived_ = false;
   return ret;
 }
 

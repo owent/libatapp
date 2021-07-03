@@ -1,11 +1,14 @@
-﻿#include <iostream>
+﻿// Copyright 2021 atframework
+// Created by owent
+
+#include "atframe/atapp_log_sink_maker.h"
 
 #include <atframe/atapp_conf.h>
 
+#include <iostream>
+
 #include "cli/shell_font.h"
 #include "log/log_sink_file_backend.h"
-
-#include "atframe/atapp_log_sink_maker.h"
 
 namespace atapp {
 namespace detail {
@@ -41,10 +44,21 @@ static util::log::log_wrapper::log_handler_t _log_sink_file(util::log::log_wrapp
   return file_sink;
 }
 
-static void _log_sink_stdout_handle(const util::log::log_wrapper::caller_info_t&, const char* content,
+static void _log_sink_stdout_handle(const util::log::log_wrapper::caller_info_t& caller, const char* content,
                                     size_t content_size) {
-  std::cout.write(content, content_size);
-  std::cout << std::endl;
+  if (caller.level_id <= util::log::log_formatter::level_t::LOG_LW_ERROR) {
+    util::cli::shell_stream ss(std::cout);
+    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << content << std::endl;
+  } else if (caller.level_id == util::log::log_formatter::level_t::LOG_LW_WARNING) {
+    util::cli::shell_stream ss(std::cout);
+    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW << content << std::endl;
+  } else if (caller.level_id == util::log::log_formatter::level_t::LOG_LW_INFO) {
+    util::cli::shell_stream ss(std::cout);
+    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_GREEN << content << std::endl;
+  } else {
+    std::cout.write(content, content_size);
+    std::cout << std::endl;
+  }
 }
 
 static util::log::log_wrapper::log_handler_t _log_sink_stdout(util::log::log_wrapper& /*logger*/, int32_t /*index*/,
@@ -54,10 +68,21 @@ static util::log::log_wrapper::log_handler_t _log_sink_stdout(util::log::log_wra
   return _log_sink_stdout_handle;
 }
 
-static void _log_sink_stderr_handle(const util::log::log_wrapper::caller_info_t& /*caller*/, const char* content,
-                                    size_t /*content_size*/) {
-  util::cli::shell_stream ss(std::cerr);
-  ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << content << std::endl;
+static void _log_sink_stderr_handle(const util::log::log_wrapper::caller_info_t& caller, const char* content,
+                                    size_t content_size) {
+  if (caller.level_id <= util::log::log_formatter::level_t::LOG_LW_ERROR) {
+    util::cli::shell_stream ss(std::cerr);
+    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << content << std::endl;
+  } else if (caller.level_id == util::log::log_formatter::level_t::LOG_LW_WARNING) {
+    util::cli::shell_stream ss(std::cerr);
+    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW << content << std::endl;
+  } else if (caller.level_id == util::log::log_formatter::level_t::LOG_LW_INFO) {
+    util::cli::shell_stream ss(std::cerr);
+    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_GREEN << content << std::endl;
+  } else {
+    std::cerr.write(content, content_size);
+    std::cerr << std::endl;
+  }
 }
 
 static util::log::log_wrapper::log_handler_t _log_sink_stderr(util::log::log_wrapper& /*logger*/, int32_t /*index*/,

@@ -26,16 +26,9 @@ class atapp_log_sink;
 namespace atapp {
 class log_sink_maker {
  public:
-#if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
   using log_reg_t = std::function<util::log::log_wrapper::log_handler_t(
       util::log::log_wrapper &, int32_t, const ::atapp::protocol::atapp_log &,
       const ::atapp::protocol::atapp_log_category &, const ::atapp::protocol::atapp_log_sink &)>;
-#else
-  typedef std::function<util::log::log_wrapper::log_handler_t(
-      util::log::log_wrapper &, int32_t, const ::atapp::protocol::atapp_log &,
-      const ::atapp::protocol::atapp_log_category &, const ::atapp::protocol::atapp_log_sink &)>
-      log_reg_t;
-#endif
 
  private:
   log_sink_maker();

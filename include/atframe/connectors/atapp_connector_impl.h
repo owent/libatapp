@@ -36,15 +36,9 @@ struct atapp_connector_bind_helper {
 
 class atapp_connection_handle {
  public:
-#if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
   using ptr_t = std::shared_ptr<atapp_connection_handle>;
   using weak_ptr_t = std::weak_ptr<atapp_connection_handle>;
   using on_destroy_fn_t = std::function<void(atapp_connection_handle &)>;
-#else
-  typedef std::shared_ptr<atapp_connection_handle> ptr_t;
-  typedef std::weak_ptr<atapp_connection_handle> weak_ptr_t;
-  typedef std::function<void(atapp_connection_handle &)> on_destroy_fn_t;
-#endif
 
   struct LIBATAPP_MACRO_API_HEAD_ONLY flags_t {
     enum type {
@@ -102,13 +96,8 @@ class atapp_connection_handle {
 
 class atapp_connector_impl {
  public:
-#if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
   using handle_set_t = LIBATFRAME_UTILS_AUTO_SELETC_SET(atapp_connection_handle *);
   using protocol_set_t = LIBATFRAME_UTILS_AUTO_SELETC_SET(std::string);
-#else
-  typedef LIBATFRAME_UTILS_AUTO_SELETC_SET(atapp_connection_handle *) handle_set_t;
-  typedef LIBATFRAME_UTILS_AUTO_SELETC_SET(std::string) protocol_set_t;
-#endif
 
   struct address_type_t {
     enum type {

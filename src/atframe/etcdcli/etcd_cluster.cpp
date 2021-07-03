@@ -244,7 +244,7 @@ LIBATAPP_MACRO_API void etcd_cluster::init(const util::network::http_request::cu
   set_flag(flag_t::CLOSING, false);
 }
 
-LIBATAPP_MACRO_API util::network::http_request::ptr_t etcd_cluster::close(bool wait) {
+LIBATAPP_MACRO_API util::network::http_request::ptr_t etcd_cluster::close(bool wait, bool revoke_lease) {
   set_flag(flag_t::CLOSING, true);
   set_flag(flag_t::RUNNING, false);
 
@@ -286,12 +286,14 @@ LIBATAPP_MACRO_API util::network::http_request::ptr_t etcd_cluster::close(bool w
   util::network::http_request::ptr_t ret;
   if (curl_multi_) {
     if (0 != conf_.lease) {
-      ret = create_request_lease_revoke();
+      if (revoke_lease) {
+        ret = create_request_lease_revoke();
 
-      // wait to delete content
-      if (ret) {
-        FWLOGDEBUG("Etcd start to revoke lease {}", get_lease());
-        ret->start(util::network::http_request::method_t::EN_MT_POST, wait);
+        // wait to delete content
+        if (ret) {
+          FWLOGDEBUG("Etcd start to revoke lease {}", get_lease());
+          ret->start(util::network::http_request::method_t::EN_MT_POST, wait);
+        }
       }
 
       conf_.lease = 0;
@@ -306,7 +308,7 @@ LIBATAPP_MACRO_API util::network::http_request::ptr_t etcd_cluster::close(bool w
 }
 
 LIBATAPP_MACRO_API void etcd_cluster::reset() {
-  close(true);
+  close(true, true);
 
   curl_multi_.reset();
   flags_ = 0;

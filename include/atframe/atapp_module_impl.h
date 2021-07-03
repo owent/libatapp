@@ -1,9 +1,8 @@
-﻿/**
- * atapp_module_impl.h
- *
- *  Created on: 2016-05-18
- *      Author: owent
- */
+﻿// Copyright 2021 atframework
+// Created on: 2016-05-18
+//     Author: owent
+//
+
 #ifndef LIBATAPP_ATAPP_MODULE_IMPL_H
 #define LIBATAPP_ATAPP_MODULE_IMPL_H
 
@@ -22,6 +21,7 @@
 
 namespace atapp {
 class app;
+struct app_conf;
 
 class module_impl {
  protected:
@@ -44,6 +44,12 @@ class module_impl {
    * @note If custom commands or options are set up on on_bind(), the related resource should be clear here
    */
   LIBATAPP_MACRO_API virtual void on_unbind();
+
+  /**
+   * @brief This callback is called after load configure and before initialization(inlcude log)
+   * @note Changing the origin configure is allowed here(even app id and name)
+   */
+  LIBATAPP_MACRO_API virtual int setup(app_conf &conf);
 
   /**
    * @brief This callback is called to initialize a module
@@ -116,6 +122,12 @@ class module_impl {
    */
   LIBATAPP_MACRO_API uint64_t get_app_type_id() const;
 
+  /**
+   * @brief if this module is actived
+   * @return true if module is actived
+   */
+  LIBATAPP_MACRO_API bool is_actived() const;
+
  protected:
   /**
    * @brief get owner atapp object
@@ -136,8 +148,13 @@ class module_impl {
 
   LIBATAPP_MACRO_API bool disable();
 
+  LIBATAPP_MACRO_API bool active();
+
+  LIBATAPP_MACRO_API bool deactive();
+
  private:
   bool enabled_;
+  bool actived_;
   app *owner_;
 
   mutable std::unique_ptr<util::scoped_demangled_name> auto_demangled_name_;

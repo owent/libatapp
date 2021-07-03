@@ -100,8 +100,6 @@ while getopts "ab:c:d:e:hlr:tus-" OPTION; do
             echo "-d [libsodium root]           set root of libsodium.";
             echo "-e <ccache path>              try to use specify ccache to speed up building.";
             echo "-h                            help message.";
-            echo "-m [mbedtls root]             set root of mbedtls.";
-            echo "-o [openssl root]             set root of openssl.";
             echo "-t                            enable clang-tidy.";
             echo "-u                            enable unit test.";
             echo "-s                            enable sample.";

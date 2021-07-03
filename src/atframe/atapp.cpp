@@ -13,10 +13,12 @@
 #  include <openssl/ssl.h>
 #endif
 
+#include <algorithm/sha.h>
 #include <common/file_system.h>
 #include <common/string_oprs.h>
 
 #include <cli/shell_font.h>
+#include <log/log_sink_file_backend.h>
 
 #include <atframe/atapp_conf_rapidjson.h>
 #include <atframe/modules/etcd_module.h>
@@ -137,7 +139,7 @@ LIBATAPP_MACRO_API app::app() : setup_result_(0), last_proc_event_count_(0), mod
   memset(pending_signals_, 0, sizeof(pending_signals_));
   conf_.id = 0;
   conf_.execute_path = NULL;
-  conf_.resume_mode = false;
+  conf_.upgrade_mode = false;
 
   tick_timer_.sec_update = util::time::time_utility::raw_time_t::min();
   tick_timer_.sec = 0;
@@ -245,12 +247,13 @@ LIBATAPP_MACRO_API int app::init(uv_loop_t *ev_loop, int argc, const char **argv
     return 0;
   }
 
-  util::cli::shell_stream ss(std::cerr);
+  setup_startup_log();
+
   // step 4. load options from cmd line
   conf_.bus_conf.ev_loop = ev_loop;
   int ret = reload();
   if (ret < 0) {
-    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "load configure failed" << std::endl;
+    FWLOGERROR("load configure failed");
     return setup_result_ = ret;
   }
 
@@ -269,53 +272,72 @@ LIBATAPP_MACRO_API int app::init(uv_loop_t *ev_loop, int argc, const char **argv
     }
   }
 
-  // step 6. setup log & signal
-  ret = setup_log();
-  if (ret < 0) {
-    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "setup log failed" << std::endl;
-    write_pidfile();
-    return setup_result_ = ret;
-  }
-
   ret = setup_signal();
   if (ret < 0) {
-    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "setup signal failed" << std::endl;
+    FWLOGERROR("setup signal failed");
     write_pidfile();
     return setup_result_ = ret;
   }
 
-  ret = setup_atbus();
-  if (ret < 0) {
-    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "setup atbus failed" << std::endl;
-    bus_node_.reset();
-    write_pidfile();
-    return setup_result_ = ret;
-  }
-
-  // step 7. all modules reload
+  // all modules setup
   for (module_ptr_t &mod : modules_) {
     if (mod->is_enabled()) {
-      ret = mod->reload();
+      ret = mod->setup(conf_);
       if (ret < 0) {
-        ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "load configure of " << mod->name() << " failed"
-             << std::endl;
+        FWLOGERROR("setup module {} failed", mod->name());
         write_pidfile();
         return setup_result_ = ret;
       }
     }
   }
 
-  // step 8. all modules init
+  WLOG_GETCAT(util::log::log_wrapper::categorize_t::DEFAULT)->clear_sinks();
+  ret = setup_log();
+  if (ret < 0) {
+    FWLOGERROR("setup log failed");
+    write_pidfile();
+    return setup_result_ = ret;
+  }
+
+  if (setup_timer() < 0) {
+    FWLOGERROR("setup timer failed");
+    bus_node_.reset();
+    write_pidfile();
+    return setup_result_ = EN_ATAPP_ERR_SETUP_TIMER;
+  }
+
+  ret = setup_atbus();
+  if (ret < 0) {
+    FWLOGERROR("setup atbus failed");
+    bus_node_.reset();
+    write_pidfile();
+    return setup_result_ = ret;
+  }
+
+  // all modules reload
+  for (module_ptr_t &mod : modules_) {
+    if (mod->is_enabled()) {
+      ret = mod->reload();
+      if (ret < 0) {
+        FWLOGERROR("load configure of {} failed", mod->name());
+        write_pidfile();
+        return setup_result_ = ret;
+      }
+    }
+  }
+
+  // all modules init
   size_t inited_mod_idx = 0;
   int mod_init_res = 0;
   for (; mod_init_res >= 0 && inited_mod_idx < modules_.size(); ++inited_mod_idx) {
     if (modules_[inited_mod_idx]->is_enabled()) {
       mod_init_res = modules_[inited_mod_idx]->init();
       if (mod_init_res < 0) {
-        ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "initialze " << modules_[inited_mod_idx]->name()
-             << " failed" << std::endl;
+        FWLOGERROR("initialze {} failed", modules_[inited_mod_idx]->name());
         break;
       }
+      modules_[inited_mod_idx]->active();
+      ++last_proc_event_count_;
     }
   }
   // cleanup all inited modules if failed
@@ -338,20 +360,9 @@ LIBATAPP_MACRO_API int app::init(uv_loop_t *ev_loop, int argc, const char **argv
     evt_on_all_module_inited_(*this);
   }
 
-  // step 9. write pid file
+  // write pid file
   if (false == write_pidfile()) {
     return EN_ATAPP_ERR_WRITE_PID_FILE;
-  }
-
-  if (setup_timer() < 0) {
-    // cleanup modules
-    for (std::vector<module_ptr_t>::reverse_iterator rit = modules_.rbegin(); rit != modules_.rend(); ++rit) {
-      if (*rit) {
-        (*rit)->cleanup();
-      }
-    }
-
-    return EN_ATAPP_ERR_SETUP_TIMER;
   }
 
   set_flag(flag_t::STOPPED, false);
@@ -359,7 +370,7 @@ LIBATAPP_MACRO_API int app::init(uv_loop_t *ev_loop, int argc, const char **argv
   set_flag(flag_t::INITIALIZED, true);
   set_flag(flag_t::RUNNING, true);
 
-  // Step 10. notify all module to get ready
+  // notify all module to get ready
   for (inited_mod_idx = 0; inited_mod_idx < modules_.size(); ++inited_mod_idx) {
     if (modules_[inited_mod_idx]->is_enabled()) {
       modules_[inited_mod_idx]->ready();
@@ -384,6 +395,54 @@ LIBATAPP_MACRO_API int app::run_noblock(uint64_t max_event_count) {
 
     evt_count += last_proc_event_count_;
   } while (0 == max_event_count || evt_count < max_event_count);
+
+  return ret;
+}
+
+static void _app_run_once_timer_handle(uv_timer_t *handle) {
+  if (NULL != handle) {
+    handle->data = nullptr;
+    uv_stop(handle->loop);
+  }
+}
+
+LIBATAPP_MACRO_API int app::run_once(uint64_t min_event_count, time_t timeout_miliseconds) {
+  uint64_t evt_count = 0;
+  int ret = 0;
+
+  timer_ptr_t timer;
+  if (timeout_miliseconds > 0) {
+    timer = std::make_shared<timer_info_t>();
+    if (!timer) {
+      FWLOGERROR("create timer failed");
+      return EN_ATAPP_ERR_SETUP_TIMER;
+    }
+    timer->timer.data = this;
+    uv_timer_init(bus_node_->get_evloop(), &timer->timer);
+    int res = uv_timer_start(&timer->timer, _app_run_once_timer_handle, timeout_miliseconds, timeout_miliseconds);
+    if (res < 0) {
+      FWLOGERROR("setup timer failed, res: {}({})", res, uv_err_name(res));
+      close_timer(timer);
+      return EN_ATAPP_ERR_SETUP_TIMER;
+    }
+  }
+
+  do {
+    ret = run_inner(UV_RUN_ONCE);
+    if (ret < 0) {
+      break;
+    }
+
+    evt_count += last_proc_event_count_;
+
+    if (evt_count >= min_event_count) {
+      break;
+    }
+  } while (evt_count >= min_event_count);
+
+  if (timer) {
+    close_timer(timer);
+  }
 
   return ret;
 }
@@ -444,7 +503,6 @@ static bool reload_all_configure_files(app::yaml_conf_map_t &yaml_map, util::con
                                        atbus::detail::auto_select_set<std::string>::type &loaded_files,
                                        std::list<std::string> &pending_load_files) {
   bool ret = true;
-  util::cli::shell_stream ss(std::cerr);
   size_t conf_external_loaded_index;
 
   while (!pending_load_files.empty()) {
@@ -525,18 +583,12 @@ static bool reload_all_configure_files(app::yaml_conf_map_t &yaml_map, util::con
         }
 #if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
       } catch (YAML::ParserException &e) {
-        ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "load configure file " << file_rule << " failed."
-             << e.what() << std::endl;
         FWLOGERROR("load configure file {} failed.{}", file_rule, e.what());
         ret = false;
       } catch (YAML::BadSubscript &e) {
-        ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "load configure file " << file_rule << " failed."
-             << e.what() << std::endl;
         FWLOGERROR("load configure file {} failed.{}", file_rule, e.what());
         ret = false;
       } catch (...) {
-        ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "load configure file " << file_rule << " failed."
-             << std::endl;
         FWLOGERROR("load configure file {} failed.", file_rule);
         ret = false;
       }
@@ -544,8 +596,6 @@ static bool reload_all_configure_files(app::yaml_conf_map_t &yaml_map, util::con
     } else {
       conf_external_loaded_index = conf_loader.get_node("atapp.config.external").size();
       if (conf_loader.load_file(file_rule.c_str(), false) < 0) {
-        ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "load configure file " << file_rule << " failed"
-             << std::endl;
         FWLOGERROR("load configure file {} failed", file_rule);
         ret = false;
         continue;
@@ -567,7 +617,6 @@ static bool reload_all_configure_files(app::yaml_conf_map_t &yaml_map, util::con
 LIBATAPP_MACRO_API int app::reload() {
   atbus::adapter::loop_t *old_loop = conf_.bus_conf.ev_loop;
   ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration old_tick_interval = conf_.origin.timer().tick_interval();
-  util::cli::shell_stream ss(std::cerr);
 
   FWLOGWARNING("============ start to load configure ============");
   // step 1. reset configure
@@ -576,7 +625,7 @@ LIBATAPP_MACRO_API int app::reload() {
 
   // step 2. reload from program configure file
   if (conf_.conf_file.empty()) {
-    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "missing configure file" << std::endl;
+    FWLOGERROR("missing configure file");
     print_help();
     return EN_ATAPP_ERR_MISSING_CONFIGURE_FILE;
   }
@@ -679,7 +728,7 @@ LIBATAPP_MACRO_API int app::tick() {
     int res;
     // step 1. proc available modules
     for (module_ptr_t &mod : modules_) {
-      if (mod->is_enabled()) {
+      if (mod->is_enabled() && mod->is_actived()) {
         res = mod->tick();
         if (res < 0) {
           FWLOGERROR("module {} run tick and return {}", mod->name(), res);
@@ -854,6 +903,8 @@ LIBATAPP_MACRO_API util::cli::cmd_option::ptr_type app::get_option_manager() {
   return app_option_;
 }
 
+LIBATAPP_MACRO_API bool app::is_current_upgrade_mode() const { return conf_.upgrade_mode; }
+
 LIBATAPP_MACRO_API util::network::http_request::curl_m_bind_ptr_t app::get_shared_curl_multi_context() const {
   if (likely(inner_module_etcd_)) {
     return inner_module_etcd_->get_shared_curl_multi_context();
@@ -946,6 +997,8 @@ LIBATAPP_MACRO_API const std::string &app::get_build_version() const {
 
 LIBATAPP_MACRO_API const std::string &app::get_app_name() const { return conf_.origin.name(); }
 
+LIBATAPP_MACRO_API const std::string &app::get_app_identity() const { return conf_.origin.identity(); }
+
 LIBATAPP_MACRO_API const std::string &app::get_type_name() const { return conf_.origin.type_name(); }
 
 LIBATAPP_MACRO_API app::app_id_t app::get_type_id() const { return static_cast<app::app_id_t>(conf_.origin.type_id()); }
@@ -1028,6 +1081,7 @@ LIBATAPP_MACRO_API void app::pack(atapp::protocol::atapp_discovery &out) const {
   out.set_name(get_app_name());
   out.set_hostname(atbus::node::get_hostname());
   out.set_pid(atbus::node::get_pid());
+  out.set_identity(get_app_identity());
 
   out.set_hash_code(get_hash_code());
   out.set_type_id(get_type_id());
@@ -1691,6 +1745,7 @@ LIBATAPP_MACRO_API bool app::check_flag(flag_t::type f) const {
 int app::apply_configure() {
   std::string old_name = conf_.origin.name();
   std::string old_hostname = conf_.origin.hostname();
+  std::string old_identity = conf_.origin.identity();
   parse_configures_into(conf_.origin, "atapp");
 
   // id and id mask
@@ -1727,6 +1782,22 @@ int app::apply_configure() {
 
   if (!conf_.origin.hostname().empty()) {
     atbus::node::set_hostname(conf_.origin.hostname());
+  }
+
+  // Changing identity is not allowed
+  if (!old_identity.empty()) {
+    conf_.origin.set_identity(old_identity);
+  }
+  if (conf_.origin.identity().empty()) {
+    std::stringstream identity_stream;
+    identity_stream << util::file_system::get_abs_path(conf_.execute_path) << std::endl;
+    identity_stream << util::file_system::get_abs_path(conf_.conf_file.c_str()) << std::endl;
+    identity_stream << "id: " << conf_.id << std::endl;
+    identity_stream << "name: " << conf_.origin.name() << std::endl;
+    identity_stream << "hostname: " << conf_.origin.hostname() << std::endl;
+    std::string identity_buffer = identity_stream.str();
+    conf_.origin.set_identity(util::hash::sha::hash_to_hex(util::hash::sha::EN_ALGORITHM_SHA256,
+                                                           identity_buffer.c_str(), identity_buffer.size()));
   }
 
   // atbus configure
@@ -1941,6 +2012,7 @@ void app::process_signal(int signo) {
     case SIGSTOP:
 #endif
     case SIGTERM: {
+      conf_.upgrade_mode = false;
       stop();
       break;
     }
@@ -2056,9 +2128,7 @@ static void setup_load_category(
   }
 
   if (NULL == log_cat) {
-    util::cli::shell_stream ss(std::cerr);
-    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "log " << name_node.Scalar()
-         << "malloc category failed, skipped." << std::endl;
+    FWLOGERROR("log {} malloc category failed, skipped.", name_node.Scalar());
     return;
   }
 
@@ -2081,6 +2151,36 @@ static void setup_load_category(
       setup_load_sink(sink_node[i], *log_cat->mutable_sink(i + old_sink_count));
     }
   }
+}
+
+void app::setup_startup_log() {
+  util::log::log_wrapper &wrapper = *WLOG_GETCAT(util::log::log_wrapper::categorize_t::DEFAULT);
+
+  ::atapp::protocol::atapp_log std_log_cfg;
+  ::atapp::protocol::atapp_log_category std_cat_cfg;
+  ::atapp::protocol::atapp_log_sink std_sink_cfg;
+
+  for (std::list<std::string>::iterator iter = conf_.startup_log.begin(); iter != conf_.startup_log.end(); ++iter) {
+    if ((*iter).empty() || 0 == UTIL_STRFUNC_STRNCASE_CMP("stdout", (*iter).c_str(), (*iter).size())) {
+      wrapper.add_sink(log_sink_maker::get_stdout_sink_reg()(wrapper, util::log::log_wrapper::categorize_t::DEFAULT,
+                                                             std_log_cfg, std_cat_cfg, std_sink_cfg));
+    } else if (0 == UTIL_STRFUNC_STRNCASE_CMP("stderr", (*iter).c_str(), (*iter).size())) {
+      wrapper.add_sink(log_sink_maker::get_stderr_sink_reg()(wrapper, util::log::log_wrapper::categorize_t::DEFAULT,
+                                                             std_log_cfg, std_cat_cfg, std_sink_cfg));
+    } else {
+      util::log::log_sink_file_backend file_sink(*iter);
+      file_sink.set_rotate_size(100 * 1024 * 1024);  // Max 100 MB
+      file_sink.set_flush_interval(1);
+      wrapper.add_sink(file_sink);
+    }
+  }
+
+  if (wrapper.sink_size() == 0) {
+    wrapper.add_sink(log_sink_maker::get_stdout_sink_reg()(wrapper, util::log::log_wrapper::categorize_t::DEFAULT,
+                                                           std_log_cfg, std_cat_cfg, std_sink_cfg));
+  }
+
+  wrapper.init();
 }
 
 int app::setup_log() {
@@ -2812,8 +2912,15 @@ int app::prog_option_handler_set_pid(util::cli::callback_param params) {
   return 0;
 }
 
-int app::prog_option_handler_resume_mode(util::cli::callback_param /*params*/) {
-  conf_.resume_mode = true;
+int app::prog_option_handler_upgrade_mode(util::cli::callback_param /*params*/) {
+  conf_.upgrade_mode = true;
+  return 0;
+}
+
+int app::prog_option_handler_set_startup_log(util::cli::callback_param params) {
+  for (util::cli::cmd_option_list::size_type i = 0; i < params.get_params_number(); ++i) {
+    conf_.startup_log.push_back(params[i]->to_cpp_string());
+  }
   return 0;
 }
 
@@ -2826,6 +2933,9 @@ int app::prog_option_handler_stop(util::cli::callback_param /*params*/) {
   mode_ = mode_t::STOP;
   last_command_.clear();
   last_command_.push_back("stop");
+  if (conf_.upgrade_mode) {
+    last_command_.push_back("--upgrade");
+  }
   return 0;
 }
 
@@ -2833,6 +2943,9 @@ int app::prog_option_handler_reload(util::cli::callback_param /*params*/) {
   mode_ = mode_t::RELOAD;
   last_command_.clear();
   last_command_.push_back("reload");
+  if (conf_.upgrade_mode) {
+    last_command_.push_back("--upgrade");
+  }
   return 0;
 }
 
@@ -2882,8 +2995,11 @@ void app::setup_option(int argc, const char *argv[], void *priv_data) {
       ->set_help_msg("-p, --pid <pid file>                   set where to store pid.");
 
   // set configure file path
-  opt_mgr->bind_cmd("-r, --resume", &app::prog_option_handler_resume_mode, this)
-      ->set_help_msg("-r, --resume                           try to resume when start.");
+  opt_mgr->bind_cmd("--upgrade", &app::prog_option_handler_upgrade_mode, this)
+      ->set_help_msg("--upgrade                              set upgrade mode.");
+
+  opt_mgr->bind_cmd("--startup-log", &app::prog_option_handler_set_startup_log, this)
+      ->set_help_msg("--startup-log                          where to write start up log(file name or stdout/stderr).");
 
   // start server
   opt_mgr->bind_cmd("start", &app::prog_option_handler_start, this)
@@ -2929,6 +3045,14 @@ int app::command_handler_stop(util::cli::callback_param params) {
   LOG_WRAPPER_FWAPI_FORMAT_TO_N(msg, sizeof(msg), "app node {:#x} run stop command success", get_id());
   FWLOGINFO("{}", msg);
   add_custom_command_rsp(params, msg);
+
+  bool enable_upgrade_mode = false;
+  for (util::cli::cmd_option_list::size_type i = 0; i < params.get_params_number(); ++i) {
+    if (params[i]->to_cpp_string() == "--upgrade") {
+      enable_upgrade_mode = true;
+    }
+  }
+  conf_.upgrade_mode = enable_upgrade_mode;
   return stop();
 }
 
@@ -2937,6 +3061,14 @@ int app::command_handler_reload(util::cli::callback_param params) {
   LOG_WRAPPER_FWAPI_FORMAT_TO_N(msg, sizeof(msg), "app node {:#x} run reload command success", get_id());
   FWLOGINFO("{}", msg);
   add_custom_command_rsp(params, msg);
+
+  bool enable_upgrade_mode = false;
+  for (util::cli::cmd_option_list::size_type i = 0; i < params.get_params_number(); ++i) {
+    if (params[i]->to_cpp_string() == "--upgrade") {
+      enable_upgrade_mode = true;
+    }
+  }
+  conf_.upgrade_mode = enable_upgrade_mode;
   return reload();
 }
 
@@ -3372,10 +3504,8 @@ void app::setup_command() {
 }
 
 int app::send_last_command(uv_loop_t *ev_loop) {
-  util::cli::shell_stream ss(std::cerr);
-
   if (last_command_.empty()) {
-    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "command is empty." << std::endl;
+    FWLOGERROR("command is empty.");
     return EN_ATAPP_ERR_COMMAND_IS_NULL;
   }
 
@@ -3415,8 +3545,7 @@ int app::send_last_command(uv_loop_t *ev_loop) {
   }
 
   if (0 == use_level) {
-    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED
-         << "there is no available listener address to send command." << std::endl;
+    FWLOGERROR("there is no available listener address to send command.");
     return EN_ATAPP_ERR_NO_AVAILABLE_ADDRESS;
   }
 
@@ -3426,7 +3555,7 @@ int app::send_last_command(uv_loop_t *ev_loop) {
 
   // command mode , must no concurrence
   if (!bus_node_) {
-    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "create bus node failed" << std::endl;
+    FWLOGERROR("create bus node failed");
     return EN_ATAPP_ERR_SETUP_ATBUS;
   }
 
@@ -3436,13 +3565,13 @@ int app::send_last_command(uv_loop_t *ev_loop) {
   // using 0 for command sender
   int ret = bus_node_->init(0, &conf_.bus_conf);
   if (ret < 0) {
-    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "init bus node failed. ret: " << ret << std::endl;
+    FWLOGERROR("init bus node failed. ret: {}", ret);
     return ret;
   }
 
   ret = bus_node_->start();
   if (ret < 0) {
-    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "start bus node failed. ret: " << ret << std::endl;
+    FWLOGERROR("start bus node failed. ret: {}", ret);
     return ret;
   }
 
@@ -3455,8 +3584,7 @@ int app::send_last_command(uv_loop_t *ev_loop) {
         atbus::endpoint::create(bus_node_.get(), conf_.id, subnets, bus_node_->get_pid(), bus_node_->get_hostname());
     ret = bus_node_->add_endpoint(new_ep);
     if (ret < 0) {
-      ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "connect to " << use_addr.address
-           << " failed. ret: " << ret << std::endl;
+      FWLOGERROR("connect to {} failed. ret: {}", use_addr.address, ret);
       return ret;
     }
 
@@ -3469,8 +3597,7 @@ int app::send_last_command(uv_loop_t *ev_loop) {
   }
 
   if (ret < 0) {
-    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "connect to " << use_addr.address
-         << " failed. ret: " << ret << std::endl;
+    FWLOGERROR("connect to {} failed. ret: {}", use_addr.address, ret);
     return ret;
   }
 
@@ -3486,8 +3613,7 @@ int app::send_last_command(uv_loop_t *ev_loop) {
     if (0 == res) {
       tick_timer_.timeout_timer = timer;
     } else {
-      ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "setup timeout timer failed, res: " << res
-           << std::endl;
+      FWLOGERROR("setup timeout timer failed, res: {}", res);
       set_flag(flag_t::TIMEOUT, false);
 
       timer->timer.data = new timer_ptr_t(timer);
@@ -3513,8 +3639,7 @@ int app::send_last_command(uv_loop_t *ev_loop) {
 
   if (NULL == ep) {
     close_timer(tick_timer_.timeout_timer);
-    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "connect to " << use_addr.address
-         << " failed or timeout." << std::endl;
+    FWLOGERROR("connect to {} failed or timeout.", use_addr.address);
     return EN_ATAPP_ERR_CONNECT_ATAPP_FAILED;
   }
 
@@ -3537,7 +3662,7 @@ int app::send_last_command(uv_loop_t *ev_loop) {
   ret = bus_node_->send_custom_cmd(ep->get_id(), &arr_buff[0], &arr_size[0], last_command_.size());
   if (ret < 0) {
     close_timer(tick_timer_.timeout_timer);
-    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "send command failed. ret: " << ret << std::endl;
+    FWLOGERROR("send command failed. ret: {}", ret);
     return ret;
   }
 
@@ -3551,8 +3676,7 @@ int app::send_last_command(uv_loop_t *ev_loop) {
       flag_guard_t in_callback_guard(*this, flag_t::IN_CALLBACK);
       uv_run(ev_loop, UV_RUN_ONCE);
       if (check_flag(flag_t::TIMEOUT)) {
-        ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "send command or receive response timeout"
-             << std::endl;
+        FWLOGERROR("send command or receive response timeout");
         ret = -1;
         break;
       }

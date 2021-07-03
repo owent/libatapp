@@ -1,4 +1,12 @@
-﻿#include <libatbus.h>
+﻿// Copyright 2021 atframework
+// Create by owent
+
+#include "atframe/etcdcli/etcd_keepalive.h"
+
+#include <atframe/atapp_conf.h>
+#include <atframe/atapp_conf_rapidjson.h>
+
+#include <libatbus.h>
 
 #include <algorithm/base64.h>
 
@@ -13,11 +21,28 @@
 
 namespace atapp {
 
-etcd_keepalive::default_checker_t::default_checker_t(const std::string &checked) : data(checked) {}
+etcd_keepalive::default_checker_t::default_checker_t(const std::string &checked) : data(checked) {
+  ::atapp::protocol::atapp_discovery node;
+  if (::atapp::rapidsjon_loader_parse(node, checked)) {
+    identity = node.identity();
+  }
+}
+
 etcd_keepalive::default_checker_t::~default_checker_t() {}
 
 bool etcd_keepalive::default_checker_t::operator()(const std::string &checked) const {
-  return checked.empty() || data == checked;
+  if (checked.empty()) {
+    return true;
+  }
+
+  if (!identity.empty()) {
+    ::atapp::protocol::atapp_discovery node;
+    if (::atapp::rapidsjon_loader_parse(node, checked)) {
+      return node.identity().empty() || identity == node.identity();
+    }
+  }
+
+  return data == checked;
 }
 
 LIBATAPP_MACRO_API etcd_keepalive::etcd_keepalive(etcd_cluster &owner, const std::string &path, constrict_helper_t &)

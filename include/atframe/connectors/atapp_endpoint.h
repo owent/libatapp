@@ -39,19 +39,11 @@ struct atapp_endpoint_bind_helper {
 
 class atapp_endpoint {
  public:
-#if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
   using handle_set_t = LIBATFRAME_UTILS_AUTO_SELETC_SET(atapp_connection_handle *);
   using handle_set_iterator = handle_set_t::iterator;
   using handle_set_const_iterator = handle_set_t::const_iterator;
   using ptr_t = std::shared_ptr<atapp_endpoint>;
   using weak_ptr_t = std::weak_ptr<atapp_endpoint>;
-#else
-  typedef LIBATFRAME_UTILS_AUTO_SELETC_SET(atapp_connection_handle *) handle_set_t;
-  typedef handle_set_t::iterator handle_set_iterator;
-  typedef handle_set_t::const_iterator handle_set_const_iterator;
-  typedef std::shared_ptr<atapp_endpoint> ptr_t;
-  typedef std::weak_ptr<atapp_endpoint> weak_ptr_t;
-#endif
 
   struct pending_message_t {
     util::time::time_utility::raw_time_t expired_timepoint;

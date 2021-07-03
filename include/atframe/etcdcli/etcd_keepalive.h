@@ -39,6 +39,7 @@ class etcd_keepalive : public std::enable_shared_from_this<etcd_keepalive> {
     bool operator()(const std::string &checked) const;
 
     std::string data;
+    std::string identity;
   };
 
   struct constrict_helper_t {};

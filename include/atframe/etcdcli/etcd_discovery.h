@@ -33,13 +33,8 @@ struct LIBATAPP_MACRO_API_HEAD_ONLY etcd_discovery_action_t {
 
 class etcd_discovery_node {
  public:
-#if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
   using on_destroy_fn_t = std::function<void(etcd_discovery_node &)>;
   using ptr_t = std::shared_ptr<etcd_discovery_node>;
-#else
-  typedef std::function<void(etcd_discovery_node &)> on_destroy_fn_t;
-  typedef std::shared_ptr<etcd_discovery_node> ptr_t;
-#endif
 
   UTIL_DESIGN_PATTERN_NOCOPYABLE(etcd_discovery_node)
   UTIL_DESIGN_PATTERN_NOMOVABLE(etcd_discovery_node)
@@ -88,15 +83,9 @@ class etcd_discovery_node {
 
 class etcd_discovery_set {
  public:
-#if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
   using node_by_name_t = LIBATFRAME_UTILS_AUTO_SELETC_MAP(std::string, etcd_discovery_node::ptr_t);
   using node_by_id_t = LIBATFRAME_UTILS_AUTO_SELETC_MAP(uint64_t, etcd_discovery_node::ptr_t);
   using ptr_t = std::shared_ptr<etcd_discovery_set>;
-#else
-  typedef LIBATFRAME_UTILS_AUTO_SELETC_MAP(std::string, etcd_discovery_node::ptr_t) node_by_name_t;
-  typedef LIBATFRAME_UTILS_AUTO_SELETC_MAP(uint64_t, etcd_discovery_node::ptr_t) node_by_id_t;
-  typedef std::shared_ptr<etcd_discovery_set> ptr_t;
-#endif
 
   struct node_hash_t {
     enum { HASH_POINT_PER_INS = 80 };

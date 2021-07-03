@@ -9,25 +9,23 @@
 
 #pragma once
 
+#include <bitset>
+#include <functional>
 #include <map>
 #include <string>
 #include <vector>
 
-#include "std/functional.h"
-
-#include <bitset>
-
-#include "atapp_conf.h"
+#include "atframe/atapp_conf.h"
 
 #include "cli/cmd_option.h"
 #include "time/time_utility.h"
 
 #include "config/ini_loader.h"
 
-#include <network/http_request.h>
+#include "network/http_request.h"
 
-#include "atapp_log_sink_maker.h"
-#include "atapp_module_impl.h"
+#include "atframe/atapp_log_sink_maker.h"
+#include "atframe/atapp_module_impl.h"
 
 #include "connectors/atapp_connector_atbus.h"
 
@@ -48,7 +46,6 @@ class etcd_module;
 
 class app {
  public:
-#if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
   using app_id_t = LIBATAPP_MACRO_BUSID_TYPE;
   using module_ptr_t = std::shared_ptr<module_impl>;
   using yaml_conf_map_t = atbus::detail::auto_select_map<std::string, std::vector<YAML::Node> >::type;
@@ -56,15 +53,6 @@ class app {
   using endpoint_index_by_name_t = LIBATFRAME_UTILS_AUTO_SELETC_MAP(std::string, atapp_endpoint::ptr_t);
   using connector_protocol_map_t = LIBATFRAME_UTILS_AUTO_SELETC_MAP(std::string, std::shared_ptr<atapp_connector_impl>);
   using address_type_t = atapp_connector_impl::address_type_t;
-#else
-  typedef LIBATAPP_MACRO_BUSID_TYPE app_id_t;
-  typedef std::shared_ptr<module_impl> module_ptr_t;
-  typedef atbus::detail::auto_select_map<std::string, std::vector<YAML::Node> >::type yaml_conf_map_t;
-  typedef LIBATFRAME_UTILS_AUTO_SELETC_MAP(uint64_t, atapp_endpoint::ptr_t) endpoint_index_by_id_t;
-  typedef LIBATFRAME_UTILS_AUTO_SELETC_MAP(std::string, atapp_endpoint::ptr_t) endpoint_index_by_name_t;
-  typedef LIBATFRAME_UTILS_AUTO_SELETC_MAP(std::string, std::shared_ptr<atapp_connector_impl>) connector_protocol_map_t;
-  typedef atapp_connector_impl::address_type_t address_type_t;
-#endif
 
   struct LIBATAPP_MACRO_API_HEAD_ONLY flag_t {
     enum type {
@@ -137,15 +125,9 @@ class app {
     uv_timer_t timer;
   };
 
-#if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
   // return > 0 means busy and will enter tick again as soon as possiable
   using tick_handler_t = std::function<int()>;
   using timer_ptr_t = std::shared_ptr<timer_info_t>;
-#else
-  // return > 0 means busy and will enter tick again as soon as possiable
-  typedef std::function<int()> tick_handler_t;
-  typedef std::shared_ptr<timer_info_t> timer_ptr_t;
-#endif
 
   struct tick_timer_t {
     util::time::time_utility::raw_time_t sec_update;
@@ -158,22 +140,12 @@ class app {
 
   // void on_forward_response(atapp_connection_handle* handle, int32_t type, uint64_t msg_sequence, int32_t error_code,
   //    const void* data, size_t data_size, const atapp::protocol::atapp_metadata* metadata)
-
-#if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
   using callback_fn_on_forward_request_t = std::function<int(app &, const message_sender_t &, const message_t &m)>;
   using callback_fn_on_forward_response_t =
       std::function<int(app &, const message_sender_t &, const message_t &m, int32_t)>;
   using callback_fn_on_connected_t = std::function<int(app &, atbus::endpoint &, int)>;
   using callback_fn_on_disconnected_t = std::function<int(app &, atbus::endpoint &, int)>;
   using callback_fn_on_all_module_inited_t = std::function<int(app &)>;
-#else
-  typedef std::function<int(app &, const message_sender_t &, const message_t &m)> callback_fn_on_forward_request_t;
-  typedef std::function<int(app &, const message_sender_t &, const message_t &m, int32_t)>
-      callback_fn_on_forward_response_t;
-  typedef std::function<int(app &, atbus::endpoint &, int)> callback_fn_on_connected_t;
-  typedef std::function<int(app &, atbus::endpoint &, int)> callback_fn_on_disconnected_t;
-  typedef std::function<int(app &)> callback_fn_on_all_module_inited_t;
-#endif
 
   UTIL_DESIGN_PATTERN_NOCOPYABLE(app)
   UTIL_DESIGN_PATTERN_NOMOVABLE(app)
@@ -209,6 +181,15 @@ class app {
    * @return 0 for no more actions or error code < 0 or 1 for there is pending actions
    */
   LIBATAPP_MACRO_API int run_noblock(uint64_t max_event_count = 20000);
+
+  /**
+   * @brief run atapp loop once
+   * @note you must call init(ev_loop, argc, argv, priv_data), before call run_noblock().
+   * @param min_event_count min event in once call, 0 for any inner action in event loop, not just the logic event
+   * @param timeout_miliseconds timeout in miliseconds if no action happen
+   * @return error code < 0 or logic event count, 0 for inner action event or timeout
+   */
+  LIBATAPP_MACRO_API int run_once(uint64_t min_event_count = 0, time_t timeout_miliseconds = 10000);
 
   LIBATAPP_MACRO_API bool is_inited() const UTIL_CONFIG_NOEXCEPT;
 
@@ -257,6 +238,12 @@ class app {
   LIBATAPP_MACRO_API util::cli::cmd_option::ptr_type get_option_manager();
 
   /**
+   * @brief api: if last command or action run with upgrade mode
+   * @return true if last command or action run with upgrade mode
+   */
+  LIBATAPP_MACRO_API bool is_current_upgrade_mode() const;
+
+  /**
    * @brief api: get shared httr_request context, this context can be reused to create util::network::http_request
    * @note All the http_requests created from this context should be cleaned before atapp is destroyed.
    * @note this function only return a valid context after initialized.
@@ -273,6 +260,8 @@ class app {
   LIBATAPP_MACRO_API const std::string &get_build_version() const;
 
   LIBATAPP_MACRO_API const std::string &get_app_name() const;
+
+  LIBATAPP_MACRO_API const std::string &get_app_identity() const;
 
   LIBATAPP_MACRO_API const std::string &get_type_name() const;
 
@@ -442,6 +431,8 @@ class app {
 
   void setup_command();
 
+  void setup_startup_log();
+
   int setup_log();
 
   int setup_atbus();
@@ -488,7 +479,8 @@ class app {
   int prog_option_handler_set_id_mask(util::cli::callback_param params);
   int prog_option_handler_set_conf_file(util::cli::callback_param params);
   int prog_option_handler_set_pid(util::cli::callback_param params);
-  int prog_option_handler_resume_mode(util::cli::callback_param params);
+  int prog_option_handler_upgrade_mode(util::cli::callback_param params);
+  int prog_option_handler_set_startup_log(util::cli::callback_param params);
   int prog_option_handler_start(util::cli::callback_param params);
   int prog_option_handler_stop(util::cli::callback_param params);
   int prog_option_handler_reload(util::cli::callback_param params);

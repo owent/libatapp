@@ -147,15 +147,9 @@ class etcd_cluster {
     size_t sum_create_requests;
   };
 
-#if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
   using on_event_up_down_fn_t = std::function<void(etcd_cluster &)>;
   using on_event_up_down_handle_set_t = std::list<on_event_up_down_fn_t>;
   using on_event_up_down_handle_t = on_event_up_down_handle_set_t::iterator;
-#else
-  typedef std::function<void(etcd_cluster &)> on_event_up_down_fn_t;
-  typedef std::list<on_event_up_down_fn_t> on_event_up_down_handle_set_t;
-  typedef on_event_up_down_handle_set_t::iterator on_event_up_down_handle_t;
-#endif
 
  public:
   LIBATAPP_MACRO_API etcd_cluster();
@@ -163,7 +157,7 @@ class etcd_cluster {
 
   LIBATAPP_MACRO_API void init(const util::network::http_request::curl_m_bind_ptr_t &curl_mgr);
 
-  LIBATAPP_MACRO_API util::network::http_request::ptr_t close(bool wait = false);
+  LIBATAPP_MACRO_API util::network::http_request::ptr_t close(bool wait, bool revoke_lease);
   LIBATAPP_MACRO_API void reset();
   LIBATAPP_MACRO_API int tick();
   LIBATAPP_MACRO_API bool is_available() const;
@@ -473,11 +467,8 @@ class etcd_cluster {
                                              time_t timeout);
 
  private:
-#if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
   using etcd_keepalive_deletor_map_t = LIBATFRAME_UTILS_AUTO_SELETC_MAP(std::string, etcd_keepalive_deletor *);
-#else
-  typedef LIBATFRAME_UTILS_AUTO_SELETC_MAP(std::string, etcd_keepalive_deletor *) etcd_keepalive_deletor_map_t;
-#endif
+
   uint32_t flags_;
   util::random::mt19937 random_generator_;
   conf_t conf_;

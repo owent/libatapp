@@ -9,14 +9,6 @@
 
 #pragma once
 
-#include <stdint.h>
-#include <cstddef>
-#include <cstring>
-#include <memory>
-#include <string>
-#include <type_traits>
-#include <vector>
-
 #include <config/compiler/protobuf_prefix.h>
 
 #include <yaml-cpp/yaml.h>
@@ -30,6 +22,15 @@
 #include <libatbus_protocol.h>
 
 #include <libatbus.h>
+
+#include <stdint.h>
+#include <cstddef>
+#include <cstring>
+#include <list>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <vector>
 
 #include "atframe/atapp_config.h"
 
@@ -48,11 +49,13 @@ struct app_conf {
   std::string conf_file;
   std::string pid_file;
   const char *execute_path;
-  bool resume_mode;
+  bool upgrade_mode;
 
   atbus::node::conf_t bus_conf;
   std::string app_version;
   std::string hash_code;
+
+  std::list<std::string> startup_log;
 
   atapp::protocol::atapp_configure origin;
   atapp::protocol::atapp_log log;

@@ -516,7 +516,12 @@ LIBATAPP_MACRO_API int etcd_module::reload() {
 
 LIBATAPP_MACRO_API int etcd_module::stop() {
   if (!cleanup_request_) {
-    cleanup_request_ = etcd_ctx_.close(false);
+    bool revoke_lease = true;
+    if (get_app() && get_app()->is_current_upgrade_mode()) {
+      revoke_lease = false;
+    }
+
+    cleanup_request_ = etcd_ctx_.close(false, revoke_lease);
 
     if (cleanup_request_ && cleanup_request_->is_running()) {
       cleanup_request_->set_priv_data(this);
@@ -552,7 +557,12 @@ LIBATAPP_MACRO_API int etcd_module::tick() {
   if (etcd_ctx_.get_conf_hosts().empty() || !etcd_ctx_enabled_) {
     // If it's initializing, is_available() will return false
     if (!cleanup_request_ && etcd_ctx_.is_available()) {
-      cleanup_request_ = etcd_ctx_.close(false);
+      bool revoke_lease = true;
+      if (get_app() && get_app()->is_current_upgrade_mode()) {
+        revoke_lease = false;
+      }
+
+      cleanup_request_ = etcd_ctx_.close(false, revoke_lease);
       reset_inner_watchers_and_keepalives();
     }
 

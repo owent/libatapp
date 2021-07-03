@@ -260,6 +260,9 @@ message atapp_configure {
   atapp_area area = 106;  // Some service is splited by area
 
   string hostname = 121;
+  // The same identity means the same instance of a app.
+  // It will take effect on discovery protocol, please make different apps have different identities.
+  string identity = 122;
 
   bool remove_pidfile_after_exit = 201;
   atapp_timer timer = 202;
@@ -282,6 +285,7 @@ message atapp_discovery {
   string version = 10;
   string custom_data = 11;
   // repeated string gateway                       = 12 [ deprecated = true ];
+  string identity = 13;
   repeated atapp_gateway gateways = 14;
 
   uint64 atbus_protocol_version = 21;

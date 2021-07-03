@@ -33,11 +33,7 @@
 namespace atapp {
 class etcd_module : public ::atapp::module_impl {
  public:
-#if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
   using node_action_t = etcd_discovery_action_t;
-#else
-  typedef etcd_discovery_action_t node_action_t;
-#endif
 
   struct LIBATAPP_MACRO_API_HEAD_ONLY node_info_t {
     atapp::protocol::atapp_discovery node_discovery;
@@ -82,21 +78,12 @@ class etcd_module : public ::atapp::module_impl {
           node(std::ref(n)) {}
   };
 
-#if defined(UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES) && UTIL_CONFIG_COMPILER_CXX_ALIAS_TEMPLATES
   using watcher_list_callback_t = std::function<void(watcher_sender_list_t &)>;
   using watcher_one_callback_t = std::function<void(watcher_sender_one_t &)>;
   using node_event_callback_t = std::function<void(node_action_t::type, const etcd_discovery_node::ptr_t &)>;
   using node_event_callback_list_t = std::list<node_event_callback_t>;
   using node_event_callback_handle_t = node_event_callback_list_t::iterator;
   using atapp_discovery_ptr_t = std::shared_ptr<atapp::protocol::atapp_discovery>;
-#else
-  typedef std::function<void(watcher_sender_list_t &)> watcher_list_callback_t;
-  typedef std::function<void(watcher_sender_one_t &)> watcher_one_callback_t;
-  typedef std::function<void(node_action_t::type, const etcd_discovery_node::ptr_t &)> node_event_callback_t;
-  typedef std::list<node_event_callback_t> node_event_callback_list_t;
-  typedef node_event_callback_list_t::iterator node_event_callback_handle_t;
-  typedef std::shared_ptr<atapp::protocol::atapp_discovery> atapp_discovery_ptr_t;
-#endif
 
  public:
   LIBATAPP_MACRO_API etcd_module();
