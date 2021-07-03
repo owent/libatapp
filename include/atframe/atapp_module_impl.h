@@ -23,7 +23,7 @@ namespace atapp {
 class app;
 struct app_conf;
 
-class module_impl {
+class LIBATAPP_MACRO_API_SYMBOL_VISIBLE module_impl {
  protected:
   LIBATAPP_MACRO_API module_impl();
   LIBATAPP_MACRO_API virtual ~module_impl();

@@ -168,7 +168,7 @@ class libatapp_c_on_module UTIL_CONFIG_FINAL : public ::atapp::module_impl {
     on_cleanup_private_data_ = NULL;
   }
 
-  virtual int init() UTIL_CONFIG_OVERRIDE UTIL_CONFIG_FINAL {
+  int init() UTIL_CONFIG_OVERRIDE UTIL_CONFIG_FINAL {
     if (NULL != on_init_) {
       libatapp_c_module mod;
       mod = this;
@@ -177,7 +177,7 @@ class libatapp_c_on_module UTIL_CONFIG_FINAL : public ::atapp::module_impl {
     return 0;
   };
 
-  virtual int reload() UTIL_CONFIG_OVERRIDE UTIL_CONFIG_FINAL {
+  int reload() UTIL_CONFIG_OVERRIDE UTIL_CONFIG_FINAL {
     if (NULL != on_reload_) {
       libatapp_c_module mod;
       mod = this;
@@ -186,7 +186,7 @@ class libatapp_c_on_module UTIL_CONFIG_FINAL : public ::atapp::module_impl {
     return 0;
   }
 
-  virtual int stop() UTIL_CONFIG_OVERRIDE UTIL_CONFIG_FINAL {
+  int stop() UTIL_CONFIG_OVERRIDE UTIL_CONFIG_FINAL {
     if (NULL != on_stop_) {
       libatapp_c_module mod;
       mod = this;
@@ -195,7 +195,7 @@ class libatapp_c_on_module UTIL_CONFIG_FINAL : public ::atapp::module_impl {
     return 0;
   }
 
-  virtual int timeout() UTIL_CONFIG_OVERRIDE UTIL_CONFIG_FINAL {
+  int timeout() UTIL_CONFIG_OVERRIDE UTIL_CONFIG_FINAL {
     if (NULL != on_timeout_) {
       libatapp_c_module mod;
       mod = this;
@@ -204,7 +204,7 @@ class libatapp_c_on_module UTIL_CONFIG_FINAL : public ::atapp::module_impl {
     return 0;
   }
 
-  virtual void cleanup() UTIL_CONFIG_OVERRIDE UTIL_CONFIG_FINAL {
+  void cleanup() UTIL_CONFIG_OVERRIDE UTIL_CONFIG_FINAL {
     if (NULL != on_cleanup_) {
       libatapp_c_module mod;
       mod = this;
@@ -212,9 +212,9 @@ class libatapp_c_on_module UTIL_CONFIG_FINAL : public ::atapp::module_impl {
     }
   }
 
-  virtual const char *name() const UTIL_CONFIG_OVERRIDE UTIL_CONFIG_FINAL { return name_.c_str(); }
+  const char *name() const UTIL_CONFIG_OVERRIDE UTIL_CONFIG_FINAL { return name_.c_str(); }
 
-  virtual int tick() UTIL_CONFIG_OVERRIDE UTIL_CONFIG_FINAL {
+  int tick() UTIL_CONFIG_OVERRIDE UTIL_CONFIG_FINAL {
     if (NULL != on_tick_) {
       libatapp_c_module mod;
       mod = this;

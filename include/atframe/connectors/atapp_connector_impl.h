@@ -94,7 +94,7 @@ class atapp_connection_handle {
   friend struct atapp_endpoint_bind_helper;
 };
 
-class atapp_connector_impl {
+class LIBATAPP_MACRO_API_SYMBOL_VISIBLE atapp_connector_impl {
  public:
   using handle_set_t = LIBATFRAME_UTILS_AUTO_SELETC_SET(atapp_connection_handle *);
   using protocol_set_t = LIBATFRAME_UTILS_AUTO_SELETC_SET(std::string);
