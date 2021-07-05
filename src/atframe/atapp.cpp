@@ -35,12 +35,12 @@
 #define ATAPP_DEFAULT_TICK_INTERVAL 16
 
 namespace atapp {
-app *app::last_instance_ = NULL;
+app *app::last_instance_ = nullptr;
 
 static void _app_close_timer_handle(uv_handle_t *handle) {
   app::timer_ptr_t *ptr = reinterpret_cast<app::timer_ptr_t *>(handle->data);
-  if (NULL == ptr) {
-    if (NULL != handle->loop) {
+  if (nullptr == ptr) {
+    if (nullptr != handle->loop) {
       uv_stop(handle->loop);
     }
     return;
@@ -49,7 +49,8 @@ static void _app_close_timer_handle(uv_handle_t *handle) {
   delete ptr;
 }
 
-LIBATAPP_MACRO_API app::message_t::message_t() : type(0), msg_sequence(0), data(NULL), data_size(0), metadata(NULL) {}
+LIBATAPP_MACRO_API app::message_t::message_t()
+    : type(0), msg_sequence(0), data(nullptr), data_size(0), metadata(nullptr) {}
 LIBATAPP_MACRO_API app::message_t::~message_t() {}
 
 LIBATAPP_MACRO_API app::message_t::message_t(const message_t &other) { (*this) = other; }
@@ -63,7 +64,7 @@ LIBATAPP_MACRO_API app::message_t &app::message_t::operator=(const message_t &ot
   return *this;
 }
 
-LIBATAPP_MACRO_API app::message_sender_t::message_sender_t() : id(0), name(NULL), remote(NULL) {}
+LIBATAPP_MACRO_API app::message_sender_t::message_sender_t() : id(0), name(nullptr), remote(nullptr) {}
 LIBATAPP_MACRO_API app::message_sender_t::~message_sender_t() {}
 
 LIBATAPP_MACRO_API app::message_sender_t::message_sender_t(const message_sender_t &other) { (*this) = other; }
@@ -77,7 +78,7 @@ LIBATAPP_MACRO_API app::message_sender_t &app::message_sender_t::operator=(const
 
 LIBATAPP_MACRO_API app::flag_guard_t::flag_guard_t(app &owner, flag_t::type f) : owner_(&owner), flag_(f) {
   if (owner_->check_flag(flag_)) {
-    owner_ = NULL;
+    owner_ = nullptr;
     return;
   }
 
@@ -85,7 +86,7 @@ LIBATAPP_MACRO_API app::flag_guard_t::flag_guard_t(app &owner, flag_t::type f) :
 }
 
 LIBATAPP_MACRO_API app::flag_guard_t::~flag_guard_t() {
-  if (NULL == owner_) {
+  if (nullptr == owner_) {
     return;
   }
 
@@ -122,13 +123,13 @@ static uint64_t chrono_to_libuv_duration(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID
   return ret;
 }
 
-LIBATAPP_MACRO_API app::app() : setup_result_(0), last_proc_event_count_(0), mode_(mode_t::CUSTOM) {
-  if (NULL == last_instance_) {
+LIBATAPP_MACRO_API app::app() : setup_result_(0), last_proc_event_count_(0), ev_loop_(nullptr), mode_(mode_t::CUSTOM) {
+  if (nullptr == last_instance_) {
 #if defined(OPENSSL_VERSION_NUMBER)
 #  if OPENSSL_VERSION_NUMBER < 0x10100000L
     SSL_library_init();
 #  else
-    OPENSSL_init_ssl(0, NULL);
+    OPENSSL_init_ssl(0, nullptr);
 #  endif
 #endif
     util::crypto::cipher::init_global_algorithm();
@@ -138,7 +139,7 @@ LIBATAPP_MACRO_API app::app() : setup_result_(0), last_proc_event_count_(0), mod
 
   memset(pending_signals_, 0, sizeof(pending_signals_));
   conf_.id = 0;
-  conf_.execute_path = NULL;
+  conf_.execute_path = nullptr;
   conf_.upgrade_mode = false;
 
   tick_timer_.sec_update = util::time::time_utility::raw_time_t::min();
@@ -166,13 +167,13 @@ LIBATAPP_MACRO_API app::~app() {
   endpoint_waker_.clear();
 
   if (this == last_instance_) {
-    last_instance_ = NULL;
+    last_instance_ = nullptr;
   }
 
   for (module_ptr_t &mod : modules_) {
     if (mod && mod->owner_ == this) {
       mod->on_unbind();
-      mod->owner_ = NULL;
+      mod->owner_ = nullptr;
     }
   }
 
@@ -188,7 +189,7 @@ LIBATAPP_MACRO_API app::~app() {
   assert(!tick_timer_.timeout_timer);
 }
 
-LIBATAPP_MACRO_API int app::run(uv_loop_t *ev_loop, int argc, const char **argv, void *priv_data) {
+LIBATAPP_MACRO_API int app::run(ev_loop_t *ev_loop, int argc, const char **argv, void *priv_data) {
   if (0 != setup_result_) {
     return setup_result_;
   }
@@ -220,7 +221,7 @@ LIBATAPP_MACRO_API int app::run(uv_loop_t *ev_loop, int argc, const char **argv,
 
 }  // namespace atapp
 
-LIBATAPP_MACRO_API int app::init(uv_loop_t *ev_loop, int argc, const char **argv, void *priv_data) {
+LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv, void *priv_data) {
   if (check_flag(flag_t::INITIALIZED)) {
     return EN_ATAPP_ERR_ALREADY_INITED;
   }
@@ -250,6 +251,11 @@ LIBATAPP_MACRO_API int app::init(uv_loop_t *ev_loop, int argc, const char **argv
   setup_startup_log();
 
   // step 4. load options from cmd line
+  if (nullptr == ev_loop) {
+    ev_loop = uv_default_loop();
+  }
+
+  ev_loop_ = ev_loop;
   conf_.bus_conf.ev_loop = ev_loop;
   int ret = reload();
   if (ret < 0) {
@@ -400,13 +406,18 @@ LIBATAPP_MACRO_API int app::run_noblock(uint64_t max_event_count) {
 }
 
 static void _app_run_once_timer_handle(uv_timer_t *handle) {
-  if (NULL != handle) {
+  if (nullptr != handle) {
     handle->data = nullptr;
     uv_stop(handle->loop);
   }
 }
 
 LIBATAPP_MACRO_API int app::run_once(uint64_t min_event_count, time_t timeout_miliseconds) {
+  ev_loop_t *loop = get_evloop();
+  if (nullptr == loop) {
+    return EN_ATAPP_ERR_NOT_INITED;
+  }
+
   uint64_t evt_count = 0;
   int ret = 0;
 
@@ -418,7 +429,7 @@ LIBATAPP_MACRO_API int app::run_once(uint64_t min_event_count, time_t timeout_mi
       return EN_ATAPP_ERR_SETUP_TIMER;
     }
     timer->timer.data = this;
-    uv_timer_init(bus_node_->get_evloop(), &timer->timer);
+    uv_timer_init(loop, &timer->timer);
     int res = uv_timer_start(&timer->timer, _app_run_once_timer_handle, timeout_miliseconds, timeout_miliseconds);
     if (res < 0) {
       FWLOGERROR("setup timer failed, res: {}({})", res, uv_err_name(res));
@@ -642,7 +653,7 @@ LIBATAPP_MACRO_API int app::reload() {
   // apply ini configure
   apply_configure();
   // reuse ev loop if not configued
-  if (NULL == conf_.bus_conf.ev_loop) {
+  if (nullptr == conf_.bus_conf.ev_loop) {
     conf_.bus_conf.ev_loop = old_loop;
   }
 
@@ -672,8 +683,9 @@ LIBATAPP_MACRO_API int app::reload() {
       old_tick_interval.nanos() != conf_.origin.timer().tick_interval().nanos()) {
     set_flag(flag_t::RESET_TIMER, true);
 
-    if (is_running()) {
-      uv_stop(bus_node_->get_evloop());
+    ev_loop_t *loop = get_evloop();
+    if (is_running() && nullptr != loop) {
+      uv_stop(loop);
     }
   }
 
@@ -693,8 +705,9 @@ LIBATAPP_MACRO_API int app::stop() {
 
   // step 2. stop libuv and return from uv_run
   // if (!is_stoping) {
-  if (bus_node_ && NULL != bus_node_->get_evloop()) {
-    uv_stop(bus_node_->get_evloop());
+  ev_loop_t *loop = get_evloop();
+  if (bus_node_ && nullptr != loop) {
+    uv_stop(loop);
   }
   // }
   return 0;
@@ -776,9 +789,10 @@ LIBATAPP_MACRO_API int app::tick() {
     }
   } while (active_count > 0 && (end_tp - start_tp) < conf_tick_interval);
 
+  ev_loop_t *loop = get_evloop();
   // if is stoping, quit loop  every tick
-  if (check_flag(flag_t::STOPING) && bus_node_ && NULL != bus_node_->get_evloop()) {
-    uv_stop(bus_node_->get_evloop());
+  if (check_flag(flag_t::STOPING) && nullptr != loop) {
+    uv_stop(loop);
   }
 
   // stat log
@@ -856,8 +870,8 @@ LIBATAPP_MACRO_API int app::tick() {
         }
       }
 
-      if (bus_node_ && NULL != bus_node_->get_evloop()) {
-        uv_stop(bus_node_->get_evloop());
+      if (nullptr != loop) {
+        uv_stop(loop);
       }
     }
   } while (false);
@@ -865,6 +879,8 @@ LIBATAPP_MACRO_API int app::tick() {
 }
 
 LIBATAPP_MACRO_API app::app_id_t app::get_id() const { return conf_.id; }
+
+LIBATAPP_MACRO_API app::ev_loop_t *app::get_evloop() { return ev_loop_; }
 
 LIBATAPP_MACRO_API app::app_id_t app::convert_app_id_by_string(const char *id_in) const {
   return convert_app_id_by_string(id_in, conf_.id_mask);
@@ -879,8 +895,8 @@ LIBATAPP_MACRO_API void app::add_module(module_ptr_t app_module) {
     return;
   }
 
-  assert(NULL == app_module->owner_);
-  if (NULL == app_module->owner_) {
+  assert(nullptr == app_module->owner_);
+  if (nullptr == app_module->owner_) {
     modules_.push_back(app_module);
     app_module->owner_ = this;
     app_module->on_bind();
@@ -910,7 +926,7 @@ LIBATAPP_MACRO_API util::network::http_request::curl_m_bind_ptr_t app::get_share
     return inner_module_etcd_->get_shared_curl_multi_context();
   }
 
-  return NULL;
+  return nullptr;
 }
 
 LIBATAPP_MACRO_API void app::set_app_version(const std::string &ver) { conf_.app_version = ver; }
@@ -1094,7 +1110,7 @@ LIBATAPP_MACRO_API void app::pack(atapp::protocol::atapp_discovery &out) const {
   out.mutable_gateways()->Reserve(conf_.origin.bus().gateways().size());
   for (int i = 0; i < conf_.origin.bus().gateways().size(); ++i) {
     atapp::protocol::atapp_gateway *gateway = out.add_gateways();
-    if (NULL != gateway) {
+    if (nullptr != gateway) {
       gateway->CopyFrom(conf_.origin.bus().gateways(i));
     }
   }
@@ -1105,7 +1121,7 @@ LIBATAPP_MACRO_API void app::pack(atapp::protocol::atapp_discovery &out) const {
     const std::vector<atbus::endpoint_subnet_conf> &subnets = bus_node_->get_conf().subnets;
     for (size_t i = 0; i < subnets.size(); ++i) {
       atapp::protocol::atbus_subnet_range *subset = out.add_atbus_subnets();
-      if (NULL == subset) {
+      if (nullptr == subset) {
         FWLOGERROR("pack configures for {}(0x{:x}) but malloc atbus_subnet_range failed", get_app_name(), get_id());
         break;
       }
@@ -1155,7 +1171,7 @@ LIBATAPP_MACRO_API uint32_t app::get_address_type(const std::string &address) co
 
 LIBATAPP_MACRO_API etcd_discovery_node::ptr_t app::get_discovery_node_by_id(uint64_t id) const {
   if (!inner_module_etcd_) {
-    return NULL;
+    return nullptr;
   }
 
   return inner_module_etcd_->get_global_discovery().get_node_by_id(id);
@@ -1163,7 +1179,7 @@ LIBATAPP_MACRO_API etcd_discovery_node::ptr_t app::get_discovery_node_by_id(uint
 
 LIBATAPP_MACRO_API etcd_discovery_node::ptr_t app::get_discovery_node_by_name(const std::string &name) const {
   if (!inner_module_etcd_) {
-    return NULL;
+    return nullptr;
   }
 
   return inner_module_etcd_->get_global_discovery().get_node_by_name(name);
@@ -1191,12 +1207,12 @@ LIBATAPP_MACRO_API int32_t app::send_message(uint64_t target_node_id, int32_t ty
   // Find from cache
   do {
     atapp_endpoint *cache = get_endpoint(target_node_id);
-    if (NULL == cache) {
+    if (nullptr == cache) {
       break;
     }
 
     int32_t ret;
-    if (NULL != msg_sequence) {
+    if (nullptr != msg_sequence) {
       ret = cache->push_forward_message(type, *msg_sequence, data, data_size, metadata);
     } else {
       uint64_t msg_seq = 0;
@@ -1235,12 +1251,12 @@ LIBATAPP_MACRO_API int32_t app::send_message(const std::string &target_node_name
                                              const atapp::protocol::atapp_metadata *metadata) {
   do {
     atapp_endpoint *cache = get_endpoint(target_node_name);
-    if (NULL == cache) {
+    if (nullptr == cache) {
       break;
     }
 
     int32_t ret;
-    if (NULL != msg_sequence) {
+    if (nullptr != msg_sequence) {
       ret = cache->push_forward_message(type, *msg_sequence, data, data_size, metadata);
     } else {
       uint64_t msg_seq = 0;
@@ -1275,7 +1291,7 @@ LIBATAPP_MACRO_API int32_t app::send_message(const etcd_discovery_node::ptr_t &t
   }
 
   int32_t ret;
-  if (NULL != msg_sequence) {
+  if (nullptr != msg_sequence) {
     ret = cache->push_forward_message(type, *msg_sequence, data, data_size, metadata);
   } else {
     uint64_t msg_seq = 0;
@@ -1548,11 +1564,11 @@ LIBATAPP_MACRO_API void app::remove_endpoint(const atapp_endpoint::ptr_t &enpoin
 
 LIBATAPP_MACRO_API atapp_endpoint::ptr_t app::mutable_endpoint(const etcd_discovery_node::ptr_t &discovery) {
   if (is_closing()) {
-    return NULL;
+    return nullptr;
   }
 
   if (!discovery) {
-    return NULL;
+    return nullptr;
   }
 
   uint64_t id = discovery->get_discovery_info().id();
@@ -1661,7 +1677,7 @@ LIBATAPP_MACRO_API atapp_endpoint *app::get_endpoint(uint64_t by_id) {
     return iter_id->second.get();
   }
 
-  return NULL;
+  return nullptr;
 }
 
 LIBATAPP_MACRO_API const atapp_endpoint *app::get_endpoint(uint64_t by_id) const {
@@ -1670,7 +1686,7 @@ LIBATAPP_MACRO_API const atapp_endpoint *app::get_endpoint(uint64_t by_id) const
     return iter_id->second.get();
   }
 
-  return NULL;
+  return nullptr;
 }
 
 LIBATAPP_MACRO_API atapp_endpoint *app::get_endpoint(const std::string &by_name) {
@@ -1679,7 +1695,7 @@ LIBATAPP_MACRO_API atapp_endpoint *app::get_endpoint(const std::string &by_name)
     return iter_name->second.get();
   }
 
-  return NULL;
+  return nullptr;
 }
 
 LIBATAPP_MACRO_API const atapp_endpoint *app::get_endpoint(const std::string &by_name) const {
@@ -1688,7 +1704,7 @@ LIBATAPP_MACRO_API const atapp_endpoint *app::get_endpoint(const std::string &by
     return iter_name->second.get();
   }
 
-  return NULL;
+  return nullptr;
 }
 
 LIBATAPP_MACRO_API bool app::match_gateway(const atapp::protocol::atapp_gateway &checked) const {
@@ -1714,12 +1730,12 @@ LIBATAPP_MACRO_API bool app::match_gateway(const atapp::protocol::atapp_gateway 
 void app::ev_stop_timeout(uv_timer_t *handle) {
   assert(handle && handle->data);
 
-  if (NULL != handle && NULL != handle->data) {
+  if (nullptr != handle && nullptr != handle->data) {
     app *self = reinterpret_cast<app *>(handle->data);
     self->set_flag(flag_t::TIMEOUT, true);
   }
 
-  if (NULL != handle) {
+  if (nullptr != handle) {
     uv_stop(handle->loop);
   }
 }
@@ -1850,12 +1866,13 @@ int app::apply_configure() {
 void app::run_ev_loop(int run_mode) {
   util::time::time_utility::update();
 
+  ev_loop_t *loop = get_evloop();
   if (bus_node_) {
+    assert(loop);
     // step X. loop uv_run util stop flag is set
-    assert(bus_node_->get_evloop());
-    if (NULL != bus_node_->get_evloop()) {
+    if (nullptr != loop) {
       flag_guard_t in_callback_guard(*this, flag_t::IN_CALLBACK);
-      uv_run(bus_node_->get_evloop(), static_cast<uv_run_mode>(run_mode));
+      uv_run(loop, static_cast<uv_run_mode>(run_mode));
     }
 
     if (check_flag(flag_t::RESET_TIMER)) {
@@ -1896,9 +1913,9 @@ void app::run_ev_loop(int run_mode) {
         }
 
         // step X. if stop is blocked and timeout not triggered, setup stop timeout and waiting for all modules finished
-        if (!tick_timer_.timeout_timer) {
+        if (!tick_timer_.timeout_timer && nullptr != loop) {
           timer_ptr_t timer = std::make_shared<timer_info_t>();
-          uv_timer_init(bus_node_->get_evloop(), &timer->timer);
+          uv_timer_init(loop, &timer->timer);
           timer->timer.data = this;
 
           int res = uv_timer_start(
@@ -1929,6 +1946,11 @@ void app::run_ev_loop(int run_mode) {
 
 int app::run_inner(int run_mode) {
   if (false == check_flag(flag_t::INITIALIZED)) {
+    return EN_ATAPP_ERR_NOT_INITED;
+  }
+
+  ev_loop_t *loop = get_evloop();
+  if (nullptr == loop) {
     return EN_ATAPP_ERR_NOT_INITED;
   }
 
@@ -1972,7 +1994,7 @@ int app::run_inner(int run_mode) {
 void app::_app_setup_signal_handle(int signo) {
   // Signal handle has a limited stack can process signal on next proc to keep signal safety
   app *current = app::last_instance_;
-  if (NULL == current) {
+  if (nullptr == current) {
     return;
   }
 
@@ -1983,8 +2005,9 @@ void app::_app_setup_signal_handle(int signo) {
     }
   }
 
-  if (current->bus_node_ && NULL != current->bus_node_->get_evloop()) {
-    uv_stop(current->bus_node_->get_evloop());
+  ev_loop_t *loop = current->get_evloop();
+  if (nullptr != loop) {
+    uv_stop(loop);
   }
 }
 
@@ -2116,18 +2139,18 @@ static void setup_load_category(
     return;
   }
 
-  atapp::protocol::atapp_log_category *log_cat = NULL;
-  for (int i = 0; i < out.size() && NULL == log_cat; ++i) {
+  atapp::protocol::atapp_log_category *log_cat = nullptr;
+  for (int i = 0; i < out.size() && nullptr == log_cat; ++i) {
     if (out.Get(i).name() == name_node.Scalar()) {
       log_cat = out.Mutable(i);
     }
   }
 
-  if (NULL == log_cat) {
+  if (nullptr == log_cat) {
     log_cat = out.Add();
   }
 
-  if (NULL == log_cat) {
+  if (nullptr == log_cat) {
     FWLOGERROR("log {} malloc category failed, skipped.", name_node.Scalar());
     return;
   }
@@ -2239,7 +2262,7 @@ int app::setup_log() {
       }
 
       ::atapp::protocol::atapp_log_category *log_cat_conf = categories.Add();
-      if (NULL == log_cat_conf) {
+      if (nullptr == log_cat_conf) {
         ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "log malloc " << log_name << "(" << i
              << ") failed, skipped." << std::endl;
         continue;
@@ -2258,7 +2281,7 @@ int app::setup_log() {
         }
 
         ::atapp::protocol::atapp_log_sink *log_sink = log_cat_conf->add_sink();
-        if (NULL == log_sink) {
+        if (nullptr == log_sink) {
           ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "log " << log_name << "(" << i
                << ") malloc sink " << sink_type << "failed, skipped." << std::endl;
           continue;
@@ -2417,6 +2440,8 @@ int app::setup_atbus() {
     return EN_ATAPP_ERR_SETUP_ATBUS;
   }
 
+  ev_loop_t *loop = get_evloop();
+  conf_.bus_conf.ev_loop = loop;
   ret = bus_node_->init(conf_.id, &conf_.bus_conf);
   if (ret < 0) {
     FWLOGERROR("init bus node failed. ret: {}", ret);
@@ -2521,7 +2546,7 @@ int app::setup_atbus() {
     if (!tick_timer_.timeout_timer) {
       timer_ptr_t timer = std::make_shared<timer_info_t>();
 
-      uv_timer_init(bus_node_->get_evloop(), &timer->timer);
+      uv_timer_init(loop, &timer->timer);
       timer->timer.data = this;
 
       res =
@@ -2537,7 +2562,7 @@ int app::setup_atbus() {
         uv_close(reinterpret_cast<uv_handle_t *>(&timer->timer), _app_close_timer_handle);
       }
 
-      while (NULL == bus_node_->get_parent_endpoint()) {
+      while (nullptr == bus_node_->get_parent_endpoint()) {
         if (check_flag(flag_t::TIMEOUT)) {
           FWLOGERROR("connection to parent node {} timeout", conf_.bus_conf.parent_address);
           ret = -1;
@@ -2546,7 +2571,7 @@ int app::setup_atbus() {
 
         {
           flag_guard_t in_callback_guard(*this, flag_t::IN_CALLBACK);
-          uv_run(bus_node_->get_evloop(), UV_RUN_ONCE);
+          uv_run(loop, UV_RUN_ONCE);
         }
       }
 
@@ -2575,7 +2600,7 @@ void app::close_timer(timer_ptr_t &t) {
 }
 
 static void _app_tick_timer_handle(uv_timer_t *handle) {
-  if (NULL != handle && NULL != handle->data) {
+  if (nullptr != handle && nullptr != handle->data) {
     app *self = reinterpret_cast<app *>(handle->data);
     self->tick();
   }
@@ -2595,7 +2620,9 @@ int app::setup_timer() {
 
   timer_ptr_t timer = std::make_shared<timer_info_t>();
 
-  uv_timer_init(bus_node_->get_evloop(), &timer->timer);
+  ev_loop_t *loop = get_evloop();
+  assert(loop);
+  uv_timer_init(loop, &timer->timer);
   timer->timer.data = this;
 
   int res = uv_timer_start(&timer->timer, _app_tick_timer_handle,
@@ -2732,9 +2759,9 @@ bool app::match_gateway_labels(const atapp::protocol::atapp_gateway &checked) co
 
 LIBATAPP_MACRO_API app::custom_command_sender_t app::get_custom_command_sender(util::cli::callback_param params) {
   custom_command_sender_t ret;
-  ret.self = NULL;
-  ret.response = NULL;
-  if (NULL != params.get_ext_param()) {
+  ret.self = nullptr;
+  ret.response = nullptr;
+  if (nullptr != params.get_ext_param()) {
     ret = *reinterpret_cast<custom_command_sender_t *>(params.get_ext_param());
   }
 
@@ -2743,7 +2770,7 @@ LIBATAPP_MACRO_API app::custom_command_sender_t app::get_custom_command_sender(u
 
 LIBATAPP_MACRO_API bool app::add_custom_command_rsp(util::cli::callback_param params, const std::string &rsp_text) {
   custom_command_sender_t sender = get_custom_command_sender(params);
-  if (NULL == sender.response) {
+  if (nullptr == sender.response) {
     return false;
   }
 
@@ -2752,13 +2779,13 @@ LIBATAPP_MACRO_API bool app::add_custom_command_rsp(util::cli::callback_param pa
 }
 
 LIBATAPP_MACRO_API void app::split_ids_by_string(const char *in, std::vector<app_id_t> &out) {
-  if (NULL == in) {
+  if (nullptr == in) {
     return;
   }
 
   out.reserve(8);
 
-  while (NULL != in && *in) {
+  while (nullptr != in && *in) {
     // skip spaces
     if (' ' == *in || '\t' == *in || '\r' == *in || '\n' == *in) {
       ++in;
@@ -2767,10 +2794,10 @@ LIBATAPP_MACRO_API void app::split_ids_by_string(const char *in, std::vector<app
 
     out.push_back(::util::string::to_int<app_id_t>(in));
 
-    for (; NULL != in && *in && '.' != *in; ++in)
+    for (; nullptr != in && *in && '.' != *in; ++in)
       ;
     // skip dot and ready to next segment
-    if (NULL != in && *in && '.' == *in) {
+    if (nullptr != in && *in && '.' == *in) {
       ++in;
     }
   }
@@ -2778,7 +2805,7 @@ LIBATAPP_MACRO_API void app::split_ids_by_string(const char *in, std::vector<app
 
 LIBATAPP_MACRO_API app::app_id_t app::convert_app_id_by_string(const char *id_in,
                                                                const std::vector<app_id_t> &mask_in) {
-  if (NULL == id_in || 0 == *id_in) {
+  if (nullptr == id_in || 0 == *id_in) {
     return 0;
   }
 
@@ -2807,7 +2834,7 @@ LIBATAPP_MACRO_API app::app_id_t app::convert_app_id_by_string(const char *id_in
 }
 
 LIBATAPP_MACRO_API app::app_id_t app::convert_app_id_by_string(const char *id_in, const char *mask_in) {
-  if (NULL == id_in || 0 == *id_in) {
+  if (nullptr == id_in || 0 == *id_in) {
     return 0;
   }
 
@@ -3176,14 +3203,14 @@ int app::bus_evt_callback_on_recv_msg(const atbus::node &, const atbus::endpoint
   app::message_t message;
   message.data = buffer;
   message.data_size = len;
-  message.metadata = NULL;
+  message.metadata = nullptr;
   message.msg_sequence = msg.head().sequence();
   message.type = msg.head().type();
 
   app::message_sender_t sender;
   sender.id = from_id;
   sender.remote = get_endpoint(from_id);
-  if (NULL != sender.remote) {
+  if (nullptr != sender.remote) {
     sender.name = &sender.remote->get_name();
   }
 
@@ -3198,7 +3225,7 @@ int app::bus_evt_callback_on_forward_response(const atbus::node &, const atbus::
   ++last_proc_event_count_;
 
   // call failed callback if it's message transfer
-  if (NULL == m) {
+  if (nullptr == m) {
     FWLOGERROR("app {:#x} receive a send failure without message", get_id());
     return EN_ATAPP_ERR_SEND_FAILED;
   }
@@ -3218,7 +3245,7 @@ int app::bus_evt_callback_on_forward_response(const atbus::node &, const atbus::
     atbus_connector_->on_receive_forward_response(
         m->data_transform_rsp().from(), m->head().type(), m->head().sequence(), m->head().ret(),
         reinterpret_cast<const void *>(m->data_transform_rsp().content().c_str()),
-        m->data_transform_rsp().content().size(), NULL);
+        m->data_transform_rsp().content().size(), nullptr);
     return 0;
   }
 
@@ -3226,14 +3253,14 @@ int app::bus_evt_callback_on_forward_response(const atbus::node &, const atbus::
   app::message_t message;
   message.data = reinterpret_cast<const void *>(m->data_transform_rsp().content().c_str());
   message.data_size = m->data_transform_rsp().content().size();
-  message.metadata = NULL;
+  message.metadata = nullptr;
   message.msg_sequence = m->head().sequence();
   message.type = m->head().type();
 
   app::message_sender_t sender;
   sender.id = from_id;
   sender.remote = get_endpoint(from_id);
-  if (NULL != sender.remote) {
+  if (nullptr != sender.remote) {
     sender.name = &sender.remote->get_name();
   }
 
@@ -3246,8 +3273,8 @@ int app::bus_evt_callback_on_error(const atbus::node &n, const atbus::endpoint *
   // meet eof or reset by peer is not a error
   if (UV_EOF == errcode || UV_ECONNRESET == errcode) {
     const char *msg = UV_EOF == errcode ? "got EOF" : "reset by peer";
-    if (NULL != conn) {
-      if (NULL != ep) {
+    if (nullptr != conn) {
+      if (nullptr != ep) {
         FWLOGINFO("bus node {:#x} endpoint {:#x} connection {}({}) closed: {}", n.get_id(), ep->get_id(),
                   reinterpret_cast<const void *>(conn), conn->get_address().address, msg);
       } else {
@@ -3256,7 +3283,7 @@ int app::bus_evt_callback_on_error(const atbus::node &n, const atbus::endpoint *
       }
 
     } else {
-      if (NULL != ep) {
+      if (nullptr != ep) {
         FWLOGINFO("bus node {:#x} endpoint {:#x} closed: {}", n.get_id(), ep->get_id(), msg);
       } else {
         FWLOGINFO("bus node {:#x} closed: {}", n.get_id(), msg);
@@ -3265,8 +3292,8 @@ int app::bus_evt_callback_on_error(const atbus::node &n, const atbus::endpoint *
     return 0;
   }
 
-  if (NULL != conn) {
-    if (NULL != ep) {
+  if (nullptr != conn) {
+    if (nullptr != ep) {
       FWLOGERROR("bus node {:#x} endpoint {:#x} connection {}({}) error, status: {}, error code: {}", n.get_id(),
                  ep->get_id(), reinterpret_cast<const void *>(conn), conn->get_address().address, status, errcode);
     } else {
@@ -3275,7 +3302,7 @@ int app::bus_evt_callback_on_error(const atbus::node &n, const atbus::endpoint *
     }
 
   } else {
-    if (NULL != ep) {
+    if (nullptr != ep) {
       FWLOGERROR("bus node {:#x} endpoint {:#x} error, status: {}, error code: {}", n.get_id(), ep->get_id(), status,
                  errcode);
     } else {
@@ -3289,9 +3316,9 @@ int app::bus_evt_callback_on_error(const atbus::node &n, const atbus::endpoint *
 int app::bus_evt_callback_on_info_log(const atbus::node &n, const atbus::endpoint *ep, const atbus::connection *conn,
                                       const char *msg) {
   FWLOGINFO("bus node {:#x} endpoint {:#x}({}) connection {}({}) message: {}", n.get_id(),
-            (NULL == ep ? 0 : ep->get_id()), reinterpret_cast<const void *>(ep),
-            (NULL == conn ? "" : conn->get_address().address.c_str()), reinterpret_cast<const void *>(conn),
-            (NULL == msg ? "" : msg));
+            (nullptr == ep ? 0 : ep->get_id()), reinterpret_cast<const void *>(ep),
+            (nullptr == conn ? "" : conn->get_address().address.c_str()), reinterpret_cast<const void *>(conn),
+            (nullptr == msg ? "" : msg));
   return 0;
 }
 
@@ -3299,8 +3326,8 @@ int app::bus_evt_callback_on_reg(const atbus::node &n, const atbus::endpoint *ep
                                  int res) {
   ++last_proc_event_count_;
 
-  if (NULL != conn) {
-    if (NULL != ep) {
+  if (nullptr != conn) {
+    if (nullptr != ep) {
       WLOGINFO("bus node 0x%llx endpoint 0x%llx connection %s registered, res: %d",
                static_cast<unsigned long long>(n.get_id()), static_cast<unsigned long long>(ep->get_id()),
                conn->get_address().address.c_str(), res);
@@ -3310,7 +3337,7 @@ int app::bus_evt_callback_on_reg(const atbus::node &n, const atbus::endpoint *ep
     }
 
   } else {
-    if (NULL != ep) {
+    if (nullptr != ep) {
       WLOGINFO("bus node 0x%llx endpoint 0x%llx registered, res: %d", static_cast<unsigned long long>(n.get_id()),
                static_cast<unsigned long long>(ep->get_id()), res);
     } else {
@@ -3334,8 +3361,8 @@ int app::bus_evt_callback_on_available(const atbus::node &n, int res) {
 int app::bus_evt_callback_on_invalid_connection(const atbus::node &n, const atbus::connection *conn, int res) {
   ++last_proc_event_count_;
 
-  if (NULL == conn) {
-    FWLOGERROR("bus node {:#x} recv a invalid NULL connection , res: {}", n.get_id(), res);
+  if (nullptr == conn) {
+    FWLOGERROR("bus node {:#x} recv a invalid nullptr connection , res: {}", n.get_id(), res);
   } else {
     // already disconncted finished.
     if (atbus::connection::state_t::DISCONNECTED != conn->get_status()) {
@@ -3411,8 +3438,8 @@ int app::bus_evt_callback_on_custom_cmd(const atbus::node &n, const atbus::endpo
 int app::bus_evt_callback_on_add_endpoint(const atbus::node &n, atbus::endpoint *ep, int res) {
   ++last_proc_event_count_;
 
-  if (NULL == ep) {
-    FWLOGERROR("bus node {:#x} make connection to NULL, res: {}", n.get_id(), res);
+  if (nullptr == ep) {
+    FWLOGERROR("bus node {:#x} make connection to nullptr, res: {}", n.get_id(), res);
   } else {
     FWLOGINFO("bus node {:#x} make connection to {:#x} done, res: {}", n.get_id(), ep->get_id(), res);
 
@@ -3426,8 +3453,8 @@ int app::bus_evt_callback_on_add_endpoint(const atbus::node &n, atbus::endpoint 
 int app::bus_evt_callback_on_remove_endpoint(const atbus::node &n, atbus::endpoint *ep, int res) {
   ++last_proc_event_count_;
 
-  if (NULL == ep) {
-    FWLOGERROR("bus node {:#x} release connection to NULL, res: {}", n.get_id(), res);
+  if (nullptr == ep) {
+    FWLOGERROR("bus node {:#x} release connection to nullptr, res: {}", n.get_id(), res);
   } else {
     FWLOGINFO("bus node {:#x} release connection to {:#x} done, res: {}", n.get_id(), ep->get_id(), res);
 
@@ -3503,7 +3530,7 @@ void app::setup_command() {
   cmd_mgr->bind_cmd("@OnError", &app::command_handler_invalid, this);
 }
 
-int app::send_last_command(uv_loop_t *ev_loop) {
+int app::send_last_command(ev_loop_t *ev_loop) {
   if (last_command_.empty()) {
     FWLOGERROR("command is empty.");
     return EN_ATAPP_ERR_COMMAND_IS_NULL;
@@ -3549,6 +3576,11 @@ int app::send_last_command(uv_loop_t *ev_loop) {
     return EN_ATAPP_ERR_NO_AVAILABLE_ADDRESS;
   }
 
+  if (!ev_loop_) {
+    ev_loop_ = uv_default_loop();
+  }
+  conf_.bus_conf.ev_loop = ev_loop_;
+
   if (!bus_node_) {
     bus_node_ = atbus::node::create();
   }
@@ -3576,7 +3608,7 @@ int app::send_last_command(uv_loop_t *ev_loop) {
   }
 
   // step 2. connect failed return error code
-  atbus::endpoint *ep = NULL;
+  atbus::endpoint *ep = nullptr;
   if (is_sync_channel) {
     // preallocate endpoint when using shared memory channel, because this channel can not be connected without endpoint
     std::vector<atbus::endpoint_subnet_conf> subnets;
@@ -3622,7 +3654,7 @@ int app::send_last_command(uv_loop_t *ev_loop) {
   }
 
   // step 4. waiting for connect success
-  while (NULL == ep) {
+  while (nullptr == ep) {
     // If there is no connection timer, it means connecting is arleady failed.
     if (0 == bus_node_->get_connection_timer_size()) {
       break;
@@ -3637,7 +3669,7 @@ int app::send_last_command(uv_loop_t *ev_loop) {
     ep = bus_node_->get_endpoint(conf_.id);
   }
 
-  if (NULL == ep) {
+  if (nullptr == ep) {
     close_timer(tick_timer_.timeout_timer);
     FWLOGERROR("connect to {} failed or timeout.", use_addr.address);
     return EN_ATAPP_ERR_CONNECT_ATAPP_FAILED;

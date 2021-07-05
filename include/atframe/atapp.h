@@ -53,6 +53,7 @@ class app {
   using endpoint_index_by_name_t = LIBATFRAME_UTILS_AUTO_SELETC_MAP(std::string, atapp_endpoint::ptr_t);
   using connector_protocol_map_t = LIBATFRAME_UTILS_AUTO_SELETC_MAP(std::string, std::shared_ptr<atapp_connector_impl>);
   using address_type_t = atapp_connector_impl::address_type_t;
+  using ev_loop_t = uv_loop_t;
 
   struct LIBATAPP_MACRO_API_HEAD_ONLY flag_t {
     enum type {
@@ -162,7 +163,7 @@ class app {
    * @note you can call init(ev_loop, argc, argv, priv_data), and then call run(NULL, 0, NULL).
    * @return 0 or error code
    */
-  LIBATAPP_MACRO_API int run(uv_loop_t *ev_loop, int argc, const char **argv, void *priv_data = NULL);
+  LIBATAPP_MACRO_API int run(ev_loop_t *ev_loop, int argc, const char **argv, void *priv_data = NULL);
 
   /**
    * @brief initialize atapp
@@ -172,7 +173,7 @@ class app {
    * @param priv_data private data for custom option callbacks
    * @return 0 or error code
    */
-  LIBATAPP_MACRO_API int init(uv_loop_t *ev_loop, int argc, const char **argv, void *priv_data = NULL);
+  LIBATAPP_MACRO_API int init(ev_loop_t *ev_loop, int argc, const char **argv, void *priv_data = NULL);
 
   /**
    * @brief run atapp loop but noblock if there is no event
@@ -206,6 +207,8 @@ class app {
   LIBATAPP_MACRO_API int tick();
 
   LIBATAPP_MACRO_API app_id_t get_id() const;
+
+  LIBATAPP_MACRO_API ev_loop_t *get_evloop();
 
   LIBATAPP_MACRO_API app_id_t convert_app_id_by_string(const char *id_in) const;
   LIBATAPP_MACRO_API std::string convert_app_id_to_string(app_id_t id_in, bool hex = false) const;
@@ -441,7 +444,7 @@ class app {
 
   int setup_timer();
 
-  int send_last_command(uv_loop_t *ev_loop);
+  int send_last_command(ev_loop_t *ev_loop);
 
   bool write_pidfile();
   bool cleanup_pidfile();
@@ -548,6 +551,7 @@ class app {
   app_conf conf_;
   mutable std::string build_version_;
 
+  ev_loop_t *ev_loop_;
   std::shared_ptr<atbus::node> bus_node_;
   std::bitset<flag_t::FLAG_MAX> flags_;
   mode_t::type mode_;
