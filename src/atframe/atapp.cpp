@@ -145,6 +145,7 @@ LIBATAPP_MACRO_API app::app() : setup_result_(0), last_proc_event_count_(0), ev_
   tick_timer_.sec_update = util::time::time_utility::raw_time_t::min();
   tick_timer_.sec = 0;
   tick_timer_.usec = 0;
+  tick_timer_.inner_break = nullptr;
 
   stat_.last_checkpoint_min = 0;
   stat_.endpoint_wake_count = 0;
@@ -405,13 +406,6 @@ LIBATAPP_MACRO_API int app::run_noblock(uint64_t max_event_count) {
   return ret;
 }
 
-static void _app_run_once_timer_handle(uv_timer_t *handle) {
-  if (nullptr != handle) {
-    handle->data = nullptr;
-    uv_stop(handle->loop);
-  }
-}
-
 LIBATAPP_MACRO_API int app::run_once(uint64_t min_event_count, time_t timeout_miliseconds) {
   ev_loop_t *loop = get_evloop();
   if (nullptr == loop) {
@@ -421,24 +415,21 @@ LIBATAPP_MACRO_API int app::run_once(uint64_t min_event_count, time_t timeout_mi
   uint64_t evt_count = 0;
   int ret = 0;
 
-  timer_ptr_t timer;
+  util::time::time_utility::raw_time_t timeout;
   if (timeout_miliseconds > 0) {
-    timer = std::make_shared<timer_info_t>();
-    if (!timer) {
-      FWLOGERROR("create timer failed");
-      return EN_ATAPP_ERR_SETUP_TIMER;
-    }
-    timer->timer.data = this;
-    uv_timer_init(loop, &timer->timer);
-    int res = uv_timer_start(&timer->timer, _app_run_once_timer_handle, timeout_miliseconds, timeout_miliseconds);
-    if (res < 0) {
-      FWLOGERROR("setup timer failed, res: {}({})", res, uv_err_name(res));
-      close_timer(timer);
-      return EN_ATAPP_ERR_SETUP_TIMER;
-    }
+    util::time::time_utility::update();
+    timeout = util::time::time_utility::sys_now() + std::chrono::milliseconds(timeout_miliseconds);
   }
 
   do {
+    if (timeout_miliseconds > 0) {
+      if (nullptr == tick_timer_.inner_break) {
+        tick_timer_.inner_break = &timeout;
+      } else if (timeout < *tick_timer_.inner_break) {
+        tick_timer_.inner_break = &timeout;
+      }
+    }
+
     ret = run_inner(UV_RUN_ONCE);
     if (ret < 0) {
       break;
@@ -446,13 +437,16 @@ LIBATAPP_MACRO_API int app::run_once(uint64_t min_event_count, time_t timeout_mi
 
     evt_count += last_proc_event_count_;
 
-    if (evt_count >= min_event_count) {
-      break;
+    if (timeout_miliseconds > 0) {
+      util::time::time_utility::update();
+      if (timeout <= util::time::time_utility::sys_now()) {
+        break;
+      }
     }
-  } while (evt_count >= min_event_count);
+  } while (evt_count < min_event_count);
 
-  if (timer) {
-    close_timer(timer);
+  if (&timeout == tick_timer_.inner_break) {
+    tick_timer_.inner_break = nullptr;
   }
 
   return ret;
@@ -791,8 +785,13 @@ LIBATAPP_MACRO_API int app::tick() {
 
   ev_loop_t *loop = get_evloop();
   // if is stoping, quit loop  every tick
-  if (check_flag(flag_t::STOPING) && nullptr != loop) {
-    uv_stop(loop);
+  if (nullptr != loop) {
+    if (check_flag(flag_t::STOPING)) {
+      uv_stop(loop);
+    } else if (nullptr != tick_timer_.inner_break && tick_timer_.sec_update >= *tick_timer_.inner_break) {
+      tick_timer_.inner_break = nullptr;
+      uv_stop(loop);
+    }
   }
 
   // stat log

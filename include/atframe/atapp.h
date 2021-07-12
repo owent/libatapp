@@ -134,6 +134,7 @@ class app {
     util::time::time_utility::raw_time_t sec_update;
     time_t sec;
     time_t usec;
+    util::time::time_utility::raw_time_t *inner_break;
 
     timer_ptr_t tick_timer;
     timer_ptr_t timeout_timer;
