@@ -12,12 +12,10 @@
 extern "C" {
 #endif
 
-typedef void *libatapp_c_context;
-typedef void *libatapp_c_custom_cmd_sender;
-
-typedef const void *libatapp_c_message[2];
-
-typedef void *libatapp_c_module;
+using libatapp_c_context = void *;
+using libatapp_c_custom_cmd_sender = void *;
+using libatapp_c_message = const void *[2];
+using libatapp_c_module = void *;
 
 enum LIBATAPP_C_ATBUS_PROTOCOL_CMD {
   LIBATAPP_C_ATBUS_CMD_INVALID = 0,
@@ -41,15 +39,16 @@ enum LIBATAPP_C_ATBUS_PROTOCOL_CMD {
 };
 
 // =========================== callbacks ===========================
-typedef int32_t (*libatapp_c_on_msg_fn_t)(libatapp_c_context, libatapp_c_message, const void *msg_data,
-                                          uint64_t msg_len, void *priv_data);
-typedef int32_t (*libatapp_c_on_send_fail_fn_t)(libatapp_c_context, uint64_t src_pd, uint64_t dst_pd,
-                                                libatapp_c_message, void *priv_data);
-typedef int32_t (*libatapp_c_on_connected_fn_t)(libatapp_c_context, uint64_t pd, int32_t status, void *priv_data);
-typedef int32_t (*libatapp_c_on_disconnected_fn_t)(libatapp_c_context, uint64_t pd, int32_t status, void *priv_data);
-typedef int32_t (*libatapp_c_on_all_module_inited_fn_t)(libatapp_c_context, void *priv_data);
-typedef int32_t (*libatapp_c_on_cmd_option_fn_t)(libatapp_c_context, libatapp_c_custom_cmd_sender, const char *buffer[],
-                                                 uint64_t buffer_len[], uint64_t sz, void *priv_data);
+using libatapp_c_on_msg_fn_t = int32_t (*)(libatapp_c_context, libatapp_c_message, const void *msg_data,
+                                           uint64_t msg_len, void *priv_data);
+using libatapp_c_on_send_fail_fn_t = int32_t (*)(libatapp_c_context, uint64_t src_pd, uint64_t dst_pd,
+                                                 libatapp_c_message, void *priv_data);
+using libatapp_c_on_connected_fn_t = int32_t (*)(libatapp_c_context, uint64_t pd, int32_t status, void *priv_data);
+using libatapp_c_on_disconnected_fn_t = int32_t (*)(libatapp_c_context, uint64_t pd, int32_t status, void *priv_data);
+using libatapp_c_on_all_module_inited_fn_t = int32_t (*)(libatapp_c_context, void *priv_data);
+using libatapp_c_on_cmd_option_fn_t = int32_t (*)(libatapp_c_context, libatapp_c_custom_cmd_sender,
+                                                  const char *buffer[], uint64_t buffer_len[], uint64_t sz,
+                                                  void *priv_data);
 
 LIBATAPP_MACRO_API void __cdecl libatapp_c_set_on_msg_fn(libatapp_c_context context, libatapp_c_on_msg_fn_t fn,
                                                          void *priv_data);
@@ -124,12 +123,12 @@ LIBATAPP_MACRO_API libatapp_c_module __cdecl libatapp_c_module_create(libatapp_c
 LIBATAPP_MACRO_API void __cdecl libatapp_c_module_get_name(libatapp_c_module mod, const char **namebuf,
                                                            uint64_t *bufsz);
 LIBATAPP_MACRO_API libatapp_c_context __cdecl libatapp_c_module_get_context(libatapp_c_module mod);
-typedef int32_t (*libatapp_c_module_on_init_fn_t)(libatapp_c_module, void *priv_data);
-typedef int32_t (*libatapp_c_module_on_reload_fn_t)(libatapp_c_module, void *priv_data);
-typedef int32_t (*libatapp_c_module_on_stop_fn_t)(libatapp_c_module, void *priv_data);
-typedef int32_t (*libatapp_c_module_on_timeout_fn_t)(libatapp_c_module, void *priv_data);
-typedef void (*libatapp_c_module_on_cleanup_fn_t)(libatapp_c_module, void *priv_data);
-typedef int32_t (*libatapp_c_module_on_tick_fn_t)(libatapp_c_module, void *priv_data);
+using libatapp_c_module_on_init_fn_t = int32_t (*)(libatapp_c_module, void *priv_data);
+using libatapp_c_module_on_reload_fn_t = int32_t (*)(libatapp_c_module, void *priv_data);
+using libatapp_c_module_on_stop_fn_t = int32_t (*)(libatapp_c_module, void *priv_data);
+using libatapp_c_module_on_timeout_fn_t = int32_t (*)(libatapp_c_module, void *priv_data);
+using libatapp_c_module_on_cleanup_fn_t = void (*)(libatapp_c_module, void *priv_data);
+using libatapp_c_module_on_tick_fn_t = int32_t (*)(libatapp_c_module, void *priv_data);
 
 LIBATAPP_MACRO_API void __cdecl libatapp_c_module_set_on_init(libatapp_c_module mod, libatapp_c_module_on_init_fn_t fn,
                                                               void *priv_data);

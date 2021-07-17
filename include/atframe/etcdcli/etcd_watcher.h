@@ -90,11 +90,7 @@ class etcd_watcher {
   }
 
   // ====================== apis for events ==================
-#if defined(UTIL_CONFIG_COMPILER_CXX_RVALUE_REFERENCES) && UTIL_CONFIG_COMPILER_CXX_RVALUE_REFERENCES
   UTIL_FORCEINLINE void set_evt_handle(watch_event_fn_t &&fn) { evt_handle_ = std::move(fn); }
-#else
-  UTIL_FORCEINLINE void set_evt_handle(const watch_event_fn_t &fn) { evt_handle_ = fn; }
-#endif
 
  private:
   void process();

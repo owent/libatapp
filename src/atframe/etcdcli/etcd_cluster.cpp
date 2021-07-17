@@ -662,11 +662,7 @@ LIBATAPP_MACRO_API bool etcd_cluster::remove_watcher(std::shared_ptr<etcd_watche
   return has_data;
 }
 
-#if defined(UTIL_CONFIG_COMPILER_CXX_RVALUE_REFERENCES) && UTIL_CONFIG_COMPILER_CXX_RVALUE_REFERENCES
 void etcd_cluster::remove_keepalive_path(etcd_keepalive_deletor *keepalive_deletor, bool delay_delete) {
-#else
-void etcd_cluster::remove_keepalive_path(etcd_keepalive_deletor *&&keepalive_deletor, bool delay_delete) {
-#endif
   if (nullptr == keepalive_deletor) {
     return;
   }

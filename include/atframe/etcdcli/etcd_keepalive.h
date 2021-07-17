@@ -27,8 +27,8 @@ class etcd_cluster;
 
 class etcd_keepalive : public std::enable_shared_from_this<etcd_keepalive> {
  public:
-  typedef std::function<bool(const std::string &)> checker_fn_t;  // the parameter will be base64 of the value
-  typedef std::shared_ptr<etcd_keepalive> ptr_t;
+  using checker_fn_t = std::function<bool(const std::string &)>;  // the parameter will be base64 of the value
+  using ptr_t = std::shared_ptr<etcd_keepalive>;
 
  private:
   struct default_checker_t {

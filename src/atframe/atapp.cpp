@@ -2240,7 +2240,7 @@ int app::setup_log() {
     }
   }
 
-  typedef ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::atapp::protocol::atapp_log_category> log_cat_array_t;
+  using log_cat_array_t = ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::atapp::protocol::atapp_log_category>;
   log_cat_array_t categories;
   // load log configure - ini/conf
   {
