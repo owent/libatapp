@@ -3,12 +3,6 @@
 
 #pragma once
 
-#include <std/smart_ptr.h>
-#include <ctime>
-#include <list>
-#include <string>
-#include <vector>
-
 #include <config/atframe_utils_build_feature.h>
 
 #include <config/compiler/template_prefix.h>
@@ -29,6 +23,12 @@
 #include <atframe/etcdcli/etcd_discovery.h>
 #include <atframe/etcdcli/etcd_keepalive.h>
 #include <atframe/etcdcli/etcd_watcher.h>
+
+#include <ctime>
+#include <list>
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace atapp {
 class etcd_module : public ::atapp::module_impl {
@@ -92,7 +92,7 @@ class etcd_module : public ::atapp::module_impl {
  public:
   LIBATAPP_MACRO_API void reset();
 
-  LIBATAPP_MACRO_API int init() UTIL_CONFIG_OVERRIDE;
+  LIBATAPP_MACRO_API int init() override;
 
  private:
   void update_keepalive_value();
@@ -100,15 +100,15 @@ class etcd_module : public ::atapp::module_impl {
   int init_watchers();
 
  public:
-  LIBATAPP_MACRO_API int reload() UTIL_CONFIG_OVERRIDE;
+  LIBATAPP_MACRO_API int reload() override;
 
-  LIBATAPP_MACRO_API int stop() UTIL_CONFIG_OVERRIDE;
+  LIBATAPP_MACRO_API int stop() override;
 
-  LIBATAPP_MACRO_API int timeout() UTIL_CONFIG_OVERRIDE;
+  LIBATAPP_MACRO_API int timeout() override;
 
-  LIBATAPP_MACRO_API const char *name() const UTIL_CONFIG_OVERRIDE;
+  LIBATAPP_MACRO_API const char *name() const override;
 
-  LIBATAPP_MACRO_API int tick() UTIL_CONFIG_OVERRIDE;
+  LIBATAPP_MACRO_API int tick() override;
 
   LIBATAPP_MACRO_API const std::string &get_conf_custom_data() const;
   LIBATAPP_MACRO_API void set_conf_custom_data(const std::string &v);

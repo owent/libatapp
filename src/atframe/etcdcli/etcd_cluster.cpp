@@ -249,7 +249,7 @@ LIBATAPP_MACRO_API util::network::http_request::ptr_t etcd_cluster::close(bool w
   set_flag(flag_t::RUNNING, false);
 
   if (rpc_keepalive_) {
-    rpc_keepalive_->set_on_complete(NULL);
+    rpc_keepalive_->set_on_complete(nullptr);
     rpc_keepalive_->stop();
     rpc_keepalive_.reset();
   }
@@ -257,13 +257,13 @@ LIBATAPP_MACRO_API util::network::http_request::ptr_t etcd_cluster::close(bool w
   cleanup_keepalive_deletors();
 
   if (rpc_update_members_) {
-    rpc_update_members_->set_on_complete(NULL);
+    rpc_update_members_->set_on_complete(nullptr);
     rpc_update_members_->stop();
     rpc_update_members_.reset();
   }
 
   if (rpc_authenticate_) {
-    rpc_authenticate_->set_on_complete(NULL);
+    rpc_authenticate_->set_on_complete(nullptr);
     rpc_authenticate_->stop();
     rpc_authenticate_.reset();
   }
@@ -453,7 +453,7 @@ LIBATAPP_MACRO_API void etcd_cluster::set_flag(flag_t::type f, bool v) {
       if (v) {
         create_request_lease_grant();
       } else if (rpc_keepalive_) {
-        rpc_keepalive_->set_on_complete(NULL);
+        rpc_keepalive_->set_on_complete(nullptr);
         rpc_keepalive_->stop();
         rpc_keepalive_.reset();
       }
@@ -489,7 +489,7 @@ LIBATAPP_MACRO_API void etcd_cluster::pick_conf_authorization(std::string &usern
     username = conf_.authorization;
   } else {
     username = conf_.authorization.substr(0, username_sep);
-    if (NULL != password && username_sep + 1 < conf_.authorization.size()) {
+    if (nullptr != password && username_sep + 1 < conf_.authorization.size()) {
       *password = conf_.authorization.substr(username_sep + 1);
     }
   }
@@ -595,14 +595,14 @@ LIBATAPP_MACRO_API bool etcd_cluster::remove_keepalive(std::shared_ptr<etcd_keep
   if (found) {
     if (keepalive->has_data()) {
       etcd_keepalive_deletor *keepalive_deletor = new etcd_keepalive_deletor();
-      if (NULL == keepalive_deletor) {
+      if (nullptr == keepalive_deletor) {
         FWLOGERROR("Etcd cluster try to delete keepalive {} path {} but malloc etcd_keepalive_deletor failed.",
                    reinterpret_cast<const void *>(keepalive.get()), keepalive->get_path());
       } else {
         keepalive_deletor->retry_times = 0;
         keepalive_deletor->path = keepalive->get_path();
         keepalive_deletor->keepalive_addr = keepalive.get();
-        keepalive_deletor->owner = NULL;
+        keepalive_deletor->owner = nullptr;
 
         remove_keepalive_path(keepalive_deletor, false);
       }
@@ -662,16 +662,12 @@ LIBATAPP_MACRO_API bool etcd_cluster::remove_watcher(std::shared_ptr<etcd_watche
   return has_data;
 }
 
-#if defined(UTIL_CONFIG_COMPILER_CXX_RVALUE_REFERENCES) && UTIL_CONFIG_COMPILER_CXX_RVALUE_REFERENCES
 void etcd_cluster::remove_keepalive_path(etcd_keepalive_deletor *keepalive_deletor, bool delay_delete) {
-#else
-void etcd_cluster::remove_keepalive_path(etcd_keepalive_deletor *&&keepalive_deletor, bool delay_delete) {
-#endif
-  if (NULL == keepalive_deletor) {
+  if (nullptr == keepalive_deletor) {
     return;
   }
 
-  etcd_keepalive_deletor *delete_old_deletor = NULL;
+  etcd_keepalive_deletor *delete_old_deletor = nullptr;
 
   {
     etcd_keepalive_deletor_map_t::iterator iter = keepalive_deletors_.find(keepalive_deletor->path);
@@ -679,7 +675,7 @@ void etcd_cluster::remove_keepalive_path(etcd_keepalive_deletor *&&keepalive_del
       delete_old_deletor = iter->second;
 
       if (delete_old_deletor == keepalive_deletor) {
-        delete_old_deletor = NULL;
+        delete_old_deletor = nullptr;
       }
 
       keepalive_deletors_.erase(iter);
@@ -726,8 +722,8 @@ void etcd_cluster::remove_keepalive_path(etcd_keepalive_deletor *&&keepalive_del
     if (res != 0) {
       FWLOGERROR("Etcd cluster start delete keepalive {} request to {} failed, res: {}",
                  reinterpret_cast<const void *>(this), rpc->get_url(), res);
-      rpc->set_on_complete(NULL);
-      rpc->set_priv_data(NULL);
+      rpc->set_on_complete(nullptr);
+      rpc->set_priv_data(nullptr);
       keepalive_deletor->rpc.reset();
 
       // insert and retry later
@@ -739,21 +735,21 @@ void etcd_cluster::remove_keepalive_path(etcd_keepalive_deletor *&&keepalive_del
 
   } while (false);
 
-  if (NULL != delete_old_deletor) {
+  if (nullptr != delete_old_deletor) {
     delete_keepalive_deletor(delete_old_deletor, true);
   }
 }  // namespace atapp
 
 int etcd_cluster::libcurl_callback_on_remove_keepalive_path(util::network::http_request &req) {
   etcd_keepalive_deletor *self = reinterpret_cast<etcd_keepalive_deletor *>(req.get_priv_data());
-  if (NULL == self) {
+  if (nullptr == self) {
     // Maybe deleted before or in callback, just skip
     return 0;
   }
 
   assert(self->keepalive_addr);
   do {
-    if (NULL == self) {
+    if (nullptr == self) {
       FWLOGERROR("Etcd cluster delete keepalive path shouldn't has request without private data");
       break;
     }
@@ -771,7 +767,7 @@ int etcd_cluster::libcurl_callback_on_remove_keepalive_path(util::network::http_
       FWLOGERROR("Etcd cluster delete keepalive {} path {} failed, error code: {}, http code: {}\n{}",
                  self->keepalive_addr, self->path, req.get_error_code(), req.get_response_code(), req.get_error_msg());
 
-      if (NULL != self->owner) {
+      if (nullptr != self->owner) {
         // only network error will trigger a etcd member update
         if (0 != req.get_error_code()) {
           self->owner->retry_request_member_update(req.get_url());
@@ -906,7 +902,7 @@ bool etcd_cluster::create_request_auth_authenticate() {
     }
     int res = req->start(util::network::http_request::method_t::EN_MT_POST, false);
     if (res != 0) {
-      req->set_on_complete(NULL);
+      req->set_on_complete(nullptr);
       FWLOGERROR("Etcd start authenticate request for user {} to {} failed, res: {}", username, req->get_url(), res);
       add_stats_error_request();
       return false;
@@ -923,7 +919,7 @@ bool etcd_cluster::create_request_auth_authenticate() {
 
 int etcd_cluster::libcurl_callback_on_auth_authenticate(util::network::http_request &req) {
   etcd_cluster *self = reinterpret_cast<etcd_cluster *>(req.get_priv_data());
-  if (NULL == self) {
+  if (nullptr == self) {
     FWLOGERROR("Etcd authenticate shouldn't has request without private data");
     return 0;
   }
@@ -1019,7 +1015,7 @@ bool etcd_cluster::create_request_auth_user_get() {
       curl_multi_.get(), LOG_WRAPPER_FWAPI_FORMAT("{}{}", conf_.path_node, ETCD_API_V3_AUTH_USER_GET));
 
   std::string username;
-  pick_conf_authorization(username, NULL);
+  pick_conf_authorization(username, nullptr);
 
   if (req) {
     add_stats_create_request();
@@ -1037,7 +1033,7 @@ bool etcd_cluster::create_request_auth_user_get() {
     }
     int res = req->start(util::network::http_request::method_t::EN_MT_POST, false);
     if (res != 0) {
-      req->set_on_complete(NULL);
+      req->set_on_complete(nullptr);
       FWLOGERROR("Etcd start user get request for user {} to {} failed, res: {}", username, req->get_url(), res);
       add_stats_error_request();
       return false;
@@ -1054,7 +1050,7 @@ bool etcd_cluster::create_request_auth_user_get() {
 
 int etcd_cluster::libcurl_callback_on_auth_user_get(util::network::http_request &req) {
   etcd_cluster *self = reinterpret_cast<etcd_cluster *>(req.get_priv_data());
-  if (NULL == self) {
+  if (nullptr == self) {
     FWLOGERROR("Etcd user get shouldn't has request without private data");
     return 0;
   }
@@ -1097,7 +1093,7 @@ int etcd_cluster::libcurl_callback_on_auth_user_get(util::network::http_request 
     }
 
     std::string username;
-    self->pick_conf_authorization(username, NULL);
+    self->pick_conf_authorization(username, nullptr);
 
     rapidjson::Value::ConstMemberIterator iter = doc.FindMember("roles");
     if (iter == doc.MemberEnd() || false == iter->value.IsArray()) {
@@ -1231,7 +1227,7 @@ bool etcd_cluster::create_request_member_update() {
 
     int res = req->start(util::network::http_request::method_t::EN_MT_POST, false);
     if (res != 0) {
-      req->set_on_complete(NULL);
+      req->set_on_complete(nullptr);
       FWLOGERROR("Etcd start update member {} request to {} failed, res: {}", get_lease(), req->get_url().c_str(), res);
 
       add_stats_error_request();
@@ -1249,7 +1245,7 @@ bool etcd_cluster::create_request_member_update() {
 
 int etcd_cluster::libcurl_callback_on_member_update(util::network::http_request &req) {
   etcd_cluster *self = reinterpret_cast<etcd_cluster *>(req.get_priv_data());
-  if (NULL == self) {
+  if (nullptr == self) {
     FWLOGERROR("Etcd member list shouldn't has request without private data");
     return 0;
   }
@@ -1378,7 +1374,7 @@ bool etcd_cluster::create_request_lease_grant() {
     }
     int res = req->start(util::network::http_request::method_t::EN_MT_POST, false);
     if (res != 0) {
-      req->set_on_complete(NULL);
+      req->set_on_complete(nullptr);
       FWLOGERROR("Etcd start keepalive lease {} request to {} failed, res: {}", get_lease(), req->get_url(), res);
       add_stats_error_request();
       return false;
@@ -1432,7 +1428,7 @@ bool etcd_cluster::create_request_lease_keepalive() {
 
     int res = req->start(util::network::http_request::method_t::EN_MT_POST, false);
     if (res != 0) {
-      req->set_on_complete(NULL);
+      req->set_on_complete(nullptr);
       FWLOGERROR("Etcd start keepalive lease {} request to {} failed, res: {}", get_lease(), req->get_url().c_str(),
                  res);
       add_stats_error_request();
@@ -1450,7 +1446,7 @@ bool etcd_cluster::create_request_lease_keepalive() {
 
 int etcd_cluster::libcurl_callback_on_lease_keepalive(util::network::http_request &req) {
   etcd_cluster *self = reinterpret_cast<etcd_cluster *>(req.get_priv_data());
-  if (NULL == self) {
+  if (nullptr == self) {
     FWLOGERROR("Etcd lease keepalive shouldn't has request without private data");
     return 0;
   }
@@ -1774,20 +1770,20 @@ bool etcd_cluster::check_authorization() const {
 }
 
 void etcd_cluster::delete_keepalive_deletor(etcd_keepalive_deletor *in, bool close_rpc) {
-  if (NULL == in) {
+  if (nullptr == in) {
     return;
   }
 
-  in->owner = NULL;
+  in->owner = nullptr;
   if (close_rpc) {
     if (in->rpc) {
-      in->rpc->set_priv_data(NULL);
-      in->rpc->set_on_complete(NULL);
+      in->rpc->set_priv_data(nullptr);
+      in->rpc->set_on_complete(nullptr);
       in->rpc->stop();
     }
   } else {
     if (in->rpc) {
-      in->rpc->set_priv_data(NULL);
+      in->rpc->set_priv_data(nullptr);
     }
   }
 

@@ -12,17 +12,16 @@
 
 #pragma once
 
-#include <sstream>
-#include <string>
-#include <vector>
-
-#include <std/chrono.h>
-#include <std/functional.h>
-#include <std/smart_ptr.h>
-
 #include <config/compiler_features.h>
 
 #include <network/http_request.h>
+
+#include <chrono>
+#include <functional>
+#include <memory>
+#include <sstream>
+#include <string>
+#include <vector>
 
 #include "atframe/etcdcli/etcd_def.h"
 
@@ -91,11 +90,7 @@ class etcd_watcher {
   }
 
   // ====================== apis for events ==================
-#if defined(UTIL_CONFIG_COMPILER_CXX_RVALUE_REFERENCES) && UTIL_CONFIG_COMPILER_CXX_RVALUE_REFERENCES
   UTIL_FORCEINLINE void set_evt_handle(watch_event_fn_t &&fn) { evt_handle_ = std::move(fn); }
-#else
-  UTIL_FORCEINLINE void set_evt_handle(const watch_event_fn_t &fn) { evt_handle_ = fn; }
-#endif
 
  private:
   void process();

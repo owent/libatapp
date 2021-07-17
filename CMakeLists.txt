@@ -1,8 +1,10 @@
 cmake_minimum_required(VERSION 3.16.0)
-cmake_policy(SET CMP0054 NEW)
 cmake_policy(SET CMP0022 NEW)
+cmake_policy(SET CMP0048 NEW)
+cmake_policy(SET CMP0054 NEW)
 cmake_policy(SET CMP0067 NEW)
 cmake_policy(SET CMP0074 NEW)
+cmake_policy(SET CMP0077 NEW)
 cmake_policy(SET CMP0091 NEW)
 if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.19.0")
   cmake_policy(SET CMP0111 NEW)
@@ -12,7 +14,7 @@ enable_testing()
 
 project(
   libatapp
-  VERSION "0.10.0"
+  VERSION "0.11.0"
   HOMEPAGE_URL "https://github.com/atframework/libatapp"
   LANGUAGES C CXX)
 
@@ -24,8 +26,6 @@ set(LIBATAPP_VERSION "${PROJECT_VERSION}")
 include("${CMAKE_CURRENT_LIST_DIR}/project/cmake/ProjectBuildOption.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/third_party/Repository.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/atframework/Repository.cmake")
-
-echowithcolor(COLOR GREEN "-- Build Type: ${CMAKE_BUILD_TYPE}")
 
 unset(PROJECT_LIBATAPP_PRIVATE_COMPILE_OPTIONS)
 unset(PROJECT_LIBATAPP_PUBLIC_INCLUDE_DIRS)

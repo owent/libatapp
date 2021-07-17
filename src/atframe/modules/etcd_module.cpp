@@ -59,7 +59,7 @@ static void init_timer_timeout_callback(uv_timer_t *handle) {
 }
 
 static void init_timer_tick_callback(uv_timer_t *handle) {
-  if (NULL == handle->data) {
+  if (nullptr == handle->data) {
     return;
   }
   assert(handle);
@@ -70,14 +70,14 @@ static void init_timer_tick_callback(uv_timer_t *handle) {
 }
 
 static void init_timer_closed_callback(uv_handle_t *handle) {
-  if (NULL == handle->data) {
+  if (nullptr == handle->data) {
     uv_stop(handle->loop);
     return;
   }
   assert(handle);
   assert(handle->loop);
 
-  handle->data = NULL;
+  handle->data = nullptr;
   uv_stop(handle->loop);
 }
 
@@ -94,8 +94,8 @@ LIBATAPP_MACRO_API void etcd_module::reset() {
   conf_path_cache_.clear();
   custom_data_.clear();
   if (cleanup_request_) {
-    cleanup_request_->set_priv_data(NULL);
-    cleanup_request_->set_on_complete(NULL);
+    cleanup_request_->set_priv_data(nullptr);
+    cleanup_request_->set_on_complete(nullptr);
     cleanup_request_->stop();
     cleanup_request_.reset();
   }
@@ -244,7 +244,7 @@ LIBATAPP_MACRO_API int etcd_module::init() {
 }
 
 void etcd_module::update_keepalive_value() {
-  if (!maybe_update_inner_keepalive_value_ || NULL == get_app()) {
+  if (!maybe_update_inner_keepalive_value_ || nullptr == get_app()) {
     return;
   }
 
@@ -341,12 +341,12 @@ int etcd_module::init_watchers() {
 
   // setup configured watchers
   if (conf.watcher().by_name()) {
-    add_watcher_by_name(NULL);
+    add_watcher_by_name(nullptr);
     return 0;
   }
 
   if (conf.watcher().by_id()) {
-    add_watcher_by_id(NULL);
+    add_watcher_by_id(nullptr);
     return 0;
   }
 
@@ -356,13 +356,13 @@ int etcd_module::init_watchers() {
     if (0 == type_id) {
       continue;
     }
-    add_watcher_by_type_id(type_id, NULL);
+    add_watcher_by_type_id(type_id, nullptr);
   }
   for (int i = 0; i < conf.watcher().by_type_name_size(); ++i) {
     if (conf.watcher().by_type_name(i).empty()) {
       continue;
     }
-    add_watcher_by_type_name(conf.watcher().by_type_name(i), NULL);
+    add_watcher_by_type_name(conf.watcher().by_type_name(i), nullptr);
   }
 
   // 内置有按tag watch
@@ -370,7 +370,7 @@ int etcd_module::init_watchers() {
     if (conf.watcher().by_tag(i).empty()) {
       continue;
     }
-    add_watcher_by_type_name(conf.watcher().by_tag(i), NULL);
+    add_watcher_by_type_name(conf.watcher().by_tag(i), nullptr);
   }
 
   return 0;
@@ -805,13 +805,13 @@ LIBATAPP_MACRO_API atapp::etcd_watcher::ptr_t etcd_module::add_watcher_by_custom
       0 != UTIL_STRFUNC_STRNCMP(custom_path.c_str(), configure_path.c_str(), configure_path.size())) {
     FWLOGERROR("create etcd_watcher by custom path {} failed. path must has prefix of {}.", custom_path,
                configure_path);
-    return NULL;
+    return nullptr;
   }
 
   atapp::etcd_watcher::ptr_t p = atapp::etcd_watcher::create(etcd_ctx_, custom_path, "+1");
   if (!p) {
     FWLOGERROR("create etcd_watcher by custom path {} failed. malloc etcd_watcher failed.", custom_path);
-    return NULL;
+    return nullptr;
   }
 
   p->set_evt_handle(watcher_callback_one_wrapper_t(*this, fn));
@@ -819,7 +819,7 @@ LIBATAPP_MACRO_API atapp::etcd_watcher::ptr_t etcd_module::add_watcher_by_custom
     FWLOGINFO("create etcd_watcher by custom path {} success", custom_path);
   } else {
     FWLOGINFO("add etcd_watcher by custom path {} failed", custom_path);
-    p->set_evt_handle(NULL);
+    p->set_evt_handle(nullptr);
     p.reset();
   }
 
@@ -966,7 +966,7 @@ bool etcd_module::unpack(node_info_t &out, const std::string &path, const std::s
     }
 
     atapp::protocol::atapp_gateway *gateway = out.node_discovery.add_gateways();
-    if (NULL != gateway) {
+    if (nullptr != gateway) {
       gateway->set_address(old_gateway_iter->value[i].GetString(), old_gateway_iter->value[i].GetStringLength());
     }
   }
@@ -980,7 +980,7 @@ void etcd_module::pack(const node_info_t &src, std::string &json) {
 
 int etcd_module::http_callback_on_etcd_closed(util::network::http_request &req) {
   etcd_module *self = reinterpret_cast<etcd_module *>(req.get_priv_data());
-  if (NULL == self) {
+  if (nullptr == self) {
     FWLOGERROR("etcd_module get request shouldn't has request without private data");
     return 0;
   }
@@ -1000,7 +1000,7 @@ etcd_module::watcher_callback_list_wrapper_t::watcher_callback_list_wrapper_t(et
     : mod(&m), callbacks(&cbks) {}
 void etcd_module::watcher_callback_list_wrapper_t::operator()(const ::atapp::etcd_response_header &header,
                                                               const ::atapp::etcd_watcher::response_t &body) {
-  if (NULL == mod) {
+  if (nullptr == mod) {
     return;
   }
   // decode data
@@ -1024,7 +1024,7 @@ void etcd_module::watcher_callback_list_wrapper_t::operator()(const ::atapp::etc
 
     mod->update_inner_watcher_event(node);
 
-    if (NULL == callbacks) {
+    if (nullptr == callbacks) {
       continue;
     }
 
@@ -1045,7 +1045,7 @@ etcd_module::watcher_callback_one_wrapper_t::watcher_callback_one_wrapper_t(etcd
     : mod(&m), callback(cbk) {}
 void etcd_module::watcher_callback_one_wrapper_t::operator()(const ::atapp::etcd_response_header &header,
                                                              const ::atapp::etcd_watcher::response_t &body) {
-  if (NULL == mod) {
+  if (nullptr == mod) {
     return;
   }
 
@@ -1150,7 +1150,7 @@ bool etcd_module::update_inner_watcher_event(node_info_t &node) {
   // remove endpoint if got DELETE event
   if (has_event) {
     app *owner = get_app();
-    if (node_action_t::EN_NAT_DELETE == node.action && NULL != owner) {
+    if (node_action_t::EN_NAT_DELETE == node.action && nullptr != owner) {
       if (0 != node.node_discovery.id()) {
         owner->remove_endpoint(node.node_discovery.id());
       }
@@ -1159,7 +1159,7 @@ bool etcd_module::update_inner_watcher_event(node_info_t &node) {
       }
     }
 
-    if (NULL != owner) {
+    if (nullptr != owner) {
       // notify all connector discovery event
       if (new_inst) {
         owner->trigger_event_on_discovery_event(node.action, new_inst);

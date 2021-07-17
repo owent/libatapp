@@ -173,6 +173,7 @@ LIBATAPP_MACRO_API app::~app() {
 
   for (module_ptr_t &mod : modules_) {
     if (mod && mod->owner_ == this) {
+      mod->deactive();
       mod->on_unbind();
       mod->owner_ = nullptr;
     }
@@ -185,6 +186,10 @@ LIBATAPP_MACRO_API app::~app() {
     bus_node_->reset();
     bus_node_.reset();
   }
+
+  // close timer
+  close_timer(tick_timer_.tick_timer);
+  close_timer(tick_timer_.timeout_timer);
 
   assert(!tick_timer_.tick_timer);
   assert(!tick_timer_.timeout_timer);
@@ -452,13 +457,13 @@ LIBATAPP_MACRO_API int app::run_once(uint64_t min_event_count, time_t timeout_mi
   return ret;
 }
 
-LIBATAPP_MACRO_API bool app::is_inited() const UTIL_CONFIG_NOEXCEPT { return check_flag(flag_t::INITIALIZED); }
+LIBATAPP_MACRO_API bool app::is_inited() const noexcept { return check_flag(flag_t::INITIALIZED); }
 
-LIBATAPP_MACRO_API bool app::is_running() const UTIL_CONFIG_NOEXCEPT { return check_flag(flag_t::RUNNING); }
+LIBATAPP_MACRO_API bool app::is_running() const noexcept { return check_flag(flag_t::RUNNING); }
 
-LIBATAPP_MACRO_API bool app::is_closing() const UTIL_CONFIG_NOEXCEPT { return check_flag(flag_t::STOPING); }
+LIBATAPP_MACRO_API bool app::is_closing() const noexcept { return check_flag(flag_t::STOPING); }
 
-LIBATAPP_MACRO_API bool app::is_closed() const UTIL_CONFIG_NOEXCEPT { return check_flag(flag_t::STOPPED); }
+LIBATAPP_MACRO_API bool app::is_closed() const noexcept { return check_flag(flag_t::STOPPED); }
 
 static bool guess_configure_file_is_yaml(const std::string &file_path) {
   std::fstream file;
@@ -2235,7 +2240,7 @@ int app::setup_log() {
     }
   }
 
-  typedef ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::atapp::protocol::atapp_log_category> log_cat_array_t;
+  using log_cat_array_t = ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::atapp::protocol::atapp_log_category>;
   log_cat_array_t categories;
   // load log configure - ini/conf
   {

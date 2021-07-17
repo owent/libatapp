@@ -62,7 +62,7 @@ struct app_conf {
   atapp::protocol::atapp_metadata metadata;
 };
 
-typedef enum {
+enum ATAPP_ERROR_TYPE {
   EN_ATAPP_ERR_SUCCESS = 0,
   EN_ATAPP_ERR_NOT_INITED = -1001,
   EN_ATAPP_ERR_ALREADY_INITED = -1002,
@@ -78,7 +78,7 @@ typedef enum {
   EN_ATAPP_ERR_NO_AVAILABLE_ADDRESS = -1802,
   EN_ATAPP_ERR_CONNECT_ATAPP_FAILED = -1803,
   EN_ATAPP_ERR_MIN = -1999,
-} ATAPP_ERROR_TYPE;
+};
 
 LIBATAPP_MACRO_API void parse_timepoint(const std::string &in, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp &out);
 LIBATAPP_MACRO_API void parse_duration(const std::string &in, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &out);

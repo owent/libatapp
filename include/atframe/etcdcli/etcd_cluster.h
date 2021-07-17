@@ -12,19 +12,18 @@
 
 #pragma once
 
-#include <ctime>
-#include <list>
-#include <string>
-#include <vector>
-
-#include <std/chrono.h>
-#include <std/smart_ptr.h>
-
 #include <network/http_request.h>
 #include <random/random_generator.h>
 #include <time/time_utility.h>
 
 #include <detail/libatbus_config.h>
+
+#include <chrono>
+#include <ctime>
+#include <list>
+#include <memory>
+#include <string>
+#include <vector>
 
 #include "atframe/etcdcli/etcd_packer.h"
 
@@ -422,11 +421,7 @@ class etcd_cluster {
   LIBATAPP_MACRO_API void reset_on_event_down_handle(on_event_up_down_handle_t &handle);
 
  private:
-#if defined(UTIL_CONFIG_COMPILER_CXX_RVALUE_REFERENCES) && UTIL_CONFIG_COMPILER_CXX_RVALUE_REFERENCES
   void remove_keepalive_path(etcd_keepalive_deletor *keepalive_deletor, bool delay_delete);
-#else
-  void remove_keepalive_path(etcd_keepalive_deletor *&&keepalive_deletor, bool delay_delete);
-#endif
   static int libcurl_callback_on_remove_keepalive_path(util::network::http_request &req);
 
   void retry_pending_actions();

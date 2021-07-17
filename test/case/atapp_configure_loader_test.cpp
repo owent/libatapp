@@ -69,7 +69,7 @@ CASE_TEST(atapp_configure, load_yaml) {
   }
 
   const char *argv[] = {"unit-test", "-c", &conf_path[0], "--version"};
-  app.init(NULL, 4, argv);
+  app.init(nullptr, 4, argv);
   app.reload();
 
   atapp::protocol::atapp_etcd sub_cfg;
@@ -93,7 +93,7 @@ CASE_TEST(atapp_configure, load_conf) {
   }
 
   const char *argv[] = {"unit-test", "-c", &conf_path[0], "--version"};
-  app.init(NULL, 4, argv);
+  app.init(nullptr, 4, argv);
   app.reload();
 
   atapp::protocol::atapp_etcd sub_cfg;

@@ -3,15 +3,11 @@
 
 #pragma once
 
-#include <list>
-#include <string>
-
 #include <config/compile_optimize.h>
 #include <config/compiler_features.h>
 
 #include <design_pattern/nomovable.h>
 #include <design_pattern/noncopyable.h>
-#include <std/smart_ptr.h>
 
 #include <common/demangle.h>
 
@@ -20,6 +16,10 @@
 
 #include <atframe/atapp_config.h>
 #include <atframe/etcdcli/etcd_discovery.h>
+
+#include <list>
+#include <memory>
+#include <string>
 
 #include "atframe/connectors/atapp_endpoint.h"
 
@@ -55,27 +55,27 @@ class atapp_connection_handle {
   LIBATAPP_MACRO_API atapp_connection_handle();
   LIBATAPP_MACRO_API ~atapp_connection_handle();
   LIBATAPP_MACRO_API void close();
-  LIBATAPP_MACRO_API bool is_closing() const UTIL_CONFIG_NOEXCEPT;
-  LIBATAPP_MACRO_API void set_ready() UTIL_CONFIG_NOEXCEPT;
-  LIBATAPP_MACRO_API bool is_ready() const UTIL_CONFIG_NOEXCEPT;
+  LIBATAPP_MACRO_API bool is_closing() const noexcept;
+  LIBATAPP_MACRO_API void set_ready() noexcept;
+  LIBATAPP_MACRO_API bool is_ready() const noexcept;
 
-  UTIL_FORCEINLINE void set_private_data_ptr(void *input) UTIL_CONFIG_NOEXCEPT { private_data_ptr_ = input; }
-  UTIL_FORCEINLINE void *get_private_data_ptr() const UTIL_CONFIG_NOEXCEPT { return private_data_ptr_; }
-  UTIL_FORCEINLINE void set_private_data_u64(uint64_t input) UTIL_CONFIG_NOEXCEPT { private_data_u64_ = input; }
-  UTIL_FORCEINLINE uint64_t get_private_data_u64() const UTIL_CONFIG_NOEXCEPT { return private_data_u64_; }
-  UTIL_FORCEINLINE void set_private_data_i64(int64_t input) UTIL_CONFIG_NOEXCEPT { private_data_i64_ = input; }
-  UTIL_FORCEINLINE int64_t get_private_data_i64() const UTIL_CONFIG_NOEXCEPT { return private_data_i64_; }
-  UTIL_FORCEINLINE void set_private_data_uptr(uintptr_t input) UTIL_CONFIG_NOEXCEPT { private_data_uptr_ = input; }
-  UTIL_FORCEINLINE uintptr_t get_private_data_uptr() const UTIL_CONFIG_NOEXCEPT { return private_data_uptr_; }
-  UTIL_FORCEINLINE void set_private_data_iptr(intptr_t input) UTIL_CONFIG_NOEXCEPT { private_data_iptr_ = input; }
-  UTIL_FORCEINLINE intptr_t get_private_data_iptr() const UTIL_CONFIG_NOEXCEPT { return private_data_iptr_; }
+  UTIL_FORCEINLINE void set_private_data_ptr(void *input) noexcept { private_data_ptr_ = input; }
+  UTIL_FORCEINLINE void *get_private_data_ptr() const noexcept { return private_data_ptr_; }
+  UTIL_FORCEINLINE void set_private_data_u64(uint64_t input) noexcept { private_data_u64_ = input; }
+  UTIL_FORCEINLINE uint64_t get_private_data_u64() const noexcept { return private_data_u64_; }
+  UTIL_FORCEINLINE void set_private_data_i64(int64_t input) noexcept { private_data_i64_ = input; }
+  UTIL_FORCEINLINE int64_t get_private_data_i64() const noexcept { return private_data_i64_; }
+  UTIL_FORCEINLINE void set_private_data_uptr(uintptr_t input) noexcept { private_data_uptr_ = input; }
+  UTIL_FORCEINLINE uintptr_t get_private_data_uptr() const noexcept { return private_data_uptr_; }
+  UTIL_FORCEINLINE void set_private_data_iptr(intptr_t input) noexcept { private_data_iptr_ = input; }
+  UTIL_FORCEINLINE intptr_t get_private_data_iptr() const noexcept { return private_data_iptr_; }
 
   LIBATAPP_MACRO_API void set_on_destroy(on_destroy_fn_t fn);
   LIBATAPP_MACRO_API const on_destroy_fn_t &get_on_destroy() const;
   LIBATAPP_MACRO_API void reset_on_destroy();
 
-  UTIL_FORCEINLINE atapp_connector_impl *get_connector() const UTIL_CONFIG_NOEXCEPT { return connector_; }
-  UTIL_FORCEINLINE atapp_endpoint *get_endpoint() const UTIL_CONFIG_NOEXCEPT { return endpiont_; }
+  UTIL_FORCEINLINE atapp_connector_impl *get_connector() const noexcept { return connector_; }
+  UTIL_FORCEINLINE atapp_endpoint *get_endpoint() const noexcept { return endpiont_; }
 
  private:
   uint32_t flags_;
@@ -120,7 +120,7 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE atapp_connector_impl {
 
  public:
   LIBATAPP_MACRO_API virtual ~atapp_connector_impl();
-  LIBATAPP_MACRO_API virtual const char *name() UTIL_CONFIG_NOEXCEPT;
+  LIBATAPP_MACRO_API virtual const char *name() noexcept;
 
   /**
    * @brief get address type
@@ -163,9 +163,9 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE atapp_connector_impl {
 
   LIBATAPP_MACRO_API virtual void on_discovery_event(etcd_discovery_action_t::type, const etcd_discovery_node::ptr_t &);
 
-  LIBATAPP_MACRO_API const protocol_set_t &get_support_protocols() const UTIL_CONFIG_NOEXCEPT;
+  LIBATAPP_MACRO_API const protocol_set_t &get_support_protocols() const noexcept;
 
-  UTIL_FORCEINLINE app *get_owner() const UTIL_CONFIG_NOEXCEPT { return owner_; }
+  UTIL_FORCEINLINE app *get_owner() const noexcept { return owner_; }
 
  private:
   app *owner_;

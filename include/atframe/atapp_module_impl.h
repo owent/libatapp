@@ -13,9 +13,10 @@
 
 #include <config/compiler_features.h>
 #include <std/explicit_declare.h>
-#include <std/smart_ptr.h>
 
 #include <common/demangle.h>
+
+#include <memory>
 
 #include "atframe/atapp_config.h"
 
@@ -131,13 +132,13 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE module_impl {
  protected:
   /**
    * @brief get owner atapp object
-   * @return return owner atapp object, NULL if not added
+   * @return return owner atapp object, nullptr if not added
    */
   LIBATAPP_MACRO_API app *get_app();
 
   /**
    * @brief get owner atapp object
-   * @return return owner atapp object, NULL if not added
+   * @return return owner atapp object, nullptr if not added
    */
   LIBATAPP_MACRO_API const app *get_app() const;
 
