@@ -111,7 +111,7 @@ static bool upper_bound_compare_index(const lower_upper_bound_pred_t &l, const e
 }
 
 LIBATAPP_MACRO_API etcd_discovery_node::etcd_discovery_node() : name_hash_(0, 0), ingress_index_(0) {
-  private_data_ptr_ = NULL;
+  private_data_ptr_ = nullptr;
   private_data_u64_ = 0;
   private_data_uptr_ = 0;
 }
@@ -184,7 +184,7 @@ LIBATAPP_MACRO_API bool etcd_discovery_set::empty() const { return node_by_name_
 LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_id(uint64_t id) const {
   node_by_id_t::const_iterator iter = node_by_id_.find(id);
   if (iter == node_by_id_.end()) {
-    return NULL;
+    return nullptr;
   }
 
   return iter->second;
@@ -193,7 +193,7 @@ LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_id
 LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_name(const std::string &name) const {
   node_by_name_t::const_iterator iter = node_by_name_.find(name);
   if (iter == node_by_name_.end()) {
-    return NULL;
+    return nullptr;
   }
 
   return iter->second;
@@ -234,7 +234,7 @@ LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_ra
   }
 
   if (round_robin_cache_.empty()) {
-    return NULL;
+    return nullptr;
   }
 
   return round_robin_cache_[random_generator_.random_between<size_t>(0, round_robin_cache_.size())];
@@ -246,7 +246,7 @@ LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_ro
   }
 
   if (round_robin_cache_.empty()) {
-    return NULL;
+    return nullptr;
   }
 
   if (round_robin_index_ >= round_robin_cache_.size()) {

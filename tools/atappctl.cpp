@@ -25,7 +25,7 @@ static void _log_sink_stdout_handle(const util::log::log_wrapper::caller_info_t 
 
 class atappctl_module : public atapp::module_impl {
  public:
-  int init() UTIL_CONFIG_OVERRIDE {
+  int init() override {
     WLOG_GETCAT(util::log::log_wrapper::categorize_t::DEFAULT)->add_sink(_log_sink_stdout_handle);
     WLOG_GETCAT(util::log::log_wrapper::categorize_t::DEFAULT)
         ->set_stacktrace_level(util::log::log_formatter::level_t::LOG_LW_DISABLED,
@@ -33,15 +33,15 @@ class atappctl_module : public atapp::module_impl {
     return 0;
   };
 
-  int reload() UTIL_CONFIG_OVERRIDE { return 0; }
+  int reload() override { return 0; }
 
-  int stop() UTIL_CONFIG_OVERRIDE { return 0; }
+  int stop() override { return 0; }
 
-  int timeout() UTIL_CONFIG_OVERRIDE { return 0; }
+  int timeout() override { return 0; }
 
-  const char *name() const UTIL_CONFIG_OVERRIDE { return "atappctl_module"; }
+  const char *name() const override { return "atappctl_module"; }
 
-  int tick() UTIL_CONFIG_OVERRIDE { return 0; }
+  int tick() override { return 0; }
 };
 
 static int app_handle_on_msg(atapp::app &, const atapp::app::message_sender_t &source,
@@ -93,7 +93,7 @@ int main(int argc, char *argv[]) {
   app.set_evt_on_app_disconnected(app_handle_on_disconnected);
 
   // run
-  int ret = app.run(uv_default_loop(), argc, (const char **)argv, NULL);
+  int ret = app.run(uv_default_loop(), argc, (const char **)argv, nullptr);
   if (0 == ret) {
     return exit_code;
   }

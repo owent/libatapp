@@ -65,8 +65,8 @@ LIBATAPP_MACRO_API etcd_keepalive::ptr_t etcd_keepalive::create(etcd_cluster &ow
 LIBATAPP_MACRO_API void etcd_keepalive::close(bool reset_has_data_flag) {
   if (rpc_.rpc_opr_) {
     FWLOGDEBUG("Etcd watcher {} cancel http request.", reinterpret_cast<const void *>(this));
-    rpc_.rpc_opr_->set_on_complete(NULL);
-    rpc_.rpc_opr_->set_priv_data(NULL);
+    rpc_.rpc_opr_->set_on_complete(nullptr);
+    rpc_.rpc_opr_->set_priv_data(nullptr);
     rpc_.rpc_opr_->stop();
     rpc_.rpc_opr_.reset();
   }
@@ -79,7 +79,7 @@ LIBATAPP_MACRO_API void etcd_keepalive::close(bool reset_has_data_flag) {
 
   checker_.is_check_run = false;
   checker_.is_check_passed = false;
-  checker_.fn = NULL;
+  checker_.fn = nullptr;
   checker_.retry_times = 0;
 }
 
@@ -94,7 +94,7 @@ LIBATAPP_MACRO_API void etcd_keepalive::set_value(const std::string &str) {
     value_ = str;
     rpc_.is_value_changed = true;
 
-    if (NULL != owner_ && owner_->check_flag(etcd_cluster::flag_t::RUNNING) && 0 != owner_->get_lease()) {
+    if (nullptr != owner_ && owner_->check_flag(etcd_cluster::flag_t::RUNNING) && 0 != owner_->get_lease()) {
       active();
     }
   }
@@ -164,8 +164,8 @@ void etcd_keepalive::process() {
     int res = rpc_.rpc_opr_->start(util::network::http_request::method_t::EN_MT_POST, false);
     if (res != 0) {
       need_retry = true;
-      rpc_.rpc_opr_->set_priv_data(NULL);
-      rpc_.rpc_opr_->set_on_complete(NULL);
+      rpc_.rpc_opr_->set_priv_data(nullptr);
+      rpc_.rpc_opr_->set_on_complete(nullptr);
       FWLOGERROR("Etcd keepalive {} start request to {} failed, res: {}", reinterpret_cast<const void *>(this),
                  rpc_.rpc_opr_->get_url(), res);
       rpc_.rpc_opr_.reset();
@@ -182,7 +182,7 @@ void etcd_keepalive::process() {
 
 int etcd_keepalive::libcurl_callback_on_get_data(util::network::http_request &req) {
   etcd_keepalive *self = reinterpret_cast<etcd_keepalive *>(req.get_priv_data());
-  if (NULL == self) {
+  if (nullptr == self) {
     FWLOGERROR("Etcd keepalive get request shouldn't has request without private data");
     return 0;
   }
@@ -259,7 +259,7 @@ int etcd_keepalive::libcurl_callback_on_get_data(util::network::http_request &re
 
 int etcd_keepalive::libcurl_callback_on_set_data(util::network::http_request &req) {
   etcd_keepalive *self = reinterpret_cast<etcd_keepalive *>(req.get_priv_data());
-  if (NULL == self) {
+  if (nullptr == self) {
     FWLOGERROR("Etcd keepalive set request shouldn't has request without private data");
     return 0;
   }

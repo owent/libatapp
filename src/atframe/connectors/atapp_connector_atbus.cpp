@@ -16,7 +16,7 @@ LIBATAPP_MACRO_API atapp_connector_atbus::atapp_connector_atbus(app &owner) : at
 
 LIBATAPP_MACRO_API atapp_connector_atbus::~atapp_connector_atbus() { cleanup(); }
 
-LIBATAPP_MACRO_API const char *atapp_connector_atbus::name() UTIL_CONFIG_NOEXCEPT { return "atapp::connector.atapp"; }
+LIBATAPP_MACRO_API const char *atapp_connector_atbus::name() noexcept { return "atapp::connector.atapp"; }
 
 LIBATAPP_MACRO_API uint32_t
 atapp_connector_atbus::get_address_type(const atbus::channel::channel_address_t &addr) const {
@@ -39,7 +39,7 @@ atapp_connector_atbus::get_address_type(const atbus::channel::channel_address_t 
 }
 
 LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_start_listen(const atbus::channel::channel_address_t &addr) {
-  if (NULL == get_owner()) {
+  if (nullptr == get_owner()) {
     return EN_ATAPP_ERR_NOT_INITED;
   }
 
@@ -54,7 +54,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_start_listen(const atbus::c
 LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_start_connect(const etcd_discovery_node *discovery,
                                                                    const atbus::channel::channel_address_t &addr,
                                                                    const atapp_connection_handle::ptr_t &handle) {
-  if (NULL == get_owner()) {
+  if (nullptr == get_owner()) {
     return EN_ATAPP_ERR_NOT_INITED;
   }
 
@@ -63,7 +63,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_start_connect(const etcd_di
     return EN_ATAPP_ERR_SETUP_ATBUS;
   }
 
-  if (NULL == discovery) {
+  if (nullptr == discovery) {
     return EN_ATBUS_ERR_PARAMS;
   }
 
@@ -84,7 +84,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_start_connect(const etcd_di
 
   do {
     const atbus::endpoint *parent_atbus_endpoint = node->get_parent_endpoint();
-    if (NULL == parent_atbus_endpoint) {
+    if (nullptr == parent_atbus_endpoint) {
       break;
     }
 
@@ -138,7 +138,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_send_forward_request(atapp_
                                                                           uint64_t *sequence, const void *data,
                                                                           size_t data_size,
                                                                           const atapp::protocol::atapp_metadata *) {
-  if (NULL == get_owner() || NULL == handle) {
+  if (nullptr == get_owner() || nullptr == handle) {
     return EN_ATAPP_ERR_NOT_INITED;
   }
 
@@ -161,7 +161,7 @@ LIBATAPP_MACRO_API void atapp_connector_atbus::on_receive_forward_response(
     return;
   }
 
-  if (NULL == get_owner()) {
+  if (nullptr == get_owner()) {
     return;
   }
 
@@ -176,7 +176,7 @@ LIBATAPP_MACRO_API void atapp_connector_atbus::on_receive_forward_response(
   app::message_sender_t sender;
   sender.id = app_id;
   sender.remote = get_owner()->get_endpoint(app_id);
-  if (NULL != sender.remote) {
+  if (nullptr != sender.remote) {
     sender.name = &sender.remote->get_name();
   }
 

@@ -161,10 +161,10 @@ class app {
    * @param argc argument count for command line(include exec)
    * @param argv arguments for command line(include exec)
    * @param priv_data private data for custom option callbacks
-   * @note you can call init(ev_loop, argc, argv, priv_data), and then call run(NULL, 0, NULL).
+   * @note you can call init(ev_loop, argc, argv, priv_data), and then call run(nullptr, 0, nullptr).
    * @return 0 or error code
    */
-  LIBATAPP_MACRO_API int run(ev_loop_t *ev_loop, int argc, const char **argv, void *priv_data = NULL);
+  LIBATAPP_MACRO_API int run(ev_loop_t *ev_loop, int argc, const char **argv, void *priv_data = nullptr);
 
   /**
    * @brief initialize atapp
@@ -174,7 +174,7 @@ class app {
    * @param priv_data private data for custom option callbacks
    * @return 0 or error code
    */
-  LIBATAPP_MACRO_API int init(ev_loop_t *ev_loop, int argc, const char **argv, void *priv_data = NULL);
+  LIBATAPP_MACRO_API int init(ev_loop_t *ev_loop, int argc, const char **argv, void *priv_data = nullptr);
 
   /**
    * @brief run atapp loop but noblock if there is no event
@@ -193,13 +193,13 @@ class app {
    */
   LIBATAPP_MACRO_API int run_once(uint64_t min_event_count = 0, time_t timeout_miliseconds = 10000);
 
-  LIBATAPP_MACRO_API bool is_inited() const UTIL_CONFIG_NOEXCEPT;
+  LIBATAPP_MACRO_API bool is_inited() const noexcept;
 
-  LIBATAPP_MACRO_API bool is_running() const UTIL_CONFIG_NOEXCEPT;
+  LIBATAPP_MACRO_API bool is_running() const noexcept;
 
-  LIBATAPP_MACRO_API bool is_closing() const UTIL_CONFIG_NOEXCEPT;
+  LIBATAPP_MACRO_API bool is_closing() const noexcept;
 
-  LIBATAPP_MACRO_API bool is_closed() const UTIL_CONFIG_NOEXCEPT;
+  LIBATAPP_MACRO_API bool is_closed() const noexcept;
 
   LIBATAPP_MACRO_API int reload();
 
@@ -320,63 +320,64 @@ class app {
 
   LIBATAPP_MACRO_API int32_t listen(const std::string &address);
   LIBATAPP_MACRO_API int32_t send_message(uint64_t target_node_id, int32_t type, const void *data, size_t data_size,
-                                          uint64_t *msg_sequence = NULL,
-                                          const atapp::protocol::atapp_metadata *metadata = NULL);
+                                          uint64_t *msg_sequence = nullptr,
+                                          const atapp::protocol::atapp_metadata *metadata = nullptr);
   LIBATAPP_MACRO_API int32_t send_message(const std::string &target_node_name, int32_t type, const void *data,
-                                          size_t data_size, uint64_t *msg_sequence = NULL,
-                                          const atapp::protocol::atapp_metadata *metadata = NULL);
+                                          size_t data_size, uint64_t *msg_sequence = nullptr,
+                                          const atapp::protocol::atapp_metadata *metadata = nullptr);
   LIBATAPP_MACRO_API int32_t send_message(const etcd_discovery_node::ptr_t &target_node_discovery, int32_t type,
-                                          const void *data, size_t data_size, uint64_t *msg_sequence = NULL,
-                                          const atapp::protocol::atapp_metadata *metadata = NULL);
+                                          const void *data, size_t data_size, uint64_t *msg_sequence = nullptr,
+                                          const atapp::protocol::atapp_metadata *metadata = nullptr);
 
   LIBATAPP_MACRO_API int32_t send_message_by_consistent_hash(const void *hash_buf, size_t hash_bufsz, int32_t type,
                                                              const void *data, size_t data_size,
-                                                             uint64_t *msg_sequence = NULL,
-                                                             const atapp::protocol::atapp_metadata *metadata = NULL);
+                                                             uint64_t *msg_sequence = nullptr,
+                                                             const atapp::protocol::atapp_metadata *metadata = nullptr);
   LIBATAPP_MACRO_API int32_t send_message_by_consistent_hash(uint64_t hash_key, int32_t type, const void *data,
-                                                             size_t data_size, uint64_t *msg_sequence = NULL,
-                                                             const atapp::protocol::atapp_metadata *metadata = NULL);
+                                                             size_t data_size, uint64_t *msg_sequence = nullptr,
+                                                             const atapp::protocol::atapp_metadata *metadata = nullptr);
   LIBATAPP_MACRO_API int32_t send_message_by_consistent_hash(int64_t hash_key, int32_t type, const void *data,
-                                                             size_t data_size, uint64_t *msg_sequence = NULL,
-                                                             const atapp::protocol::atapp_metadata *metadata = NULL);
+                                                             size_t data_size, uint64_t *msg_sequence = nullptr,
+                                                             const atapp::protocol::atapp_metadata *metadata = nullptr);
   LIBATAPP_MACRO_API int32_t send_message_by_consistent_hash(const std::string &hash_key, int32_t type,
                                                              const void *data, size_t data_size,
-                                                             uint64_t *msg_sequence = NULL,
-                                                             const atapp::protocol::atapp_metadata *metadata = NULL);
+                                                             uint64_t *msg_sequence = nullptr,
+                                                             const atapp::protocol::atapp_metadata *metadata = nullptr);
 
   LIBATAPP_MACRO_API int32_t send_message_by_random(int32_t type, const void *data, size_t data_size,
-                                                    uint64_t *msg_sequence = NULL,
-                                                    const atapp::protocol::atapp_metadata *metadata = NULL);
+                                                    uint64_t *msg_sequence = nullptr,
+                                                    const atapp::protocol::atapp_metadata *metadata = nullptr);
   LIBATAPP_MACRO_API int32_t send_message_by_round_robin(int32_t type, const void *data, size_t data_size,
-                                                         uint64_t *msg_sequence = NULL,
-                                                         const atapp::protocol::atapp_metadata *metadata = NULL);
+                                                         uint64_t *msg_sequence = nullptr,
+                                                         const atapp::protocol::atapp_metadata *metadata = nullptr);
 
   LIBATAPP_MACRO_API int32_t send_message_by_consistent_hash(const etcd_discovery_set &discovery_set,
                                                              const void *hash_buf, size_t hash_bufsz, int32_t type,
                                                              const void *data, size_t data_size,
-                                                             uint64_t *msg_sequence = NULL,
-                                                             const atapp::protocol::atapp_metadata *metadata = NULL);
+                                                             uint64_t *msg_sequence = nullptr,
+                                                             const atapp::protocol::atapp_metadata *metadata = nullptr);
   LIBATAPP_MACRO_API int32_t send_message_by_consistent_hash(const etcd_discovery_set &discovery_set, uint64_t hash_key,
                                                              int32_t type, const void *data, size_t data_size,
-                                                             uint64_t *msg_sequence = NULL,
-                                                             const atapp::protocol::atapp_metadata *metadata = NULL);
+                                                             uint64_t *msg_sequence = nullptr,
+                                                             const atapp::protocol::atapp_metadata *metadata = nullptr);
   LIBATAPP_MACRO_API int32_t send_message_by_consistent_hash(const etcd_discovery_set &discovery_set, int64_t hash_key,
                                                              int32_t type, const void *data, size_t data_size,
-                                                             uint64_t *msg_sequence = NULL,
-                                                             const atapp::protocol::atapp_metadata *metadata = NULL);
+                                                             uint64_t *msg_sequence = nullptr,
+                                                             const atapp::protocol::atapp_metadata *metadata = nullptr);
   LIBATAPP_MACRO_API int32_t send_message_by_consistent_hash(const etcd_discovery_set &discovery_set,
                                                              const std::string &hash_key, int32_t type,
                                                              const void *data, size_t data_size,
-                                                             uint64_t *msg_sequence = NULL,
-                                                             const atapp::protocol::atapp_metadata *metadata = NULL);
+                                                             uint64_t *msg_sequence = nullptr,
+                                                             const atapp::protocol::atapp_metadata *metadata = nullptr);
 
   LIBATAPP_MACRO_API int32_t send_message_by_random(const etcd_discovery_set &discovery_set, int32_t type,
-                                                    const void *data, size_t data_size, uint64_t *msg_sequence = NULL,
-                                                    const atapp::protocol::atapp_metadata *metadata = NULL);
+                                                    const void *data, size_t data_size,
+                                                    uint64_t *msg_sequence = nullptr,
+                                                    const atapp::protocol::atapp_metadata *metadata = nullptr);
   LIBATAPP_MACRO_API int32_t send_message_by_round_robin(const etcd_discovery_set &discovery_set, int32_t type,
                                                          const void *data, size_t data_size,
-                                                         uint64_t *msg_sequence = NULL,
-                                                         const atapp::protocol::atapp_metadata *metadata = NULL);
+                                                         uint64_t *msg_sequence = nullptr,
+                                                         const atapp::protocol::atapp_metadata *metadata = nullptr);
 
   /**
    * @brief add log sink maker, this function allow user to add custom log sink from the configure of atapp

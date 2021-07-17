@@ -12,17 +12,16 @@
 
 #pragma once
 
-#include <sstream>
-#include <string>
-#include <vector>
-
-#include <std/chrono.h>
-#include <std/functional.h>
-#include <std/smart_ptr.h>
-
 #include <config/compiler_features.h>
 
 #include <network/http_request.h>
+
+#include <chrono>
+#include <functional>
+#include <memory>
+#include <sstream>
+#include <string>
+#include <vector>
 
 #include "atframe/etcdcli/etcd_def.h"
 

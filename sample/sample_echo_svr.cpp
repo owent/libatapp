@@ -187,5 +187,5 @@ int main(int argc, char *argv[]) {
   app.set_evt_on_app_disconnected(app_handle_on_disconnected);
 
   // run
-  return app.run(uv_default_loop(), argc, (const char **)argv, NULL);
+  return app.run(uv_default_loop(), argc, (const char **)argv, nullptr);
 }

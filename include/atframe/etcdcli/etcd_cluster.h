@@ -12,19 +12,18 @@
 
 #pragma once
 
-#include <ctime>
-#include <list>
-#include <string>
-#include <vector>
-
-#include <std/chrono.h>
-#include <std/smart_ptr.h>
-
 #include <network/http_request.h>
 #include <random/random_generator.h>
 #include <time/time_utility.h>
 
 #include <detail/libatbus_config.h>
+
+#include <chrono>
+#include <ctime>
+#include <list>
+#include <memory>
+#include <string>
+#include <vector>
 
 #include "atframe/etcdcli/etcd_packer.h"
 

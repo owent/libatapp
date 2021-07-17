@@ -9,9 +9,9 @@
 #include "cli/shell_font.h"
 
 namespace atapp {
-LIBATAPP_MACRO_API module_impl::module_impl() : enabled_(true), actived_(false), owner_(NULL) {}
+LIBATAPP_MACRO_API module_impl::module_impl() : enabled_(true), actived_(false), owner_(nullptr) {}
 LIBATAPP_MACRO_API module_impl::~module_impl() {
-  if (NULL != owner_) {
+  if (nullptr != owner_) {
     on_unbind();
   }
 }
@@ -54,7 +54,7 @@ LIBATAPP_MACRO_API const char *module_impl::name() const {
 }
 
 LIBATAPP_MACRO_API uint64_t module_impl::get_app_id() const {
-  if (NULL == owner_) {
+  if (nullptr == owner_) {
     return 0;
   }
 
@@ -62,7 +62,7 @@ LIBATAPP_MACRO_API uint64_t module_impl::get_app_id() const {
 }
 
 LIBATAPP_MACRO_API uint64_t module_impl::get_app_type_id() const {
-  if (NULL == owner_) {
+  if (nullptr == owner_) {
     return 0;
   }
 

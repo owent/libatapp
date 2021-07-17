@@ -64,16 +64,16 @@ class atapp_endpoint {
   static LIBATAPP_MACRO_API ptr_t create(app &owner);
   LIBATAPP_MACRO_API ~atapp_endpoint();
 
-  LIBATAPP_MACRO_API uint64_t get_id() const UTIL_CONFIG_NOEXCEPT;
-  LIBATAPP_MACRO_API const std::string &get_name() const UTIL_CONFIG_NOEXCEPT;
+  LIBATAPP_MACRO_API uint64_t get_id() const noexcept;
+  LIBATAPP_MACRO_API const std::string &get_name() const noexcept;
 
-  UTIL_FORCEINLINE bool has_connection_handle() const UTIL_CONFIG_NOEXCEPT { return !refer_connections_.empty(); }
-  LIBATAPP_MACRO_API const etcd_discovery_node::ptr_t &get_discovery() const UTIL_CONFIG_NOEXCEPT;
-  LIBATAPP_MACRO_API void update_discovery(const etcd_discovery_node::ptr_t &discovery) UTIL_CONFIG_NOEXCEPT;
+  UTIL_FORCEINLINE bool has_connection_handle() const noexcept { return !refer_connections_.empty(); }
+  LIBATAPP_MACRO_API const etcd_discovery_node::ptr_t &get_discovery() const noexcept;
+  LIBATAPP_MACRO_API void update_discovery(const etcd_discovery_node::ptr_t &discovery) noexcept;
 
   LIBATAPP_MACRO_API void add_connection_handle(atapp_connection_handle &handle);
   LIBATAPP_MACRO_API void remove_connection_handle(atapp_connection_handle &handle);
-  LIBATAPP_MACRO_API atapp_connection_handle *get_ready_connection_handle() const UTIL_CONFIG_NOEXCEPT;
+  LIBATAPP_MACRO_API atapp_connection_handle *get_ready_connection_handle() const noexcept;
 
   LIBATAPP_MACRO_API int32_t push_forward_message(int32_t type, uint64_t &msg_sequence, const void *data,
                                                   size_t data_size, const atapp::protocol::atapp_metadata *metadata);
@@ -82,7 +82,7 @@ class atapp_endpoint {
                                                     int32_t max_count = 0);
   LIBATAPP_MACRO_API void add_waker(util::time::time_utility::raw_time_t wakeup_time);
 
-  UTIL_FORCEINLINE app *get_owner() const UTIL_CONFIG_NOEXCEPT { return owner_; }
+  UTIL_FORCEINLINE app *get_owner() const noexcept { return owner_; }
 
  private:
   void reset();

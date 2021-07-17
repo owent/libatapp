@@ -62,7 +62,7 @@ static void load_field_string_filter(const std::string &input, rapidjson::Value 
 static void load_map_field_item(rapidjson::Value &dst, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &src,
                                 const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds, rapidjson::Document &doc,
                                 const rapidsjon_loader_load_options &options) {
-  if (NULL == fds) {
+  if (nullptr == fds) {
     return;
   }
   if (fds->is_repeated()) {
@@ -151,7 +151,7 @@ static void load_map_field_item(rapidjson::Value &dst, const ATBUS_MACRO_PROTOBU
 static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &src,
                             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds, rapidjson::Document &doc,
                             const rapidsjon_loader_load_options &options) {
-  if (NULL == fds) {
+  if (nullptr == fds) {
     return;
   }
 
@@ -297,12 +297,12 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_MESSAGE: {
       if (fds->is_map()) {
         const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Descriptor *msg_desc = fds->message_type();
-        if (NULL == msg_desc) {
+        if (nullptr == msg_desc) {
           break;
         }
         const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *key_fds = msg_desc->map_key();
         const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *value_fds = msg_desc->map_value();
-        if (NULL == key_fds || NULL == value_fds) {
+        if (nullptr == key_fds || nullptr == value_fds) {
           break;
         }
 
@@ -435,7 +435,7 @@ static std::string dump_pick_field_string_filter(const rapidjson::Value &val,
 static void dump_pick_field(const rapidjson::Value &val, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds,
                             const rapidsjon_loader_dump_options &options) {
-  if (NULL == fds) {
+  if (nullptr == fds) {
     return;
   }
 
@@ -513,12 +513,12 @@ static void dump_pick_field(const rapidjson::Value &val, ATBUS_MACRO_PROTOBUF_NA
       rapidjson::Value &jval = const_cast<rapidjson::Value &>(val);
       if (fds->is_repeated()) {
         ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *submsg = dst.GetReflection()->AddMessage(&dst, fds);
-        if (NULL != submsg) {
+        if (nullptr != submsg) {
           rapidsjon_loader_dump_to(jval, *submsg, options);
         }
       } else {
         ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *submsg = dst.GetReflection()->MutableMessage(&dst, fds);
-        if (NULL != submsg) {
+        if (nullptr != submsg) {
           rapidsjon_loader_dump_to(jval, *submsg, options);
         }
       }
@@ -556,7 +556,7 @@ static void dump_pick_field(const rapidjson::Value &val, ATBUS_MACRO_PROTOBUF_NA
       int jval_num = val.IsInt() ? val.GetInt() : 0;
       const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::EnumValueDescriptor *jval =
           fds->enum_type()->FindValueByNumber(jval_num);
-      if (jval == NULL) {
+      if (jval == nullptr) {
         // invalid value
         break;
       }
@@ -579,7 +579,7 @@ static void dump_pick_field(const rapidjson::Value &val, ATBUS_MACRO_PROTOBUF_NA
 static void dump_field_item_map(const rapidjson::Value &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                                 const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds,
                                 const rapidsjon_loader_dump_options &options) {
-  if (NULL == fds) {
+  if (nullptr == fds) {
     return;
   }
 
@@ -592,7 +592,7 @@ static void dump_field_item_map(const rapidjson::Value &src, ATBUS_MACRO_PROTOBU
   }
 
   const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Descriptor *desc = fds->message_type();
-  if (NULL == desc) {
+  if (nullptr == desc) {
     return;
   }
 
@@ -602,12 +602,12 @@ static void dump_field_item_map(const rapidjson::Value &src, ATBUS_MACRO_PROTOBU
 
   const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *key_fds = desc->map_key();
   const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *value_fds = desc->map_value();
-  if (NULL == key_fds || NULL == value_fds) {
+  if (nullptr == key_fds || nullptr == value_fds) {
     return;
   }
 
   ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *submsg = dst.GetReflection()->AddMessage(&dst, fds);
-  if (NULL == submsg) {
+  if (nullptr == submsg) {
     return;
   }
 
@@ -621,7 +621,7 @@ static void dump_field_item_map(const rapidjson::Value &src, ATBUS_MACRO_PROTOBU
 static void dump_field_item(const rapidjson::Value &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds,
                             const rapidsjon_loader_dump_options &options) {
-  if (NULL == fds) {
+  if (nullptr == fds) {
     return;
   }
 
@@ -844,7 +844,7 @@ LIBATAPP_MACRO_API void rapidsjon_loader_dump_to(const rapidjson::Value &src,
                                                  ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                                                  const rapidsjon_loader_dump_options &options) {
   const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Descriptor *desc = dst.GetDescriptor();
-  if (NULL == desc) {
+  if (nullptr == desc) {
     return;
   }
 
@@ -858,7 +858,7 @@ LIBATAPP_MACRO_API void rapidsjon_loader_load_from(rapidjson::Value &dst, rapidj
                                                    const rapidsjon_loader_load_options &options) {
   if (options.reserve_empty) {
     const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Descriptor *desc = src.GetDescriptor();
-    if (NULL == desc) {
+    if (nullptr == desc) {
       return;
     }
 

@@ -12,14 +12,13 @@
 
 #pragma once
 
-#include <string>
-
-#include <std/functional.h>
-#include <std/smart_ptr.h>
-
 #include <config/compiler_features.h>
 
 #include <network/http_request.h>
+
+#include <functional>
+#include <memory>
+#include <string>
 
 #include "atframe/etcdcli/etcd_def.h"
 

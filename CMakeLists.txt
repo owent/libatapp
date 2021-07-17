@@ -12,7 +12,7 @@ enable_testing()
 
 project(
   libatapp
-  VERSION "0.10.0"
+  VERSION "0.11.0"
   HOMEPAGE_URL "https://github.com/atframework/libatapp"
   LANGUAGES C CXX)
 
@@ -24,8 +24,6 @@ set(LIBATAPP_VERSION "${PROJECT_VERSION}")
 include("${CMAKE_CURRENT_LIST_DIR}/project/cmake/ProjectBuildOption.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/third_party/Repository.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/atframework/Repository.cmake")
-
-echowithcolor(COLOR GREEN "-- Build Type: ${CMAKE_BUILD_TYPE}")
 
 unset(PROJECT_LIBATAPP_PRIVATE_COMPILE_OPTIONS)
 unset(PROJECT_LIBATAPP_PUBLIC_INCLUDE_DIRS)

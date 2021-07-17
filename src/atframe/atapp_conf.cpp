@@ -62,7 +62,7 @@ static const char *skip_space(const char *str) {
 template <typename TINT>
 static const char *pick_number(TINT &out, const char *str) {
   out = 0;
-  if (NULL == str || !(*str)) {
+  if (nullptr == str || !(*str)) {
     return str;
   }
 
@@ -118,8 +118,8 @@ static const char *pick_number(TINT &out, const char *str) {
 
 /*
 static bool protobuf_field_cmp_fn(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor* l, const
-ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor* r) { int lv = (NULL == l)? 0: l->number(); int rv = (NULL == r)? 0:
-r->number(); return lv < rv;
+ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor* r) { int lv = (nullptr == l)? 0: l->number(); int rv = (nullptr ==
+r)? 0: r->number(); return lv < rv;
 }
 */
 
@@ -532,7 +532,7 @@ static inline bool dump_pick_logic_bool(std::string &trans) {
 
 static void dump_pick_map_key_field(const std::string &val_str, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                                     const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds) {
-  if (NULL == fds) {
+  if (nullptr == fds) {
     return;
   }
 
@@ -584,7 +584,7 @@ static void dump_pick_map_key_field(const std::string &val_str, ATBUS_MACRO_PROT
 
 static void dump_pick_field(const util::config::ini_value &val, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds, size_t index) {
-  if (NULL == fds) {
+  if (nullptr == fds) {
     return;
   }
 
@@ -627,13 +627,13 @@ static void dump_pick_field(const util::config::ini_value &val, ATBUS_MACRO_PROT
     };
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_STRING: {
       const std::string *value = &val.as_cpp_string(index);
-      if (NULL == value || value->empty()) {
+      if (nullptr == value || value->empty()) {
         if (fds->options().HasExtension(atapp::protocol::CONFIGURE)) {
           const std::string &default_str = fds->options().GetExtension(atapp::protocol::CONFIGURE).default_value();
           value = &default_str;
         }
       }
-      if (NULL != value) {
+      if (nullptr != value) {
         if (fds->is_repeated()) {
           dst.GetReflection()->AddString(&dst, fds, *value);
         } else {
@@ -666,12 +666,12 @@ static void dump_pick_field(const util::config::ini_value &val, ATBUS_MACRO_PROT
       }
 
       if (fds->is_map()) {
-        if (NULL == fds->message_type()) {
+        if (nullptr == fds->message_type()) {
           break;
         }
         const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *key_fds = fds->message_type()->map_key();
         const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *value_fds = fds->message_type()->map_value();
-        if (NULL == key_fds || NULL == value_fds) {
+        if (nullptr == key_fds || nullptr == value_fds) {
           break;
         }
 
@@ -682,7 +682,7 @@ static void dump_pick_field(const util::config::ini_value &val, ATBUS_MACRO_PROT
           }
 
           ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *submsg = dst.GetReflection()->AddMessage(&dst, fds);
-          if (NULL == submsg) {
+          if (nullptr == submsg) {
             break;
           }
           dump_pick_map_key_field(iter->first, *submsg, key_fds);
@@ -698,14 +698,14 @@ static void dump_pick_field(const util::config::ini_value &val, ATBUS_MACRO_PROT
           }
 
           ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *submsg = dst.GetReflection()->AddMessage(&dst, fds);
-          if (NULL != submsg) {
+          if (nullptr != submsg) {
             ini_loader_dump_to(*idx_iter->second, *submsg);
           }
         }
         break;
       } else {
         ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *submsg = dst.GetReflection()->MutableMessage(&dst, fds);
-        if (NULL != submsg) {
+        if (nullptr != submsg) {
           ini_loader_dump_to(val, *submsg);
         }
       }
@@ -750,21 +750,21 @@ static void dump_pick_field(const util::config::ini_value &val, ATBUS_MACRO_PROT
     };
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_ENUM: {
       const std::string *value = &val.as_cpp_string(index);
-      if (NULL == value || value->empty()) {
+      if (nullptr == value || value->empty()) {
         if (fds->options().HasExtension(atapp::protocol::CONFIGURE)) {
           const std::string &default_str = fds->options().GetExtension(atapp::protocol::CONFIGURE).default_value();
           value = &default_str;
         }
       }
 
-      const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::EnumValueDescriptor *jval = NULL;
-      if (NULL == value || value->empty() || ((*value)[0] >= '0' && (*value)[0] <= '9')) {
+      const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::EnumValueDescriptor *jval = nullptr;
+      if (nullptr == value || value->empty() || ((*value)[0] >= '0' && (*value)[0] <= '9')) {
         jval = fds->enum_type()->FindValueByNumber(val.as_int32(index));
       } else {
         jval = fds->enum_type()->FindValueByName(*value);
       }
 
-      if (jval == NULL) {
+      if (jval == nullptr) {
         // invalid value
         break;
       }
@@ -786,7 +786,7 @@ static void dump_pick_field(const util::config::ini_value &val, ATBUS_MACRO_PROT
 
 static void dump_field_item(const util::config::ini_value &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds) {
-  if (NULL == fds) {
+  if (nullptr == fds) {
     return;
   }
 
@@ -857,7 +857,7 @@ static TRET dump_pick_field_with_extensions(const YAML::Node &val,
 static void dump_message_item(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst);
 static void dump_pick_field(const YAML::Node &val, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds) {
-  if (NULL == fds) {
+  if (nullptr == fds) {
     return;
   }
 
@@ -915,13 +915,13 @@ static void dump_pick_field(const YAML::Node &val, ATBUS_MACRO_PROTOBUF_NAMESPAC
         }
 
         const std::string *value = &val.Scalar();
-        if (NULL == value || value->empty()) {
+        if (nullptr == value || value->empty()) {
           if (fds->options().HasExtension(atapp::protocol::CONFIGURE)) {
             const std::string &default_str = fds->options().GetExtension(atapp::protocol::CONFIGURE).default_value();
             value = &default_str;
           }
         }
-        if (NULL != value) {
+        if (nullptr != value) {
           if (fds->is_repeated()) {
             dst.GetReflection()->AddString(&dst, fds, val.Scalar());
           } else {
@@ -959,19 +959,19 @@ static void dump_pick_field(const YAML::Node &val, ATBUS_MACRO_PROTOBUF_NAMESPAC
         if (val.IsMap()) {
           ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *submsg;
           if (fds->is_map()) {
-            if (NULL == fds->message_type()) {
+            if (nullptr == fds->message_type()) {
               break;
             }
             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *key_fds = fds->message_type()->map_key();
             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *value_fds = fds->message_type()->map_value();
-            if (NULL == key_fds || NULL == value_fds) {
+            if (nullptr == key_fds || nullptr == value_fds) {
               break;
             }
 
             YAML::Node::const_iterator iter = val.begin();
             for (; iter != val.end(); ++iter) {
               submsg = dst.GetReflection()->AddMessage(&dst, fds);
-              if (NULL == submsg) {
+              if (nullptr == submsg) {
                 break;
               }
               dump_pick_field(iter->first, *submsg, key_fds);
@@ -979,13 +979,13 @@ static void dump_pick_field(const YAML::Node &val, ATBUS_MACRO_PROTOBUF_NAMESPAC
             }
           } else if (fds->is_repeated()) {
             submsg = dst.GetReflection()->AddMessage(&dst, fds);
-            if (NULL == submsg) {
+            if (nullptr == submsg) {
               break;
             }
             dump_message_item(val, *submsg);
           } else {
             submsg = dst.GetReflection()->MutableMessage(&dst, fds);
-            if (NULL == submsg) {
+            if (nullptr == submsg) {
               break;
             }
             dump_message_item(val, *submsg);
@@ -1046,21 +1046,21 @@ static void dump_pick_field(const YAML::Node &val, ATBUS_MACRO_PROTOBUF_NAMESPAC
         }
 
         const std::string *value = &val.Scalar();
-        if (NULL == value || value->empty()) {
+        if (nullptr == value || value->empty()) {
           if (fds->options().HasExtension(atapp::protocol::CONFIGURE)) {
             const std::string &default_str = fds->options().GetExtension(atapp::protocol::CONFIGURE).default_value();
             value = &default_str;
           }
         }
 
-        const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::EnumValueDescriptor *jval = NULL;
-        if (NULL == value || value->empty() || ((*value)[0] >= '0' && (*value)[0] <= '9')) {
+        const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::EnumValueDescriptor *jval = nullptr;
+        if (nullptr == value || value->empty() || ((*value)[0] >= '0' && (*value)[0] <= '9')) {
           jval = fds->enum_type()->FindValueByNumber(util::string::to_int<int32_t>(val.Scalar().c_str()));
         } else {
           jval = fds->enum_type()->FindValueByName(*value);
         }
 
-        if (jval == NULL) {
+        if (jval == nullptr) {
           // invalid value
           break;
         }
@@ -1088,7 +1088,7 @@ static void dump_pick_field(const YAML::Node &val, ATBUS_MACRO_PROTOBUF_NAMESPAC
 
 static void dump_field_item(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds) {
-  if (NULL == fds) {
+  if (nullptr == fds) {
     return;
   }
 
@@ -1128,7 +1128,7 @@ static void dump_field_item(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPAC
 
 static void dump_message_item(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst) {
   const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Descriptor *desc = dst.GetDescriptor();
-  if (NULL == desc) {
+  if (nullptr == desc) {
     return;
   }
 
@@ -1165,7 +1165,7 @@ LIBATAPP_MACRO_API void parse_duration(const std::string &in, ATBUS_MACRO_PROTOB
 LIBATAPP_MACRO_API void ini_loader_dump_to(const util::config::ini_value &src,
                                            ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst) {
   const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Descriptor *desc = dst.GetDescriptor();
-  if (NULL == desc) {
+  if (nullptr == desc) {
     return;
   }
 
@@ -1198,7 +1198,7 @@ LIBATAPP_MACRO_API void ini_loader_dump_to(const util::config::ini_value &src,
     if (prefix.empty()) {
       const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds =
           ::atapp::protocol::atapp_log_sink::descriptor()->FindFieldByName(iter->first);
-      if (NULL != fds && fds->name() != "unresolved_key_values") {
+      if (nullptr != fds && fds->name() != "unresolved_key_values") {
         continue;
       }
     }

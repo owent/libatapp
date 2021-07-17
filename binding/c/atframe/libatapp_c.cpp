@@ -16,10 +16,10 @@
 #include <libatbus_protocol.h>
 
 #define ATAPP_CONTEXT(x) ((::atapp::app *)(x))
-#define ATAPP_CONTEXT_IS_NULL(x) (NULL == (x))
+#define ATAPP_CONTEXT_IS_NULL(x) (nullptr == (x))
 
 #define ATAPP_MESSAGE(x) ((const ::atapp::app::message_t *)(x[1]))
-#define ATAPP_MESSAGE_IS_NULL(x) (NULL == (x))
+#define ATAPP_MESSAGE_IS_NULL(x) (nullptr == (x))
 
 #define ATAPP_SENDER(x) ((const ::atapp::app::message_sender_t *)(x[0]))
 
@@ -28,7 +28,7 @@ struct libatapp_c_on_msg_functor {
   libatapp_c_on_msg_functor(libatapp_c_on_msg_fn_t fn, void *priv_data) : callee_(fn), private_data_(priv_data) {}
 
   int operator()(::atapp::app &self, const ::atapp::app::message_sender_t &source, const ::atapp::app::message_t &msg) {
-    if (NULL == callee_) {
+    if (nullptr == callee_) {
       return 0;
     }
 
@@ -51,7 +51,7 @@ struct libatapp_c_on_send_fail_functor {
 
   int operator()(::atapp::app &self, const ::atapp::app::message_sender_t &source, const ::atapp::app::message_t &msg,
                  int32_t) {
-    if (NULL == callee_) {
+    if (nullptr == callee_) {
       return 0;
     }
 
@@ -73,7 +73,7 @@ struct libatapp_c_on_connected_functor {
       : callee_(fn), private_data_(priv_data) {}
 
   int operator()(::atapp::app &self, ::atbus::endpoint &ep, int status) {
-    if (NULL == callee_) {
+    if (nullptr == callee_) {
       return 0;
     }
 
@@ -91,7 +91,7 @@ struct libatapp_c_on_disconnected_functor {
       : callee_(fn), private_data_(priv_data) {}
 
   int operator()(::atapp::app &self, ::atbus::endpoint &ep, int status) {
-    if (NULL == callee_) {
+    if (nullptr == callee_) {
       return 0;
     }
 
@@ -109,7 +109,7 @@ struct libatapp_c_on_all_module_inited_functor {
       : callee_(fn), private_data_(priv_data) {}
 
   int operator()(::atapp::app &self) {
-    if (NULL == callee_) {
+    if (nullptr == callee_) {
       return 0;
     }
 
@@ -127,7 +127,7 @@ struct libatapp_c_on_cmd_option_functor {
       : ctx_(ctx), callee_(fn), private_data_(priv_data) {}
 
   int operator()(util::cli::callback_param params) {
-    if (NULL == callee_) {
+    if (nullptr == callee_) {
       return 0;
     }
 
@@ -149,27 +149,27 @@ struct libatapp_c_on_cmd_option_functor {
   void *private_data_;
 };
 
-class libatapp_c_on_module UTIL_CONFIG_FINAL : public ::atapp::module_impl {
+class libatapp_c_on_module final : public ::atapp::module_impl {
  public:
   libatapp_c_on_module(const char *name) {
     name_ = name;
 
-    on_init_ = NULL;
-    on_reload_ = NULL;
-    on_stop_ = NULL;
-    on_timeout_ = NULL;
-    on_cleanup_ = NULL;
-    on_tick_ = NULL;
-    on_init_private_data_ = NULL;
-    on_reload_private_data_ = NULL;
-    on_stop_private_data_ = NULL;
-    on_timeout_private_data_ = NULL;
-    on_tick_private_data_ = NULL;
-    on_cleanup_private_data_ = NULL;
+    on_init_ = nullptr;
+    on_reload_ = nullptr;
+    on_stop_ = nullptr;
+    on_timeout_ = nullptr;
+    on_cleanup_ = nullptr;
+    on_tick_ = nullptr;
+    on_init_private_data_ = nullptr;
+    on_reload_private_data_ = nullptr;
+    on_stop_private_data_ = nullptr;
+    on_timeout_private_data_ = nullptr;
+    on_tick_private_data_ = nullptr;
+    on_cleanup_private_data_ = nullptr;
   }
 
-  int init() UTIL_CONFIG_OVERRIDE UTIL_CONFIG_FINAL {
-    if (NULL != on_init_) {
+  int init() override final {
+    if (nullptr != on_init_) {
       libatapp_c_module mod;
       mod = this;
       return (*on_init_)(mod, on_init_private_data_);
@@ -177,8 +177,8 @@ class libatapp_c_on_module UTIL_CONFIG_FINAL : public ::atapp::module_impl {
     return 0;
   };
 
-  int reload() UTIL_CONFIG_OVERRIDE UTIL_CONFIG_FINAL {
-    if (NULL != on_reload_) {
+  int reload() override final {
+    if (nullptr != on_reload_) {
       libatapp_c_module mod;
       mod = this;
       return (*on_reload_)(mod, on_reload_private_data_);
@@ -186,8 +186,8 @@ class libatapp_c_on_module UTIL_CONFIG_FINAL : public ::atapp::module_impl {
     return 0;
   }
 
-  int stop() UTIL_CONFIG_OVERRIDE UTIL_CONFIG_FINAL {
-    if (NULL != on_stop_) {
+  int stop() override final {
+    if (nullptr != on_stop_) {
       libatapp_c_module mod;
       mod = this;
       return (*on_stop_)(mod, on_stop_private_data_);
@@ -195,8 +195,8 @@ class libatapp_c_on_module UTIL_CONFIG_FINAL : public ::atapp::module_impl {
     return 0;
   }
 
-  int timeout() UTIL_CONFIG_OVERRIDE UTIL_CONFIG_FINAL {
-    if (NULL != on_timeout_) {
+  int timeout() override final {
+    if (nullptr != on_timeout_) {
       libatapp_c_module mod;
       mod = this;
       return (*on_timeout_)(mod, on_timeout_private_data_);
@@ -204,18 +204,18 @@ class libatapp_c_on_module UTIL_CONFIG_FINAL : public ::atapp::module_impl {
     return 0;
   }
 
-  void cleanup() UTIL_CONFIG_OVERRIDE UTIL_CONFIG_FINAL {
-    if (NULL != on_cleanup_) {
+  void cleanup() override final {
+    if (nullptr != on_cleanup_) {
       libatapp_c_module mod;
       mod = this;
       (*on_cleanup_)(mod, on_cleanup_private_data_);
     }
   }
 
-  const char *name() const UTIL_CONFIG_OVERRIDE UTIL_CONFIG_FINAL { return name_.c_str(); }
+  const char *name() const override final { return name_.c_str(); }
 
-  int tick() UTIL_CONFIG_OVERRIDE UTIL_CONFIG_FINAL {
-    if (NULL != on_tick_) {
+  int tick() override final {
+    if (nullptr != on_tick_) {
       libatapp_c_module mod;
       mod = this;
       return (*on_tick_)(mod, on_tick_private_data_);
@@ -246,7 +246,7 @@ class libatapp_c_on_module UTIL_CONFIG_FINAL : public ::atapp::module_impl {
 }  // namespace detail
 
 #define ATAPP_MODULE(x) ((::detail::libatapp_c_on_module *)(x))
-#define ATAPP_MODULE_IS_NULL(x) (NULL == (x))
+#define ATAPP_MODULE_IS_NULL(x) (nullptr == (x))
 
 #ifdef __cplusplus
 extern "C" {
@@ -307,7 +307,7 @@ LIBATAPP_MACRO_API void __cdecl libatapp_c_add_cmd(libatapp_c_context context, c
     return;
   }
 
-  if (NULL != help_msg && *help_msg) {
+  if (nullptr != help_msg && *help_msg) {
     ATAPP_CONTEXT(context)
         ->get_command_manager()
         ->bind_cmd(cmd, detail::libatapp_c_on_cmd_option_functor(context, fn, priv_data))
@@ -325,7 +325,7 @@ LIBATAPP_MACRO_API void __cdecl libatapp_c_add_option(libatapp_c_context context
     return;
   }
 
-  if (NULL != help_msg && *help_msg) {
+  if (nullptr != help_msg && *help_msg) {
     ATAPP_CONTEXT(context)
         ->get_option_manager()
         ->bind_cmd(opt, detail::libatapp_c_on_cmd_option_functor(context, fn, priv_data))
@@ -338,7 +338,7 @@ LIBATAPP_MACRO_API void __cdecl libatapp_c_add_option(libatapp_c_context context
 
 LIBATAPP_MACRO_API void __cdecl libatapp_c_custom_cmd_add_rsp(libatapp_c_custom_cmd_sender sender, const char *rsp,
                                                               uint64_t rsp_sz) {
-  if (NULL == sender) {
+  if (nullptr == sender) {
     return;
   }
 
@@ -417,20 +417,20 @@ LIBATAPP_MACRO_API uint64_t __cdecl libatapp_c_get_id(libatapp_c_context context
 LIBATAPP_MACRO_API void __cdecl libatapp_c_get_app_version(libatapp_c_context context, const char **verbuf,
                                                            uint64_t *bufsz) {
   if (ATAPP_CONTEXT_IS_NULL(context)) {
-    if (NULL != bufsz) {
+    if (nullptr != bufsz) {
       *bufsz = 0;
     }
-    if (NULL != verbuf) {
-      *verbuf = NULL;
+    if (nullptr != verbuf) {
+      *verbuf = nullptr;
     }
 
     return;
   }
 
-  if (NULL != bufsz) {
+  if (nullptr != bufsz) {
     *bufsz = static_cast<uint64_t>(ATAPP_CONTEXT(context)->get_app_version().size());
   }
-  if (NULL != verbuf) {
+  if (nullptr != verbuf) {
     *verbuf = ATAPP_CONTEXT(context)->get_app_version().c_str();
   }
 }
@@ -584,8 +584,8 @@ LIBATAPP_MACRO_API uint64_t __cdecl libatapp_c_msg_get_forward_from(libatapp_c_m
 LIBATAPP_MACRO_API libatapp_c_module __cdecl libatapp_c_module_create(libatapp_c_context context,
                                                                       const char *mod_name) {
   libatapp_c_module ret;
-  ret = NULL;
-  if (ATAPP_CONTEXT_IS_NULL(context) || NULL == mod_name) {
+  ret = nullptr;
+  if (ATAPP_CONTEXT_IS_NULL(context) || nullptr == mod_name) {
     return ret;
   }
 
@@ -602,26 +602,26 @@ LIBATAPP_MACRO_API libatapp_c_module __cdecl libatapp_c_module_create(libatapp_c
 LIBATAPP_MACRO_API void __cdecl libatapp_c_module_get_name(libatapp_c_module mod, const char **namebuf,
                                                            uint64_t *bufsz) {
   if (ATAPP_MODULE_IS_NULL(mod)) {
-    if (NULL != bufsz) {
+    if (nullptr != bufsz) {
       *bufsz = 0;
     }
-    if (NULL != namebuf) {
-      *namebuf = NULL;
+    if (nullptr != namebuf) {
+      *namebuf = nullptr;
     }
     return;
   }
 
-  if (NULL != bufsz) {
+  if (nullptr != bufsz) {
     *bufsz = static_cast<uint64_t>(strlen(ATAPP_MODULE(mod)->name()));
   }
-  if (NULL != namebuf) {
+  if (nullptr != namebuf) {
     *namebuf = ATAPP_MODULE(mod)->name();
   }
 }
 
 LIBATAPP_MACRO_API libatapp_c_context __cdecl libatapp_c_module_get_context(libatapp_c_module mod) {
   libatapp_c_context ret;
-  ret = NULL;
+  ret = nullptr;
 
   if (ATAPP_MODULE_IS_NULL(mod)) {
     return ret;
@@ -699,7 +699,7 @@ LIBATAPP_MACRO_API void __cdecl libatapp_c_log_write(uint32_t tag, uint32_t leve
                                                      const char *file_path, const char *func_name, uint32_t line_number,
                                                      const char *content) {
   util::log::log_wrapper *log_cat = util::log::log_wrapper::mutable_log_cat(tag);
-  if (NULL == log_cat) {
+  if (nullptr == log_cat) {
     return;
   }
 
@@ -716,7 +716,7 @@ LIBATAPP_MACRO_API void __cdecl libatapp_c_log_update() { util::log::log_wrapper
 
 LIBATAPP_MACRO_API uint32_t __cdecl libatapp_c_log_get_level(uint32_t tag) {
   util::log::log_wrapper *log_cat = util::log::log_wrapper::mutable_log_cat(tag);
-  if (NULL == log_cat) {
+  if (nullptr == log_cat) {
     return 0;
   }
 
@@ -725,7 +725,7 @@ LIBATAPP_MACRO_API uint32_t __cdecl libatapp_c_log_get_level(uint32_t tag) {
 
 LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_log_check_level(uint32_t tag, uint32_t level) {
   util::log::log_wrapper *log_cat = util::log::log_wrapper::mutable_log_cat(tag);
-  if (NULL == log_cat) {
+  if (nullptr == log_cat) {
     return 0;
   }
 

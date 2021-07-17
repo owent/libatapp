@@ -38,9 +38,9 @@ LIBATAPP_MACRO_API etcd_watcher::ptr_t etcd_watcher::create(etcd_cluster &owner,
 LIBATAPP_MACRO_API void etcd_watcher::close() {
   if (rpc_.rpc_opr_) {
     FWLOGDEBUG("Etcd watcher {} cancel http request.", reinterpret_cast<const void *>(this));
-    rpc_.rpc_opr_->set_on_complete(NULL);
-    rpc_.rpc_opr_->set_on_write(NULL);
-    rpc_.rpc_opr_->set_priv_data(NULL);
+    rpc_.rpc_opr_->set_on_complete(nullptr);
+    rpc_.rpc_opr_->set_on_write(nullptr);
+    rpc_.rpc_opr_->set_priv_data(nullptr);
     rpc_.rpc_opr_->stop();
     rpc_.rpc_opr_.reset();
   }
@@ -87,7 +87,7 @@ void etcd_watcher::process() {
 
     int res = rpc_.rpc_opr_->start(util::network::http_request::method_t::EN_MT_POST, false);
     if (res != 0) {
-      rpc_.rpc_opr_->set_on_complete(NULL);
+      rpc_.rpc_opr_->set_on_complete(nullptr);
       FWLOGERROR("Etcd watcher {} start request to {} failed, res: {}", reinterpret_cast<const void *>(this),
                  rpc_.rpc_opr_->get_url(), res);
       rpc_.rpc_opr_.reset();
@@ -119,8 +119,8 @@ void etcd_watcher::process() {
 
   int res = rpc_.rpc_opr_->start(util::network::http_request::method_t::EN_MT_POST, false);
   if (res != 0) {
-    rpc_.rpc_opr_->set_on_complete(NULL);
-    rpc_.rpc_opr_->set_on_write(NULL);
+    rpc_.rpc_opr_->set_on_complete(nullptr);
+    rpc_.rpc_opr_->set_on_write(nullptr);
     FWLOGERROR("Etcd watcher {} start request to {} failed, res: {}", reinterpret_cast<const void *>(this),
                rpc_.rpc_opr_->get_url(), res);
     rpc_.rpc_opr_.reset();
@@ -134,7 +134,7 @@ void etcd_watcher::process() {
 
 int etcd_watcher::libcurl_callback_on_range_completed(util::network::http_request &req) {
   etcd_watcher *self = reinterpret_cast<etcd_watcher *>(req.get_priv_data());
-  if (NULL == self) {
+  if (nullptr == self) {
     FWLOGERROR("Etcd watcher range request shouldn't has request without private data");
     return 0;
   }
@@ -255,7 +255,7 @@ int etcd_watcher::libcurl_callback_on_range_completed(util::network::http_reques
 
 int etcd_watcher::libcurl_callback_on_watch_completed(util::network::http_request &req) {
   etcd_watcher *self = reinterpret_cast<etcd_watcher *>(req.get_priv_data());
-  if (NULL == self) {
+  if (nullptr == self) {
     FWLOGERROR("Etcd watcher watch request shouldn't has request without private data");
     return 0;
   }
@@ -297,16 +297,16 @@ int etcd_watcher::libcurl_callback_on_watch_completed(util::network::http_reques
 int etcd_watcher::libcurl_callback_on_watch_write(util::network::http_request &req, const char *inbuf, size_t inbufsz,
                                                   const char *&outbuf, size_t &outbufsz) {
   // etcd_watcher 模块内消耗掉缓冲区，不需要写出到通用缓冲区了
-  outbuf = NULL;
+  outbuf = nullptr;
   outbufsz = 0;
 
   etcd_watcher *self = reinterpret_cast<etcd_watcher *>(req.get_priv_data());
-  if (NULL == self) {
+  if (nullptr == self) {
     FWLOGERROR("Etcd watcher watch request shouldn't has request without private data");
     return 0;
   }
 
-  if (inbuf == NULL || 0 == inbufsz) {
+  if (inbuf == nullptr || 0 == inbufsz) {
     FWLOGDEBUG("Etcd watcher {} got http trunk without data", reinterpret_cast<const void *>(self));
     return 0;
   }
