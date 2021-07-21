@@ -1,4 +1,4 @@
-﻿// Copyright 2021 atframework
+// Copyright 2021 atframework
 // Created by owent
 
 #include "atframe/atapp_log_sink_maker.h"

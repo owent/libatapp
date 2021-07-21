@@ -1,5 +1,5 @@
-﻿#ifndef ATFRAME_SERVICE_COMPONENT_MODULES_ETCD_MODULE_H
-#define ATFRAME_SERVICE_COMPONENT_MODULES_ETCD_MODULE_H
+// Copyright 2021 atframework
+// Created by owent
 
 #pragma once
 
@@ -205,5 +205,3 @@ class etcd_module : public ::atapp::module_impl {
   node_event_callback_list_t node_event_callbacks_;
 };
 }  // namespace atapp
-
-#endif

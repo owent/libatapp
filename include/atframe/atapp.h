@@ -1,21 +1,19 @@
-﻿/**
- * atapp.h
- *
- *  Created on: 2016年04月23日
- *      Author: owent
- */
-#ifndef LIBATAPP_ATAPP_H
-#define LIBATAPP_ATAPP_H
+// Copyright 2021 atframework
+// Created by owent on 2016-04-23
 
 #pragma once
 
 #include <bitset>
 #include <functional>
+#include <list>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
 #include "atframe/atapp_conf.h"
+
+#include "gsl/select-gsl.h"
 
 #include "cli/cmd_option.h"
 #include "time/time_utility.h"
@@ -26,8 +24,8 @@
 
 #include "atframe/atapp_log_sink_maker.h"
 #include "atframe/atapp_module_impl.h"
-
-#include "connectors/atapp_connector_atbus.h"
+#include "atframe/connectors/atapp_connector_impl.h"
+#include "atframe/connectors/atapp_endpoint.h"
 
 #include "etcdcli/etcd_cluster.h"
 
@@ -43,15 +41,17 @@ class connection;
 namespace atapp {
 
 class etcd_module;
+class atapp_connector_atbus;
+class atapp_connector_loopback;
 
 class app {
  public:
   using app_id_t = LIBATAPP_MACRO_BUSID_TYPE;
   using module_ptr_t = std::shared_ptr<module_impl>;
   using yaml_conf_map_t = atbus::detail::auto_select_map<std::string, std::vector<YAML::Node> >::type;
-  using endpoint_index_by_id_t = LIBATFRAME_UTILS_AUTO_SELETC_MAP(uint64_t, atapp_endpoint::ptr_t);
-  using endpoint_index_by_name_t = LIBATFRAME_UTILS_AUTO_SELETC_MAP(std::string, atapp_endpoint::ptr_t);
-  using connector_protocol_map_t = LIBATFRAME_UTILS_AUTO_SELETC_MAP(std::string, std::shared_ptr<atapp_connector_impl>);
+  using endpoint_index_by_id_t = std::unordered_map<uint64_t, atapp_endpoint::ptr_t>;
+  using endpoint_index_by_name_t = std::unordered_map<std::string, atapp_endpoint::ptr_t>;
+  using connector_protocol_map_t = std::unordered_map<std::string, std::shared_ptr<atapp_connector_impl> >;
   using address_type_t = atapp_connector_impl::address_type_t;
   using ev_loop_t = uv_loop_t;
 
@@ -65,6 +65,7 @@ class app {
       INITIALIZED,
       STOPPED,
       DISABLE_ATBUS_FALLBACK,
+      IN_TICK,
       FLAG_MAX
     };
   };
@@ -84,7 +85,7 @@ class app {
 
   struct message_sender_t {
     app_id_t id;
-    const std::string *name;
+    gsl::string_view name;
     atapp_endpoint *remote;
     LIBATAPP_MACRO_API message_sender_t();
     LIBATAPP_MACRO_API ~message_sender_t();
@@ -316,13 +317,13 @@ class app {
   LIBATAPP_MACRO_API uint32_t get_address_type(const std::string &addr) const;
 
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_discovery_node_by_id(uint64_t id) const;
-  LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_discovery_node_by_name(const std::string &name) const;
+  LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_discovery_node_by_name(gsl::string_view name) const;
 
   LIBATAPP_MACRO_API int32_t listen(const std::string &address);
   LIBATAPP_MACRO_API int32_t send_message(uint64_t target_node_id, int32_t type, const void *data, size_t data_size,
                                           uint64_t *msg_sequence = nullptr,
                                           const atapp::protocol::atapp_metadata *metadata = nullptr);
-  LIBATAPP_MACRO_API int32_t send_message(const std::string &target_node_name, int32_t type, const void *data,
+  LIBATAPP_MACRO_API int32_t send_message(gsl::string_view target_node_name, int32_t type, const void *data,
                                           size_t data_size, uint64_t *msg_sequence = nullptr,
                                           const atapp::protocol::atapp_metadata *metadata = nullptr);
   LIBATAPP_MACRO_API int32_t send_message(const etcd_discovery_node::ptr_t &target_node_discovery, int32_t type,
@@ -382,7 +383,7 @@ class app {
   /**
    * @brief add log sink maker, this function allow user to add custom log sink from the configure of atapp
    */
-  LIBATAPP_MACRO_API bool add_log_sink_maker(const std::string &name, log_sink_maker::log_reg_t fn);
+  LIBATAPP_MACRO_API bool add_log_sink_maker(gsl::string_view name, log_sink_maker::log_reg_t fn);
 
   LIBATAPP_MACRO_API void set_evt_on_forward_request(callback_fn_on_forward_request_t fn);
   LIBATAPP_MACRO_API void set_evt_on_forward_response(callback_fn_on_forward_response_t fn);
@@ -404,8 +405,8 @@ class app {
   LIBATAPP_MACRO_API atapp_endpoint::ptr_t mutable_endpoint(const etcd_discovery_node::ptr_t &discovery);
   LIBATAPP_MACRO_API atapp_endpoint *get_endpoint(uint64_t by_id);
   LIBATAPP_MACRO_API const atapp_endpoint *get_endpoint(uint64_t by_id) const;
-  LIBATAPP_MACRO_API atapp_endpoint *get_endpoint(const std::string &by_name);
-  LIBATAPP_MACRO_API const atapp_endpoint *get_endpoint(const std::string &by_name) const;
+  LIBATAPP_MACRO_API atapp_endpoint *get_endpoint(gsl::string_view by_name);
+  LIBATAPP_MACRO_API const atapp_endpoint *get_endpoint(gsl::string_view by_name) const;
 
   template <class TCONNECTOR, class... TARGS>
   LIBATAPP_MACRO_API_HEAD_ONLY std::shared_ptr<TCONNECTOR> add_connector(TARGS &&...args) {
@@ -525,6 +526,8 @@ class app {
   void process_signals();
   void process_signal(int signo);
 
+  int64_t process_inner_events(const util::time::time_utility::raw_time_t &end_tick);
+
  public:
   LIBATAPP_MACRO_API int trigger_event_on_forward_request(const message_sender_t &source, const message_t &msg);
   LIBATAPP_MACRO_API int trigger_event_on_forward_response(const message_sender_t &source, const message_t &msg,
@@ -592,7 +595,6 @@ class app {
   std::list<std::shared_ptr<atapp_connector_impl> > connectors_;
   connector_protocol_map_t connector_protocols_;
   std::shared_ptr<atapp_connector_atbus> atbus_connector_;
+  std::shared_ptr<atapp_connector_loopback> loopback_connector_;
 };
 }  // namespace atapp
-
-#endif

@@ -1,16 +1,9 @@
-/**
- * etcd_def.h
- *
- *  Created on: 2020-08-18
- *      Author: owent
- *
- *  Released under the MIT license
- */
-
-#ifndef LIBATAPP_ETCDCLI_ETCD_DISCOVERY_H
-#define LIBATAPP_ETCDCLI_ETCD_DISCOVERY_H
+// Copyright 2021 atframework
+// Created by owent on 2020-08-18
 
 #pragma once
+
+#include <gsl/select-gsl.h>
 
 #include <config/atframe_utils_build_feature.h>
 #include <config/compiler_features.h>
@@ -20,7 +13,7 @@
 
 #include <random/random_generator.h>
 
-#include <atframe/atapp_conf.h>
+#include "atframe/atapp_conf.h"
 
 namespace atapp {
 struct LIBATAPP_MACRO_API_HEAD_ONLY etcd_discovery_action_t {
@@ -83,8 +76,8 @@ class etcd_discovery_node {
 
 class etcd_discovery_set {
  public:
-  using node_by_name_t = LIBATFRAME_UTILS_AUTO_SELETC_MAP(std::string, etcd_discovery_node::ptr_t);
-  using node_by_id_t = LIBATFRAME_UTILS_AUTO_SELETC_MAP(uint64_t, etcd_discovery_node::ptr_t);
+  using node_by_name_t = std::unordered_map<std::string, etcd_discovery_node::ptr_t>;
+  using node_by_id_t = std::unordered_map<uint64_t, etcd_discovery_node::ptr_t>;
   using ptr_t = std::shared_ptr<etcd_discovery_set>;
 
   struct node_hash_t {
@@ -103,26 +96,26 @@ class etcd_discovery_set {
   LIBATAPP_MACRO_API bool empty() const;
 
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_id(uint64_t id) const;
-  LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_name(const std::string &name) const;
+  LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_name(gsl::string_view name) const;
 
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_consistent_hash(const void *buf, size_t bufsz) const;
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_consistent_hash(uint64_t key) const;
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_consistent_hash(int64_t key) const;
-  LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_consistent_hash(const std::string &key) const;
+  LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_consistent_hash(gsl::string_view key) const;
 
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_random() const;
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_round_robin() const;
 
   LIBATAPP_MACRO_API const std::vector<etcd_discovery_node::ptr_t> &get_sorted_nodes() const;
   LIBATAPP_MACRO_API std::vector<etcd_discovery_node::ptr_t>::const_iterator lower_bound_sorted_nodes(
-      uint64_t id, const std::string &name) const;
+      uint64_t id, gsl::string_view name) const;
   LIBATAPP_MACRO_API std::vector<etcd_discovery_node::ptr_t>::const_iterator upper_bound_sorted_nodes(
-      uint64_t id, const std::string &name) const;
+      uint64_t id, gsl::string_view name) const;
 
   LIBATAPP_MACRO_API void add_node(const etcd_discovery_node::ptr_t &node);
   LIBATAPP_MACRO_API void remove_node(const etcd_discovery_node::ptr_t &node);
   LIBATAPP_MACRO_API void remove_node(uint64_t id);
-  LIBATAPP_MACRO_API void remove_node(const std::string &name);
+  LIBATAPP_MACRO_API void remove_node(gsl::string_view name);
 
  private:
   void rebuild_cache() const;
@@ -138,5 +131,3 @@ class etcd_discovery_set {
   mutable size_t round_robin_index_;
 };
 }  // namespace atapp
-
-#endif

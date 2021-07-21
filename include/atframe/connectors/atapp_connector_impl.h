@@ -1,5 +1,5 @@
-#ifndef LIBATAPP_ATAPP_CONNECTORS_ATAPP_CONNECTOR_IMPL_H
-#define LIBATAPP_ATAPP_CONNECTORS_ATAPP_CONNECTOR_IMPL_H
+// Copyright 2021 atframework
+// Created by owent
 
 #pragma once
 
@@ -14,18 +14,19 @@
 #include <detail/buffer.h>
 #include <detail/libatbus_channel_export.h>
 
-#include <atframe/atapp_config.h>
-#include <atframe/etcdcli/etcd_discovery.h>
-
 #include <list>
 #include <memory>
 #include <string>
 
-#include "atframe/connectors/atapp_endpoint.h"
+#include "atframe/atapp_config.h"
+#include "atframe/etcdcli/etcd_discovery.h"
 
 namespace atapp {
 
+class app;
+class atapp_endpoint;
 class atapp_connector_impl;
+class atapp_connection_handle;
 
 struct atapp_connector_bind_helper {
   // This API is used by inner system and will not be exported, do not call it directly
@@ -96,8 +97,8 @@ class atapp_connection_handle {
 
 class LIBATAPP_MACRO_API_SYMBOL_VISIBLE atapp_connector_impl {
  public:
-  using handle_set_t = LIBATFRAME_UTILS_AUTO_SELETC_SET(atapp_connection_handle *);
-  using protocol_set_t = LIBATFRAME_UTILS_AUTO_SELETC_SET(std::string);
+  using handle_set_t = std::unordered_set<atapp_connection_handle *>;
+  using protocol_set_t = std::unordered_set<std::string>;
 
   struct address_type_t {
     enum type {
@@ -178,5 +179,3 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE atapp_connector_impl {
 };
 
 }  // namespace atapp
-
-#endif

@@ -1,11 +1,5 @@
-﻿/**
- * atapp_conf.h
- *
- *  Created on: 2016-04-23
- *      Author: owent
- */
-#ifndef LIBATAPP_ATAPP_CONF_H
-#define LIBATAPP_ATAPP_CONF_H
+// Copyright 2021 atframework
+// Created by owent on 2016-04-23
 
 #pragma once
 
@@ -98,5 +92,3 @@ LIBATAPP_MACRO_API const YAML::Node yaml_loader_get_child_by_path(const YAML::No
 LIBATAPP_MACRO_API bool protobuf_equal(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &l,
                                        const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &r);
 }  // namespace atapp
-
-#endif

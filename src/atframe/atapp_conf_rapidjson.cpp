@@ -1,3 +1,6 @@
+// Copyright 2021 atframework
+// Created by owent
+
 #if defined(_WIN32)
 #  ifndef WIN32_LEAN_AND_MEAN
 #    define WIN32_LEAN_AND_MEAN
@@ -743,81 +746,59 @@ LIBATAPP_MACRO_API bool rapidsjon_loader_parse(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID
   return true;
 }
 
-LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, const char *key,
+LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, gsl::string_view key,
                                                             rapidjson::Value &&val, rapidjson::Document &doc) {
   if (!parent.IsObject()) {
     parent.SetObject();
   }
 
-  rapidjson::Value::MemberIterator iter = parent.FindMember(key);
+  rapidjson::Value jkey;
+  jkey.SetString(rapidjson::StringRef(key.data(), static_cast<rapidjson::SizeType>(key.size())));
+
+  rapidjson::Value::MemberIterator iter = parent.FindMember(jkey);
   if (iter != parent.MemberEnd()) {
     iter->value.Swap(val);
   } else {
     rapidjson::Value k;
     rapidjson::Value v;
-    k.SetString(key, doc.GetAllocator());
+    k.SetString(key.data(), static_cast<rapidjson::SizeType>(key.size()), doc.GetAllocator());
     v.Swap(val);
     parent.AddMember(k, v, doc.GetAllocator());
   }
 }
 
-LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, const char *key,
+LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, gsl::string_view key,
                                                             const rapidjson::Value &val, rapidjson::Document &doc) {
   if (!parent.IsObject()) {
     parent.SetObject();
   }
 
-  rapidjson::Value::MemberIterator iter = parent.FindMember(key);
+  rapidjson::Value jkey;
+  jkey.SetString(rapidjson::StringRef(key.data(), static_cast<rapidjson::SizeType>(key.size())));
+
+  rapidjson::Value::MemberIterator iter = parent.FindMember(jkey);
   if (iter != parent.MemberEnd()) {
     iter->value.CopyFrom(val, doc.GetAllocator());
   } else {
     rapidjson::Value k;
     rapidjson::Value v;
-    k.SetString(key, doc.GetAllocator());
+    k.SetString(key.data(), static_cast<rapidjson::SizeType>(key.size()), doc.GetAllocator());
     v.CopyFrom(val, doc.GetAllocator());
     parent.AddMember(k, v, doc.GetAllocator());
   }
 }
 
-LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, const char *key,
-                                                            const std::string &val, rapidjson::Document &doc) {
+LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, gsl::string_view key,
+                                                            gsl::string_view val, rapidjson::Document &doc) {
   rapidjson::Value v;
-  v.SetString(val.c_str(), static_cast<rapidjson::SizeType>(val.size()), doc.GetAllocator());
+  v.SetString(val.data(), static_cast<rapidjson::SizeType>(val.size()), doc.GetAllocator());
   rapidsjon_loader_mutable_set_member(parent, key, std::move(v), doc);
 }
 
-LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, const char *key, std::string &val,
-                                                            rapidjson::Document &doc) {
-  rapidjson::Value v;
-  v.SetString(val.c_str(), static_cast<rapidjson::SizeType>(val.size()), doc.GetAllocator());
-  rapidsjon_loader_mutable_set_member(parent, key, std::move(v), doc);
-}
-
-LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, const char *key, const char *val,
-                                                            rapidjson::Document &doc) {
-  rapidjson::Value v;
-  v.SetString(val, doc.GetAllocator());
-  rapidsjon_loader_mutable_set_member(parent, key, std::move(v), doc);
-}
-
-LIBATAPP_MACRO_API void rapidsjon_loader_append_to_list(rapidjson::Value &list_parent, const std::string &val,
+LIBATAPP_MACRO_API void rapidsjon_loader_append_to_list(rapidjson::Value &list_parent, gsl::string_view val,
                                                         rapidjson::Document &doc) {
   rapidjson::Value v;
-  v.SetString(val.c_str(), static_cast<rapidjson::SizeType>(val.size()), doc.GetAllocator());
-  rapidsjon_loader_append_to_list(list_parent, std::move(v), doc);
-}
-
-LIBATAPP_MACRO_API void rapidsjon_loader_append_to_list(rapidjson::Value &list_parent, std::string &val,
-                                                        rapidjson::Document &doc) {
-  rapidjson::Value v;
-  v.SetString(val.c_str(), static_cast<rapidjson::SizeType>(val.size()), doc.GetAllocator());
-  rapidsjon_loader_append_to_list(list_parent, std::move(v), doc);
-}
-
-LIBATAPP_MACRO_API void rapidsjon_loader_append_to_list(rapidjson::Value &list_parent, const char *val,
-                                                        rapidjson::Document &doc) {
-  rapidjson::Value v;
-  v.SetString(val, doc.GetAllocator());
+  v.SetString(val.data(), static_cast<rapidjson::SizeType>(val.size()), doc.GetAllocator());
   rapidsjon_loader_append_to_list(list_parent, std::move(v), doc);
 }
 

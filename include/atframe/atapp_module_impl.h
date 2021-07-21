@@ -1,10 +1,5 @@
 ﻿// Copyright 2021 atframework
-// Created on: 2016-05-18
-//     Author: owent
-//
-
-#ifndef LIBATAPP_ATAPP_MODULE_IMPL_H
-#define LIBATAPP_ATAPP_MODULE_IMPL_H
+// Created by owent on 2016-05-18
 
 #pragma once
 
@@ -163,5 +158,3 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE module_impl {
   friend class app;
 };
 }  // namespace atapp
-
-#endif

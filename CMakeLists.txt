@@ -14,7 +14,7 @@ enable_testing()
 
 project(
   libatapp
-  VERSION "0.11.0"
+  VERSION "0.12.0"
   HOMEPAGE_URL "https://github.com/atframework/libatapp"
   LANGUAGES C CXX)
 
@@ -32,7 +32,6 @@ unset(PROJECT_LIBATAPP_PUBLIC_INCLUDE_DIRS)
 unset(PROJECT_LIBATAPP_PUBLIC_LINK_NAMES)
 
 # ######################################################################################################################
-# 导入项目配置 导入所有 macro 定义
 include("${CMAKE_CURRENT_LIST_DIR}/include/include.macro.cmake")
 
 if(COMPILER_STRICT_EXTRA_CFLAGS)
@@ -47,9 +46,22 @@ include(GNUInstallDirs)
 
 set(LIBATAPP_MACRO_BUSID_TYPE ${ATBUS_MACRO_BUSID_TYPE})
 if(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
-  # TODO 不应该仅按版本号判定，需要检测一下编译选项(std::list<T>的大小？)
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS "5.0.0")
     set(LIBATAPP_ENABLE_CUSTOM_COUNT_FOR_STD_LIST YES)
+  else() # Detect if using legacy ABI
+    include(CheckCXXSourceCompiles)
+    check_cxx_source_compiles(
+      "
+#include <stdint.h>
+#include <cstddef>
+#include <list>
+
+int main() {
+  static_assert(sizeof(std::list<size_t>) <= 2 * sizeof(size_t), \"Legacy ABI\");
+  return 0;
+}
+    "
+      LIBATAPP_ENABLE_CUSTOM_COUNT_FOR_STD_LIST)
   endif()
 endif()
 configure_file("${CMAKE_CURRENT_LIST_DIR}/include/atframe/atapp_config.h.in"
@@ -70,8 +82,6 @@ endif()
 if(PROJECT_ENABLE_TOOLS)
   add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/tools")
 endif()
-
-# 生成文档和导入配置
 
 # Install configuration
 set(CMAKE_INSTALL_CMAKEDIR

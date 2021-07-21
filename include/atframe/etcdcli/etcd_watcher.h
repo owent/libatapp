@@ -1,14 +1,5 @@
-﻿/**
- * etcd_watcher.h
- *
- *  Created on: 2017-12-26
- *      Author: owent
- *
- *  Released under the MIT license
- */
-
-#ifndef LIBATAPP_ETCDCLI_ETCD_WATCHER_H
-#define LIBATAPP_ETCDCLI_ETCD_WATCHER_H
+﻿// Copyright 2021 atframework
+// Created by owent on 2017-12-26
 
 #pragma once
 
@@ -124,5 +115,3 @@ class etcd_watcher {
   watch_event_fn_t evt_handle_;
 };
 }  // namespace atapp
-
-#endif

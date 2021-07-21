@@ -13,6 +13,7 @@ set(PROJECT_LIBATAPP_SRC_LIST
     "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_module_impl.h"
     "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/connectors/atapp_connector_atbus.h"
     "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/connectors/atapp_connector_impl.h"
+    "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/connectors/atapp_connector_loopback.h"
     "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/connectors/atapp_endpoint.h"
     "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/etcdcli/etcd_cluster.h"
     "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/etcdcli/etcd_def.h"
@@ -28,6 +29,7 @@ set(PROJECT_LIBATAPP_SRC_LIST
     "${CMAKE_CURRENT_LIST_DIR}/atframe/atapp_module_impl.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/atframe/connectors/atapp_connector_atbus.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/atframe/connectors/atapp_connector_impl.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/atframe/connectors/atapp_connector_loopback.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/atframe/connectors/atapp_endpoint.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/atframe/etcdcli/etcd_cluster.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/atframe/etcdcli/etcd_discovery.cpp"
@@ -80,6 +82,16 @@ endif()
 list(PREPEND PROJECT_LIBATAPP_PUBLIC_LINK_NAMES "${PROJECT_LIBATAPP_LIB_LINK}-protocol")
 list(APPEND PROJECT_LIBATAPP_PUBLIC_LINK_NAMES ${ATFRAMEWORK_LIBATBUS_LINK_NAME}
      ${ATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_YAML_CPP_LINK_NAME})
+
+if(ATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_GSL_LINK_NAME)
+  list(APPEND PROJECT_LIBATAPP_PUBLIC_LINK_NAMES ${ATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_GSL_LINK_NAME})
+elseif(TARGET Microsoft.GSL::GSL)
+  list(APPEND PROJECT_LIBATAPP_PUBLIC_LINK_NAMES Microsoft.GSL::GSL)
+elseif(TARGET gsl::gsl-lite-v1)
+  list(APPEND PROJECT_LIBATAPP_PUBLIC_LINK_NAMES gsl::gsl-lite-v1)
+elseif(TARGET gsl::gsl-lite)
+  list(APPEND PROJECT_LIBATAPP_PUBLIC_LINK_NAMES gsl::gsl-lite)
+endif()
 
 if(NOT MINGW AND (BUILD_SHARED_LIBS OR ATFRAMEWORK_USE_DYNAMIC_LIBRARY))
   add_library(${PROJECT_LIBATAPP_LIB_LINK} SHARED ${PROJECT_LIBATAPP_SRC_LIST})

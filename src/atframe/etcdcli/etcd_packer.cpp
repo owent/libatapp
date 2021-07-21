@@ -1,4 +1,7 @@
-﻿#include <cstring>
+// Copyright 2021 atframework
+// Created by owent
+
+#include <cstring>
 #include <sstream>
 
 #include "libatbus.h"

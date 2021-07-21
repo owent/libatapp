@@ -1,9 +1,14 @@
-#include <algorithm>
+// Copyright 2021 atframework
+// Created by owent
+
+#include "atframe/connectors/atapp_connector_impl.h"
 
 #include <common/string_oprs.h>
 
-#include <atframe/atapp.h>
-#include <atframe/connectors/atapp_connector_impl.h>
+#include <algorithm>
+
+#include "atframe/atapp.h"
+#include "atframe/connectors/atapp_endpoint.h"
 
 namespace atapp {
 
@@ -231,7 +236,7 @@ LIBATAPP_MACRO_API void atapp_connector_impl::on_receive_forward_response(
   }
   if (nullptr != sender.remote) {
     sender.id = sender.remote->get_id();
-    sender.name = &sender.remote->get_name();
+    sender.name = sender.remote->get_name();
   }
 
   get_owner()->trigger_event_on_forward_response(sender, msg, error_code);

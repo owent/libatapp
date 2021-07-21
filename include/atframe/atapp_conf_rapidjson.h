@@ -1,5 +1,5 @@
-﻿#ifndef LIBATAPP_ATAPP_CONF_RAPIDJSON_H
-#define LIBATAPP_ATAPP_CONF_RAPIDJSON_H
+// Copyright 2021 atframework
+// Created by owent on
 
 #pragma once
 
@@ -15,6 +15,8 @@
 #include <rapidjson/document.h>
 
 #include <config/compiler/protobuf_suffix.h>
+
+#include <gsl/select-gsl.h>
 
 #include <log/log_wrapper.h>
 
@@ -67,30 +69,14 @@ LIBATAPP_MACRO_API bool rapidsjon_loader_parse(
     ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst, const std::string &src,
     const rapidsjon_loader_dump_options &options = rapidsjon_loader_dump_options());
 
-template <typename TVAL>
-LIBATAPP_MACRO_API_HEAD_ONLY void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, const char *key,
-                                                                      TVAL &&val, rapidjson::Document &doc);
-
-LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, const char *key,
+LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, gsl::string_view key,
                                                             rapidjson::Value &&val, rapidjson::Document &doc);
-LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, const char *key,
+LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, gsl::string_view key,
                                                             const rapidjson::Value &val, rapidjson::Document &doc);
-LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, const char *key,
-                                                            const std::string &val, rapidjson::Document &doc);
-LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, const char *key, std::string &val,
-                                                            rapidjson::Document &doc);
-LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, const char *key, const char *val,
-                                                            rapidjson::Document &doc);
+LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, gsl::string_view key,
+                                                            gsl::string_view val, rapidjson::Document &doc);
 
-template <typename TVAL>
-LIBATAPP_MACRO_API_HEAD_ONLY void rapidsjon_loader_append_to_list(rapidjson::Value &list_parent, TVAL &&val,
-                                                                  rapidjson::Document &doc);
-
-LIBATAPP_MACRO_API void rapidsjon_loader_append_to_list(rapidjson::Value &list_parent, const std::string &val,
-                                                        rapidjson::Document &doc);
-LIBATAPP_MACRO_API void rapidsjon_loader_append_to_list(rapidjson::Value &list_parent, std::string &val,
-                                                        rapidjson::Document &doc);
-LIBATAPP_MACRO_API void rapidsjon_loader_append_to_list(rapidjson::Value &list_parent, const char *val,
+LIBATAPP_MACRO_API void rapidsjon_loader_append_to_list(rapidjson::Value &list_parent, gsl::string_view val,
                                                         rapidjson::Document &doc);
 
 LIBATAPP_MACRO_API void rapidsjon_loader_dump_to(
@@ -111,32 +97,75 @@ LIBATAPP_MACRO_API void rapidsjon_loader_load_from(
 
 // ============ template implement ============
 
-template <typename TVAL>
-LIBATAPP_MACRO_API_HEAD_ONLY void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, const char *key,
-                                                                      TVAL &&val, rapidjson::Document &doc) {
-  if (!parent.IsObject()) {
-    parent.SetObject();
+template <class TVAL, bool>
+struct rapidsjon_loader_mutable_member_helper;
+
+template <class TVAL>
+struct rapidsjon_loader_mutable_member_helper<TVAL, true> {
+  static LIBATAPP_MACRO_API_HEAD_ONLY inline void set(rapidjson::Value &parent, gsl::string_view key, TVAL &&val,
+                                                      rapidjson::Document &doc) {
+    rapidsjon_loader_mutable_set_member(parent, key, gsl::string_view(std::forward<TVAL>(val)), doc);
   }
 
-  rapidjson::Value::MemberIterator iter = parent.FindMember(key);
-  if (iter != parent.MemberEnd()) {
-    iter->value.Set(std::forward<TVAL>(val), doc.GetAllocator());
-  } else {
-    rapidjson::Value k;
-    k.SetString(key, doc.GetAllocator());
-    parent.AddMember(k, std::forward<TVAL>(val), doc.GetAllocator());
+  static LIBATAPP_MACRO_API_HEAD_ONLY inline void append(rapidjson::Value &parent, TVAL &&val,
+                                                         rapidjson::Document &doc) {
+    rapidsjon_loader_append_to_list(parent, gsl::string_view(std::forward<TVAL>(val)), doc);
   }
+};
+
+template <class TVAL>
+struct rapidsjon_loader_mutable_member_helper<TVAL, false> {
+  static LIBATAPP_MACRO_API_HEAD_ONLY inline void set(rapidjson::Value &parent, gsl::string_view key, TVAL &&val,
+                                                      rapidjson::Document &doc) {
+    if (parent.IsNull()) {
+      parent.SetObject();
+    }
+
+    if (!parent.IsObject()) {
+      FWLOGERROR("parent should be a object, but we got {}.", rapidsjon_loader_get_type_name(parent.GetType()));
+      return;
+    }
+
+    rapidjson::Value jkey;
+    jkey.SetString(rapidjson::StringRef(key.data(), static_cast<rapidjson::SizeType>(key.size())));
+    rapidjson::Value::MemberIterator iter = parent.FindMember(jkey);
+    if (iter != parent.MemberEnd()) {
+      iter->value.Set(std::forward<TVAL>(val), doc.GetAllocator());
+    } else {
+      rapidjson::Value k;
+      k.SetString(key.data(), static_cast<rapidjson::SizeType>(key.size()), doc.GetAllocator());
+      parent.AddMember(k, std::forward<TVAL>(val), doc.GetAllocator());
+    }
+  }
+
+  static LIBATAPP_MACRO_API_HEAD_ONLY inline void append(rapidjson::Value &parent, TVAL &&val,
+                                                         rapidjson::Document &doc) {
+    if (parent.IsNull()) {
+      parent.IsArray();
+    }
+
+    if (!parent.IsObject()) {
+      FWLOGERROR("parent should be a array, but we got {}.", rapidsjon_loader_get_type_name(parent.GetType()));
+      return;
+    }
+
+    parent.PushBack(std::forward<TVAL>(val), doc.GetAllocator());
+  }
+};
+
+template <class TVAL, class = typename std::enable_if<
+                          !std::is_same<typename std::decay<TVAL>::type, gsl::string_view>::value>::type>
+LIBATAPP_MACRO_API_HEAD_ONLY void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, gsl::string_view key,
+                                                                      TVAL &&val, rapidjson::Document &doc) {
+  rapidsjon_loader_mutable_member_helper<TVAL, std::is_convertible<TVAL, gsl::string_view>::value>::set(
+      parent, key, std::forward<TVAL>(val), doc);
 }
 
-template <typename TVAL>
-LIBATAPP_MACRO_API_HEAD_ONLY void rapidsjon_loader_append_to_list(rapidjson::Value &list_parent, TVAL &&val,
+template <class TVAL, class = typename std::enable_if<
+                          !std::is_same<typename std::decay<TVAL>::type, gsl::string_view>::value>::type>
+LIBATAPP_MACRO_API_HEAD_ONLY void rapidsjon_loader_append_to_list(rapidjson::Value &parent, TVAL &&val,
                                                                   rapidjson::Document &doc) {
-  if (list_parent.IsArray()) {
-    list_parent.PushBack(std::forward<TVAL>(val), doc.GetAllocator());
-  } else {
-    WLOGERROR("parent should be a array, but we got %s.", rapidsjon_loader_get_type_name(list_parent.GetType()));
-  }
+  rapidsjon_loader_mutable_member_helper<TVAL, std::is_convertible<TVAL, gsl::string_view>::value>::append(
+      parent, std::forward<TVAL>(val), doc);
 }
 }  // namespace atapp
-
-#endif

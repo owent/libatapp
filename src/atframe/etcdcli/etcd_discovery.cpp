@@ -1,5 +1,9 @@
+// Copyright 2021 atframework
+// Created by owent
+
 #include <algorithm>
 
+#include <common/string_oprs.h>
 #include <time/time_utility.h>
 
 #include <algorithm/murmur_hash.h>
@@ -66,7 +70,7 @@ static bool round_robin_compare_index(const etcd_discovery_node::ptr_t &l, const
 
 struct lower_upper_bound_pred_t {
   uint64_t id;
-  const std::string *name;
+  gsl::string_view name;
   std::pair<uint64_t, uint64_t> hash_code;
 };
 
@@ -79,7 +83,7 @@ static bool lower_bound_compare_index(const etcd_discovery_node::ptr_t &l, const
     return l->get_discovery_info().id() < r.id;
   }
 
-  if (!r.name) {
+  if (r.name.empty()) {
     return false;
   }
 
@@ -87,7 +91,7 @@ static bool lower_bound_compare_index(const etcd_discovery_node::ptr_t &l, const
     return l->get_name_hash() < r.hash_code;
   }
 
-  return l->get_discovery_info().name() < *r.name;
+  return UTIL_STRFUNC_STRNCMP(l->get_discovery_info().name().c_str(), r.name.data(), r.name.size()) < 0;
 }
 
 static bool upper_bound_compare_index(const lower_upper_bound_pred_t &l, const etcd_discovery_node::ptr_t &r) {
@@ -99,7 +103,7 @@ static bool upper_bound_compare_index(const lower_upper_bound_pred_t &l, const e
     return l.id < r->get_discovery_info().id();
   }
 
-  if (!l.name) {
+  if (l.name.empty()) {
     return true;
   }
 
@@ -107,7 +111,7 @@ static bool upper_bound_compare_index(const lower_upper_bound_pred_t &l, const e
     return l.hash_code < r->get_name_hash();
   }
 
-  return *l.name < r->get_discovery_info().name();
+  return UTIL_STRFUNC_STRNCMP(l.name.data(), r->get_discovery_info().name().c_str(), l.name.size()) < 0;
 }
 
 LIBATAPP_MACRO_API etcd_discovery_node::etcd_discovery_node() : name_hash_(0, 0), ingress_index_(0) {
@@ -190,8 +194,8 @@ LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_id
   return iter->second;
 }
 
-LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_name(const std::string &name) const {
-  node_by_name_t::const_iterator iter = node_by_name_.find(name);
+LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_name(gsl::string_view name) const {
+  node_by_name_t::const_iterator iter = node_by_name_.find(std::string(name.data(), name.size()));
   if (iter == node_by_name_.end()) {
     return nullptr;
   }
@@ -224,8 +228,8 @@ LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_co
 }
 
 LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_consistent_hash(
-    const std::string &key) const {
-  return get_node_by_consistent_hash(key.c_str(), key.size());
+    gsl::string_view key) const {
+  return get_node_by_consistent_hash(key.data(), key.size());
 }
 
 LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_random() const {
@@ -265,14 +269,14 @@ LIBATAPP_MACRO_API const std::vector<etcd_discovery_node::ptr_t> &etcd_discovery
 }
 
 LIBATAPP_MACRO_API std::vector<etcd_discovery_node::ptr_t>::const_iterator etcd_discovery_set::lower_bound_sorted_nodes(
-    uint64_t id, const std::string &name) const {
+    uint64_t id, gsl::string_view name) const {
   const std::vector<etcd_discovery_node::ptr_t> &container = get_sorted_nodes();
 
   lower_upper_bound_pred_t pred_val;
   pred_val.id = id;
-  pred_val.name = &name;
+  pred_val.name = name;
   if (!name.empty()) {
-    pred_val.hash_code = consistent_hash_calc(name.c_str(), name.size(), LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
+    pred_val.hash_code = consistent_hash_calc(name.data(), name.size(), LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
   } else {
     pred_val.hash_code = std::pair<uint64_t, uint64_t>(0, 0);
   }
@@ -281,14 +285,14 @@ LIBATAPP_MACRO_API std::vector<etcd_discovery_node::ptr_t>::const_iterator etcd_
 }
 
 LIBATAPP_MACRO_API std::vector<etcd_discovery_node::ptr_t>::const_iterator etcd_discovery_set::upper_bound_sorted_nodes(
-    uint64_t id, const std::string &name) const {
+    uint64_t id, gsl::string_view name) const {
   const std::vector<etcd_discovery_node::ptr_t> &container = get_sorted_nodes();
 
   lower_upper_bound_pred_t pred_val;
   pred_val.id = id;
-  pred_val.name = &name;
+  pred_val.name = name;
   if (!name.empty()) {
-    pred_val.hash_code = consistent_hash_calc(name.c_str(), name.size(), LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
+    pred_val.hash_code = consistent_hash_calc(name.data(), name.size(), LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
   } else {
     pred_val.hash_code = std::pair<uint64_t, uint64_t>(0, 0);
   }
@@ -407,8 +411,8 @@ LIBATAPP_MACRO_API void etcd_discovery_set::remove_node(uint64_t id) {
   clear_cache();
 }
 
-LIBATAPP_MACRO_API void etcd_discovery_set::remove_node(const std::string &name) {
-  node_by_name_t::iterator iter_name = node_by_name_.find(name);
+LIBATAPP_MACRO_API void etcd_discovery_set::remove_node(gsl::string_view name) {
+  node_by_name_t::iterator iter_name = node_by_name_.find(std::string(name.data(), name.size()));
   if (iter_name == node_by_name_.end()) {
     return;
   }

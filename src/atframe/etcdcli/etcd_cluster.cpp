@@ -1,4 +1,7 @@
-﻿#include <assert.h>
+// Copyright 2021 atframework
+// Created by owent
+
+#include <assert.h>
 
 #include <libatbus.h>
 
