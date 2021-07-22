@@ -1,4 +1,7 @@
-﻿#include <sstream>
+// Copyright 2021 atframework
+// Created by owent
+
+#include <sstream>
 #include <vector>
 
 #include <config/compiler/protobuf_prefix.h>

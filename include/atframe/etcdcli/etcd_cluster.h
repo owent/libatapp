@@ -1,14 +1,5 @@
-﻿/**
- * etcd_cluster.h
- *
- *  Created on: 2017-11-17
- *      Author: owent
- *
- *  Released under the MIT license
- */
-
-#ifndef LIBATAPP_ETCDCLI_ETCD_CLUSTER_H
-#define LIBATAPP_ETCDCLI_ETCD_CLUSTER_H
+// Copyright 2021 atframework
+// Created by owent on 2017-11-17
 
 #pragma once
 
@@ -462,7 +453,7 @@ class etcd_cluster {
                                              time_t timeout);
 
  private:
-  using etcd_keepalive_deletor_map_t = LIBATFRAME_UTILS_AUTO_SELETC_MAP(std::string, etcd_keepalive_deletor *);
+  using etcd_keepalive_deletor_map_t = std::unordered_map<std::string, etcd_keepalive_deletor *>;
 
   uint32_t flags_;
   util::random::mt19937 random_generator_;
@@ -481,5 +472,3 @@ class etcd_cluster {
   on_event_up_down_handle_set_t event_on_down_callbacks_;
 };
 }  // namespace atapp
-
-#endif

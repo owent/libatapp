@@ -1,5 +1,5 @@
-#ifndef LIBATAPP_ATAPP_CONNECTORS_ATAPP_ENDPOINT_H
-#define LIBATAPP_ATAPP_CONNECTORS_ATAPP_ENDPOINT_H
+// Copyright 2021 atframework
+// Created by owent
 
 #pragma once
 
@@ -29,6 +29,7 @@ namespace atapp {
 class app;
 class atapp_connection_handle;
 class atapp_endpoint;
+class atapp_connector_impl;
 
 struct atapp_endpoint_bind_helper {
   // This API is used by inner system and will not be exported, do not call it directly
@@ -39,7 +40,7 @@ struct atapp_endpoint_bind_helper {
 
 class atapp_endpoint {
  public:
-  using handle_set_t = LIBATFRAME_UTILS_AUTO_SELETC_SET(atapp_connection_handle *);
+  using handle_set_t = std::unordered_set<atapp_connection_handle *>;
   using handle_set_iterator = handle_set_t::iterator;
   using handle_set_const_iterator = handle_set_t::const_iterator;
   using ptr_t = std::shared_ptr<atapp_endpoint>;
@@ -88,6 +89,10 @@ class atapp_endpoint {
   void reset();
   void cancel_pending_messages();
 
+  void trigger_on_receive_forward_response(atapp_connector_impl *connector, atapp_connection_handle *handle,
+                                           int32_t type, uint64_t sequence, int32_t error_code, const void *data,
+                                           size_t data_size, const atapp::protocol::atapp_metadata *metadata);
+
  private:
   bool closing_;
   app *owner_;
@@ -105,5 +110,3 @@ class atapp_endpoint {
   friend struct atapp_endpoint_bind_helper;
 };
 }  // namespace atapp
-
-#endif

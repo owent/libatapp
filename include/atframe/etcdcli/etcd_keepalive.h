@@ -1,14 +1,5 @@
-﻿/**
- * etcd_keepalive.h
- *
- *  Created on: 2017-12-26
- *      Author: owent
- *
- *  Released under the MIT license
- */
-
-#ifndef LIBATAPP_ETCDCLI_ETCD_KEEPALIVE_H
-#define LIBATAPP_ETCDCLI_ETCD_KEEPALIVE_H
+// Copyright 2021 atframework
+// Created by owent on 2017-12-26
 
 #pragma once
 
@@ -98,5 +89,3 @@ class etcd_keepalive : public std::enable_shared_from_this<etcd_keepalive> {
   checker_t checker_;
 };
 }  // namespace atapp
-
-#endif

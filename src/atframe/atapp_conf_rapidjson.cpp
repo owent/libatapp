@@ -1,3 +1,6 @@
+// Copyright 2021 atframework
+// Created by owent
+
 #if defined(_WIN32)
 #  ifndef WIN32_LEAN_AND_MEAN
 #    define WIN32_LEAN_AND_MEAN
@@ -168,9 +171,9 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
         for (int i = 0; i < len; ++i) {
           rapidsjon_loader_append_to_list(ls, src.GetReflection()->GetRepeatedInt32(src, fds, i), doc);
         }
-        rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), std::move(ls), doc);
+        rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
       } else {
-        rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), src.GetReflection()->GetInt32(src, fds), doc);
+        rapidsjon_loader_mutable_set_member(parent, fds->name(), src.GetReflection()->GetInt32(src, fds), doc);
       }
       break;
     };
@@ -191,7 +194,7 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
             rapidsjon_loader_append_to_list(ls, int_val, doc);
           }
         }
-        rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), std::move(ls), doc);
+        rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
       } else {
         int64_t int_val = src.GetReflection()->GetInt64(src, fds);
         if (options.convert_large_number_to_string && int_val > std::numeric_limits<int32_t>::max()) {
@@ -199,9 +202,9 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
           util::string::int2str(str_val, sizeof(str_val) - 1, int_val);
           rapidjson::Value v;
           v.SetString(str_val, static_cast<rapidjson::SizeType>(strlen(str_val)), doc.GetAllocator());
-          rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), std::move(v), doc);
+          rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(v), doc);
         } else {
-          rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), int_val, doc);
+          rapidsjon_loader_mutable_set_member(parent, fds->name(), int_val, doc);
         }
       }
       break;
@@ -224,7 +227,7 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
             rapidsjon_loader_append_to_list(ls, int_val, doc);
           }
         }
-        rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), std::move(ls), doc);
+        rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
       } else {
         uint32_t int_val = src.GetReflection()->GetUInt32(src, fds);
         if (options.convert_large_number_to_string &&
@@ -233,9 +236,9 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
           util::string::int2str(str_val, sizeof(str_val) - 1, int_val);
           rapidjson::Value v;
           v.SetString(str_val, static_cast<rapidjson::SizeType>(strlen(str_val)), doc.GetAllocator());
-          rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), std::move(v), doc);
+          rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(v), doc);
         } else {
-          rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), int_val, doc);
+          rapidsjon_loader_mutable_set_member(parent, fds->name(), int_val, doc);
         }
       }
       break;
@@ -258,7 +261,7 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
             rapidsjon_loader_append_to_list(ls, int_val, doc);
           }
         }
-        rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), std::move(ls), doc);
+        rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
       } else {
         uint64_t int_val = src.GetReflection()->GetUInt64(src, fds);
         if (options.convert_large_number_to_string &&
@@ -267,9 +270,9 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
           util::string::int2str(str_val, sizeof(str_val) - 1, int_val);
           rapidjson::Value v;
           v.SetString(str_val, static_cast<rapidjson::SizeType>(strlen(str_val)), doc.GetAllocator());
-          rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), std::move(v), doc);
+          rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(v), doc);
         } else {
-          rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), int_val, doc);
+          rapidsjon_loader_mutable_set_member(parent, fds->name(), int_val, doc);
         }
       }
       break;
@@ -286,11 +289,11 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
                                    options);
           rapidsjon_loader_append_to_list(ls, std::move(v), doc);
         }
-        rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), std::move(ls), doc);
+        rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
       } else {
         rapidjson::Value v;
         load_field_string_filter(src.GetReflection()->GetStringReference(src, fds, &empty), v, doc, options);
-        rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), std::move(v), doc);
+        rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(v), doc);
       }
       break;
     };
@@ -326,7 +329,7 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
             }
           }
         }
-        rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), std::move(obj), doc);
+        rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(obj), doc);
 
       } else if (fds->is_repeated()) {
         rapidjson::Value ls;
@@ -339,14 +342,14 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
             rapidsjon_loader_load_from(ls[ls.Size() - 1], doc, data.Get(i, nullptr), options);
           }
         }
-        rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), std::move(ls), doc);
+        rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
       } else {
         rapidjson::Value obj;
         obj.SetObject();
         if (obj.IsObject()) {
           rapidsjon_loader_load_from(obj, doc, src.GetReflection()->GetMessage(src, fds), options);
         }
-        rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), std::move(obj), doc);
+        rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(obj), doc);
       }
 
       break;
@@ -359,9 +362,9 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
         for (int i = 0; i < len; ++i) {
           rapidsjon_loader_append_to_list(ls, src.GetReflection()->GetRepeatedDouble(src, fds, i), doc);
         }
-        rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), std::move(ls), doc);
+        rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
       } else {
-        rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), src.GetReflection()->GetDouble(src, fds), doc);
+        rapidsjon_loader_mutable_set_member(parent, fds->name(), src.GetReflection()->GetDouble(src, fds), doc);
       }
       break;
     };
@@ -373,9 +376,9 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
         for (int i = 0; i < len; ++i) {
           rapidsjon_loader_append_to_list(ls, src.GetReflection()->GetRepeatedFloat(src, fds, i), doc);
         }
-        rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), std::move(ls), doc);
+        rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
       } else {
-        rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), src.GetReflection()->GetFloat(src, fds), doc);
+        rapidsjon_loader_mutable_set_member(parent, fds->name(), src.GetReflection()->GetFloat(src, fds), doc);
       }
       break;
     };
@@ -387,9 +390,9 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
         for (int i = 0; i < len; ++i) {
           rapidsjon_loader_append_to_list(ls, src.GetReflection()->GetRepeatedBool(src, fds, i), doc);
         }
-        rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), std::move(ls), doc);
+        rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
       } else {
-        rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), src.GetReflection()->GetBool(src, fds), doc);
+        rapidsjon_loader_mutable_set_member(parent, fds->name(), src.GetReflection()->GetBool(src, fds), doc);
       }
       break;
     };
@@ -401,10 +404,9 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
         for (int i = 0; i < len; ++i) {
           rapidsjon_loader_append_to_list(ls, src.GetReflection()->GetRepeatedEnumValue(src, fds, i), doc);
         }
-        rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), std::move(ls), doc);
+        rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
       } else {
-        rapidsjon_loader_mutable_set_member(parent, fds->name().c_str(), src.GetReflection()->GetEnumValue(src, fds),
-                                            doc);
+        rapidsjon_loader_mutable_set_member(parent, fds->name(), src.GetReflection()->GetEnumValue(src, fds), doc);
       }
       break;
     };
@@ -743,81 +745,59 @@ LIBATAPP_MACRO_API bool rapidsjon_loader_parse(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID
   return true;
 }
 
-LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, const char *key,
+LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, gsl::string_view key,
                                                             rapidjson::Value &&val, rapidjson::Document &doc) {
   if (!parent.IsObject()) {
     parent.SetObject();
   }
 
-  rapidjson::Value::MemberIterator iter = parent.FindMember(key);
+  rapidjson::Value jkey;
+  jkey.SetString(rapidjson::StringRef(key.data(), static_cast<rapidjson::SizeType>(key.size())));
+
+  rapidjson::Value::MemberIterator iter = parent.FindMember(jkey);
   if (iter != parent.MemberEnd()) {
     iter->value.Swap(val);
   } else {
     rapidjson::Value k;
     rapidjson::Value v;
-    k.SetString(key, doc.GetAllocator());
+    k.SetString(key.data(), static_cast<rapidjson::SizeType>(key.size()), doc.GetAllocator());
     v.Swap(val);
     parent.AddMember(k, v, doc.GetAllocator());
   }
 }
 
-LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, const char *key,
+LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, gsl::string_view key,
                                                             const rapidjson::Value &val, rapidjson::Document &doc) {
   if (!parent.IsObject()) {
     parent.SetObject();
   }
 
-  rapidjson::Value::MemberIterator iter = parent.FindMember(key);
+  rapidjson::Value jkey;
+  jkey.SetString(rapidjson::StringRef(key.data(), static_cast<rapidjson::SizeType>(key.size())));
+
+  rapidjson::Value::MemberIterator iter = parent.FindMember(jkey);
   if (iter != parent.MemberEnd()) {
     iter->value.CopyFrom(val, doc.GetAllocator());
   } else {
     rapidjson::Value k;
     rapidjson::Value v;
-    k.SetString(key, doc.GetAllocator());
+    k.SetString(key.data(), static_cast<rapidjson::SizeType>(key.size()), doc.GetAllocator());
     v.CopyFrom(val, doc.GetAllocator());
     parent.AddMember(k, v, doc.GetAllocator());
   }
 }
 
-LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, const char *key,
-                                                            const std::string &val, rapidjson::Document &doc) {
+LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, gsl::string_view key,
+                                                            gsl::string_view val, rapidjson::Document &doc) {
   rapidjson::Value v;
-  v.SetString(val.c_str(), static_cast<rapidjson::SizeType>(val.size()), doc.GetAllocator());
+  v.SetString(val.data(), static_cast<rapidjson::SizeType>(val.size()), doc.GetAllocator());
   rapidsjon_loader_mutable_set_member(parent, key, std::move(v), doc);
 }
 
-LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, const char *key, std::string &val,
-                                                            rapidjson::Document &doc) {
-  rapidjson::Value v;
-  v.SetString(val.c_str(), static_cast<rapidjson::SizeType>(val.size()), doc.GetAllocator());
-  rapidsjon_loader_mutable_set_member(parent, key, std::move(v), doc);
-}
-
-LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, const char *key, const char *val,
-                                                            rapidjson::Document &doc) {
-  rapidjson::Value v;
-  v.SetString(val, doc.GetAllocator());
-  rapidsjon_loader_mutable_set_member(parent, key, std::move(v), doc);
-}
-
-LIBATAPP_MACRO_API void rapidsjon_loader_append_to_list(rapidjson::Value &list_parent, const std::string &val,
+LIBATAPP_MACRO_API void rapidsjon_loader_append_to_list(rapidjson::Value &list_parent, gsl::string_view val,
                                                         rapidjson::Document &doc) {
   rapidjson::Value v;
-  v.SetString(val.c_str(), static_cast<rapidjson::SizeType>(val.size()), doc.GetAllocator());
-  rapidsjon_loader_append_to_list(list_parent, std::move(v), doc);
-}
-
-LIBATAPP_MACRO_API void rapidsjon_loader_append_to_list(rapidjson::Value &list_parent, std::string &val,
-                                                        rapidjson::Document &doc) {
-  rapidjson::Value v;
-  v.SetString(val.c_str(), static_cast<rapidjson::SizeType>(val.size()), doc.GetAllocator());
-  rapidsjon_loader_append_to_list(list_parent, std::move(v), doc);
-}
-
-LIBATAPP_MACRO_API void rapidsjon_loader_append_to_list(rapidjson::Value &list_parent, const char *val,
-                                                        rapidjson::Document &doc) {
-  rapidjson::Value v;
-  v.SetString(val, doc.GetAllocator());
+  v.SetString(val.data(), static_cast<rapidjson::SizeType>(val.size()), doc.GetAllocator());
   rapidsjon_loader_append_to_list(list_parent, std::move(v), doc);
 }
 

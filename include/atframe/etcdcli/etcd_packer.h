@@ -1,14 +1,5 @@
-﻿/**
- * etcd_cluster.h
- *
- *  Created on: 2017-11-17
- *      Author: owent
- *
- *  Released under the MIT license
- */
-
-#ifndef LIBATAPP_ETCDCLI_ETCD_PACKER_H
-#define LIBATAPP_ETCDCLI_ETCD_PACKER_H
+﻿// Copyright 2021 atframework
+// Created by owent on 2017-11-17
 
 #pragma once
 
@@ -62,5 +53,3 @@ class etcd_packer {
   static LIBATAPP_MACRO_API void unpack_bool(const rapidjson::Value &json_val, const char *key, bool &out);
 };
 }  // namespace atapp
-
-#endif

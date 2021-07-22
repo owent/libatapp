@@ -1,11 +1,5 @@
-﻿/**
- * atapp_log_sink_maker.h
- *
- *  Created on: 2016-05-21
- *      Author: owent
- */
-#ifndef LIBATAPP_ATAPP_LOG_SINK_MAKER_H
-#define LIBATAPP_ATAPP_LOG_SINK_MAKER_H
+// Copyright 2021 atframework
+// Created by owent on 2016-05-21
 
 #pragma once
 
@@ -48,5 +42,3 @@ class log_sink_maker {
   static LIBATAPP_MACRO_API log_reg_t get_stderr_sink_reg();
 };
 }  // namespace atapp
-
-#endif

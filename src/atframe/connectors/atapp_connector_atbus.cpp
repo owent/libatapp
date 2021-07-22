@@ -1,3 +1,6 @@
+// Copyright 2021 atframework
+// Created by owent
+
 #include <detail/libatbus_error.h>
 
 #include <atframe/atapp.h>
@@ -126,7 +129,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_start_connect(const etcd_di
 
 LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_close_connect(atapp_connection_handle &handle) {
   // remove handle
-  LIBATFRAME_UTILS_AUTO_SELETC_MAP(uint64_t, atapp_connection_handle::ptr_t)::iterator iter =
+  std::unordered_map<uint64_t, atapp_connection_handle::ptr_t>::iterator iter =
       handles_.find(handle.get_private_data_u64());
   if (iter != handles_.end() && iter->second.get() == &handle) {
     handles_.erase(iter);
@@ -153,7 +156,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_send_forward_request(atapp_
 LIBATAPP_MACRO_API void atapp_connector_atbus::on_receive_forward_response(
     uint64_t app_id, int32_t type, uint64_t msg_sequence, int32_t error_code, const void *data, size_t data_size,
     const atapp::protocol::atapp_metadata *metadata) {
-  LIBATFRAME_UTILS_AUTO_SELETC_MAP(uint64_t, atapp_connection_handle::ptr_t)::iterator iter = handles_.find(app_id);
+  std::unordered_map<uint64_t, atapp_connection_handle::ptr_t>::iterator iter = handles_.find(app_id);
 
   if (iter != handles_.end()) {
     atapp_connector_impl::on_receive_forward_response(iter->second.get(), type, msg_sequence, error_code, data,
@@ -177,7 +180,7 @@ LIBATAPP_MACRO_API void atapp_connector_atbus::on_receive_forward_response(
   sender.id = app_id;
   sender.remote = get_owner()->get_endpoint(app_id);
   if (nullptr != sender.remote) {
-    sender.name = &sender.remote->get_name();
+    sender.name = sender.remote->get_name();
   }
 
   get_owner()->trigger_event_on_forward_response(sender, msg, error_code);

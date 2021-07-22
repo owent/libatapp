@@ -1,4 +1,6 @@
-﻿
+// Copyright 2021 Tencent
+// Created by owent
+
 #include "atframe/atapp.h"
 
 #include <std/static_assert.h>
@@ -20,9 +22,6 @@
 #include <cli/shell_font.h>
 #include <log/log_sink_file_backend.h>
 
-#include <atframe/atapp_conf_rapidjson.h>
-#include <atframe/modules/etcd_module.h>
-
 #include <assert.h>
 #include <signal.h>
 
@@ -30,6 +29,12 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+
+#include "atframe/atapp_conf_rapidjson.h"
+#include "atframe/modules/etcd_module.h"
+
+#include "atframe/connectors/atapp_connector_atbus.h"
+#include "atframe/connectors/atapp_connector_loopback.h"
 
 #define ATAPP_DEFAULT_STOP_TIMEOUT 30000
 #define ATAPP_DEFAULT_TICK_INTERVAL 16
@@ -64,7 +69,7 @@ LIBATAPP_MACRO_API app::message_t &app::message_t::operator=(const message_t &ot
   return *this;
 }
 
-LIBATAPP_MACRO_API app::message_sender_t::message_sender_t() : id(0), name(nullptr), remote(nullptr) {}
+LIBATAPP_MACRO_API app::message_sender_t::message_sender_t() : id(0), remote(nullptr) {}
 LIBATAPP_MACRO_API app::message_sender_t::~message_sender_t() {}
 
 LIBATAPP_MACRO_API app::message_sender_t::message_sender_t(const message_sender_t &other) { (*this) = other; }
@@ -156,6 +161,7 @@ LIBATAPP_MACRO_API app::app() : setup_result_(0), last_proc_event_count_(0), ev_
   stat_.inner_etcd.sum_create_requests = 0;
 
   atbus_connector_ = add_connector<atapp_connector_atbus>();
+  loopback_connector_ = add_connector<atapp_connector_loopback>();
 
   // inner modules
   inner_module_etcd_ = std::make_shared<atapp::etcd_module>();
@@ -163,13 +169,31 @@ LIBATAPP_MACRO_API app::app() : setup_result_(0), last_proc_event_count_(0), ev_
 }
 
 LIBATAPP_MACRO_API app::~app() {
+  if (is_inited() && !is_closed()) {
+    if (!is_closing()) {
+      stop();
+    }
+
+    util::time::time_utility::update();
+    time_t now = util::time::time_utility::get_sys_now() * 1000 + util::time::time_utility::get_now_usec() / 1000;
+    time_t offset = get_origin_configure().timer().stop_timeout().seconds() * 1000;
+    offset += get_origin_configure().timer().stop_timeout().nanos() / 1000000;
+    if (offset <= 0) {
+      offset = 30000;
+    }
+
+    time_t timeout = now + offset;
+    while (!is_closed() && timeout > now) {
+      run_once(0, timeout - now);
+
+      util::time::time_utility::update();
+      now = util::time::time_utility::get_sys_now() * 1000 + util::time::time_utility::get_now_usec() / 1000;
+    }
+  }
+
   endpoint_index_by_id_.clear();
   endpoint_index_by_name_.clear();
   endpoint_waker_.clear();
-
-  if (this == last_instance_) {
-    last_instance_ = nullptr;
-  }
 
   for (module_ptr_t &mod : modules_) {
     if (mod && mod->owner_ == this) {
@@ -193,6 +217,10 @@ LIBATAPP_MACRO_API app::~app() {
 
   assert(!tick_timer_.tick_timer);
   assert(!tick_timer_.timeout_timer);
+
+  if (this == last_instance_) {
+    last_instance_ = nullptr;
+  }
 }
 
 LIBATAPP_MACRO_API int app::run(ev_loop_t *ev_loop, int argc, const char **argv, void *priv_data) {
@@ -223,8 +251,8 @@ LIBATAPP_MACRO_API int app::run(ev_loop_t *ev_loop, int argc, const char **argv,
   while (!is_closed()) {
     ret = run_inner(UV_RUN_DEFAULT);
   }
-  return ret;
 
+  return ret;
 }  // namespace atapp
 
 LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv, void *priv_data) {
@@ -713,7 +741,12 @@ LIBATAPP_MACRO_API int app::stop() {
 }
 
 LIBATAPP_MACRO_API int app::tick() {
-  int active_count;
+  if (check_flag(flag_t::IN_TICK)) {
+    return 0;
+  }
+  flag_guard_t in_tick_guard(*this, flag_t::IN_TICK);
+
+  int64_t active_count;
   util::time::time_utility::update();
   // record start time point
   util::time::time_utility::raw_time_t start_tp = util::time::time_utility::sys_now();
@@ -724,6 +757,7 @@ LIBATAPP_MACRO_API int app::tick() {
           std::chrono::seconds(conf_.origin.timer().tick_interval().seconds()));
   conf_tick_interval += std::chrono::duration_cast<std::chrono::system_clock::duration>(
       std::chrono::nanoseconds(conf_.origin.timer().tick_interval().nanos()));
+  end_tp += conf_tick_interval;
 
   do {
     if (tick_timer_.sec != util::time::time_utility::get_sys_now()) {
@@ -760,33 +794,16 @@ LIBATAPP_MACRO_API int app::tick() {
       }
     }
 
-    // step 3. proc for pending messages of endpoints
-    while (!endpoint_waker_.empty() && endpoint_waker_.begin()->first <= tick_timer_.sec_update) {
-      atapp_endpoint::ptr_t ep = endpoint_waker_.begin()->second.lock();
-      endpoint_waker_.erase(endpoint_waker_.begin());
-      ++stat_.endpoint_wake_count;
-
-      if (ep) {
-        res = ep->retry_pending_messages(tick_timer_.sec_update, conf_.origin.bus().loop_times());
-        if (res > 0) {
-          active_count += res;
-        }
-
-        // TODO Support for delay recycle?
-        if (!ep->has_connection_handle()) {
-          remove_endpoint(ep);
-        }
-      }
-    }
+    // step 3. process inner events
+    // This should be called at last, because it only concern time
+    active_count += process_inner_events(end_tp);
 
     // only tick time less than tick interval will run loop again
-    util::time::time_utility::update();
-    end_tp = util::time::time_utility::sys_now();
-
     if (active_count > 0) {
       last_proc_event_count_ += static_cast<uint64_t>(active_count);
     }
-  } while (active_count > 0 && (end_tp - start_tp) < conf_tick_interval);
+    util::time::time_utility::update();
+  } while (active_count > 0 && util::time::time_utility::sys_now() < end_tp);
 
   ev_loop_t *loop = get_evloop();
   // if is stoping, quit loop  every tick
@@ -811,8 +828,8 @@ LIBATAPP_MACRO_API int app::tick() {
         if (0 != uv_getrusage(&stat_.last_checkpoint_usage)) {
           break;
         }
-        long offset_usr = stat_.last_checkpoint_usage.ru_utime.tv_sec - last_usage.ru_utime.tv_sec;
-        long offset_sys = stat_.last_checkpoint_usage.ru_stime.tv_sec - last_usage.ru_stime.tv_sec;
+        auto offset_usr = stat_.last_checkpoint_usage.ru_utime.tv_sec - last_usage.ru_utime.tv_sec;
+        auto offset_sys = stat_.last_checkpoint_usage.ru_stime.tv_sec - last_usage.ru_stime.tv_sec;
         offset_usr *= 1000000;
         offset_sys *= 1000000;
         offset_usr += stat_.last_checkpoint_usage.ru_utime.tv_usec - last_usage.ru_utime.tv_usec;
@@ -824,8 +841,7 @@ LIBATAPP_MACRO_API int app::tick() {
             "[STATISTICS]: {} CPU usage: user {:02.3}%, sys {:02.3}%, max rss: {}{}, page faults: {}", get_app_name(),
             offset_usr / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f),  // usec and add %
             offset_sys / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f),  // usec and add %
-            static_cast<unsigned long long>(max_rss.first), max_rss.second,
-            static_cast<unsigned long long>(last_usage.ru_majflt));
+            max_rss.first, max_rss.second, last_usage.ru_majflt);
 #else
         std::pair<uint64_t, const char *> ru_ixrss = make_size_showup(last_usage.ru_ixrss);
         std::pair<uint64_t, const char *> ru_idrss = make_size_showup(last_usage.ru_idrss);
@@ -838,11 +854,8 @@ LIBATAPP_MACRO_API int app::tick() {
             get_app_name(),
             offset_usr / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f),  // usec and add %
             offset_sys / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f),  // usec and add %
-            static_cast<unsigned long long>(max_rss.first), max_rss.second,
-            static_cast<unsigned long long>(ru_ixrss.first), ru_ixrss.second,
-            static_cast<unsigned long long>(ru_idrss.first), ru_idrss.second,
-            static_cast<unsigned long long>(ru_isrss.first), ru_isrss.second,
-            static_cast<unsigned long long>(last_usage.ru_majflt));
+            max_rss.first, max_rss.second, ru_ixrss.first, ru_ixrss.second, ru_idrss.first, ru_idrss.second,
+            ru_isrss.first, ru_isrss.second, last_usage.ru_majflt);
         if (inner_module_etcd_) {
           const ::atapp::etcd_cluster::stats_t &current = inner_module_etcd_->get_raw_etcd_ctx().get_stats();
           FWLOGINFO(
@@ -1181,7 +1194,7 @@ LIBATAPP_MACRO_API etcd_discovery_node::ptr_t app::get_discovery_node_by_id(uint
   return inner_module_etcd_->get_global_discovery().get_node_by_id(id);
 }
 
-LIBATAPP_MACRO_API etcd_discovery_node::ptr_t app::get_discovery_node_by_name(const std::string &name) const {
+LIBATAPP_MACRO_API etcd_discovery_node::ptr_t app::get_discovery_node_by_name(gsl::string_view name) const {
   if (!inner_module_etcd_) {
     return nullptr;
   }
@@ -1250,11 +1263,11 @@ LIBATAPP_MACRO_API int32_t app::send_message(uint64_t target_node_id, int32_t ty
   return bus_node_->send_data(target_node_id, type, data, data_size, msg_sequence);
 }
 
-LIBATAPP_MACRO_API int32_t app::send_message(const std::string &target_node_name, int32_t type, const void *data,
+LIBATAPP_MACRO_API int32_t app::send_message(gsl::string_view target_node_name, int32_t type, const void *data,
                                              size_t data_size, uint64_t *msg_sequence,
                                              const atapp::protocol::atapp_metadata *metadata) {
   do {
-    atapp_endpoint *cache = get_endpoint(target_node_name);
+    atapp_endpoint *cache = get_endpoint(std::string(target_node_name.data(), target_node_name.size()));
     if (nullptr == cache) {
       break;
     }
@@ -1444,12 +1457,13 @@ LIBATAPP_MACRO_API int32_t app::send_message_by_round_robin(const etcd_discovery
   return send_message(node, type, data, data_size, msg_sequence, metadata);
 }
 
-LIBATAPP_MACRO_API bool app::add_log_sink_maker(const std::string &name, log_sink_maker::log_reg_t fn) {
-  if (log_reg_.end() != log_reg_.find(name)) {
+LIBATAPP_MACRO_API bool app::add_log_sink_maker(gsl::string_view name, log_sink_maker::log_reg_t fn) {
+  std::string key{name.data(), name.size()};
+  if (log_reg_.end() != log_reg_.find(key)) {
     return false;
   }
 
-  log_reg_[name] = fn;
+  log_reg_[key] = fn;
   return true;
 }
 
@@ -1666,9 +1680,13 @@ LIBATAPP_MACRO_API atapp_endpoint::ptr_t app::mutable_endpoint(const etcd_discov
                   addr.address, reinterpret_cast<const void *>(handle.get()));
         break;
       } else {
-        FWLOGINFO("atapp endpoint {}({}) skip address {} with handle {}", ret->get_id(), ret->get_name(), addr.address,
-                  reinterpret_cast<const void *>(handle.get()));
+        FWLOGINFO("atapp endpoint {}({}) skip address {} with handle {}, connect result {}", ret->get_id(),
+                  ret->get_name(), addr.address, reinterpret_cast<const void *>(handle.get()), res);
       }
+    }
+
+    // TODO(owent): Check loopback
+    if (handle.use_count() == 1) {
     }
   }
 
@@ -1693,8 +1711,9 @@ LIBATAPP_MACRO_API const atapp_endpoint *app::get_endpoint(uint64_t by_id) const
   return nullptr;
 }
 
-LIBATAPP_MACRO_API atapp_endpoint *app::get_endpoint(const std::string &by_name) {
-  endpoint_index_by_name_t::iterator iter_name = endpoint_index_by_name_.find(by_name);
+LIBATAPP_MACRO_API atapp_endpoint *app::get_endpoint(gsl::string_view by_name) {
+  endpoint_index_by_name_t::iterator iter_name =
+      endpoint_index_by_name_.find(std::string(by_name.data(), by_name.size()));
   if (iter_name != endpoint_index_by_name_.end()) {
     return iter_name->second.get();
   }
@@ -1702,8 +1721,9 @@ LIBATAPP_MACRO_API atapp_endpoint *app::get_endpoint(const std::string &by_name)
   return nullptr;
 }
 
-LIBATAPP_MACRO_API const atapp_endpoint *app::get_endpoint(const std::string &by_name) const {
-  endpoint_index_by_name_t::const_iterator iter_name = endpoint_index_by_name_.find(by_name);
+LIBATAPP_MACRO_API const atapp_endpoint *app::get_endpoint(gsl::string_view by_name) const {
+  endpoint_index_by_name_t::const_iterator iter_name =
+      endpoint_index_by_name_.find(std::string(by_name.data(), by_name.size()));
   if (iter_name != endpoint_index_by_name_.end()) {
     return iter_name->second.get();
   }
@@ -2048,6 +2068,44 @@ void app::process_signal(int signo) {
       break;
     }
   }
+}
+
+int64_t app::process_inner_events(const util::time::time_utility::raw_time_t &end_tick) {
+  int64_t ret = 0;
+  bool more_messages = true;
+  while (util::time::time_utility::sys_now() < end_tick && more_messages) {
+    int64_t round_res = 0;
+    if (!endpoint_waker_.empty() && endpoint_waker_.begin()->first <= tick_timer_.sec_update) {
+      atapp_endpoint::ptr_t ep = endpoint_waker_.begin()->second.lock();
+      endpoint_waker_.erase(endpoint_waker_.begin());
+      ++stat_.endpoint_wake_count;
+
+      if (ep) {
+        int32_t res = ep->retry_pending_messages(tick_timer_.sec_update, conf_.origin.bus().loop_times());
+        if (res > 0) {
+          round_res += res;
+        }
+
+        // TODO Support for delay recycle?
+        if (!ep->has_connection_handle()) {
+          remove_endpoint(ep);
+        }
+      }
+    }
+
+    if (loopback_connector_) {
+      round_res += loopback_connector_->process(end_tick);
+    }
+
+    if (round_res > 0) {
+      ret += round_res;
+    } else {
+      // No more event, exit directly
+      more_messages = false;
+    }
+  }
+
+  return ret;
 }
 
 LIBATAPP_MACRO_API int app::trigger_event_on_forward_request(const message_sender_t &source, const message_t &msg) {
@@ -2518,9 +2576,8 @@ int app::setup_atbus() {
           atbus::channel::channel_address_t address;
           atbus::channel::make_address(conf_.origin.bus().listen(i).c_str(), address);
           std::string abs_path = util::file_system::get_abs_path(address.host.c_str());
-          FWLOGERROR("listen pipe socket {}, but the length ({}) exceed the limit {}", abs_path,
-                     static_cast<unsigned long long>(abs_path.size()),
-                     static_cast<unsigned long long>(atbus::channel::io_stream_get_max_unix_socket_length()));
+          FWLOGERROR("listen pipe socket {}, but the length ({}) exceed the limit {}", abs_path, abs_path.size(),
+                     atbus::channel::io_stream_get_max_unix_socket_length());
         }
         ret = res;
 #ifdef _WIN32
@@ -2618,8 +2675,8 @@ int app::setup_timer() {
   if (chrono_to_libuv_duration(conf_.origin.timer().tick_interval(), 0) < 1) {
     FWLOGWARNING("tick interval can not smaller than 1ms, we use default {}ms now.", ATAPP_DEFAULT_TICK_INTERVAL);
   } else {
-    FWLOGINFO("setup tick interval to {}ms.", static_cast<unsigned long long>(chrono_to_libuv_duration(
-                                                  conf_.origin.timer().tick_interval(), ATAPP_DEFAULT_TICK_INTERVAL)));
+    FWLOGINFO("setup tick interval to {}ms.",
+              chrono_to_libuv_duration(conf_.origin.timer().tick_interval(), ATAPP_DEFAULT_TICK_INTERVAL));
   }
 
   timer_ptr_t timer = std::make_shared<timer_info_t>();
@@ -3215,10 +3272,17 @@ int app::bus_evt_callback_on_recv_msg(const atbus::node &, const atbus::endpoint
   sender.id = from_id;
   sender.remote = get_endpoint(from_id);
   if (nullptr != sender.remote) {
-    sender.name = &sender.remote->get_name();
+    sender.name = sender.remote->get_name();
   }
 
-  trigger_event_on_forward_request(sender, message);
+  int res = trigger_event_on_forward_request(sender, message);
+  if (res < 0) {
+    FWLOGERROR("{} forward data {}(type={}, sequence={}) bytes failed, error code: {}",
+               atbus_connector_ ? atbus_connector_->name() : "[null]", len, message.type, message.msg_sequence, res);
+  } else {
+    FWLOGDEBUG("{} forward data {}(type={}, sequence={}) bytes success, result code: {}",
+               atbus_connector_ ? atbus_connector_->name() : "[null]", len, message.type, message.msg_sequence, res);
+  }
 
   ++last_proc_event_count_;
   return 0;
@@ -3265,7 +3329,7 @@ int app::bus_evt_callback_on_forward_response(const atbus::node &, const atbus::
   sender.id = from_id;
   sender.remote = get_endpoint(from_id);
   if (nullptr != sender.remote) {
-    sender.name = &sender.remote->get_name();
+    sender.name = sender.remote->get_name();
   }
 
   trigger_event_on_forward_response(sender, message, m->head().ret());
@@ -3332,20 +3396,17 @@ int app::bus_evt_callback_on_reg(const atbus::node &n, const atbus::endpoint *ep
 
   if (nullptr != conn) {
     if (nullptr != ep) {
-      WLOGINFO("bus node 0x%llx endpoint 0x%llx connection %s registered, res: %d",
-               static_cast<unsigned long long>(n.get_id()), static_cast<unsigned long long>(ep->get_id()),
-               conn->get_address().address.c_str(), res);
+      FWLOGINFO("bus node {:#x} endpoint {:#x} connection {} registered, res: {}", n.get_id(), ep->get_id(),
+                conn->get_address().address.c_str(), res);
     } else {
-      WLOGINFO("bus node 0x%llx connection %s registered, res: %d", static_cast<unsigned long long>(n.get_id()),
-               conn->get_address().address.c_str(), res);
+      FWLOGINFO("bus node {:#x} connection {} registered, res: {}", n.get_id(), conn->get_address().address, res);
     }
 
   } else {
     if (nullptr != ep) {
-      WLOGINFO("bus node 0x%llx endpoint 0x%llx registered, res: %d", static_cast<unsigned long long>(n.get_id()),
-               static_cast<unsigned long long>(ep->get_id()), res);
+      FWLOGINFO("bus node {:#x} endpoint {:#x} registered, res: {}", n.get_id(), ep->get_id(), res);
     } else {
-      WLOGINFO("bus node 0x%llx registered, res: %d", static_cast<unsigned long long>(n.get_id()), res);
+      FWLOGINFO("bus node {:#x} registered, res: {}", n.get_id(), res);
     }
   }
 
@@ -3480,11 +3541,9 @@ int app::bus_evt_callback_on_custom_rsp(const atbus::node &, const atbus::endpoi
   }
 
   util::cli::shell_stream ss(std::cout);
-  char bus_addr[64] = {0};
-  UTIL_STRFUNC_SNPRINTF(bus_addr, sizeof(bus_addr), "0x%llx", static_cast<unsigned long long>(src_id));
   for (size_t i = 0; i < args.size(); ++i) {
     std::string text(static_cast<const char *>(args[i].first), args[i].second);
-    ss() << "Custom Command: (" << bus_addr << "): " << text << std::endl;
+    ss() << "Custom Command: (" << LOG_WRAPPER_FWAPI_FORMAT("{:#x}", src_id) << "): " << text << std::endl;
   }
 
   return 0;

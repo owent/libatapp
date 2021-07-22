@@ -1,4 +1,7 @@
-﻿#include <libatbus.h>
+// Copyright 2021 atframework
+// Created by owent
+
+#include <libatbus.h>
 
 #include <algorithm/base64.h>
 

@@ -1,3 +1,6 @@
+// Copyright 2021 atframework
+// Created by owent
+
 #include <limits>
 
 #include <detail/libatbus_error.h>
@@ -127,17 +130,13 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::push_forward_message(int32_t type, ui
   if (closing_ || nullptr == owner_) {
     do {
       atapp_connection_handle *handle = get_ready_connection_handle();
-      if (nullptr == handle) {
-        break;
+      atapp_connector_impl *connector = nullptr;
+      if (nullptr != handle) {
+        connector = handle->get_connector();
       }
 
-      atapp_connector_impl *connector = handle->get_connector();
-      if (nullptr == connector) {
-        break;
-      }
-
-      connector->on_receive_forward_response(handle, type, msg_sequence, EN_ATBUS_ERR_CLOSING, data, data_size,
-                                             metadata);
+      trigger_on_receive_forward_response(connector, handle, type, msg_sequence, EN_ATBUS_ERR_CLOSING, data, data_size,
+                                          metadata);
     } while (false);
     return EN_ATBUS_ERR_CLOSING;
   }
@@ -153,7 +152,7 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::push_forward_message(int32_t type, ui
     }
 
     atapp_connection_handle *handle = get_ready_connection_handle();
-    if (nullptr == handle) {
+    if (nullptr != handle) {
       break;
     }
 
@@ -164,7 +163,7 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::push_forward_message(int32_t type, ui
 
     int32_t ret = connector->on_send_forward_request(handle, type, &msg_sequence, data, data_size, metadata);
     if (0 != ret) {
-      connector->on_receive_forward_response(handle, type, msg_sequence, ret, data, data_size, metadata);
+      trigger_on_receive_forward_response(connector, handle, type, msg_sequence, ret, data, data_size, metadata);
     }
 
     return ret;
@@ -192,16 +191,13 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::push_forward_message(int32_t type, ui
 
   if (failed_error_code != 0) {
     atapp_connection_handle *handle = get_ready_connection_handle();
-    if (nullptr == handle) {
-      return failed_error_code;
+    atapp_connector_impl *connector = nullptr;
+    if (nullptr != handle) {
+      connector = handle->get_connector();
     }
 
-    atapp_connector_impl *connector = handle->get_connector();
-    if (nullptr == connector) {
-      return failed_error_code;
-    }
-
-    connector->on_receive_forward_response(handle, type, msg_sequence, failed_error_code, data, data_size, metadata);
+    trigger_on_receive_forward_response(connector, handle, type, msg_sequence, failed_error_code, data, data_size,
+                                        metadata);
     return failed_error_code;
   }
 
@@ -267,11 +263,9 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::retry_pending_messages(const util::ti
     }
 
     if (0 != res) {
-      if (nullptr != handle && nullptr != connector) {
-        connector->on_receive_forward_response(handle, msg.type, msg.msg_sequence, res,
-                                               reinterpret_cast<const void *>(msg.data.data()), msg.data.size(),
-                                               msg.metadata.get());
-      }
+      trigger_on_receive_forward_response(connector, handle, msg.type, msg.msg_sequence, res,
+                                          reinterpret_cast<const void *>(msg.data.data()), msg.data.size(),
+                                          msg.metadata.get());
     }
 
     ++ret;
@@ -313,20 +307,20 @@ LIBATAPP_MACRO_API void atapp_endpoint::add_waker(util::time::time_utility::raw_
 
 void atapp_endpoint::cancel_pending_messages() {
   atapp_connection_handle *handle = get_ready_connection_handle();
-  if (nullptr == handle) {
-    return;
+  atapp_connector_impl *connector = nullptr;
+  if (nullptr != handle) {
+    connector = handle->get_connector();
   }
 
-  atapp_connector_impl *connector = handle->get_connector();
   if (nullptr == connector) {
     return;
   }
 
   while (!pending_message_.empty()) {
     const pending_message_t &msg = pending_message_.front();
-    connector->on_receive_forward_response(handle, msg.type, msg.msg_sequence, EN_ATBUS_ERR_CLOSING,
-                                           reinterpret_cast<const void *>(msg.data.data()), msg.data.size(),
-                                           msg.metadata.get());
+    trigger_on_receive_forward_response(connector, handle, msg.type, msg.msg_sequence, EN_ATBUS_ERR_CLOSING,
+                                        reinterpret_cast<const void *>(msg.data.data()), msg.data.size(),
+                                        msg.metadata.get());
 
     if (likely(pending_message_size_ >= msg.data.size())) {
       pending_message_size_ -= msg.data.size();
@@ -346,4 +340,40 @@ void atapp_endpoint::cancel_pending_messages() {
   pending_message_count_ = 0;
 #endif
 }
+
+void atapp_endpoint::trigger_on_receive_forward_response(atapp_connector_impl *connector,
+                                                         atapp_connection_handle *handle, int32_t type,
+                                                         uint64_t sequence, int32_t error_code, const void *data,
+                                                         size_t data_size,
+                                                         const atapp::protocol::atapp_metadata *metadata) {
+  if (nullptr != connector && nullptr != handle) {
+    connector->on_receive_forward_response(handle, type, sequence, error_code, data, data_size, metadata);
+    return;
+  }
+
+  atapp::app *app = get_owner();
+  if (nullptr == app) {
+    return;
+  }
+
+  // notify app
+  app::message_t msg;
+  msg.data = data;
+  msg.data_size = data_size;
+  msg.metadata = metadata;
+  msg.msg_sequence = sequence;
+  msg.type = type;
+
+  app::message_sender_t sender;
+  if (nullptr != handle) {
+    sender.remote = handle->get_endpoint();
+  }
+  if (nullptr != sender.remote) {
+    sender.id = sender.remote->get_id();
+    sender.name = sender.remote->get_name();
+  }
+
+  app->trigger_event_on_forward_response(sender, msg, error_code);
+}
+
 }  // namespace atapp

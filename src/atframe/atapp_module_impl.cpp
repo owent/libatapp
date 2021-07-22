@@ -1,4 +1,7 @@
-﻿#include <signal.h>
+// Copyright 2021 atframework
+// Created by owent
+
+#include <signal.h>
 #include <iostream>
 #include <typeinfo>
 
