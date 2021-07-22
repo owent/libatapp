@@ -1,4 +1,4 @@
-﻿// Copyright 2021 atframework
+// Copyright 2021 atframework
 // Created by owent on 2017-11-17
 
 #pragma once
