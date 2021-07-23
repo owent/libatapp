@@ -1287,7 +1287,7 @@ LIBATAPP_MACRO_API int32_t app::send_message(gsl::string_view target_node_name, 
   }
 
   do {
-    atapp_endpoint *cache = get_endpoint(std::string(target_node_name.data(), target_node_name.size()));
+    atapp_endpoint *cache = get_endpoint(target_node_name);
     if (nullptr == cache && target_node_name == get_app_name()) {
       cache = auto_mutable_self_endpoint().get();
     }
