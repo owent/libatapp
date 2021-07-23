@@ -6,7 +6,7 @@ atapp:
   type_name: "unit-test"
 
   bus:
-    listen: "ipv6://::1:21538"
+    listen: "ipv4://127.0.0.1:21538"
     subnets: "0/0"
     proxy: ""
     backlog: 256
