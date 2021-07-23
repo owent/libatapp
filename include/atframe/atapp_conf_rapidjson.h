@@ -141,10 +141,10 @@ struct rapidsjon_loader_mutable_member_helper<TVAL, false> {
   static LIBATAPP_MACRO_API_HEAD_ONLY inline void append(rapidjson::Value &parent, TVAL &&val,
                                                          rapidjson::Document &doc) {
     if (parent.IsNull()) {
-      parent.IsArray();
+      parent.SetArray();
     }
 
-    if (!parent.IsObject()) {
+    if (!parent.IsArray()) {
       FWLOGERROR("parent should be a array, but we got {}.", rapidsjon_loader_get_type_name(parent.GetType()));
       return;
     }
