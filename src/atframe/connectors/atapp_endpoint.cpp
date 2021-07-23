@@ -205,7 +205,7 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::push_forward_message(int32_t type, ui
   pending_message_.push_back(pending_message_t());
   pending_message_t &msg = pending_message_.back();
   msg.type = type;
-  msg.msg_sequence = msg_sequence;
+  msg.message_sequence = msg_sequence;
   msg.data.resize(data_size);
   msg.expired_timepoint = owner_->get_last_tick_time();
   msg.expired_timepoint += owner_->get_configure_message_timeout();
@@ -255,7 +255,7 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::retry_pending_messages(const util::ti
     // Support to send data after reconnected
     if (max_count > 0 && nullptr != handle && nullptr != connector) {
       --max_count;
-      res = connector->on_send_forward_request(handle, msg.type, &msg.msg_sequence,
+      res = connector->on_send_forward_request(handle, msg.type, &msg.message_sequence,
                                                reinterpret_cast<const void *>(msg.data.data()), msg.data.size(),
                                                msg.metadata.get());
     } else if (msg.expired_timepoint > tick_time) {
@@ -263,7 +263,7 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::retry_pending_messages(const util::ti
     }
 
     if (0 != res) {
-      trigger_on_receive_forward_response(connector, handle, msg.type, msg.msg_sequence, res,
+      trigger_on_receive_forward_response(connector, handle, msg.type, msg.message_sequence, res,
                                           reinterpret_cast<const void *>(msg.data.data()), msg.data.size(),
                                           msg.metadata.get());
     }
@@ -318,7 +318,7 @@ void atapp_endpoint::cancel_pending_messages() {
 
   while (!pending_message_.empty()) {
     const pending_message_t &msg = pending_message_.front();
-    trigger_on_receive_forward_response(connector, handle, msg.type, msg.msg_sequence, EN_ATBUS_ERR_CLOSING,
+    trigger_on_receive_forward_response(connector, handle, msg.type, msg.message_sequence, EN_ATBUS_ERR_CLOSING,
                                         reinterpret_cast<const void *>(msg.data.data()), msg.data.size(),
                                         msg.metadata.get());
 
@@ -361,7 +361,7 @@ void atapp_endpoint::trigger_on_receive_forward_response(atapp_connector_impl *c
   msg.data = data;
   msg.data_size = data_size;
   msg.metadata = metadata;
-  msg.msg_sequence = sequence;
+  msg.message_sequence = sequence;
   msg.type = type;
 
   app::message_sender_t sender;

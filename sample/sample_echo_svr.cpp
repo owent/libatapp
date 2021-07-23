@@ -133,9 +133,10 @@ static int app_handle_on_response(atapp::app &app, const atapp::app::message_sen
                                   const atapp::app::message_t &msg, int32_t error_code) {
   if (error_code < 0) {
     FWLOGERROR("send data from {:#x} to {:#x} failed, sequence: {}, code: {}", app.get_id(), source.id,
-               msg.msg_sequence, error_code);
+               msg.message_sequence, error_code);
   } else {
-    FWLOGDEBUG("send data from {:#x} to {:#x} got response, sequence: {}", app.get_id(), source.id, msg.msg_sequence);
+    FWLOGDEBUG("send data from {:#x} to {:#x} got response, sequence: {}", app.get_id(), source.id,
+               msg.message_sequence);
   }
   return 0;
 }

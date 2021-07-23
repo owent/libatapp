@@ -98,7 +98,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_loopback::on_send_forward_request(
   pending_message_.push_back(pending_message_t());
   pending_message_t &msg = pending_message_.back();
   msg.type = type;
-  msg.msg_sequence = nullptr == sequence ? 0 : *sequence;
+  msg.message_sequence = nullptr == sequence ? 0 : *sequence;
   msg.data.resize(data_size);
   memcpy(&msg.data[0], data, data_size);
   if (nullptr != metadata) {
@@ -128,7 +128,7 @@ LIBATAPP_MACRO_API void atapp_connector_loopback::on_receive_forward_response(
   msg.data = data;
   msg.data_size = data_size;
   msg.metadata = metadata;
-  msg.msg_sequence = msg_sequence;
+  msg.message_sequence = msg_sequence;
   msg.type = type;
 
   app::message_sender_t sender;
@@ -172,7 +172,7 @@ atapp_connector_loopback::process(const util::time::time_utility::raw_time_t &ma
       msg.data = pending_msg.data.data();
       msg.data_size = pending_msg.data.size();
       msg.metadata = pending_msg.metadata.get();
-      msg.msg_sequence = pending_msg.msg_sequence;
+      msg.message_sequence = pending_msg.message_sequence;
       msg.type = pending_msg.type;
 
       app::message_sender_t sender;
@@ -188,10 +188,10 @@ atapp_connector_loopback::process(const util::time::time_utility::raw_time_t &ma
       int res = owner->trigger_event_on_forward_request(sender, msg);
       if (res < 0) {
         FWLOGERROR("{} forward data {}(type={}, sequence={}) bytes failed, error code: {}", name(),
-                   pending_msg.data.size(), pending_msg.type, pending_msg.msg_sequence, res);
+                   pending_msg.data.size(), pending_msg.type, pending_msg.message_sequence, res);
       } else {
         FWLOGDEBUG("{} forward data {}(type={}, sequence={}) bytes success, result code: {}", name(),
-                   pending_msg.data.size(), pending_msg.type, pending_msg.msg_sequence, res);
+                   pending_msg.data.size(), pending_msg.type, pending_msg.message_sequence, res);
       }
 
       ++ret;

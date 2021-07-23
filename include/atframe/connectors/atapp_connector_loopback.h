@@ -39,7 +39,7 @@ class atapp_connector_loopback : public atapp_connector_impl {
   std::unordered_map<uintptr_t, atapp_connection_handle::ptr_t> handles_;
   struct pending_message_t {
     int32_t type;
-    uint64_t msg_sequence;
+    uint64_t message_sequence;
     std::vector<unsigned char> data;
     std::unique_ptr<atapp::protocol::atapp_metadata> metadata;
   };

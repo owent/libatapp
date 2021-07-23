@@ -125,7 +125,12 @@ LIBATAPP_MACRO_API int etcd_module::init() {
   }
 
   const atapp::protocol::atapp_etcd &conf = get_configure();
-  if (etcd_ctx_.get_conf_hosts().empty() || !etcd_ctx_enabled_) {
+  if (!etcd_ctx_enabled_) {
+    FWLOGINFO("etcd disabled, start single mode");
+    return res;
+  }
+
+  if (etcd_ctx_.get_conf_hosts().empty()) {
     FWLOGINFO("etcd host not found, start single mode");
     return res;
   }

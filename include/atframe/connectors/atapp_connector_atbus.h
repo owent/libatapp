@@ -5,6 +5,11 @@
 
 #include "atframe/connectors/atapp_connector_impl.h"
 
+namespace atbus {
+class node;
+class endpoint;
+}  // namespace atbus
+
 namespace atapp {
 
 class atapp_connector_atbus : public atapp_connector_impl {
@@ -32,6 +37,11 @@ class atapp_connector_atbus : public atapp_connector_impl {
   LIBATAPP_MACRO_API void on_receive_forward_response(uint64_t app_id, int32_t type, uint64_t msg_sequence,
                                                       int32_t error_code, const void *data, size_t data_size,
                                                       const atapp::protocol::atapp_metadata *metadata);
+
+ private:
+  friend class app;
+  int on_add_endpoint(const atbus::node &n, atbus::endpoint *ep, int res);
+  int on_remove_endpoint(const atbus::node &n, atbus::endpoint *ep, int res);
 
  private:
   std::unordered_map<uint64_t, atapp_connection_handle::ptr_t> handles_;

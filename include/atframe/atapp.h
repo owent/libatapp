@@ -4,6 +4,7 @@
 #pragma once
 
 #include <bitset>
+#include <chrono>
 #include <functional>
 #include <list>
 #include <map>
@@ -72,7 +73,10 @@ class app {
 
   struct message_t {
     int32_t type;
-    uint64_t msg_sequence;
+    union {
+      uint64_t msg_sequence;  // compatibility for old version
+      uint64_t message_sequence;
+    };
     const void *data;
     size_t data_size;
     const atapp::protocol::atapp_metadata *metadata;
@@ -189,10 +193,13 @@ class app {
    * @brief run atapp loop once
    * @note you must call init(ev_loop, argc, argv, priv_data), before call run_noblock().
    * @param min_event_count min event in once call, 0 for any inner action in event loop, not just the logic event
-   * @param timeout_miliseconds timeout in miliseconds if no action happen
+   * @param timeout timeout if no action happen
    * @return error code < 0 or logic event count, 0 for inner action event or timeout
    */
-  LIBATAPP_MACRO_API int run_once(uint64_t min_event_count = 0, time_t timeout_miliseconds = 10000);
+  LIBATAPP_MACRO_API int run_once(
+      uint64_t min_event_count = 0,
+      std::chrono::system_clock::duration timeout =
+          std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::seconds(10)));
 
   LIBATAPP_MACRO_API bool is_inited() const noexcept;
 
@@ -208,14 +215,14 @@ class app {
 
   LIBATAPP_MACRO_API int tick();
 
-  LIBATAPP_MACRO_API app_id_t get_id() const;
+  LIBATAPP_MACRO_API app_id_t get_id() const noexcept;
 
   LIBATAPP_MACRO_API ev_loop_t *get_evloop();
 
-  LIBATAPP_MACRO_API app_id_t convert_app_id_by_string(const char *id_in) const;
-  LIBATAPP_MACRO_API std::string convert_app_id_to_string(app_id_t id_in, bool hex = false) const;
+  LIBATAPP_MACRO_API app_id_t convert_app_id_by_string(const char *id_in) const noexcept;
+  LIBATAPP_MACRO_API std::string convert_app_id_to_string(app_id_t id_in, bool hex = false) const noexcept;
 
-  LIBATAPP_MACRO_API bool check_flag(flag_t::type f) const;
+  LIBATAPP_MACRO_API bool check_flag(flag_t::type f) const noexcept;
 
   /**
    * @brief add a new module
@@ -246,7 +253,7 @@ class app {
    * @brief api: if last command or action run with upgrade mode
    * @return true if last command or action run with upgrade mode
    */
-  LIBATAPP_MACRO_API bool is_current_upgrade_mode() const;
+  LIBATAPP_MACRO_API bool is_current_upgrade_mode() const noexcept;
 
   /**
    * @brief api: get shared httr_request context, this context can be reused to create util::network::http_request
@@ -254,37 +261,39 @@ class app {
    * @note this function only return a valid context after initialized.
    * @return the shared http_request context
    */
-  LIBATAPP_MACRO_API util::network::http_request::curl_m_bind_ptr_t get_shared_curl_multi_context() const;
+  LIBATAPP_MACRO_API util::network::http_request::curl_m_bind_ptr_t get_shared_curl_multi_context() const noexcept;
 
   LIBATAPP_MACRO_API void set_app_version(const std::string &ver);
 
-  LIBATAPP_MACRO_API const std::string &get_app_version() const;
+  LIBATAPP_MACRO_API const std::string &get_app_version() const noexcept;
 
   LIBATAPP_MACRO_API void set_build_version(const std::string &ver);
 
-  LIBATAPP_MACRO_API const std::string &get_build_version() const;
+  LIBATAPP_MACRO_API const std::string &get_build_version() const noexcept;
 
-  LIBATAPP_MACRO_API const std::string &get_app_name() const;
+  LIBATAPP_MACRO_API app_id_t get_app_id() const noexcept;
 
-  LIBATAPP_MACRO_API const std::string &get_app_identity() const;
+  LIBATAPP_MACRO_API const std::string &get_app_name() const noexcept;
 
-  LIBATAPP_MACRO_API const std::string &get_type_name() const;
+  LIBATAPP_MACRO_API const std::string &get_app_identity() const noexcept;
 
-  LIBATAPP_MACRO_API app_id_t get_type_id() const;
+  LIBATAPP_MACRO_API const std::string &get_type_name() const noexcept;
 
-  LIBATAPP_MACRO_API const std::string &get_hash_code() const;
+  LIBATAPP_MACRO_API app_id_t get_type_id() const noexcept;
+
+  LIBATAPP_MACRO_API const std::string &get_hash_code() const noexcept;
 
   LIBATAPP_MACRO_API std::shared_ptr<atbus::node> get_bus_node();
-  LIBATAPP_MACRO_API const std::shared_ptr<atbus::node> get_bus_node() const;
+  LIBATAPP_MACRO_API const std::shared_ptr<atbus::node> get_bus_node() const noexcept;
 
   LIBATAPP_MACRO_API void enable_fallback_to_atbus_connector();
   LIBATAPP_MACRO_API void disable_fallback_to_atbus_connector();
-  LIBATAPP_MACRO_API bool is_fallback_to_atbus_connector_enabled() const;
+  LIBATAPP_MACRO_API bool is_fallback_to_atbus_connector_enabled() const noexcept;
 
-  LIBATAPP_MACRO_API util::time::time_utility::raw_time_t get_last_tick_time() const;
+  LIBATAPP_MACRO_API util::time::time_utility::raw_time_t get_last_tick_time() const noexcept;
 
   LIBATAPP_MACRO_API util::config::ini_loader &get_configure_loader();
-  LIBATAPP_MACRO_API const util::config::ini_loader &get_configure_loader() const;
+  LIBATAPP_MACRO_API const util::config::ini_loader &get_configure_loader() const noexcept;
 
   /**
    * @brief get yaml configure loaders
@@ -298,26 +307,26 @@ class app {
    * @note Be careful yaml API may throw a exception
    * @return yaml configure loaders
    */
-  LIBATAPP_MACRO_API const yaml_conf_map_t &get_yaml_loaders() const;
+  LIBATAPP_MACRO_API const yaml_conf_map_t &get_yaml_loaders() const noexcept;
 
   LIBATAPP_MACRO_API void parse_configures_into(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                                                 const std::string &path) const;
 
-  LIBATAPP_MACRO_API const atapp::protocol::atapp_configure &get_origin_configure() const;
-  LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata &get_metadata() const;
+  LIBATAPP_MACRO_API const atapp::protocol::atapp_configure &get_origin_configure() const noexcept;
+  LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata &get_metadata() const noexcept;
   LIBATAPP_MACRO_API atapp::protocol::atapp_metadata &mutable_metadata();
-  LIBATAPP_MACRO_API const atapp::protocol::atapp_area &get_area() const;
+  LIBATAPP_MACRO_API const atapp::protocol::atapp_area &get_area() const noexcept;
   LIBATAPP_MACRO_API atapp::protocol::atapp_area &mutable_area();
-  LIBATAPP_MACRO_API util::time::time_utility::raw_duration_t get_configure_message_timeout() const;
+  LIBATAPP_MACRO_API util::time::time_utility::raw_duration_t get_configure_message_timeout() const noexcept;
 
   LIBATAPP_MACRO_API void pack(atapp::protocol::atapp_discovery &out) const;
 
-  LIBATAPP_MACRO_API std::shared_ptr< ::atapp::etcd_module> get_etcd_module() const;
+  LIBATAPP_MACRO_API std::shared_ptr< ::atapp::etcd_module> get_etcd_module() const noexcept;
 
-  LIBATAPP_MACRO_API uint32_t get_address_type(const std::string &addr) const;
+  LIBATAPP_MACRO_API uint32_t get_address_type(const std::string &addr) const noexcept;
 
-  LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_discovery_node_by_id(uint64_t id) const;
-  LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_discovery_node_by_name(gsl::string_view name) const;
+  LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_discovery_node_by_id(uint64_t id) const noexcept;
+  LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_discovery_node_by_name(gsl::string_view name) const noexcept;
 
   LIBATAPP_MACRO_API int32_t listen(const std::string &address);
   LIBATAPP_MACRO_API int32_t send_message(uint64_t target_node_id, int32_t type, const void *data, size_t data_size,
@@ -391,11 +400,11 @@ class app {
   LIBATAPP_MACRO_API void set_evt_on_app_disconnected(callback_fn_on_disconnected_t fn);
   LIBATAPP_MACRO_API void set_evt_on_all_module_inited(callback_fn_on_all_module_inited_t fn);
 
-  LIBATAPP_MACRO_API const callback_fn_on_forward_request_t &get_evt_on_forward_request() const;
-  LIBATAPP_MACRO_API const callback_fn_on_forward_response_t &get_evt_on_forward_response() const;
-  LIBATAPP_MACRO_API const callback_fn_on_connected_t &get_evt_on_app_connected() const;
-  LIBATAPP_MACRO_API const callback_fn_on_disconnected_t &get_evt_on_app_disconnected() const;
-  LIBATAPP_MACRO_API const callback_fn_on_all_module_inited_t &get_evt_on_all_module_inited() const;
+  LIBATAPP_MACRO_API const callback_fn_on_forward_request_t &get_evt_on_forward_request() const noexcept;
+  LIBATAPP_MACRO_API const callback_fn_on_forward_response_t &get_evt_on_forward_response() const noexcept;
+  LIBATAPP_MACRO_API const callback_fn_on_connected_t &get_evt_on_app_connected() const noexcept;
+  LIBATAPP_MACRO_API const callback_fn_on_disconnected_t &get_evt_on_app_disconnected() const noexcept;
+  LIBATAPP_MACRO_API const callback_fn_on_all_module_inited_t &get_evt_on_all_module_inited() const noexcept;
 
   LIBATAPP_MACRO_API bool add_endpoint_waker(util::time::time_utility::raw_time_t wakeup_time,
                                              const atapp_endpoint::weak_ptr_t &ep_watcher);
@@ -404,9 +413,9 @@ class app {
   LIBATAPP_MACRO_API void remove_endpoint(const atapp_endpoint::ptr_t &enpoint);
   LIBATAPP_MACRO_API atapp_endpoint::ptr_t mutable_endpoint(const etcd_discovery_node::ptr_t &discovery);
   LIBATAPP_MACRO_API atapp_endpoint *get_endpoint(uint64_t by_id);
-  LIBATAPP_MACRO_API const atapp_endpoint *get_endpoint(uint64_t by_id) const;
+  LIBATAPP_MACRO_API const atapp_endpoint *get_endpoint(uint64_t by_id) const noexcept;
   LIBATAPP_MACRO_API atapp_endpoint *get_endpoint(gsl::string_view by_name);
-  LIBATAPP_MACRO_API const atapp_endpoint *get_endpoint(gsl::string_view by_name) const;
+  LIBATAPP_MACRO_API const atapp_endpoint *get_endpoint(gsl::string_view by_name) const noexcept;
 
   template <class TCONNECTOR, class... TARGS>
   LIBATAPP_MACRO_API_HEAD_ONLY std::shared_ptr<TCONNECTOR> add_connector(TARGS &&...args) {
@@ -418,7 +427,7 @@ class app {
     return ret;
   }
 
-  LIBATAPP_MACRO_API bool match_gateway(const atapp::protocol::atapp_gateway &checked) const;
+  LIBATAPP_MACRO_API bool match_gateway(const atapp::protocol::atapp_gateway &checked) const noexcept;
 
  private:
   static void ev_stop_timeout(uv_timer_t *handle);
@@ -453,9 +462,9 @@ class app {
   bool cleanup_pidfile();
   void print_help();
 
-  bool match_gateway_hosts(const atapp::protocol::atapp_gateway &checked) const;
-  bool match_gateway_namespace(const atapp::protocol::atapp_gateway &checked) const;
-  bool match_gateway_labels(const atapp::protocol::atapp_gateway &checked) const;
+  bool match_gateway_hosts(const atapp::protocol::atapp_gateway &checked) const noexcept;
+  bool match_gateway_namespace(const atapp::protocol::atapp_gateway &checked) const noexcept;
+  bool match_gateway_labels(const atapp::protocol::atapp_gateway &checked) const noexcept;
 
   // ============ inner functional handlers ============
 
@@ -527,6 +536,8 @@ class app {
   void process_signal(int signo);
 
   int64_t process_inner_events(const util::time::time_utility::raw_time_t &end_tick);
+
+  atapp_endpoint::ptr_t auto_mutable_self_endpoint();
 
  public:
   LIBATAPP_MACRO_API int trigger_event_on_forward_request(const message_sender_t &source, const message_t &msg);

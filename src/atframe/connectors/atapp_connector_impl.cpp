@@ -227,7 +227,7 @@ LIBATAPP_MACRO_API void atapp_connector_impl::on_receive_forward_response(
   msg.data = data;
   msg.data_size = data_size;
   msg.metadata = metadata;
-  msg.msg_sequence = sequence;
+  msg.message_sequence = sequence;
   msg.type = type;
 
   app::message_sender_t sender;

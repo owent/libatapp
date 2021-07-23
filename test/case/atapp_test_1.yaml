@@ -1,0 +1,55 @@
+atapp:
+  id: 0x00000001
+  id_mask: 8.8.8.8
+  name: "unit-test-1"
+  type_id: 1
+  type_name: "unit-test"
+
+  bus:
+    listen: "ipv6://::1:21537"
+    subnets: "0/0"
+    proxy: ""
+    backlog: 256
+    access_token_max_number: 5
+    first_idle_timeout: 10s
+    ping_interval: 60s
+    retry_interval: 3s
+    fault_tolerant: 3
+    msg_size: 64KB
+    recv_buffer_size: 1MB
+    send_buffer_size: 1MB
+    send_buffer_number: 0
+  timer:
+    tick_interval: 8ms
+    stop_timeout: 3s
+  etcd:
+    enable: false
+
+  log:
+    level: debug
+    category:
+      - name: default
+        prefix: "[Log %L][%F %T.%f][%s:%n(%C)]: "
+        stacktrace:
+          min: error
+          max: fatal
+        sink:
+          - type: file
+            level:
+              min: fatal
+              max: debug
+            rotate:
+              number: 10
+              size: 10485760
+            file: "../log/unit-test-1.%N.log"
+            writing_alias: "../log/unit-test-1.log"
+            auto_flush: info
+            flush_interval: 1s
+          - type: stderr
+            level:
+              min: fatal
+              max: warning
+          - type: stdout
+            level:
+              min: fatal
+              max: debug

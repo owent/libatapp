@@ -49,7 +49,7 @@ class atapp_endpoint {
   struct pending_message_t {
     util::time::time_utility::raw_time_t expired_timepoint;
     int32_t type;
-    uint64_t msg_sequence;
+    uint64_t message_sequence;
     std::vector<unsigned char> data;
     std::unique_ptr<atapp::protocol::atapp_metadata> metadata;
   };

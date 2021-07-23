@@ -570,7 +570,7 @@ LIBATAPP_MACRO_API uint64_t __cdecl libatapp_c_msg_get_sequence(libatapp_c_messa
     return 0;
   }
 
-  return ATAPP_MESSAGE(msg)->msg_sequence;
+  return ATAPP_MESSAGE(msg)->message_sequence;
 }
 
 LIBATAPP_MACRO_API uint64_t __cdecl libatapp_c_msg_get_forward_from(libatapp_c_message msg) {

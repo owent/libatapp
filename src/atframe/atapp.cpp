@@ -55,14 +55,14 @@ static void _app_close_timer_handle(uv_handle_t *handle) {
 }
 
 LIBATAPP_MACRO_API app::message_t::message_t()
-    : type(0), msg_sequence(0), data(nullptr), data_size(0), metadata(nullptr) {}
+    : type(0), message_sequence(0), data(nullptr), data_size(0), metadata(nullptr) {}
 LIBATAPP_MACRO_API app::message_t::~message_t() {}
 
 LIBATAPP_MACRO_API app::message_t::message_t(const message_t &other) { (*this) = other; }
 
 LIBATAPP_MACRO_API app::message_t &app::message_t::operator=(const message_t &other) {
   type = other.type;
-  msg_sequence = other.msg_sequence;
+  message_sequence = other.message_sequence;
   data = other.data;
   data_size = other.data_size;
   metadata = other.metadata;
@@ -184,7 +184,7 @@ LIBATAPP_MACRO_API app::~app() {
 
     time_t timeout = now + offset;
     while (!is_closed() && timeout > now) {
-      run_once(0, timeout - now);
+      run_once(0, std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::seconds(timeout - now)));
 
       util::time::time_utility::update();
       now = util::time::time_utility::get_sys_now() * 1000 + util::time::time_utility::get_now_usec() / 1000;
@@ -439,7 +439,7 @@ LIBATAPP_MACRO_API int app::run_noblock(uint64_t max_event_count) {
   return ret;
 }
 
-LIBATAPP_MACRO_API int app::run_once(uint64_t min_event_count, time_t timeout_miliseconds) {
+LIBATAPP_MACRO_API int app::run_once(uint64_t min_event_count, std::chrono::system_clock::duration timeout_duration) {
   ev_loop_t *loop = get_evloop();
   if (nullptr == loop) {
     return EN_ATAPP_ERR_NOT_INITED;
@@ -449,13 +449,13 @@ LIBATAPP_MACRO_API int app::run_once(uint64_t min_event_count, time_t timeout_mi
   int ret = 0;
 
   util::time::time_utility::raw_time_t timeout;
-  if (timeout_miliseconds > 0) {
+  if (timeout_duration.count() > 0) {
     util::time::time_utility::update();
-    timeout = util::time::time_utility::sys_now() + std::chrono::milliseconds(timeout_miliseconds);
+    timeout = util::time::time_utility::sys_now() + timeout_duration;
   }
 
   do {
-    if (timeout_miliseconds > 0) {
+    if (timeout_duration.count() > 0) {
       if (nullptr == tick_timer_.inner_break) {
         tick_timer_.inner_break = &timeout;
       } else if (timeout < *tick_timer_.inner_break) {
@@ -470,7 +470,7 @@ LIBATAPP_MACRO_API int app::run_once(uint64_t min_event_count, time_t timeout_mi
 
     evt_count += last_proc_event_count_;
 
-    if (timeout_miliseconds > 0) {
+    if (timeout_duration.count() > 0) {
       util::time::time_utility::update();
       if (timeout <= util::time::time_utility::sys_now()) {
         break;
@@ -895,15 +895,15 @@ LIBATAPP_MACRO_API int app::tick() {
   return 0;
 }
 
-LIBATAPP_MACRO_API app::app_id_t app::get_id() const { return conf_.id; }
+LIBATAPP_MACRO_API app::app_id_t app::get_id() const noexcept { return conf_.id; }
 
 LIBATAPP_MACRO_API app::ev_loop_t *app::get_evloop() { return ev_loop_; }
 
-LIBATAPP_MACRO_API app::app_id_t app::convert_app_id_by_string(const char *id_in) const {
+LIBATAPP_MACRO_API app::app_id_t app::convert_app_id_by_string(const char *id_in) const noexcept {
   return convert_app_id_by_string(id_in, conf_.id_mask);
 }
 
-LIBATAPP_MACRO_API std::string app::convert_app_id_to_string(app_id_t id_in, bool hex) const {
+LIBATAPP_MACRO_API std::string app::convert_app_id_to_string(app_id_t id_in, bool hex) const noexcept {
   return convert_app_id_to_string(id_in, conf_.id_mask, hex);
 }
 
@@ -936,9 +936,9 @@ LIBATAPP_MACRO_API util::cli::cmd_option::ptr_type app::get_option_manager() {
   return app_option_;
 }
 
-LIBATAPP_MACRO_API bool app::is_current_upgrade_mode() const { return conf_.upgrade_mode; }
+LIBATAPP_MACRO_API bool app::is_current_upgrade_mode() const noexcept { return conf_.upgrade_mode; }
 
-LIBATAPP_MACRO_API util::network::http_request::curl_m_bind_ptr_t app::get_shared_curl_multi_context() const {
+LIBATAPP_MACRO_API util::network::http_request::curl_m_bind_ptr_t app::get_shared_curl_multi_context() const noexcept {
   if (likely(inner_module_etcd_)) {
     return inner_module_etcd_->get_shared_curl_multi_context();
   }
@@ -948,11 +948,11 @@ LIBATAPP_MACRO_API util::network::http_request::curl_m_bind_ptr_t app::get_share
 
 LIBATAPP_MACRO_API void app::set_app_version(const std::string &ver) { conf_.app_version = ver; }
 
-LIBATAPP_MACRO_API const std::string &app::get_app_version() const { return conf_.app_version; }
+LIBATAPP_MACRO_API const std::string &app::get_app_version() const noexcept { return conf_.app_version; }
 
 LIBATAPP_MACRO_API void app::set_build_version(const std::string &ver) { build_version_ = ver; }
 
-LIBATAPP_MACRO_API const std::string &app::get_build_version() const {
+LIBATAPP_MACRO_API const std::string &app::get_build_version() const noexcept {
   if (build_version_.empty()) {
     std::stringstream ss;
     if (get_app_version().empty()) {
@@ -1028,36 +1028,40 @@ LIBATAPP_MACRO_API const std::string &app::get_build_version() const {
   return build_version_;
 }
 
-LIBATAPP_MACRO_API const std::string &app::get_app_name() const { return conf_.origin.name(); }
+LIBATAPP_MACRO_API app::app_id_t app::get_app_id() const noexcept { return conf_.id; }
 
-LIBATAPP_MACRO_API const std::string &app::get_app_identity() const { return conf_.origin.identity(); }
+LIBATAPP_MACRO_API const std::string &app::get_app_name() const noexcept { return conf_.origin.name(); }
 
-LIBATAPP_MACRO_API const std::string &app::get_type_name() const { return conf_.origin.type_name(); }
+LIBATAPP_MACRO_API const std::string &app::get_app_identity() const noexcept { return conf_.origin.identity(); }
 
-LIBATAPP_MACRO_API app::app_id_t app::get_type_id() const { return static_cast<app::app_id_t>(conf_.origin.type_id()); }
+LIBATAPP_MACRO_API const std::string &app::get_type_name() const noexcept { return conf_.origin.type_name(); }
 
-LIBATAPP_MACRO_API const std::string &app::get_hash_code() const { return conf_.hash_code; }
+LIBATAPP_MACRO_API app::app_id_t app::get_type_id() const noexcept {
+  return static_cast<app::app_id_t>(conf_.origin.type_id());
+}
+
+LIBATAPP_MACRO_API const std::string &app::get_hash_code() const noexcept { return conf_.hash_code; }
 
 LIBATAPP_MACRO_API std::shared_ptr<atbus::node> app::get_bus_node() { return bus_node_; }
-LIBATAPP_MACRO_API const std::shared_ptr<atbus::node> app::get_bus_node() const { return bus_node_; }
+LIBATAPP_MACRO_API const std::shared_ptr<atbus::node> app::get_bus_node() const noexcept { return bus_node_; }
 
 LIBATAPP_MACRO_API void app::enable_fallback_to_atbus_connector() { set_flag(flag_t::DISABLE_ATBUS_FALLBACK, false); }
 
 LIBATAPP_MACRO_API void app::disable_fallback_to_atbus_connector() { set_flag(flag_t::DISABLE_ATBUS_FALLBACK, true); }
 
-LIBATAPP_MACRO_API bool app::is_fallback_to_atbus_connector_enabled() const {
+LIBATAPP_MACRO_API bool app::is_fallback_to_atbus_connector_enabled() const noexcept {
   return !check_flag(flag_t::DISABLE_ATBUS_FALLBACK);
 }
 
-LIBATAPP_MACRO_API util::time::time_utility::raw_time_t app::get_last_tick_time() const {
+LIBATAPP_MACRO_API util::time::time_utility::raw_time_t app::get_last_tick_time() const noexcept {
   return tick_timer_.sec_update;
 }
 
 LIBATAPP_MACRO_API util::config::ini_loader &app::get_configure_loader() { return cfg_loader_; }
-LIBATAPP_MACRO_API const util::config::ini_loader &app::get_configure_loader() const { return cfg_loader_; }
+LIBATAPP_MACRO_API const util::config::ini_loader &app::get_configure_loader() const noexcept { return cfg_loader_; }
 
 LIBATAPP_MACRO_API app::yaml_conf_map_t &app::get_yaml_loaders() { return yaml_loader_; }
-LIBATAPP_MACRO_API const app::yaml_conf_map_t &app::get_yaml_loaders() const { return yaml_loader_; }
+LIBATAPP_MACRO_API const app::yaml_conf_map_t &app::get_yaml_loaders() const noexcept { return yaml_loader_; }
 
 LIBATAPP_MACRO_API void app::parse_configures_into(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                                                    const std::string &path) const {
@@ -1077,9 +1081,11 @@ LIBATAPP_MACRO_API void app::parse_configures_into(ATBUS_MACRO_PROTOBUF_NAMESPAC
   }
 }
 
-LIBATAPP_MACRO_API const atapp::protocol::atapp_configure &app::get_origin_configure() const { return conf_.origin; }
+LIBATAPP_MACRO_API const atapp::protocol::atapp_configure &app::get_origin_configure() const noexcept {
+  return conf_.origin;
+}
 
-LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata &app::get_metadata() const { return conf_.metadata; }
+LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata &app::get_metadata() const noexcept { return conf_.metadata; }
 
 LIBATAPP_MACRO_API atapp::protocol::atapp_metadata &app::mutable_metadata() {
   if (inner_module_etcd_) {
@@ -1088,7 +1094,7 @@ LIBATAPP_MACRO_API atapp::protocol::atapp_metadata &app::mutable_metadata() {
   return conf_.metadata;
 }
 
-LIBATAPP_MACRO_API const atapp::protocol::atapp_area &app::get_area() const { return conf_.origin.area(); }
+LIBATAPP_MACRO_API const atapp::protocol::atapp_area &app::get_area() const noexcept { return conf_.origin.area(); }
 
 LIBATAPP_MACRO_API atapp::protocol::atapp_area &app::mutable_area() {
   if (inner_module_etcd_) {
@@ -1097,7 +1103,7 @@ LIBATAPP_MACRO_API atapp::protocol::atapp_area &app::mutable_area() {
   return *conf_.origin.mutable_area();
 }
 
-LIBATAPP_MACRO_API util::time::time_utility::raw_time_t::duration app::get_configure_message_timeout() const {
+LIBATAPP_MACRO_API util::time::time_utility::raw_time_t::duration app::get_configure_message_timeout() const noexcept {
   const google::protobuf::Duration &dur = conf_.origin.timer().message_timeout();
   if (dur.seconds() <= 0 && dur.nanos() <= 0) {
     return std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::seconds(5));
@@ -1110,7 +1116,7 @@ LIBATAPP_MACRO_API util::time::time_utility::raw_time_t::duration app::get_confi
 }
 
 LIBATAPP_MACRO_API void app::pack(atapp::protocol::atapp_discovery &out) const {
-  out.set_id(get_id());
+  out.set_id(get_app_id());
   out.set_name(get_app_name());
   out.set_hostname(atbus::node::get_hostname());
   out.set_pid(atbus::node::get_pid());
@@ -1139,7 +1145,7 @@ LIBATAPP_MACRO_API void app::pack(atapp::protocol::atapp_discovery &out) const {
     for (size_t i = 0; i < subnets.size(); ++i) {
       atapp::protocol::atbus_subnet_range *subset = out.add_atbus_subnets();
       if (nullptr == subset) {
-        FWLOGERROR("pack configures for {}(0x{:x}) but malloc atbus_subnet_range failed", get_app_name(), get_id());
+        FWLOGERROR("pack configures for {}(0x{:x}) but malloc atbus_subnet_range failed", get_app_name(), get_app_id());
         break;
       }
 
@@ -1165,9 +1171,11 @@ LIBATAPP_MACRO_API void app::pack(atapp::protocol::atapp_discovery &out) const {
   }
 }
 
-LIBATAPP_MACRO_API std::shared_ptr< ::atapp::etcd_module> app::get_etcd_module() const { return inner_module_etcd_; }
+LIBATAPP_MACRO_API std::shared_ptr< ::atapp::etcd_module> app::get_etcd_module() const noexcept {
+  return inner_module_etcd_;
+}
 
-LIBATAPP_MACRO_API uint32_t app::get_address_type(const std::string &address) const {
+LIBATAPP_MACRO_API uint32_t app::get_address_type(const std::string &address) const noexcept {
   uint32_t ret = address_type_t::EN_ACAT_NONE;
 
   atbus::channel::channel_address_t addr;
@@ -1186,7 +1194,7 @@ LIBATAPP_MACRO_API uint32_t app::get_address_type(const std::string &address) co
   return iter->second->get_address_type(addr);
 }
 
-LIBATAPP_MACRO_API etcd_discovery_node::ptr_t app::get_discovery_node_by_id(uint64_t id) const {
+LIBATAPP_MACRO_API etcd_discovery_node::ptr_t app::get_discovery_node_by_id(uint64_t id) const noexcept {
   if (!inner_module_etcd_) {
     return nullptr;
   }
@@ -1194,7 +1202,7 @@ LIBATAPP_MACRO_API etcd_discovery_node::ptr_t app::get_discovery_node_by_id(uint
   return inner_module_etcd_->get_global_discovery().get_node_by_id(id);
 }
 
-LIBATAPP_MACRO_API etcd_discovery_node::ptr_t app::get_discovery_node_by_name(gsl::string_view name) const {
+LIBATAPP_MACRO_API etcd_discovery_node::ptr_t app::get_discovery_node_by_name(gsl::string_view name) const noexcept {
   if (!inner_module_etcd_) {
     return nullptr;
   }
@@ -1221,9 +1229,17 @@ LIBATAPP_MACRO_API int32_t app::listen(const std::string &address) {
 
 LIBATAPP_MACRO_API int32_t app::send_message(uint64_t target_node_id, int32_t type, const void *data, size_t data_size,
                                              uint64_t *msg_sequence, const atapp::protocol::atapp_metadata *metadata) {
+  if (!check_flag(flag_t::INITIALIZED)) {
+    return EN_ATAPP_ERR_NOT_INITED;
+  }
+
   // Find from cache
   do {
     atapp_endpoint *cache = get_endpoint(target_node_id);
+    if (nullptr == cache && target_node_id == get_app_id()) {
+      cache = auto_mutable_self_endpoint().get();
+    }
+
     if (nullptr == cache) {
       break;
     }
@@ -1266,8 +1282,16 @@ LIBATAPP_MACRO_API int32_t app::send_message(uint64_t target_node_id, int32_t ty
 LIBATAPP_MACRO_API int32_t app::send_message(gsl::string_view target_node_name, int32_t type, const void *data,
                                              size_t data_size, uint64_t *msg_sequence,
                                              const atapp::protocol::atapp_metadata *metadata) {
+  if (!check_flag(flag_t::INITIALIZED)) {
+    return EN_ATAPP_ERR_NOT_INITED;
+  }
+
   do {
     atapp_endpoint *cache = get_endpoint(std::string(target_node_name.data(), target_node_name.size()));
+    if (nullptr == cache && target_node_name == get_app_name()) {
+      cache = auto_mutable_self_endpoint().get();
+    }
+
     if (nullptr == cache) {
       break;
     }
@@ -1298,6 +1322,10 @@ LIBATAPP_MACRO_API int32_t app::send_message(gsl::string_view target_node_name, 
 LIBATAPP_MACRO_API int32_t app::send_message(const etcd_discovery_node::ptr_t &target_node_discovery, int32_t type,
                                              const void *data, size_t data_size, uint64_t *msg_sequence,
                                              const atapp::protocol::atapp_metadata *metadata) {
+  if (!check_flag(flag_t::INITIALIZED)) {
+    return EN_ATAPP_ERR_NOT_INITED;
+  }
+
   if (!inner_module_etcd_) {
     return EN_ATBUS_ERR_PARAMS;
   }
@@ -1481,19 +1509,19 @@ LIBATAPP_MACRO_API void app::set_evt_on_all_module_inited(callback_fn_on_all_mod
   evt_on_all_module_inited_ = fn;
 }
 
-LIBATAPP_MACRO_API const app::callback_fn_on_forward_request_t &app::get_evt_on_forward_request() const {
+LIBATAPP_MACRO_API const app::callback_fn_on_forward_request_t &app::get_evt_on_forward_request() const noexcept {
   return evt_on_forward_request_;
 }
-LIBATAPP_MACRO_API const app::callback_fn_on_forward_response_t &app::get_evt_on_forward_response() const {
+LIBATAPP_MACRO_API const app::callback_fn_on_forward_response_t &app::get_evt_on_forward_response() const noexcept {
   return evt_on_forward_response_;
 }
-LIBATAPP_MACRO_API const app::callback_fn_on_connected_t &app::get_evt_on_app_connected() const {
+LIBATAPP_MACRO_API const app::callback_fn_on_connected_t &app::get_evt_on_app_connected() const noexcept {
   return evt_on_app_connected_;
 }
-LIBATAPP_MACRO_API const app::callback_fn_on_disconnected_t &app::get_evt_on_app_disconnected() const {
+LIBATAPP_MACRO_API const app::callback_fn_on_disconnected_t &app::get_evt_on_app_disconnected() const noexcept {
   return evt_on_app_disconnected_;
 }
-LIBATAPP_MACRO_API const app::callback_fn_on_all_module_inited_t &app::get_evt_on_all_module_inited() const {
+LIBATAPP_MACRO_API const app::callback_fn_on_all_module_inited_t &app::get_evt_on_all_module_inited() const noexcept {
   return evt_on_all_module_inited_;
 }
 
@@ -1687,7 +1715,7 @@ LIBATAPP_MACRO_API atapp_endpoint::ptr_t app::mutable_endpoint(const etcd_discov
 
     // Check loopback
     if (handle.use_count() == 1 && loopback_connector_) {
-      if ((0 == id || id == get_id()) && (name.empty() || name == get_app_name())) {
+      if ((0 == id || id == get_app_id()) && (name.empty() || name == get_app_name())) {
         atbus::channel::channel_address_t addr;
         atbus::channel::make_address("loopback://", get_app_name().c_str(), 0, addr);
         int res = loopback_connector_->on_start_connect(discovery.get(), addr, handle);
@@ -1717,7 +1745,7 @@ LIBATAPP_MACRO_API atapp_endpoint *app::get_endpoint(uint64_t by_id) {
   return nullptr;
 }
 
-LIBATAPP_MACRO_API const atapp_endpoint *app::get_endpoint(uint64_t by_id) const {
+LIBATAPP_MACRO_API const atapp_endpoint *app::get_endpoint(uint64_t by_id) const noexcept {
   endpoint_index_by_id_t::const_iterator iter_id = endpoint_index_by_id_.find(by_id);
   if (iter_id != endpoint_index_by_id_.end()) {
     return iter_id->second.get();
@@ -1736,7 +1764,7 @@ LIBATAPP_MACRO_API atapp_endpoint *app::get_endpoint(gsl::string_view by_name) {
   return nullptr;
 }
 
-LIBATAPP_MACRO_API const atapp_endpoint *app::get_endpoint(gsl::string_view by_name) const {
+LIBATAPP_MACRO_API const atapp_endpoint *app::get_endpoint(gsl::string_view by_name) const noexcept {
   endpoint_index_by_name_t::const_iterator iter_name =
       endpoint_index_by_name_.find(std::string(by_name.data(), by_name.size()));
   if (iter_name != endpoint_index_by_name_.end()) {
@@ -1746,7 +1774,7 @@ LIBATAPP_MACRO_API const atapp_endpoint *app::get_endpoint(gsl::string_view by_n
   return nullptr;
 }
 
-LIBATAPP_MACRO_API bool app::match_gateway(const atapp::protocol::atapp_gateway &checked) const {
+LIBATAPP_MACRO_API bool app::match_gateway(const atapp::protocol::atapp_gateway &checked) const noexcept {
   if (checked.address().empty()) {
     return false;
   }
@@ -1789,7 +1817,7 @@ bool app::set_flag(flag_t::type f, bool v) {
   return ret;
 }
 
-LIBATAPP_MACRO_API bool app::check_flag(flag_t::type f) const {
+LIBATAPP_MACRO_API bool app::check_flag(flag_t::type f) const noexcept {
   if (f < 0 || f >= flag_t::FLAG_MAX) {
     return false;
   }
@@ -2123,6 +2151,19 @@ int64_t app::process_inner_events(const util::time::time_utility::raw_time_t &en
   return ret;
 }
 
+atapp_endpoint::ptr_t app::auto_mutable_self_endpoint() {
+  auto self_discovery = std::make_shared<atapp::etcd_discovery_node>();
+  if (!self_discovery) {
+    return nullptr;
+  }
+
+  atapp::protocol::atapp_discovery self_discovery_info;
+  pack(self_discovery_info);
+  self_discovery->copy_from(self_discovery_info);
+
+  return mutable_endpoint(self_discovery);
+}
+
 LIBATAPP_MACRO_API int app::trigger_event_on_forward_request(const message_sender_t &source, const message_t &msg) {
   if (evt_on_forward_request_) {
     return evt_on_forward_request_(std::ref(*this), source, msg);
@@ -2145,11 +2186,11 @@ LIBATAPP_MACRO_API void app::trigger_event_on_discovery_event(etcd_discovery_act
   if (node) {
     const atapp::protocol::atapp_discovery &discovery_info = node->get_discovery_info();
     if (action == etcd_discovery_action_t::EN_NAT_PUT) {
-      FWLOGINFO("app {}({}, type={}:{}) got a PUT discovery event({}({}, type={}:{}))", get_app_name(), get_id(),
+      FWLOGINFO("app {}({}, type={}:{}) got a PUT discovery event({}({}, type={}:{}))", get_app_name(), get_app_id(),
                 get_type_id(), get_type_name(), discovery_info.name(), discovery_info.id(), discovery_info.type_id(),
                 discovery_info.type_name());
     } else {
-      FWLOGINFO("app {}({}, type={}:{}) got a DELETE discovery event({}({}, type={}:{})", get_app_name(), get_id(),
+      FWLOGINFO("app {}({}, type={}:{}) got a DELETE discovery event({}({}, type={}:{})", get_app_name(), get_app_id(),
                 get_type_id(), get_type_name(), discovery_info.name(), discovery_info.id(), discovery_info.type_id(),
                 discovery_info.type_name());
     }
@@ -2781,7 +2822,7 @@ void app::print_help() {
   }
 }
 
-bool app::match_gateway_hosts(const atapp::protocol::atapp_gateway &checked) const {
+bool app::match_gateway_hosts(const atapp::protocol::atapp_gateway &checked) const noexcept {
   bool has_matched_value = false;
   bool has_valid_conf = false;
   for (int i = 0; !has_matched_value && i < checked.match_hosts_size(); ++i) {
@@ -2795,7 +2836,7 @@ bool app::match_gateway_hosts(const atapp::protocol::atapp_gateway &checked) con
   return !has_valid_conf || has_matched_value;
 }
 
-bool app::match_gateway_namespace(const atapp::protocol::atapp_gateway &checked) const {
+bool app::match_gateway_namespace(const atapp::protocol::atapp_gateway &checked) const noexcept {
   bool has_matched_value = false;
   bool has_valid_conf = false;
   for (int i = 0; !has_matched_value && i < checked.match_namespaces_size(); ++i) {
@@ -2809,7 +2850,7 @@ bool app::match_gateway_namespace(const atapp::protocol::atapp_gateway &checked)
   return !has_valid_conf || has_matched_value;
 }
 
-bool app::match_gateway_labels(const atapp::protocol::atapp_gateway &checked) const {
+bool app::match_gateway_labels(const atapp::protocol::atapp_gateway &checked) const noexcept {
   ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Map<std::string, std::string>::const_iterator iter =
       checked.match_labels().begin();
   for (; iter != checked.match_labels().end(); ++iter) {
@@ -3142,7 +3183,7 @@ int app::app::command_handler_start(util::cli::callback_param /*params*/) {
 
 int app::command_handler_stop(util::cli::callback_param params) {
   char msg[256] = {0};
-  LOG_WRAPPER_FWAPI_FORMAT_TO_N(msg, sizeof(msg), "app node {:#x} run stop command success", get_id());
+  LOG_WRAPPER_FWAPI_FORMAT_TO_N(msg, sizeof(msg), "app node {:#x} run stop command success", get_app_id());
   FWLOGINFO("{}", msg);
   add_custom_command_rsp(params, msg);
 
@@ -3158,7 +3199,7 @@ int app::command_handler_stop(util::cli::callback_param params) {
 
 int app::command_handler_reload(util::cli::callback_param params) {
   char msg[256] = {0};
-  LOG_WRAPPER_FWAPI_FORMAT_TO_N(msg, sizeof(msg), "app node {:#x} run reload command success", get_id());
+  LOG_WRAPPER_FWAPI_FORMAT_TO_N(msg, sizeof(msg), "app node {:#x} run reload command success", get_app_id());
   FWLOGINFO("{}", msg);
   add_custom_command_rsp(params, msg);
 
@@ -3277,7 +3318,7 @@ int app::bus_evt_callback_on_recv_msg(const atbus::node &, const atbus::endpoint
   message.data = buffer;
   message.data_size = len;
   message.metadata = nullptr;
-  message.msg_sequence = msg.head().sequence();
+  message.message_sequence = msg.head().sequence();
   message.type = msg.head().type();
 
   app::message_sender_t sender;
@@ -3290,10 +3331,12 @@ int app::bus_evt_callback_on_recv_msg(const atbus::node &, const atbus::endpoint
   int res = trigger_event_on_forward_request(sender, message);
   if (res < 0) {
     FWLOGERROR("{} forward data {}(type={}, sequence={}) bytes failed, error code: {}",
-               atbus_connector_ ? atbus_connector_->name() : "[null]", len, message.type, message.msg_sequence, res);
+               atbus_connector_ ? atbus_connector_->name() : "[null]", len, message.type, message.message_sequence,
+               res);
   } else {
     FWLOGDEBUG("{} forward data {}(type={}, sequence={}) bytes success, result code: {}",
-               atbus_connector_ ? atbus_connector_->name() : "[null]", len, message.type, message.msg_sequence, res);
+               atbus_connector_ ? atbus_connector_->name() : "[null]", len, message.type, message.message_sequence,
+               res);
   }
 
   ++last_proc_event_count_;
@@ -3306,13 +3349,13 @@ int app::bus_evt_callback_on_forward_response(const atbus::node &, const atbus::
 
   // call failed callback if it's message transfer
   if (nullptr == m) {
-    FWLOGERROR("app {:#x} receive a send failure without message", get_id());
+    FWLOGERROR("app {:#x} receive a send failure without message", get_app_id());
     return EN_ATAPP_ERR_SEND_FAILED;
   }
 
   if (m->head().ret() < 0) {
     FWLOGERROR("app {:#x} receive a send failure from {:#x}, message cmd: {}, type: {}, ret: {}, sequence: {}",
-               get_id(), m->head().src_bus_id(), atbus::msg_handler::get_body_name(m->msg_body_case()),
+               get_app_id(), m->head().src_bus_id(), atbus::msg_handler::get_body_name(m->msg_body_case()),
                m->head().type(), m->head().ret(), m->head().sequence());
   }
 
@@ -3334,7 +3377,7 @@ int app::bus_evt_callback_on_forward_response(const atbus::node &, const atbus::
   message.data = reinterpret_cast<const void *>(m->data_transform_rsp().content().c_str());
   message.data_size = m->data_transform_rsp().content().size();
   message.metadata = nullptr;
-  message.msg_sequence = m->head().sequence();
+  message.message_sequence = m->head().sequence();
   message.type = m->head().type();
 
   app::message_sender_t sender;
@@ -3519,6 +3562,9 @@ int app::bus_evt_callback_on_add_endpoint(const atbus::node &n, atbus::endpoint 
     FWLOGERROR("bus node {:#x} make connection to nullptr, res: {}", n.get_id(), res);
   } else {
     FWLOGINFO("bus node {:#x} make connection to {:#x} done, res: {}", n.get_id(), ep->get_id(), res);
+    if (atbus_connector_) {
+      atbus_connector_->on_add_endpoint(n, ep, res);
+    }
 
     if (evt_on_app_connected_) {
       evt_on_app_connected_(std::ref(*this), std::ref(*ep), res);
@@ -3534,6 +3580,9 @@ int app::bus_evt_callback_on_remove_endpoint(const atbus::node &n, atbus::endpoi
     FWLOGERROR("bus node {:#x} release connection to nullptr, res: {}", n.get_id(), res);
   } else {
     FWLOGINFO("bus node {:#x} release connection to {:#x} done, res: {}", n.get_id(), ep->get_id(), res);
+    if (atbus_connector_) {
+      atbus_connector_->on_remove_endpoint(n, ep, res);
+    }
 
     if (evt_on_app_disconnected_) {
       evt_on_app_disconnected_(std::ref(*this), std::ref(*ep), res);

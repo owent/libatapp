@@ -121,7 +121,9 @@ LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_start_connect(const etcd_di
 
   if (handle) {
     handles_[atbus_id] = handle;
-    handle->set_ready();
+    if (get_owner()->get_bus_node() && get_owner()->get_bus_node()->get_endpoint(atbus_id) != nullptr) {
+      handle->set_ready();
+    }
     handle->set_private_data_u64(atbus_id);
   }
   return EN_ATAPP_ERR_SUCCESS;
@@ -173,7 +175,7 @@ LIBATAPP_MACRO_API void atapp_connector_atbus::on_receive_forward_response(
   msg.data = data;
   msg.data_size = data_size;
   msg.metadata = metadata;
-  msg.msg_sequence = msg_sequence;
+  msg.message_sequence = msg_sequence;
   msg.type = type;
 
   app::message_sender_t sender;
@@ -188,4 +190,52 @@ LIBATAPP_MACRO_API void atapp_connector_atbus::on_receive_forward_response(
 
 LIBATAPP_MACRO_API void atapp_connector_atbus::on_discovery_event(etcd_discovery_action_t::type,
                                                                   const etcd_discovery_node::ptr_t &) {}
+
+int atapp_connector_atbus::on_add_endpoint(const atbus::node &, atbus::endpoint *ep, int res) {
+  if (ep == nullptr) {
+    return res;
+  }
+
+  auto iter = handles_.find(ep->get_id());
+  // Maybe destroyed
+  if (iter == handles_.end()) {
+    return res;
+  }
+
+  if (!iter->second) {
+    handles_.erase(iter);
+    return res;
+  }
+
+  if (res < 0) {
+    return on_close_connect(*iter->second);
+  }
+
+  iter->second->set_ready();
+  auto endpoint = iter->second->get_endpoint();
+  if (nullptr != endpoint) {
+    endpoint->add_waker(get_owner()->get_last_tick_time());
+  }
+
+  return res;
+}
+
+int atapp_connector_atbus::on_remove_endpoint(const atbus::node &, atbus::endpoint *ep, int res) {
+  if (ep == nullptr) {
+    return res;
+  }
+
+  auto iter = handles_.find(ep->get_id());
+  // Maybe destroyed
+  if (iter == handles_.end()) {
+    return res;
+  }
+
+  if (!iter->second) {
+    handles_.erase(iter);
+    return res;
+  }
+
+  return on_close_connect(*iter->second);
+}
 }  // namespace atapp
