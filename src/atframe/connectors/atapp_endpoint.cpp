@@ -152,7 +152,7 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::push_forward_message(int32_t type, ui
     }
 
     atapp_connection_handle *handle = get_ready_connection_handle();
-    if (nullptr != handle) {
+    if (nullptr == handle) {
       break;
     }
 
