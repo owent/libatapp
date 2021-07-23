@@ -1685,8 +1685,23 @@ LIBATAPP_MACRO_API atapp_endpoint::ptr_t app::mutable_endpoint(const etcd_discov
       }
     }
 
-    // TODO(owent): Check loopback
-    if (handle.use_count() == 1) {
+    // Check loopback
+    if (handle.use_count() == 1 && loopback_connector_) {
+      if ((0 == id || id == get_id()) && (name.empty() || name == get_app_name())) {
+        atbus::channel::channel_address_t addr;
+        atbus::channel::make_address("loopback://", get_app_name().c_str(), 0, addr);
+        int res = loopback_connector_->on_start_connect(discovery.get(), addr, handle);
+        if (0 == res && handle.use_count() > 1) {
+          atapp_connector_bind_helper::bind(*handle, *loopback_connector_);
+          atapp_endpoint_bind_helper::bind(*handle, *ret);
+
+          FWLOGINFO("atapp endpoint {}({}) connect loopback connector success and use handle {}", ret->get_id(),
+                    ret->get_name(), addr.address, reinterpret_cast<const void *>(handle.get()));
+        } else {
+          FWLOGINFO("atapp endpoint {}({}) skip loopback connector with handle {}, connect result {}", ret->get_id(),
+                    ret->get_name(), addr.address, reinterpret_cast<const void *>(handle.get()), res);
+        }
+      }
     }
   }
 
@@ -2549,9 +2564,6 @@ int app::setup_atbus() {
   bus_node_->set_on_remove_endpoint_handle(std::bind(&app::bus_evt_callback_on_remove_endpoint, this,
                                                      std::placeholders::_1, std::placeholders::_2,
                                                      std::placeholders::_3));
-
-  // TODO if not in resume mode, destroy shm
-  // if (false == conf_.resume_mode) {}
 
   // init listen
   for (int i = 0; i < conf_.origin.bus().listen_size(); ++i) {
