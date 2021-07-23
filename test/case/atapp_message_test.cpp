@@ -84,6 +84,7 @@ CASE_TEST(atapp_message, send_message_remote) {
     CASE_EXPECT_TRUE(app2.mutable_endpoint(app1_discovery));
   }
 
+  CASE_MSG_INFO() << "Start to send message..." << std::endl;
   auto now = util::time::time_utility::sys_now();
   auto end_time = now + std::chrono::seconds(3);
 

@@ -192,6 +192,8 @@ LIBATAPP_MACRO_API void atapp_connector_impl::cleanup() {
   }
 }
 
+LIBATAPP_MACRO_API bool atapp_connector_impl::support_loopback() const noexcept { return false; }
+
 LIBATAPP_MACRO_API int32_t atapp_connector_impl::on_start_listen(const atbus::channel::channel_address_t &) {
   return EN_ATBUS_ERR_CHANNEL_NOT_SUPPORT;
 }

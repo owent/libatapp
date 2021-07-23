@@ -1676,6 +1676,8 @@ LIBATAPP_MACRO_API atapp_endpoint::ptr_t app::mutable_endpoint(const etcd_discov
     ret->add_waker(get_last_tick_time());
     atapp_connection_handle::ptr_t handle = std::make_shared<atapp_connection_handle>();
 
+    bool is_loopback = (0 == id || id == get_app_id()) && (name.empty() || name == get_app_name());
+
     int32_t gateway_size = discovery->get_ingress_size();
     for (int32_t i = 0; handle && i < gateway_size; ++i) {
       atbus::channel::channel_address_t addr;
@@ -1699,6 +1701,11 @@ LIBATAPP_MACRO_API atapp_endpoint::ptr_t app::mutable_endpoint(const etcd_discov
         continue;
       }
 
+      // Skip loopback and use inner loopback connector
+      if (is_loopback && !iter->second->support_loopback()) {
+        continue;
+      }
+
       int res = iter->second->on_start_connect(discovery.get(), addr, handle);
       if (0 == res && handle.use_count() > 1) {
         atapp_connector_bind_helper::bind(*handle, *iter->second);
@@ -1714,21 +1721,19 @@ LIBATAPP_MACRO_API atapp_endpoint::ptr_t app::mutable_endpoint(const etcd_discov
     }
 
     // Check loopback
-    if (handle.use_count() == 1 && loopback_connector_) {
-      if ((0 == id || id == get_app_id()) && (name.empty() || name == get_app_name())) {
-        atbus::channel::channel_address_t addr;
-        atbus::channel::make_address("loopback://", get_app_name().c_str(), 0, addr);
-        int res = loopback_connector_->on_start_connect(discovery.get(), addr, handle);
-        if (0 == res && handle.use_count() > 1) {
-          atapp_connector_bind_helper::bind(*handle, *loopback_connector_);
-          atapp_endpoint_bind_helper::bind(*handle, *ret);
+    if (handle.use_count() == 1 && loopback_connector_ && is_loopback) {
+      atbus::channel::channel_address_t addr;
+      atbus::channel::make_address("loopback://", get_app_name().c_str(), 0, addr);
+      int res = loopback_connector_->on_start_connect(discovery.get(), addr, handle);
+      if (0 == res && handle.use_count() > 1) {
+        atapp_connector_bind_helper::bind(*handle, *loopback_connector_);
+        atapp_endpoint_bind_helper::bind(*handle, *ret);
 
-          FWLOGINFO("atapp endpoint {}({}) connect loopback connector success and use handle {}", ret->get_id(),
-                    ret->get_name(), addr.address, reinterpret_cast<const void *>(handle.get()));
-        } else {
-          FWLOGINFO("atapp endpoint {}({}) skip loopback connector with handle {}, connect result {}", ret->get_id(),
-                    ret->get_name(), addr.address, reinterpret_cast<const void *>(handle.get()), res);
-        }
+        FWLOGINFO("atapp endpoint {}({}) connect loopback connector success and use handle {}", ret->get_id(),
+                  ret->get_name(), addr.address, reinterpret_cast<const void *>(handle.get()));
+      } else {
+        FWLOGINFO("atapp endpoint {}({}) skip loopback connector with handle {}, connect result {}", ret->get_id(),
+                  ret->get_name(), addr.address, reinterpret_cast<const void *>(handle.get()), res);
       }
     }
   }

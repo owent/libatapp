@@ -133,6 +133,13 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE atapp_connector_impl {
   virtual uint32_t get_address_type(const atbus::channel::channel_address_t &addr) const = 0;
 
   /**
+   * @brief if this connector is allowed to connect to loopback endpoint
+   * @note false for default
+   * @return true if this connector
+   */
+  LIBATAPP_MACRO_API bool support_loopback() const noexcept;
+
+  /**
    * @brief callback for listen
    * @note just return non-zero when something wrong happend and this listen address will not be used
    * @return 0 or error code
