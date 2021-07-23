@@ -191,7 +191,7 @@ LIBATAPP_MACRO_API void atapp_connector_atbus::on_receive_forward_response(
 LIBATAPP_MACRO_API void atapp_connector_atbus::on_discovery_event(etcd_discovery_action_t::type,
                                                                   const etcd_discovery_node::ptr_t &) {}
 
-int atapp_connector_atbus::on_add_endpoint(const atbus::node &, atbus::endpoint *ep, int res) {
+int atapp_connector_atbus::on_add_endpoint(const atbus::node &n, atbus::endpoint *ep, int res) {
   if (ep == nullptr) {
     return res;
   }
@@ -214,7 +214,11 @@ int atapp_connector_atbus::on_add_endpoint(const atbus::node &, atbus::endpoint 
   iter->second->set_ready();
   auto endpoint = iter->second->get_endpoint();
   if (nullptr != endpoint) {
-    endpoint->add_waker(get_owner()->get_last_tick_time());
+    if (endpoint->get_pending_message_size() > 0) {
+      FWLOGINFO("bus node {:#x} add_waker for {:#x} with {} pending messages(size: {})", n.get_id(), ep->get_id(),
+                endpoint->get_pending_message_count(), endpoint->get_pending_message_size());
+      endpoint->add_waker(get_owner()->get_last_tick_time());
+    }
   }
 
   return res;

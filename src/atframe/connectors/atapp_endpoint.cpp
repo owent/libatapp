@@ -246,6 +246,8 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::retry_pending_messages(const util::ti
   atapp_connector_impl *connector = nullptr;
   if (nullptr != handle) {
     connector = handle->get_connector();
+    FWLOGDEBUG("Retry send pending message to {:#x}({}) with connector {} and handle {}", get_id(), get_name(),
+               reinterpret_cast<const void *>(connector), reinterpret_cast<const void *>(handle));
   }
 
   while (!pending_message_.empty()) {
@@ -300,10 +302,21 @@ LIBATAPP_MACRO_API void atapp_endpoint::add_waker(util::time::time_utility::raw_
     if (nullptr != owner_) {
       if (owner_->add_endpoint_waker(wakeup_time, watcher_)) {
         nearest_waker_ = wakeup_time;
+        FWLOGDEBUG("Update waker for {:#x}({})", get_id(), get_name());
       }
     }
   }
 }
+
+LIBATAPP_MACRO_API size_t atapp_endpoint::get_pending_message_count() const noexcept {
+#if defined(LIBATAPP_ENABLE_CUSTOM_COUNT_FOR_STD_LIST) && LIBATAPP_ENABLE_CUSTOM_COUNT_FOR_STD_LIST
+  return pending_message_count_;
+#else
+  return pending_message_.size();
+#endif
+}
+
+LIBATAPP_MACRO_API size_t atapp_endpoint::get_pending_message_size() const noexcept { return pending_message_size_; }
 
 void atapp_endpoint::cancel_pending_messages() {
   atapp_connection_handle *handle = get_ready_connection_handle();

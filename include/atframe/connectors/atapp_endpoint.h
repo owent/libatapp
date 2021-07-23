@@ -85,6 +85,9 @@ class atapp_endpoint {
 
   UTIL_FORCEINLINE app *get_owner() const noexcept { return owner_; }
 
+  LIBATAPP_MACRO_API size_t get_pending_message_count() const noexcept;
+  LIBATAPP_MACRO_API size_t get_pending_message_size() const noexcept;
+
  private:
   void reset();
   void cancel_pending_messages();

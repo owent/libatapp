@@ -94,6 +94,18 @@ CASE_TEST(atapp_message, send_message_remote) {
   CASE_EXPECT_EQ(0, app1.send_message(app2.get_app_name(), 223, expect_message, strlen(expect_message), &set_sequence));
   ++set_sequence;
 
+  CASE_EXPECT_EQ(2, app1.mutable_endpoint(app2_discovery)->get_pending_message_count());
+
+  while (received_messge_count < 2 && end_time > now) {
+    app1.run_once(0, end_time - now);
+    app2.run_once(0, end_time - now);
+
+    now = util::time::time_utility::sys_now();
+    util::time::time_utility::update();
+  }
+
+  CASE_EXPECT_EQ(0, app1.mutable_endpoint(app2_discovery)->get_pending_message_count());
+
   CASE_EXPECT_EQ(0, app1.send_message(app2_discovery, 223, expect_message, strlen(expect_message), &set_sequence));
   ++set_sequence;
 
@@ -104,13 +116,14 @@ CASE_TEST(atapp_message, send_message_remote) {
     now = util::time::time_utility::sys_now();
     util::time::time_utility::update();
   }
+
   CASE_EXPECT_EQ(received_messge_count, 3);
 }
 
 CASE_TEST(atapp_message, send_message_loopback) {
   std::string conf_path_base;
   util::file_system::dirname(__FILE__, 0, conf_path_base);
-  std::string conf_path_1 = conf_path_base + "/atapp_test_1.yaml";
+  std::string conf_path_1 = conf_path_base + "/atapp_test_0.yaml";
 
   if (!util::file_system::is_exist(conf_path_1.c_str())) {
     CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path_1 << " not found, skip this test" << std::endl;
