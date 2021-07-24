@@ -1548,7 +1548,7 @@ LIBATAPP_MACRO_API void app::remove_endpoint(uint64_t by_id) {
 
   std::string name;
   if (res) {
-    name = res->get_name();
+    name = std::string(res->get_name());
   }
   if (!name.empty()) {
     endpoint_index_by_name_t::const_iterator iter_name = endpoint_index_by_name_.find(name);
