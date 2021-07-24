@@ -147,8 +147,9 @@ LIBATAPP_MACRO_API app::app() : setup_result_(0), last_proc_event_count_(0), ev_
   conf_.execute_path = nullptr;
   conf_.upgrade_mode = false;
 
-  tick_timer_.sec_update = util::time::time_utility::raw_time_t::min();
-  tick_timer_.sec = 0;
+  util::time::time_utility::update();
+  tick_timer_.sec_update = util::time::time_utility::sys_now();
+  tick_timer_.sec = util::time::time_utility::get_sys_now();
   tick_timer_.usec = 0;
   tick_timer_.inner_break = nullptr;
 
@@ -1598,7 +1599,7 @@ LIBATAPP_MACRO_API void app::remove_endpoint(const atapp_endpoint::ptr_t &enpoin
   }
 
   {
-    std::string name = enpoint->get_name();
+    std::string name{enpoint->get_name()};
     if (!name.empty()) {
       endpoint_index_by_name_t::const_iterator iter_name = endpoint_index_by_name_.find(name);
       if (iter_name != endpoint_index_by_name_.end() && iter_name->second == enpoint) {
@@ -2131,6 +2132,8 @@ int64_t app::process_inner_events(const util::time::time_utility::raw_time_t &en
       ++stat_.endpoint_wake_count;
 
       if (ep) {
+        FWLOGDEBUG("atapp {:#x}({}) wakeup endpint {:#x}({})", get_app_id(), get_app_name(), ep->get_id(),
+                   ep->get_name());
         int32_t res = ep->retry_pending_messages(tick_timer_.sec_update, conf_.origin.bus().loop_times());
         if (res > 0) {
           round_res += res;

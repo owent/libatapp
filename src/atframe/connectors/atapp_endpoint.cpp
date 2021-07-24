@@ -39,8 +39,8 @@ LIBATAPP_MACRO_API atapp_endpoint::ptr_t atapp_endpoint::create(app &owner) {
 }
 
 LIBATAPP_MACRO_API atapp_endpoint::~atapp_endpoint() {
+  FWLOGINFO("destroy atapp endpoint  {:#x}({}) - {}", get_id(), get_name(), reinterpret_cast<const void *>(this));
   reset();
-  FWLOGINFO("destroy atapp endpoint {}", reinterpret_cast<const void *>(this));
 }
 
 void atapp_endpoint::reset() {
@@ -97,10 +97,9 @@ LIBATAPP_MACRO_API uint64_t atapp_endpoint::get_id() const noexcept {
   return discovery_->get_discovery_info().id();
 }
 
-LIBATAPP_MACRO_API const std::string &atapp_endpoint::get_name() const noexcept {
+LIBATAPP_MACRO_API gsl::string_view atapp_endpoint::get_name() const noexcept {
   if (!discovery_) {
-    static std::string empty;
-    return empty;
+    return {};
   }
 
   return discovery_->get_discovery_info().name();
@@ -302,11 +301,12 @@ LIBATAPP_MACRO_API void atapp_endpoint::add_waker(util::time::time_utility::raw_
     if (nullptr != owner_) {
       if (owner_->add_endpoint_waker(wakeup_time, watcher_)) {
         nearest_waker_ = wakeup_time;
-        FWLOGDEBUG(
-            "atapp {:#x}({}) update waker for {:#x}({}) to {}us later", owner_->get_app_id(), owner_->get_app_name(),
-            get_id(), get_name(),
-            std::chrono::duration_cast<std::chrono::microseconds>(nearest_waker_ - util::time::time_utility::sys_now())
-                .count());
+        FWLOGDEBUG("atapp {:#x}({}) update waker for {:#x}({}) to {}us later", owner_->get_app_id(),
+                   owner_->get_app_name(), get_id(), get_name(),
+                   std::max<int64_t>(std::chrono::duration_cast<std::chrono::microseconds>(
+                                         nearest_waker_ - util::time::time_utility::sys_now())
+                                         .count(),
+                                     0));
       }
     }
   }

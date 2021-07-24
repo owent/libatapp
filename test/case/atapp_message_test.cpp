@@ -97,8 +97,8 @@ CASE_TEST(atapp_message, send_message_remote) {
   CASE_EXPECT_EQ(2, app1.mutable_endpoint(app2_discovery)->get_pending_message_count());
 
   while (received_messge_count < 2 && end_time > now) {
-    app1.run_once(0, end_time - now);
-    app2.run_once(0, end_time - now);
+    app1.run_noblock();
+    app2.run_noblock();
 
     now = util::time::time_utility::sys_now();
     util::time::time_utility::update();
@@ -110,8 +110,8 @@ CASE_TEST(atapp_message, send_message_remote) {
   ++set_sequence;
 
   while (received_messge_count < 3 && end_time > now) {
-    app1.run_once(0, end_time - now);
-    app2.run_once(0, end_time - now);
+    app1.run_noblock();
+    app2.run_noblock();
 
     now = util::time::time_utility::sys_now();
     util::time::time_utility::update();

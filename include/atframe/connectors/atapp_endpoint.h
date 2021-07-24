@@ -3,9 +3,6 @@
 
 #pragma once
 
-#include <list>
-#include <vector>
-
 #include <config/atframe_utils_build_feature.h>
 #include <config/compiler_features.h>
 
@@ -13,6 +10,11 @@
 #include <design_pattern/noncopyable.h>
 
 #include <time/time_utility.h>
+
+#include <gsl/select-gsl.h>
+
+#include <list>
+#include <vector>
 
 #if defined(LIBATFRAME_UTILS_ENABLE_UNORDERED_MAP_SET) && LIBATFRAME_UTILS_ENABLE_UNORDERED_MAP_SET
 #  include <unordered_map>
@@ -22,8 +24,8 @@
 #  include <set>
 #endif
 
-#include <atframe/atapp_conf.h>
-#include <atframe/etcdcli/etcd_discovery.h>
+#include "atframe/atapp_conf.h"
+#include "atframe/etcdcli/etcd_discovery.h"
 
 namespace atapp {
 class app;
@@ -66,7 +68,7 @@ class atapp_endpoint {
   LIBATAPP_MACRO_API ~atapp_endpoint();
 
   LIBATAPP_MACRO_API uint64_t get_id() const noexcept;
-  LIBATAPP_MACRO_API const std::string &get_name() const noexcept;
+  LIBATAPP_MACRO_API gsl::string_view get_name() const noexcept;
 
   UTIL_FORCEINLINE bool has_connection_handle() const noexcept { return !refer_connections_.empty(); }
   LIBATAPP_MACRO_API const etcd_discovery_node::ptr_t &get_discovery() const noexcept;
