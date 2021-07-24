@@ -788,7 +788,7 @@ LIBATAPP_MACRO_API int app::tick() {
     if (bus_node_ && ::atbus::node::state_t::CREATED != bus_node_->get_state()) {
       res = bus_node_->proc(tick_timer_.sec, tick_timer_.usec);
       if (res < 0) {
-        FWLOGERROR("atbus run tick and return {}", res);
+        FWLOGERROR("atbus node run tick and return {}", res);
       } else {
         active_count += res;
       }
@@ -1711,11 +1711,11 @@ LIBATAPP_MACRO_API atapp_endpoint::ptr_t app::mutable_endpoint(const etcd_discov
         atapp_connector_bind_helper::bind(*handle, *iter->second);
         atapp_endpoint_bind_helper::bind(*handle, *ret);
 
-        FWLOGINFO("atapp endpoint {}({}) connect address {} success and use handle {}", ret->get_id(), ret->get_name(),
-                  addr.address, reinterpret_cast<const void *>(handle.get()));
+        FWLOGINFO("connect address {} of atapp endpoint {}({}) success and use handle {}", ret->get_id(),
+                  ret->get_name(), addr.address, reinterpret_cast<const void *>(handle.get()));
         break;
       } else {
-        FWLOGINFO("atapp endpoint {}({}) skip address {} with handle {}, connect result {}", ret->get_id(),
+        FWLOGINFO("skip address {} of atapp endpoint {}({}) with handle {}, connect result {}", ret->get_id(),
                   ret->get_name(), addr.address, reinterpret_cast<const void *>(handle.get()), res);
       }
     }
@@ -2121,7 +2121,9 @@ void app::process_signal(int signo) {
 int64_t app::process_inner_events(const util::time::time_utility::raw_time_t &end_tick) {
   int64_t ret = 0;
   bool more_messages = true;
-  while (util::time::time_utility::sys_now() < end_tick && more_messages) {
+  bool first_round = true;
+  while ((first_round || util::time::time_utility::sys_now() < end_tick) && more_messages) {
+    first_round = false;
     int64_t round_res = 0;
     if (!endpoint_waker_.empty() && endpoint_waker_.begin()->first <= tick_timer_.sec_update) {
       atapp_endpoint::ptr_t ep = endpoint_waker_.begin()->second.lock();
@@ -2142,7 +2144,7 @@ int64_t app::process_inner_events(const util::time::time_utility::raw_time_t &en
     }
 
     if (loopback_connector_) {
-      round_res += loopback_connector_->process(end_tick);
+      round_res += loopback_connector_->process(end_tick, conf_.origin.bus().loop_times());
     }
 
     if (round_res > 0) {

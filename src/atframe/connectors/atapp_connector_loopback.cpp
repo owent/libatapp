@@ -151,20 +151,20 @@ LIBATAPP_MACRO_API void atapp_connector_loopback::on_receive_forward_response(
 LIBATAPP_MACRO_API void atapp_connector_loopback::on_discovery_event(etcd_discovery_action_t::type,
                                                                      const etcd_discovery_node::ptr_t &) {}
 
-LIBATAPP_MACRO_API int32_t
-atapp_connector_loopback::process(const util::time::time_utility::raw_time_t &max_end_timepoint) {
+LIBATAPP_MACRO_API int32_t atapp_connector_loopback::process(
+    const util::time::time_utility::raw_time_t &max_end_timepoint, int32_t max_loop_messages) {
   int32_t ret = 0;
   auto owner = get_owner();
   if (nullptr == owner) {
     return ret;
   }
 
-  while (!pending_message_.empty()) {
-    int32_t limit = owner->get_origin_configure().bus().loop_times();
-    if (limit <= 0) {
-      limit = 1000;
-    }
+  if (max_loop_messages <= 0) {
+    max_loop_messages = 1000;
+  }
 
+  while (!pending_message_.empty()) {
+    int32_t limit = max_loop_messages > 10 ? max_loop_messages / 10 : max_loop_messages;
     while (limit-- > 0 && !pending_message_.empty()) {
       pending_message_t &pending_msg = pending_message_.front();
 

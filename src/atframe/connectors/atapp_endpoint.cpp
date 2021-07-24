@@ -302,7 +302,11 @@ LIBATAPP_MACRO_API void atapp_endpoint::add_waker(util::time::time_utility::raw_
     if (nullptr != owner_) {
       if (owner_->add_endpoint_waker(wakeup_time, watcher_)) {
         nearest_waker_ = wakeup_time;
-        FWLOGDEBUG("Update waker for {:#x}({})", get_id(), get_name());
+        FWLOGDEBUG(
+            "atapp {:#x}({}) update waker for {:#x}({}) to {}us later", owner_->get_app_id(), owner_->get_app_name(),
+            get_id(), get_name(),
+            std::chrono::duration_cast<std::chrono::microseconds>(nearest_waker_ - util::time::time_utility::sys_now())
+                .count());
       }
     }
   }
