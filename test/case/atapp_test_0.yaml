@@ -1,7 +1,7 @@
 atapp:
-  id: 0x00000001
+  id: 0x00000010
   id_mask: 8.8.8.8
-  name: "unit-test-1"
+  name: "unit-test-0"
   type_id: 1
   type_name: "unit-test"
 
@@ -41,8 +41,8 @@ atapp:
             rotate:
               number: 10
               size: 10485760
-            file: "../log/unit-test-1.%N.log"
-            writing_alias: "../log/unit-test-1.log"
+            file: "../log/unit-test-0.%N.log"
+            writing_alias: "../log/unit-test-0.log"
             auto_flush: info
             flush_interval: 1s
           - type: stderr

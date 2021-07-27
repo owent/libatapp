@@ -64,6 +64,7 @@ class app {
       IN_CALLBACK,
       RESET_TIMER,
       INITIALIZED,
+      INITIALIZING,
       STOPPED,
       DISABLE_ATBUS_FALLBACK,
       IN_TICK,
@@ -454,7 +455,9 @@ class app {
 
   void close_timer(timer_ptr_t &t);
 
-  int setup_timer();
+  int setup_tick_timer();
+
+  bool setup_timeout_timer(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &duration);
 
   int send_last_command(ev_loop_t *ev_loop);
 

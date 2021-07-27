@@ -42,8 +42,9 @@
 namespace atapp {
 app *app::last_instance_ = nullptr;
 
+namespace details {
 static void _app_close_timer_handle(uv_handle_t *handle) {
-  app::timer_ptr_t *ptr = reinterpret_cast<app::timer_ptr_t *>(handle->data);
+  ::atapp::app::timer_ptr_t *ptr = reinterpret_cast<::atapp::app::timer_ptr_t *>(handle->data);
   if (nullptr == ptr) {
     if (nullptr != handle->loop) {
       uv_stop(handle->loop);
@@ -53,6 +54,38 @@ static void _app_close_timer_handle(uv_handle_t *handle) {
 
   delete ptr;
 }
+
+static std::pair<uint64_t, const char *> make_size_showup(uint64_t sz) {
+  const char *unit = "KB";
+  if (sz > 102400) {
+    sz /= 1024;
+    unit = "MB";
+  }
+
+  if (sz > 102400) {
+    sz /= 1024;
+    unit = "GB";
+  }
+
+  if (sz > 102400) {
+    sz /= 1024;
+    unit = "TB";
+  }
+
+  return std::pair<uint64_t, const char *>(sz, unit);
+}
+
+static uint64_t chrono_to_libuv_duration(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &in,
+                                         uint64_t default_value) {
+  uint64_t ret = static_cast<uint64_t>(in.seconds() * 1000 + in.nanos() / 1000000);
+  if (ret <= 0) {
+    ret = default_value;
+  }
+
+  return ret;
+}
+
+}  // namespace details
 
 LIBATAPP_MACRO_API app::message_t::message_t()
     : type(0), message_sequence(0), data(nullptr), data_size(0), metadata(nullptr) {}
@@ -96,36 +129,6 @@ LIBATAPP_MACRO_API app::flag_guard_t::~flag_guard_t() {
   }
 
   owner_->set_flag(flag_, false);
-}
-
-static std::pair<uint64_t, const char *> make_size_showup(uint64_t sz) {
-  const char *unit = "KB";
-  if (sz > 102400) {
-    sz /= 1024;
-    unit = "MB";
-  }
-
-  if (sz > 102400) {
-    sz /= 1024;
-    unit = "GB";
-  }
-
-  if (sz > 102400) {
-    sz /= 1024;
-    unit = "TB";
-  }
-
-  return std::pair<uint64_t, const char *>(sz, unit);
-}
-
-static uint64_t chrono_to_libuv_duration(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &in,
-                                         uint64_t default_value) {
-  uint64_t ret = static_cast<uint64_t>(in.seconds() * 1000 + in.nanos() / 1000000);
-  if (ret <= 0) {
-    ret = default_value;
-  }
-
-  return ret;
 }
 
 LIBATAPP_MACRO_API app::app() : setup_result_(0), last_proc_event_count_(0), ev_loop_(nullptr), mode_(mode_t::CUSTOM) {
@@ -260,11 +263,17 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
   if (check_flag(flag_t::INITIALIZED)) {
     return EN_ATAPP_ERR_ALREADY_INITED;
   }
-  setup_result_ = 0;
 
   if (check_flag(flag_t::IN_CALLBACK)) {
     return 0;
   }
+
+  if (check_flag(flag_t::INITIALIZING)) {
+    return EN_ATAPP_ERR_RECURSIVE_CALL;
+  }
+  flag_guard_t init_flag_guard(*this, flag_t::INITIALIZING);
+
+  setup_result_ = 0;
 
   // update time first
   util::time::time_utility::update();
@@ -332,6 +341,14 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
     }
   }
 
+  // setup timeout timer for initialization
+  bool hold_timeout_timer = setup_timeout_timer(conf_.origin.timer().initialize_timeout());
+  auto timeout_timer_guard = gsl::finally([hold_timeout_timer, this]() {
+    if (hold_timeout_timer) {
+      this->close_timer(this->tick_timer_.timeout_timer);
+    }
+  });
+
   WLOG_GETCAT(util::log::log_wrapper::categorize_t::DEFAULT)->clear_sinks();
   ret = setup_log();
   if (ret < 0) {
@@ -340,7 +357,12 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
     return setup_result_ = ret;
   }
 
-  if (setup_timer() < 0) {
+  if (check_flag(flag_t::TIMEOUT)) {
+    setup_result_ = EN_ATAPP_ERR_OPERATION_TIMEOUT;
+    return setup_result_;
+  }
+
+  if (setup_tick_timer() < 0) {
     FWLOGERROR("setup timer failed");
     bus_node_.reset();
     write_pidfile();
@@ -367,6 +389,11 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
     }
   }
 
+  if (check_flag(flag_t::TIMEOUT)) {
+    setup_result_ = EN_ATAPP_ERR_OPERATION_TIMEOUT;
+    return setup_result_;
+  }
+
   // all modules init
   size_t inited_mod_idx = 0;
   int mod_init_res = 0;
@@ -377,10 +404,30 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
         FWLOGERROR("initialze {} failed", modules_[inited_mod_idx]->name());
         break;
       }
+
       modules_[inited_mod_idx]->active();
       ++last_proc_event_count_;
+
+      if (check_flag(flag_t::TIMEOUT)) {
+        mod_init_res = EN_ATAPP_ERR_OPERATION_TIMEOUT;
+        FWLOGERROR("initialze {} success but atapp timeout", modules_[inited_mod_idx]->name());
+        break;
+      }
     }
   }
+
+  if (mod_init_res >= 0) {
+    // callback of all modules inited
+    if (evt_on_all_module_inited_) {
+      evt_on_all_module_inited_(*this);
+    }
+
+    // maybe timeout in callback
+    if (check_flag(flag_t::TIMEOUT)) {
+      mod_init_res = EN_ATAPP_ERR_OPERATION_TIMEOUT;
+    }
+  }
+
   // cleanup all inited modules if failed
   if (mod_init_res < 0) {
     for (; inited_mod_idx < modules_.size(); --inited_mod_idx) {
@@ -394,11 +441,6 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
     }
     write_pidfile();
     return setup_result_ = mod_init_res;
-  }
-
-  // callback of all modules inited
-  if (evt_on_all_module_inited_) {
-    evt_on_all_module_inited_(*this);
   }
 
   // write pid file
@@ -836,7 +878,7 @@ LIBATAPP_MACRO_API int app::tick() {
         offset_usr += stat_.last_checkpoint_usage.ru_utime.tv_usec - last_usage.ru_utime.tv_usec;
         offset_sys += stat_.last_checkpoint_usage.ru_stime.tv_usec - last_usage.ru_stime.tv_usec;
 
-        std::pair<uint64_t, const char *> max_rss = make_size_showup(last_usage.ru_maxrss);
+        std::pair<uint64_t, const char *> max_rss = details::make_size_showup(last_usage.ru_maxrss);
 #ifdef WIN32
         FWLOGINFO(
             "[STATISTICS]: {} CPU usage: user {:02.3}%, sys {:02.3}%, max rss: {}{}, page faults: {}", get_app_name(),
@@ -844,9 +886,9 @@ LIBATAPP_MACRO_API int app::tick() {
             offset_sys / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f),  // usec and add %
             max_rss.first, max_rss.second, last_usage.ru_majflt);
 #else
-        std::pair<uint64_t, const char *> ru_ixrss = make_size_showup(last_usage.ru_ixrss);
-        std::pair<uint64_t, const char *> ru_idrss = make_size_showup(last_usage.ru_idrss);
-        std::pair<uint64_t, const char *> ru_isrss = make_size_showup(last_usage.ru_isrss);
+        std::pair<uint64_t, const char *> ru_ixrss = details::make_size_showup(last_usage.ru_ixrss);
+        std::pair<uint64_t, const char *> ru_idrss = details::make_size_showup(last_usage.ru_idrss);
+        std::pair<uint64_t, const char *> ru_isrss = details::make_size_showup(last_usage.ru_isrss);
         FWLOGINFO(
             "[STATISTICS]: {} CPU usage: user {:02.3}%, sys {:02.3}%, max rss: {}{}, shared size: {}{}, unshared data "
             "size: "
@@ -1172,7 +1214,7 @@ LIBATAPP_MACRO_API void app::pack(atapp::protocol::atapp_discovery &out) const {
   }
 }
 
-LIBATAPP_MACRO_API std::shared_ptr< ::atapp::etcd_module> app::get_etcd_module() const noexcept {
+LIBATAPP_MACRO_API std::shared_ptr<::atapp::etcd_module> app::get_etcd_module() const noexcept {
   return inner_module_etcd_;
 }
 
@@ -1949,7 +1991,7 @@ void app::run_ev_loop(int run_mode) {
     }
 
     if (check_flag(flag_t::RESET_TIMER)) {
-      setup_timer();
+      setup_tick_timer();
     }
 
     if (0 != pending_signals_[0]) {
@@ -1987,22 +2029,7 @@ void app::run_ev_loop(int run_mode) {
 
         // step X. if stop is blocked and timeout not triggered, setup stop timeout and waiting for all modules finished
         if (!tick_timer_.timeout_timer && nullptr != loop) {
-          timer_ptr_t timer = std::make_shared<timer_info_t>();
-          uv_timer_init(loop, &timer->timer);
-          timer->timer.data = this;
-
-          int res = uv_timer_start(
-              &timer->timer, ev_stop_timeout,
-              chrono_to_libuv_duration(conf_.origin.timer().stop_timeout(), ATAPP_DEFAULT_STOP_TIMEOUT), 0);
-          if (0 == res) {
-            tick_timer_.timeout_timer = timer;
-          } else {
-            FWLOGERROR("setup stop timeout failed, res: {}", res);
-            set_flag(flag_t::TIMEOUT, false);
-
-            timer->timer.data = new timer_ptr_t(timer);
-            uv_close(reinterpret_cast<uv_handle_t *>(&timer->timer), _app_close_timer_handle);
-          }
+          setup_timeout_timer(conf_.origin.timer().stop_timeout());
         }
       }
 
@@ -2018,7 +2045,7 @@ void app::run_ev_loop(int run_mode) {
 }
 
 int app::run_inner(int run_mode) {
-  if (false == check_flag(flag_t::INITIALIZED)) {
+  if (!check_flag(flag_t::INITIALIZED) && !check_flag(flag_t::INITIALIZING)) {
     return EN_ATAPP_ERR_NOT_INITED;
   }
 
@@ -2206,7 +2233,7 @@ LIBATAPP_MACRO_API void app::trigger_event_on_discovery_event(etcd_discovery_act
     }
   }
 
-  for (std::list<std::shared_ptr<atapp_connector_impl> >::const_iterator iter = connectors_.begin();
+  for (std::list<std::shared_ptr<atapp_connector_impl>>::const_iterator iter = connectors_.begin();
        iter != connectors_.end(); ++iter) {
     if (*iter) {
       (*iter)->on_discovery_event(action, node);
@@ -2364,7 +2391,7 @@ int app::setup_log() {
     }
   }
 
-  using log_cat_array_t = ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::atapp::protocol::atapp_log_category>;
+  using log_cat_array_t = ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::RepeatedPtrField<::atapp::protocol::atapp_log_category>;
   log_cat_array_t categories;
   // load log configure - ini/conf
   {
@@ -2666,47 +2693,21 @@ int app::setup_atbus() {
   // if has father node, block and connect to father node
   if (atbus::node::state_t::CONNECTING_PARENT == bus_node_->get_state() ||
       atbus::node::state_t::LOST_PARENT == bus_node_->get_state()) {
-    // setup timeout and waiting for parent connected
-    if (!tick_timer_.timeout_timer) {
-      timer_ptr_t timer = std::make_shared<timer_info_t>();
-
-      uv_timer_init(loop, &timer->timer);
-      timer->timer.data = this;
-
-      res =
-          uv_timer_start(&timer->timer, ev_stop_timeout,
-                         chrono_to_libuv_duration(conf_.origin.timer().stop_timeout(), ATAPP_DEFAULT_STOP_TIMEOUT), 0);
-      if (0 == res) {
-        tick_timer_.timeout_timer = timer;
-      } else {
-        FWLOGERROR("setup stop timeout failed, res: {}", res);
-        set_flag(flag_t::TIMEOUT, false);
-
-        timer->timer.data = new timer_ptr_t(timer);
-        uv_close(reinterpret_cast<uv_handle_t *>(&timer->timer), _app_close_timer_handle);
+    while (nullptr == bus_node_->get_parent_endpoint()) {
+      if (check_flag(flag_t::TIMEOUT)) {
+        FWLOGERROR("connection to parent node {} timeout", conf_.bus_conf.parent_address);
+        ret = -1;
+        break;
       }
 
-      while (nullptr == bus_node_->get_parent_endpoint()) {
-        if (check_flag(flag_t::TIMEOUT)) {
-          FWLOGERROR("connection to parent node {} timeout", conf_.bus_conf.parent_address);
-          ret = -1;
-          break;
-        }
+      flag_guard_t in_callback_guard(*this, flag_t::IN_CALLBACK);
+      uv_run(loop, UV_RUN_ONCE);
+    }
 
-        {
-          flag_guard_t in_callback_guard(*this, flag_t::IN_CALLBACK);
-          uv_run(loop, UV_RUN_ONCE);
-        }
-      }
-
-      // if connected, do not trigger timeout
-      close_timer(tick_timer_.timeout_timer);
-
-      if (ret < 0) {
-        FWLOGERROR("connect to parent node failed");
-        bus_node_.reset();
-        return ret;
-      }
+    if (ret < 0) {
+      FWLOGERROR("connect to parent node failed");
+      bus_node_.reset();
+      return ret;
     }
   }
 
@@ -2714,10 +2715,11 @@ int app::setup_atbus() {
 }
 
 void app::close_timer(timer_ptr_t &t) {
+  // if timer is maintained by a RAII guard, just ignore.
   if (t) {
     uv_timer_stop(&t->timer);
     t->timer.data = new timer_ptr_t(t);
-    uv_close(reinterpret_cast<uv_handle_t *>(&t->timer), _app_close_timer_handle);
+    uv_close(reinterpret_cast<uv_handle_t *>(&t->timer), details::_app_close_timer_handle);
 
     t.reset();
   }
@@ -2730,40 +2732,70 @@ static void _app_tick_timer_handle(uv_timer_t *handle) {
   }
 }
 
-int app::setup_timer() {
+int app::setup_tick_timer() {
   set_flag(flag_t::RESET_TIMER, false);
 
   close_timer(tick_timer_.tick_timer);
 
-  if (chrono_to_libuv_duration(conf_.origin.timer().tick_interval(), 0) < 1) {
+  if (details::chrono_to_libuv_duration(conf_.origin.timer().tick_interval(), 0) < 1) {
     FWLOGWARNING("tick interval can not smaller than 1ms, we use default {}ms now.", ATAPP_DEFAULT_TICK_INTERVAL);
   } else {
     FWLOGINFO("setup tick interval to {}ms.",
-              chrono_to_libuv_duration(conf_.origin.timer().tick_interval(), ATAPP_DEFAULT_TICK_INTERVAL));
+              details::chrono_to_libuv_duration(conf_.origin.timer().tick_interval(), ATAPP_DEFAULT_TICK_INTERVAL));
   }
 
   timer_ptr_t timer = std::make_shared<timer_info_t>();
-
   ev_loop_t *loop = get_evloop();
   assert(loop);
   uv_timer_init(loop, &timer->timer);
   timer->timer.data = this;
 
-  int res = uv_timer_start(&timer->timer, _app_tick_timer_handle,
-                           chrono_to_libuv_duration(conf_.origin.timer().tick_interval(), ATAPP_DEFAULT_TICK_INTERVAL),
-                           chrono_to_libuv_duration(conf_.origin.timer().tick_interval(), ATAPP_DEFAULT_TICK_INTERVAL));
+  int res = uv_timer_start(
+      &timer->timer, _app_tick_timer_handle,
+      details::chrono_to_libuv_duration(conf_.origin.timer().tick_interval(), ATAPP_DEFAULT_TICK_INTERVAL),
+      details::chrono_to_libuv_duration(conf_.origin.timer().tick_interval(), ATAPP_DEFAULT_TICK_INTERVAL));
   if (0 == res) {
     tick_timer_.tick_timer = timer;
   } else {
     FWLOGERROR("setup tick timer failed, res: {}", res);
 
     timer->timer.data = new timer_ptr_t(timer);
-    uv_close(reinterpret_cast<uv_handle_t *>(&timer->timer), _app_close_timer_handle);
+    uv_close(reinterpret_cast<uv_handle_t *>(&timer->timer), details::_app_close_timer_handle);
 
     return EN_ATAPP_ERR_SETUP_TIMER;
   }
 
   return 0;
+}
+
+bool app::setup_timeout_timer(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &duration) {
+  if (tick_timer_.timeout_timer) {
+    return false;
+  }
+
+  if (nullptr == get_evloop()) {
+    return false;
+  }
+
+  timer_ptr_t timer = std::make_shared<timer_info_t>();
+  uv_timer_init(get_evloop(), &timer->timer);
+  timer->timer.data = this;
+
+  int res = uv_timer_start(&timer->timer, ev_stop_timeout,
+                           details::chrono_to_libuv_duration(duration, ATAPP_DEFAULT_STOP_TIMEOUT), 0);
+  if (likely(0 == res)) {
+    tick_timer_.timeout_timer = timer;
+
+    return true;
+  } else {
+    FWLOGERROR("setup timeout timer failed, res: {}", res);
+    set_flag(flag_t::TIMEOUT, false);
+
+    timer->timer.data = new timer_ptr_t(timer);
+    uv_close(reinterpret_cast<uv_handle_t *>(&timer->timer), details::_app_close_timer_handle);
+
+    return false;
+  }
 }
 
 bool app::write_pidfile() {
@@ -3516,7 +3548,7 @@ int app::bus_evt_callback_on_invalid_connection(const atbus::node &n, const atbu
 }
 
 int app::bus_evt_callback_on_custom_cmd(const atbus::node &n, const atbus::endpoint *, const atbus::connection *,
-                                        app_id_t /*src_id*/, const std::vector<std::pair<const void *, size_t> > &args,
+                                        app_id_t /*src_id*/, const std::vector<std::pair<const void *, size_t>> &args,
                                         std::list<std::string> &rsp) {
   ++last_proc_event_count_;
   if (args.empty()) {
@@ -3603,7 +3635,7 @@ int app::bus_evt_callback_on_remove_endpoint(const atbus::node &n, atbus::endpoi
 
 static size_t __g_atapp_custom_cmd_rsp_recv_times = 0;
 int app::bus_evt_callback_on_custom_rsp(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
-                                        app_id_t src_id, const std::vector<std::pair<const void *, size_t> > &args,
+                                        app_id_t src_id, const std::vector<std::pair<const void *, size_t>> &args,
                                         uint64_t /*seq*/) {
   ++last_proc_event_count_;
   ++__g_atapp_custom_cmd_rsp_recv_times;
@@ -3768,24 +3800,12 @@ int app::send_last_command(ev_loop_t *ev_loop) {
   }
 
   // step 3. setup timeout timer
-  if (!tick_timer_.timeout_timer) {
-    timer_ptr_t timer = std::make_shared<timer_info_t>();
-    uv_timer_init(ev_loop, &timer->timer);
-    timer->timer.data = this;
-
-    int res =
-        uv_timer_start(&timer->timer, ev_stop_timeout,
-                       chrono_to_libuv_duration(conf_.origin.timer().stop_timeout(), ATAPP_DEFAULT_STOP_TIMEOUT), 0);
-    if (0 == res) {
-      tick_timer_.timeout_timer = timer;
-    } else {
-      FWLOGERROR("setup timeout timer failed, res: {}", res);
-      set_flag(flag_t::TIMEOUT, false);
-
-      timer->timer.data = new timer_ptr_t(timer);
-      uv_close(reinterpret_cast<uv_handle_t *>(&timer->timer), _app_close_timer_handle);
+  bool hold_timeout_timer = setup_timeout_timer(conf_.origin.timer().initialize_timeout());
+  auto timeout_timer_guard = gsl::finally([hold_timeout_timer, this]() {
+    if (hold_timeout_timer) {
+      this->close_timer(this->tick_timer_.timeout_timer);
     }
-  }
+  });
 
   // step 4. waiting for connect success
   while (nullptr == ep) {
@@ -3804,7 +3824,6 @@ int app::send_last_command(ev_loop_t *ev_loop) {
   }
 
   if (nullptr == ep) {
-    close_timer(tick_timer_.timeout_timer);
     FWLOGERROR("connect to {} failed or timeout.", use_addr.address);
     return EN_ATAPP_ERR_CONNECT_ATAPP_FAILED;
   }
@@ -3827,7 +3846,6 @@ int app::send_last_command(ev_loop_t *ev_loop) {
 
   ret = bus_node_->send_custom_cmd(ep->get_id(), &arr_buff[0], &arr_size[0], last_command_.size());
   if (ret < 0) {
-    close_timer(tick_timer_.timeout_timer);
     FWLOGERROR("send command failed. ret: {}", ret);
     return ret;
   }
@@ -3848,8 +3866,6 @@ int app::send_last_command(ev_loop_t *ev_loop) {
       }
     } while (true);
   }
-
-  close_timer(tick_timer_.timeout_timer);
 
   if (bus_node_) {
     bus_node_->reset();
