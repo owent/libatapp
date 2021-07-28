@@ -31,8 +31,8 @@ atapp:
       - name: default
         prefix: "[Log %L][%F %T.%f][%s:%n(%C)]: "
         stacktrace:
-          min: error
-          max: fatal
+          min: disable
+          max: disable
         sink:
           - type: file
             level:

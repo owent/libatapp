@@ -2,6 +2,7 @@
 #include <atframe/atapp_module_impl.h>
 
 #include <common/file_system.h>
+#include <time/time_utility.h>
 
 #include <chrono>
 #include <cstdlib>
@@ -51,5 +52,10 @@ CASE_TEST(atapp_setup, timeout) {
 
   app1.add_module(std::make_shared<atapp_setup_test_timeout_module>());
 
+  util::time::time_utility::update();
+  auto before = util::time::time_utility::sys_now();
   CASE_EXPECT_EQ(atapp::EN_ATAPP_ERR_OPERATION_TIMEOUT, app1.init(nullptr, 4, args1, nullptr));
+  util::time::time_utility::update();
+  auto after = util::time::time_utility::sys_now();
+  CASE_EXPECT_LE(std::chrono::duration_cast<std::chrono::seconds>(after - before).count(), 3);
 }
