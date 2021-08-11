@@ -165,7 +165,7 @@ LIBATAPP_MACRO_API int etcd_module::init() {
   uv_timer_start(&tick_timer, detail::init_timer_tick_callback, 128, 128);
 
   int ticks = 0;
-  while (false == is_failed && false == is_timeout) {
+  while (false == is_failed && false == is_timeout && nullptr != get_app()) {
     util::time::time_utility::update();
     etcd_ctx_.tick();
     ++ticks;
@@ -555,18 +555,23 @@ LIBATAPP_MACRO_API int etcd_module::timeout() {
 LIBATAPP_MACRO_API const char *etcd_module::name() const { return "atapp: etcd module"; }
 
 LIBATAPP_MACRO_API int etcd_module::tick() {
-  // Slow down the tick interval of etcd module, it require http request which is very slow compared to atbus
-  if (tick_next_timepoint_ >= get_app()->get_last_tick_time()) {
+  atapp::app *owner = get_app();
+  if (nullptr == owner) {
     return 0;
   }
-  tick_next_timepoint_ = get_app()->get_last_tick_time() + tick_interval_;
+
+  // Slow down the tick interval of etcd module, it require http request which is very slow compared to atbus
+  if (tick_next_timepoint_ >= owner->get_last_tick_time()) {
+    return 0;
+  }
+  tick_next_timepoint_ = owner->get_last_tick_time() + tick_interval_;
 
   // single mode
   if (etcd_ctx_.get_conf_hosts().empty() || !etcd_ctx_enabled_) {
     // If it's initializing, is_available() will return false
     if (!cleanup_request_ && etcd_ctx_.is_available()) {
       bool revoke_lease = true;
-      if (get_app() && get_app()->is_current_upgrade_mode()) {
+      if (owner->is_current_upgrade_mode()) {
         revoke_lease = false;
       }
 
@@ -591,7 +596,7 @@ LIBATAPP_MACRO_API int etcd_module::tick() {
     int res = init();
     if (res < 0) {
       FWLOGERROR("initialize etcd failed, res: {}", res);
-      get_app()->stop();
+      owner->stop();
       return res;
     }
   } else if (etcd_ctx_.check_flag(etcd_cluster::flag_t::CLOSING)) {  // Already stoped and restart etcd_ctx_
@@ -634,28 +639,53 @@ LIBATAPP_MACRO_API const util::network::http_request::curl_m_bind_ptr_t &etcd_mo
 }
 
 LIBATAPP_MACRO_API std::string etcd_module::get_by_id_path() const {
-  return LOG_WRAPPER_FWAPI_FORMAT("{}{}/{}-{}", get_configure_path(), ETCD_MODULE_BY_ID_DIR, get_app()->get_app_name(),
-                                  get_app()->get_id());
+  const atapp::app *owner = get_app();
+  if (nullptr == owner) {
+    return std::string();
+  }
+
+  return LOG_WRAPPER_FWAPI_FORMAT("{}{}/{}-{}", get_configure_path(), ETCD_MODULE_BY_ID_DIR, owner->get_app_name(),
+                                  owner->get_id());
 }
 
 LIBATAPP_MACRO_API std::string etcd_module::get_by_type_id_path() const {
+  const atapp::app *owner = get_app();
+  if (nullptr == owner) {
+    return std::string();
+  }
+
   return LOG_WRAPPER_FWAPI_FORMAT("{}{}/{}/{}-{}", get_configure_path(), ETCD_MODULE_BY_TYPE_ID_DIR,
-                                  get_app()->get_type_id(), get_app()->get_app_name(), get_app()->get_id());
+                                  owner->get_type_id(), owner->get_app_name(), owner->get_id());
 }
 
 LIBATAPP_MACRO_API std::string etcd_module::get_by_type_name_path() const {
+  const atapp::app *owner = get_app();
+  if (nullptr == owner) {
+    return std::string();
+  }
+
   return LOG_WRAPPER_FWAPI_FORMAT("{}{}/{}/{}-{}", get_configure_path(), ETCD_MODULE_BY_TYPE_NAME_DIR,
-                                  get_app()->get_type_name(), get_app()->get_app_name(), get_app()->get_id());
+                                  owner->get_type_name(), owner->get_app_name(), owner->get_id());
 }
 
 LIBATAPP_MACRO_API std::string etcd_module::get_by_name_path() const {
-  return LOG_WRAPPER_FWAPI_FORMAT("{}{}/{}-{}", get_configure_path(), ETCD_MODULE_BY_NAME_DIR,
-                                  get_app()->get_app_name(), get_app()->get_id());
+  const atapp::app *owner = get_app();
+  if (nullptr == owner) {
+    return std::string();
+  }
+
+  return LOG_WRAPPER_FWAPI_FORMAT("{}{}/{}-{}", get_configure_path(), ETCD_MODULE_BY_NAME_DIR, owner->get_app_name(),
+                                  owner->get_id());
 }
 
 LIBATAPP_MACRO_API std::string etcd_module::get_by_tag_path(const std::string &tag_name) const {
+  const atapp::app *owner = get_app();
+  if (nullptr == owner) {
+    return std::string();
+  }
+
   return LOG_WRAPPER_FWAPI_FORMAT("{}{}/{}/{}-{}", get_configure_path(), ETCD_MODULE_BY_TAG_DIR, tag_name,
-                                  get_app()->get_app_name(), get_app()->get_id());
+                                  owner->get_app_name(), owner->get_id());
 }
 
 LIBATAPP_MACRO_API std::string etcd_module::get_by_id_watcher_path() const {
@@ -862,6 +892,10 @@ LIBATAPP_MACRO_API const std::string &etcd_module::get_configure_path() const {
 LIBATAPP_MACRO_API atapp::etcd_keepalive::ptr_t etcd_module::add_keepalive_actor(std::string &val,
                                                                                  const std::string &node_path) {
   atapp::etcd_keepalive::ptr_t ret;
+  if (nullptr == get_app()) {
+    return ret;
+  }
+
   if (val.empty()) {
     node_info_t ni;
     get_app()->pack(ni.node_discovery);
@@ -998,7 +1032,9 @@ int etcd_module::http_callback_on_etcd_closed(util::network::http_request &req) 
   FWLOGDEBUG("Etcd revoke lease finished");
 
   // call stop to trigger stop process again.
-  self->get_app()->stop();
+  if (nullptr != self->get_app()) {
+    self->get_app()->stop();
+  }
 
   return 0;
 }
