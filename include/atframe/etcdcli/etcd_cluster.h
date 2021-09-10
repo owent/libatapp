@@ -86,6 +86,7 @@ class etcd_cluster {
     std::chrono::system_clock::time_point keepalive_next_update_time;
     std::chrono::system_clock::duration keepalive_timeout;
     std::chrono::system_clock::duration keepalive_interval;
+    std::chrono::system_clock::duration keepalive_retry_interval;
     size_t keepalive_retry_times;
 
     // SSL configure
@@ -216,6 +217,16 @@ class etcd_cluster {
   }
   UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_keepalive_interval() const {
     return conf_.keepalive_interval;
+  }
+
+  UTIL_FORCEINLINE void set_conf_keepalive_retry_interval(std::chrono::system_clock::duration v) {
+    conf_.keepalive_retry_interval = v;
+  }
+  UTIL_FORCEINLINE void set_conf_keepalive_retry_interval_sec(time_t v) {
+    set_conf_keepalive_retry_interval(std::chrono::seconds(v));
+  }
+  UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_keepalive_retry_interval() const {
+    return conf_.keepalive_retry_interval;
   }
 
   UTIL_FORCEINLINE void set_conf_keepalive_retry_times(size_t v) { conf_.keepalive_retry_times = v; }

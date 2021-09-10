@@ -172,6 +172,7 @@ message atapp_etcd_cluster {
 message atapp_etcd_keepalive {
   google.protobuf.Duration timeout = 1 [(atapp.protocol.CONFIGURE) = { default_value: "31s" }];
   google.protobuf.Duration ttl = 2 [(atapp.protocol.CONFIGURE) = { default_value: "10s" }];
+  google.protobuf.Duration retry_interval = 3 [(atapp.protocol.CONFIGURE) = { default_value: "3s" }];
 }
 
 message atapp_etcd_request {

@@ -201,6 +201,7 @@ LIBATAPP_MACRO_API etcd_cluster::etcd_cluster() : flags_(0) {
   conf_.keepalive_next_update_time = std::chrono::system_clock::from_time_t(0);
   conf_.keepalive_timeout = std::chrono::seconds(16);
   conf_.keepalive_interval = std::chrono::seconds(5);
+  conf_.keepalive_retry_interval = std::chrono::seconds(3);
   conf_.keepalive_retry_times = 8;
 
   conf_.ssl_enable_alpn = true;
@@ -334,6 +335,7 @@ LIBATAPP_MACRO_API void etcd_cluster::reset() {
   conf_.keepalive_next_update_time = std::chrono::system_clock::from_time_t(0);
   conf_.keepalive_timeout = std::chrono::seconds(16);
   conf_.keepalive_interval = std::chrono::seconds(5);
+  conf_.keepalive_retry_interval = std::chrono::seconds(3);
   conf_.keepalive_retry_times = 8;
 
   conf_.ssl_enable_alpn = true;
@@ -1349,6 +1351,10 @@ bool etcd_cluster::create_request_lease_grant() {
     return false;
   }
 
+  if (util::time::time_utility::sys_now() <= conf_.keepalive_next_update_time) {
+    return false;
+  }
+
   if (std::chrono::system_clock::duration::zero() >= conf_.keepalive_interval) {
     conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + std::chrono::seconds(1);
   } else {
@@ -1387,6 +1393,9 @@ bool etcd_cluster::create_request_lease_grant() {
     rpc_keepalive_ = req;
   } else {
     add_stats_error_request();
+    if (std::chrono::system_clock::duration::zero() >= conf_.keepalive_retry_interval) {
+      conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + conf_.keepalive_retry_interval;
+    }
   }
 
   return true;
@@ -1442,6 +1451,9 @@ bool etcd_cluster::create_request_lease_keepalive() {
     rpc_keepalive_ = req;
   } else {
     add_stats_error_request();
+    if (std::chrono::system_clock::duration::zero() >= conf_.keepalive_retry_interval) {
+      conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + conf_.keepalive_retry_interval;
+    }
   }
 
   return true;

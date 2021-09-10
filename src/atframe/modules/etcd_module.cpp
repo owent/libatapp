@@ -408,6 +408,7 @@ LIBATAPP_MACRO_API int etcd_module::reload() {
 
   etcd_ctx_.set_conf_keepalive_timeout(detail::convert_to_chrono(conf.keepalive().timeout(), 16000));
   etcd_ctx_.set_conf_keepalive_interval(detail::convert_to_chrono(conf.keepalive().ttl(), 5000));
+  etcd_ctx_.set_conf_keepalive_retry_interval(detail::convert_to_chrono(conf.keepalive().retry_interval(), 3000));
 
   // HTTP
   if (!conf.http().user_agent().empty()) {
