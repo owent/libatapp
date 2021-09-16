@@ -14,7 +14,7 @@ enable_testing()
 
 project(
   libatapp
-  VERSION "0.12.4"
+  VERSION "0.12.5"
   HOMEPAGE_URL "https://github.com/atframework/libatapp"
   LANGUAGES C CXX)
 
