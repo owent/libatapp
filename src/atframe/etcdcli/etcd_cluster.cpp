@@ -869,17 +869,17 @@ bool etcd_cluster::create_request_auth_authenticate() {
     return false;
   }
 
-  if (rpc_authenticate_) {
-    return false;
-  }
-
   if (util::time::time_utility::sys_now() <= conf_.authorization_next_update_time) {
     return false;
   }
 
-  // At least 1 second
+  if (rpc_authenticate_) {
+    rpc_authenticate_->stop();
+    rpc_authenticate_.reset();
+  }
+
   if (std::chrono::system_clock::duration::zero() >= conf_.authorization_retry_interval) {
-    conf_.authorization_next_update_time = util::time::time_utility::sys_now();
+    conf_.authorization_next_update_time = util::time::time_utility::sys_now() + std::chrono::seconds(3);
   } else {
     conf_.authorization_next_update_time = util::time::time_utility::sys_now() + conf_.authorization_retry_interval;
   }
@@ -915,6 +915,11 @@ bool etcd_cluster::create_request_auth_authenticate() {
 
     FWLOGINFO("Etcd start authenticate request for user {} to {}", username, req->get_url());
     rpc_authenticate_ = req;
+    if (std::chrono::system_clock::duration::zero() >= conf_.auth_user_get_retry_interval) {
+      conf_.auth_user_get_next_update_time = util::time::time_utility::sys_now() + std::chrono::seconds(3);
+    } else {
+      conf_.auth_user_get_next_update_time = util::time::time_utility::sys_now() + conf_.auth_user_get_retry_interval;
+    }
   } else {
     add_stats_error_request();
   }
@@ -1001,17 +1006,17 @@ bool etcd_cluster::create_request_auth_user_get() {
     return false;
   }
 
-  if (rpc_authenticate_) {
-    return false;
-  }
-
   if (util::time::time_utility::sys_now() <= conf_.auth_user_get_next_update_time) {
     return false;
   }
 
-  // At least 1 second
+  if (rpc_authenticate_) {
+    rpc_authenticate_->stop();
+    rpc_authenticate_.reset();
+  }
+
   if (std::chrono::system_clock::duration::zero() >= conf_.auth_user_get_retry_interval) {
-    conf_.auth_user_get_next_update_time = util::time::time_utility::sys_now();
+    conf_.auth_user_get_next_update_time = util::time::time_utility::sys_now() + std::chrono::seconds(3);
   } else {
     conf_.auth_user_get_next_update_time = util::time::time_utility::sys_now() + conf_.auth_user_get_retry_interval;
   }
@@ -1164,7 +1169,7 @@ bool etcd_cluster::retry_request_member_update(const std::string &bad_url) {
       conf_.etcd_members_init_retry_interval > std::chrono::system_clock::duration::zero()) {
     retry_interval = conf_.etcd_members_init_retry_interval;
   } else if (retry_interval <= std::chrono::system_clock::duration::zero()) {
-    retry_interval = std::chrono::seconds(1);
+    retry_interval = std::chrono::minutes(1);
   }
   if (util::time::time_utility::sys_now() + retry_interval < conf_.etcd_members_next_update_time) {
     conf_.etcd_members_next_update_time = util::time::time_utility::sys_now() + retry_interval;
@@ -1187,18 +1192,19 @@ bool etcd_cluster::create_request_member_update() {
     return false;
   }
 
-  if (rpc_update_members_) {
-    return false;
-  }
-
   if (conf_.conf_hosts.empty() && conf_.hosts.empty()) {
     return false;
   }
 
   if (std::chrono::system_clock::duration::zero() >= conf_.etcd_members_update_interval) {
-    conf_.etcd_members_next_update_time = util::time::time_utility::sys_now() + std::chrono::seconds(1);
+    conf_.etcd_members_next_update_time = util::time::time_utility::sys_now() + std::chrono::minutes(1);
   } else {
     conf_.etcd_members_next_update_time = util::time::time_utility::sys_now() + conf_.etcd_members_update_interval;
+  }
+
+  if (rpc_update_members_) {
+    rpc_update_members_->stop();
+    rpc_update_members_.reset();
   }
 
   // Trust etcd ingress and do not use cluster member to keep healthy
@@ -1325,7 +1331,7 @@ int etcd_cluster::libcurl_callback_on_member_update(util::network::http_request 
     self->add_stats_success_request();
 
     if (std::chrono::system_clock::duration::zero() >= self->conf_.etcd_members_update_interval) {
-      self->conf_.etcd_members_next_update_time = util::time::time_utility::sys_now() + std::chrono::seconds(1);
+      self->conf_.etcd_members_next_update_time = util::time::time_utility::sys_now() + std::chrono::minutes(1);
     } else {
       self->conf_.etcd_members_next_update_time =
           util::time::time_utility::sys_now() + self->conf_.etcd_members_update_interval;
@@ -1347,16 +1353,17 @@ bool etcd_cluster::create_request_lease_grant() {
     return false;
   }
 
-  if (rpc_keepalive_) {
-    return false;
-  }
-
   if (util::time::time_utility::sys_now() <= conf_.keepalive_next_update_time) {
     return false;
   }
 
+  if (rpc_keepalive_) {
+    rpc_keepalive_->stop();
+    rpc_keepalive_.reset();
+  }
+
   if (std::chrono::system_clock::duration::zero() >= conf_.keepalive_interval) {
-    conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + std::chrono::seconds(1);
+    conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + std::chrono::seconds(3);
   } else {
     conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + conf_.keepalive_interval;
   }
@@ -1410,16 +1417,17 @@ bool etcd_cluster::create_request_lease_keepalive() {
     return false;
   }
 
-  if (rpc_keepalive_) {
-    return false;
-  }
-
   if (util::time::time_utility::sys_now() <= conf_.keepalive_next_update_time) {
     return false;
   }
 
+  if (rpc_keepalive_) {
+    rpc_keepalive_->stop();
+    rpc_keepalive_.reset();
+  }
+
   if (std::chrono::system_clock::duration::zero() >= conf_.keepalive_interval) {
-    conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + std::chrono::seconds(1);
+    conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + std::chrono::seconds(3);
   } else {
     conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + conf_.keepalive_interval;
   }
