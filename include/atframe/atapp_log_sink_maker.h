@@ -5,6 +5,7 @@
 
 #include <string>
 
+#include <gsl/select-gsl.h>
 #include <log/log_wrapper.h>
 
 #include "atframe/atapp_config.h"
@@ -29,16 +30,20 @@ class log_sink_maker {
   ~log_sink_maker();
 
  public:
-  static LIBATAPP_MACRO_API const std::string &get_file_sink_name();
+  static LIBATAPP_MACRO_API gsl::string_view get_file_sink_name();
 
   static LIBATAPP_MACRO_API log_reg_t get_file_sink_reg();
 
-  static LIBATAPP_MACRO_API const std::string &get_stdout_sink_name();
+  static LIBATAPP_MACRO_API gsl::string_view get_stdout_sink_name();
 
   static LIBATAPP_MACRO_API log_reg_t get_stdout_sink_reg();
 
-  static LIBATAPP_MACRO_API const std::string &get_stderr_sink_name();
+  static LIBATAPP_MACRO_API gsl::string_view get_stderr_sink_name();
 
   static LIBATAPP_MACRO_API log_reg_t get_stderr_sink_reg();
+
+  static LIBATAPP_MACRO_API gsl::string_view get_syslog_sink_name();
+
+  static LIBATAPP_MACRO_API log_reg_t get_syslog_sink_reg();
 };
 }  // namespace atapp

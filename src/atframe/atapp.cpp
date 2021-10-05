@@ -1931,6 +1931,11 @@ int app::apply_configure() {
                                                            identity_buffer.c_str(), identity_buffer.size()));
   }
 
+  // reset metadata from configure
+  if (conf_.origin.configure_metadata()) {
+    mutable_metadata().CopyFrom(conf_.origin.metadata());
+  }
+
   // atbus configure
   atbus::node::default_conf(&conf_.bus_conf);
 
@@ -2263,15 +2268,18 @@ int app::setup_signal() {
 static void setup_load_sink(const YAML::Node &log_sink_yaml_src, atapp::protocol::atapp_log_sink &out) {
   // yaml_loader_dump_to(src, out); // already dumped before in setup_load_category(...)
 
-  if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_file_sink_name().c_str())) {
+  if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_file_sink_name().data())) {
     // Inner file sink
     yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_log_backend_file());
-  } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stdout_sink_name().c_str())) {
+  } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stdout_sink_name().data())) {
     // Inner stdout sink
     yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_log_backend_stdout());
-  } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stderr_sink_name().c_str())) {
+  } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stderr_sink_name().data())) {
     // Inner stderr sink
     yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_log_backend_stderr());
+  } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_syslog_sink_name().data())) {
+    // Inner syslog sink
+    yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_log_backend_syslog());
   } else {
     // Dump all configures into unresolved_key_values
     yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_unresolved_key_values(), std::string());
@@ -2339,12 +2347,20 @@ void app::setup_startup_log() {
   ::atapp::protocol::atapp_log_sink std_sink_cfg;
 
   for (std::list<std::string>::iterator iter = conf_.startup_log.begin(); iter != conf_.startup_log.end(); ++iter) {
-    if ((*iter).empty() || 0 == UTIL_STRFUNC_STRNCASE_CMP("stdout", (*iter).c_str(), (*iter).size())) {
+    if ((*iter).empty() || 0 == UTIL_STRFUNC_STRNCASE_CMP(log_sink_maker::get_stdout_sink_name().data(),
+                                                          (*iter).c_str(), (*iter).size())) {
       wrapper.add_sink(log_sink_maker::get_stdout_sink_reg()(wrapper, util::log::log_wrapper::categorize_t::DEFAULT,
                                                              std_log_cfg, std_cat_cfg, std_sink_cfg));
-    } else if (0 == UTIL_STRFUNC_STRNCASE_CMP("stderr", (*iter).c_str(), (*iter).size())) {
+    } else if (0 == UTIL_STRFUNC_STRNCASE_CMP(log_sink_maker::get_stderr_sink_name().data(), (*iter).c_str(),
+                                              (*iter).size())) {
       wrapper.add_sink(log_sink_maker::get_stderr_sink_reg()(wrapper, util::log::log_wrapper::categorize_t::DEFAULT,
                                                              std_log_cfg, std_cat_cfg, std_sink_cfg));
+    } else if (0 == UTIL_STRFUNC_STRNCASE_CMP(log_sink_maker::get_syslog_sink_name().data(), (*iter).c_str(),
+                                              (*iter).size())) {
+      util::log::log_sink_file_backend file_sink(*iter);
+      file_sink.set_rotate_size(100 * 1024 * 1024);  // Max 100 MB
+      file_sink.set_flush_interval(1);
+      wrapper.add_sink(file_sink);
     } else {
       util::log::log_sink_file_backend file_sink(*iter);
       file_sink.set_rotate_size(100 * 1024 * 1024);  // Max 100 MB
@@ -2365,16 +2381,24 @@ int app::setup_log() {
   util::cli::shell_stream ss(std::cerr);
 
   // register inner log module
-  if (log_reg_.find(log_sink_maker::get_file_sink_name()) == log_reg_.end()) {
-    log_reg_[log_sink_maker::get_file_sink_name()] = log_sink_maker::get_file_sink_reg();
+  std::string log_sink_name = static_cast<std::string>(log_sink_maker::get_file_sink_name());
+  if (log_reg_.find(log_sink_name) == log_reg_.end()) {
+    log_reg_[log_sink_name] = log_sink_maker::get_file_sink_reg();
   }
 
-  if (log_reg_.find(log_sink_maker::get_stdout_sink_name()) == log_reg_.end()) {
-    log_reg_[log_sink_maker::get_stdout_sink_name()] = log_sink_maker::get_stdout_sink_reg();
+  log_sink_name = static_cast<std::string>(log_sink_maker::get_stdout_sink_name());
+  if (log_reg_.find(log_sink_name) == log_reg_.end()) {
+    log_reg_[log_sink_name] = log_sink_maker::get_stdout_sink_reg();
   }
 
-  if (log_reg_.find(log_sink_maker::get_stderr_sink_name()) == log_reg_.end()) {
-    log_reg_[log_sink_maker::get_stderr_sink_name()] = log_sink_maker::get_stderr_sink_reg();
+  log_sink_name = static_cast<std::string>(log_sink_maker::get_stderr_sink_name());
+  if (log_reg_.find(log_sink_name) == log_reg_.end()) {
+    log_reg_[log_sink_name] = log_sink_maker::get_stderr_sink_reg();
+  }
+
+  log_sink_name = static_cast<std::string>(log_sink_maker::get_syslog_sink_name());
+  if (log_reg_.find(log_sink_name) == log_reg_.end()) {
+    log_reg_[log_sink_name] = log_sink_maker::get_syslog_sink_reg();
   }
 
   if (false == is_running()) {
@@ -2444,15 +2468,18 @@ int app::setup_log() {
 
         ini_loader_dump_to(log_sink_conf_src, *log_sink);
 
-        if (0 == UTIL_STRFUNC_STRCASE_CMP(sink_type.c_str(), log_sink_maker::get_file_sink_name().c_str())) {
+        if (0 == UTIL_STRFUNC_STRCASE_CMP(sink_type.c_str(), log_sink_maker::get_file_sink_name().data())) {
           // Inner file sink
           ini_loader_dump_to(log_sink_conf_src, *log_sink->mutable_log_backend_file());
-        } else if (0 == UTIL_STRFUNC_STRCASE_CMP(sink_type.c_str(), log_sink_maker::get_stdout_sink_name().c_str())) {
+        } else if (0 == UTIL_STRFUNC_STRCASE_CMP(sink_type.c_str(), log_sink_maker::get_stdout_sink_name().data())) {
           // Inner stdout sink
           ini_loader_dump_to(log_sink_conf_src, *log_sink->mutable_log_backend_stdout());
-        } else if (0 == UTIL_STRFUNC_STRCASE_CMP(sink_type.c_str(), log_sink_maker::get_stderr_sink_name().c_str())) {
+        } else if (0 == UTIL_STRFUNC_STRCASE_CMP(sink_type.c_str(), log_sink_maker::get_stderr_sink_name().data())) {
           // Inner stderr sink
           ini_loader_dump_to(log_sink_conf_src, *log_sink->mutable_log_backend_stderr());
+        } else if (0 == UTIL_STRFUNC_STRCASE_CMP(sink_type.c_str(), log_sink_maker::get_syslog_sink_name().data())) {
+          // Inner syslog sink
+          ini_loader_dump_to(log_sink_conf_src, *log_sink->mutable_log_backend_syslog());
         } else {
           // Dump all configures into unresolved_key_values
           ini_loader_dump_to(log_sink_conf_src, *log_sink->mutable_unresolved_key_values(), std::string());

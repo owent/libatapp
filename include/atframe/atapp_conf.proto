@@ -97,6 +97,12 @@ message atapp_log_sink_file {
 
 message atapp_log_sink_std {}
 
+message atapp_log_sink_syslog {
+  string ident = 1;
+  repeated string options = 2;  // cons, ndelay, nowait, odelay, perror, pid
+  string facility = 3;          // auth, authpriv, cron, daemon, ftp, kern, lpr, mail, news, syslog, user, uucp
+}
+
 message atapp_log_sink {
   string type = 1;
   atapp_log_level_range level = 2;
@@ -105,6 +111,7 @@ message atapp_log_sink {
     atapp_log_sink_file log_backend_file = 21;
     atapp_log_sink_std log_backend_stdout = 22;
     atapp_log_sink_std log_backend_stderr = 23;
+    atapp_log_sink_syslog log_backend_syslog = 24;
   }
 
   map<string, string> unresolved_key_values = 101;
@@ -260,6 +267,8 @@ message atapp_configure {
   uint64 type_id = 104;
   string type_name = 105;
   atapp_area area = 106;  // Some service is splited by area
+  bool configure_metadata = 107 [(atapp.protocol.CONFIGURE) = { default_value: "10s" }];
+  atapp_metadata metadata = 108;  // Just like in kubernetes
 
   string hostname = 121;
   // The same identity means the same instance of a app.
@@ -294,6 +303,6 @@ message atapp_discovery {
   uint64 atbus_protocol_min_version = 22;
   repeated atbus_subnet_range atbus_subnets = 23;
 
-  // just like in kubernetes
+  // Just like in kubernetes
   atapp_metadata metadata = 61;
 }
