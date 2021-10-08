@@ -8,7 +8,13 @@
 #include <iostream>
 
 #include "cli/shell_font.h"
+#include "common/string_oprs.h"
 #include "log/log_sink_file_backend.h"
+#include "log/log_sink_syslog_backend.h"
+
+#if defined(LOG_SINK_ENABLE_SYSLOG_SUPPORT) && LOG_SINK_ENABLE_SYSLOG_SUPPORT
+#  include <syslog.h>
+#endif
 
 namespace atapp {
 namespace detail {
@@ -91,30 +97,96 @@ static util::log::log_wrapper::log_handler_t _log_sink_stderr(util::log::log_wra
                                                               const ::atapp::protocol::atapp_log_sink& /*sink_cfg*/) {
   return _log_sink_stderr_handle;
 }
+
+static util::log::log_wrapper::log_handler_t _log_sink_syslog(util::log::log_wrapper& /*logger*/, int32_t /*index*/,
+                                                              const ::atapp::protocol::atapp_log& /*log_cfg*/,
+                                                              const ::atapp::protocol::atapp_log_category& /*cat_cfg*/,
+                                                              const ::atapp::protocol::atapp_log_sink& sink_cfg) {
+  const ::atapp::protocol::atapp_log_sink_syslog& syslog_conf = sink_cfg.log_backend_syslog();
+#if defined(LOG_SINK_ENABLE_SYSLOG_SUPPORT) && LOG_SINK_ENABLE_SYSLOG_SUPPORT
+  int options = 0;
+  for (const std::string& option : syslog_conf.options()) {
+    if (0 == UTIL_STRFUNC_STRCASE_CMP("cons", option.c_str())) {
+      options |= LOG_CONS;
+    } else if (0 == UTIL_STRFUNC_STRCASE_CMP("ndelay", option.c_str())) {
+      options |= LOG_NDELAY;
+    } else if (0 == UTIL_STRFUNC_STRCASE_CMP("nowait", option.c_str())) {
+      options |= LOG_NOWAIT;
+    } else if (0 == UTIL_STRFUNC_STRCASE_CMP("odely", option.c_str())) {
+      options |= LOG_ODELAY;
+    } else if (0 == UTIL_STRFUNC_STRCASE_CMP("perror", option.c_str())) {
+      options |= LOG_PERROR;
+    } else if (0 == UTIL_STRFUNC_STRCASE_CMP("pid", option.c_str())) {
+      options |= LOG_PID;
+    }
+  }
+  if (0 == options) {
+    options = LOG_PID;
+  }
+  int facility;
+  if (0 == UTIL_STRFUNC_STRCASE_CMP("cons", syslog_conf.facility().c_str())) {
+    facility = LOG_AUTH;
+  } else if (0 == UTIL_STRFUNC_STRCASE_CMP("ndelay", syslog_conf.facility().c_str())) {
+    facility = LOG_AUTHPRIV;
+  } else if (0 == UTIL_STRFUNC_STRCASE_CMP("nowait", syslog_conf.facility().c_str())) {
+    facility = LOG_CRON;
+  } else if (0 == UTIL_STRFUNC_STRCASE_CMP("odely", syslog_conf.facility().c_str())) {
+    facility = LOG_DAEMON;
+  } else if (0 == UTIL_STRFUNC_STRCASE_CMP("perror", syslog_conf.facility().c_str())) {
+    facility = LOG_FTP;
+  } else if (0 == UTIL_STRFUNC_STRCASE_CMP("pid", syslog_conf.facility().c_str())) {
+    facility = LOG_KERN;
+  } else if (0 == UTIL_STRFUNC_STRCASE_CMP("lpr", syslog_conf.facility().c_str())) {
+    facility = LOG_LPR;
+  } else if (0 == UTIL_STRFUNC_STRCASE_CMP("mail", syslog_conf.facility().c_str())) {
+    facility = LOG_MAIL;
+  } else if (0 == UTIL_STRFUNC_STRCASE_CMP("syslog", syslog_conf.facility().c_str())) {
+    facility = LOG_SYSLOG;
+  } else if (0 == UTIL_STRFUNC_STRCASE_CMP("user", syslog_conf.facility().c_str())) {
+    facility = LOG_USER;
+  } else if (0 == UTIL_STRFUNC_STRCASE_CMP("uucp", syslog_conf.facility().c_str())) {
+    facility = LOG_UUCP;
+  } else {
+    facility = util::string::to_int<int>(syslog_conf.facility().c_str());
+    if (0 == facility) {
+      facility = LOG_USER;
+    }
+  }
+
+  return util::log::log_sink_syslog_backend(syslog_conf.ident().empty() ? nullptr : syslog_conf.ident().c_str(),
+                                            options, facility);
+
+#else
+  for (const std::string& option : syslog_conf.options()) {
+    if (0 == UTIL_STRFUNC_STRCASE_CMP("perror", option.c_str())) {
+      return _log_sink_stderr_handle;
+    }
+  }
+
+  return _log_sink_stdout_handle;
+#endif
+}
+
 }  // namespace detail
 
 log_sink_maker::log_sink_maker() {}
 
 log_sink_maker::~log_sink_maker() {}
 
-LIBATAPP_MACRO_API const std::string& log_sink_maker::get_file_sink_name() {
-  static std::string ret = "file";
-  return ret;
-}
+LIBATAPP_MACRO_API gsl::string_view log_sink_maker::get_file_sink_name() { return "file"; }
 
 LIBATAPP_MACRO_API log_sink_maker::log_reg_t log_sink_maker::get_file_sink_reg() { return detail::_log_sink_file; }
 
-LIBATAPP_MACRO_API const std::string& log_sink_maker::get_stdout_sink_name() {
-  static std::string ret = "stdout";
-  return ret;
-}
+LIBATAPP_MACRO_API gsl::string_view log_sink_maker::get_stdout_sink_name() { return "stdout"; }
 
 LIBATAPP_MACRO_API log_sink_maker::log_reg_t log_sink_maker::get_stdout_sink_reg() { return detail::_log_sink_stdout; }
 
-LIBATAPP_MACRO_API const std::string& log_sink_maker::get_stderr_sink_name() {
-  static std::string ret = "stderr";
-  return ret;
-}
+LIBATAPP_MACRO_API gsl::string_view log_sink_maker::get_stderr_sink_name() { return "stderr"; }
 
 LIBATAPP_MACRO_API log_sink_maker::log_reg_t log_sink_maker::get_stderr_sink_reg() { return detail::_log_sink_stderr; }
+
+LIBATAPP_MACRO_API gsl::string_view log_sink_maker::get_syslog_sink_name() { return "syslog"; }
+
+LIBATAPP_MACRO_API log_sink_maker::log_reg_t log_sink_maker::get_syslog_sink_reg() { return detail::_log_sink_syslog; }
+
 }  // namespace atapp
