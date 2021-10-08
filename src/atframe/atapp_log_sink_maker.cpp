@@ -157,7 +157,7 @@ static util::log::log_wrapper::log_handler_t _log_sink_syslog(util::log::log_wra
                                             options, facility);
 
 #else
-  for (std::string& option : syslog_conf.options()) {
+  for (const std::string& option : syslog_conf.options()) {
     if (0 == UTIL_STRFUNC_STRCASE_CMP("perror", option.c_str())) {
       return _log_sink_stderr_handle;
     }
