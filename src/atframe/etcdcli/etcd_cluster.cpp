@@ -191,7 +191,11 @@ LIBATAPP_MACRO_API etcd_cluster::etcd_cluster() : flags_(0) {
   conf_.authorization_retry_interval = std::chrono::seconds(5);
   conf_.auth_user_get_next_update_time = std::chrono::system_clock::from_time_t(0);
   conf_.auth_user_get_retry_interval = std::chrono::minutes(2);
-  conf_.http_cmd_timeout = std::chrono::seconds(10);
+  conf_.http_request_timeout = std::chrono::seconds(10);
+  conf_.http_initialization_timeout = std::chrono::seconds(3);
+  conf_.http_connect_timeout = std::chrono::seconds(5);
+  conf_.dns_cache_timeout = std::chrono::seconds(0);
+  conf_.dns_servers.clear();
   conf_.etcd_members_next_update_time = std::chrono::system_clock::from_time_t(0);
   conf_.etcd_members_update_interval = std::chrono::minutes(5);
   conf_.etcd_members_retry_interval = std::chrono::minutes(1);
@@ -317,7 +321,11 @@ LIBATAPP_MACRO_API void etcd_cluster::reset() {
   curl_multi_.reset();
   flags_ = 0;
 
-  conf_.http_cmd_timeout = std::chrono::seconds(10);
+  conf_.http_request_timeout = std::chrono::seconds(10);
+  conf_.http_initialization_timeout = std::chrono::seconds(3);
+  conf_.http_connect_timeout = std::chrono::seconds(5);
+  conf_.dns_cache_timeout = std::chrono::seconds(0);
+  conf_.dns_servers.clear();
 
   conf_.authorization_user_roles.clear();
   conf_.authorization_header.clear();
@@ -500,12 +508,19 @@ LIBATAPP_MACRO_API void etcd_cluster::pick_conf_authorization(std::string &usern
   }
 }
 
-LIBATAPP_MACRO_API time_t etcd_cluster::get_http_timeout_ms() const {
+LIBATAPP_MACRO_API time_t etcd_cluster::get_http_timeout_ms() const noexcept {
   time_t ret =
       static_cast<time_t>(std::chrono::duration_cast<std::chrono::milliseconds>(get_conf_http_timeout()).count());
   if (ret <= 0) {
     ret = 30000;  // 30s
   }
+
+  return ret;
+}
+
+LIBATAPP_MACRO_API time_t etcd_cluster::get_http_connect_timeout_ms() const noexcept {
+  time_t ret = static_cast<time_t>(
+      std::chrono::duration_cast<std::chrono::milliseconds>(get_conf_http_connect_timeout()).count());
 
   return ret;
 }
@@ -1362,10 +1377,12 @@ bool etcd_cluster::create_request_lease_grant() {
     rpc_keepalive_.reset();
   }
 
-  if (std::chrono::system_clock::duration::zero() >= conf_.keepalive_interval) {
-    conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + std::chrono::seconds(3);
-  } else {
+  if (check_flag(flag_t::RUNNING) && conf_.keepalive_interval > std::chrono::system_clock::duration::zero()) {
     conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + conf_.keepalive_interval;
+  } else if (conf_.keepalive_retry_interval > std::chrono::system_clock::duration::zero()) {
+    conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + conf_.keepalive_retry_interval;
+  } else {
+    conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + std::chrono::seconds(3);
   }
 
   util::network::http_request::ptr_t req = util::network::http_request::create(
@@ -1872,6 +1889,23 @@ LIBATAPP_MACRO_API void etcd_cluster::setup_http_request(util::network::http_req
   if (timeout <= 0) {
     timeout = get_http_timeout_ms();
   }
+
+  time_t connect_timeout = get_http_connect_timeout_ms();
+  if (connect_timeout > 0) {
+    req->set_opt_connect_timeout(timeout);
+  }
+  if (get_conf_dns_cache_timeout() > std::chrono::system_clock::duration::zero()) {
+    time_t dns_cache_timeout = static_cast<time_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(get_conf_dns_cache_timeout()).count());
+    if (dns_cache_timeout > 0) {
+      req->set_opt_long(CURLOPT_DNS_CACHE_TIMEOUT, dns_cache_timeout);
+    }
+  }
+#if LIBCURL_VERSION_NUM >= 0x071800
+  if (!get_conf_dns_servers().empty()) {
+    req->set_opt_string(CURLOPT_DNS_SERVERS, get_conf_dns_servers().c_str());
+  }
+#endif
 
   req->set_opt_follow_location(true);
   req->set_opt_ssl_verify_peer(conf_.ssl_verify_peer);

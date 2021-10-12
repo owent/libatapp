@@ -184,10 +184,14 @@ message atapp_etcd_keepalive {
 
 message atapp_etcd_request {
   google.protobuf.Duration timeout = 1 [(atapp.protocol.CONFIGURE) = { default_value: "15s" }];
+  google.protobuf.Duration initialization_timeout = 2 [(atapp.protocol.CONFIGURE) = { default_value: "3s" }];
+  google.protobuf.Duration connect_timeout = 3 [(atapp.protocol.CONFIGURE) = { default_value: "0ms" }];
+  google.protobuf.Duration dns_cache_timeout = 4 [(atapp.protocol.CONFIGURE) = { default_value: "300s" }];
+  string dns_servers = 5;
 }
 
 message atapp_etcd_init {
-  google.protobuf.Duration timeout = 1 [(atapp.protocol.CONFIGURE) = { default_value: "5s" }];
+  google.protobuf.Duration timeout = 1 [(atapp.protocol.CONFIGURE) = { default_value: "10s" }];
   google.protobuf.Duration tick_interval = 2
       [(atapp.protocol.CONFIGURE) = { default_value: "256ms" min_value: "16ms" }];
 }
