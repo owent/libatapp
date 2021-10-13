@@ -401,7 +401,12 @@ LIBATAPP_MACRO_API int etcd_module::reload() {
   }
 
   etcd_ctx_.set_conf_authorization(conf.authorization());
-  etcd_ctx_.set_conf_http_timeout(detail::convert_to_chrono(conf.request().timeout(), 10000));
+  etcd_ctx_.set_conf_http_request_timeout(detail::convert_to_chrono(conf.request().timeout(), 10000));
+  etcd_ctx_.set_conf_http_initialization_timeout(
+      detail::convert_to_chrono(conf.request().initialization_timeout(), 3000));
+  etcd_ctx_.set_conf_http_connect_timeout(detail::convert_to_chrono(conf.request().connect_timeout(), 0));
+  etcd_ctx_.set_conf_dns_cache_timeout(detail::convert_to_chrono(conf.request().dns_cache_timeout(), 0));
+  etcd_ctx_.set_conf_dns_servers(conf.request().dns_servers());
   etcd_ctx_.set_conf_etcd_members_auto_update_hosts(conf.cluster().auto_update());
   etcd_ctx_.set_conf_etcd_members_update_interval(detail::convert_to_chrono(conf.cluster().update_interval(), 300000));
   etcd_ctx_.set_conf_etcd_members_retry_interval(detail::convert_to_chrono(conf.cluster().retry_interval(), 60000));

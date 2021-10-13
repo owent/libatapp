@@ -56,7 +56,11 @@ class etcd_cluster {
     std::vector<std::string> conf_hosts;
     std::vector<std::string> hosts;
     std::string authorization;
-    std::chrono::system_clock::duration http_cmd_timeout;
+    std::chrono::system_clock::duration http_request_timeout;
+    std::chrono::system_clock::duration http_initialization_timeout;
+    std::chrono::system_clock::duration http_connect_timeout;
+    std::chrono::system_clock::duration dns_cache_timeout;
+    std::string dns_servers;
 
     // generated data for cluster members
     std::vector<std::string> authorization_user_roles;
@@ -172,12 +176,38 @@ class etcd_cluster {
   UTIL_FORCEINLINE void set_conf_hosts(const std::vector<std::string> &hosts) { conf_.conf_hosts = hosts; }
   UTIL_FORCEINLINE const std::vector<std::string> &get_conf_hosts() const { return conf_.conf_hosts; }
 
-  UTIL_FORCEINLINE void set_conf_http_timeout(std::chrono::system_clock::duration v) { conf_.http_cmd_timeout = v; }
-  UTIL_FORCEINLINE void set_conf_http_timeout_sec(time_t v) { set_conf_http_timeout(std::chrono::seconds(v)); }
-  UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_http_timeout() const {
-    return conf_.http_cmd_timeout;
+  UTIL_FORCEINLINE void set_conf_http_request_timeout(std::chrono::system_clock::duration v) {
+    conf_.http_request_timeout = v;
   }
-  LIBATAPP_MACRO_API time_t get_http_timeout_ms() const;
+  UTIL_FORCEINLINE void set_conf_http_initialization_timeout(std::chrono::system_clock::duration v) {
+    conf_.http_initialization_timeout = v;
+  }
+  UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_http_timeout() const {
+    if (check_flag(flag_t::RUNNING)) {
+      return conf_.http_request_timeout;
+    } else {
+      return conf_.http_initialization_timeout;
+    }
+  }
+  LIBATAPP_MACRO_API time_t get_http_timeout_ms() const noexcept;
+
+  UTIL_FORCEINLINE void set_conf_http_connect_timeout(std::chrono::system_clock::duration v) {
+    conf_.http_connect_timeout = v;
+  }
+  UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_http_connect_timeout() const {
+    return conf_.http_connect_timeout;
+  }
+  LIBATAPP_MACRO_API time_t get_http_connect_timeout_ms() const noexcept;
+
+  UTIL_FORCEINLINE void set_conf_dns_cache_timeout(std::chrono::system_clock::duration v) {
+    conf_.dns_cache_timeout = v;
+  }
+  UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_dns_cache_timeout() const {
+    return conf_.dns_cache_timeout;
+  }
+
+  UTIL_FORCEINLINE void set_conf_dns_servers(const std::string &servers) { conf_.dns_servers = servers; }
+  UTIL_FORCEINLINE const std::string &get_conf_dns_servers() const { return conf_.dns_servers; }
 
   UTIL_FORCEINLINE void set_conf_etcd_members_update_interval(std::chrono::system_clock::duration v) {
     conf_.etcd_members_update_interval = v;
