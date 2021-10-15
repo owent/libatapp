@@ -1128,6 +1128,8 @@ LIBATAPP_MACRO_API const atapp::protocol::atapp_configure &app::get_origin_confi
   return conf_.origin;
 }
 
+LIBATAPP_MACRO_API const atapp::protocol::atapp_log &app::get_log_configure() const noexcept { return conf_.log; }
+
 LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata &app::get_metadata() const noexcept { return conf_.metadata; }
 
 LIBATAPP_MACRO_API atapp::protocol::atapp_metadata &app::mutable_metadata() {

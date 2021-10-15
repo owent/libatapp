@@ -314,6 +314,7 @@ class app {
                                                 const std::string &path) const;
 
   LIBATAPP_MACRO_API const atapp::protocol::atapp_configure &get_origin_configure() const noexcept;
+  LIBATAPP_MACRO_API const atapp::protocol::atapp_log &get_log_configure() const noexcept;
   LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata &get_metadata() const noexcept;
   LIBATAPP_MACRO_API atapp::protocol::atapp_metadata &mutable_metadata();
   LIBATAPP_MACRO_API const atapp::protocol::atapp_area &get_area() const noexcept;
