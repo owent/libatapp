@@ -37,7 +37,14 @@ atapp:
   log:
     level: debug
     category:
+      - name: db
+        index: 1 # reorder
+        prefix: "[Log %L][%F %T.%f]: "
+        stacktrace:
+          min: disable
+          max: disable
       - name: default
+        index: 0
         prefix: "[Log %L][%F %T.%f][%s:%n(%C)]: "
         stacktrace:
           min: error
@@ -73,9 +80,3 @@ atapp:
             level:
               min: fatal
               max: debug
-
-      - name: db
-        prefix: "[Log %L][%F %T.%f]: "
-        stacktrace:
-          min: disable
-          max: disable

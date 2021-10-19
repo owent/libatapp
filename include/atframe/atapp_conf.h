@@ -26,6 +26,8 @@
 #include <type_traits>
 #include <vector>
 
+#include "gsl/select-gsl.h"
+
 #include "atframe/atapp_config.h"
 
 namespace util {
@@ -66,7 +68,7 @@ enum ATAPP_ERROR_TYPE {
   EN_ATAPP_ERR_MISSING_CONFIGURE_FILE = -1006,
   EN_ATAPP_ERR_LOAD_CONFIGURE_FILE = -1007,
   EN_ATAPP_ERR_OPERATION_TIMEOUT = -1008,
-  EN_ATAPP_ERR_RECURSIVE_CALL= -1009,
+  EN_ATAPP_ERR_RECURSIVE_CALL = -1009,
   EN_ATAPP_ERR_SETUP_ATBUS = -1101,
   EN_ATAPP_ERR_SEND_FAILED = -1102,
   EN_ATAPP_ERR_DISCOVERY_DISABLED = -1103,
@@ -76,20 +78,24 @@ enum ATAPP_ERROR_TYPE {
   EN_ATAPP_ERR_MIN = -1999,
 };
 
-LIBATAPP_MACRO_API void parse_timepoint(const std::string &in, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp &out);
-LIBATAPP_MACRO_API void parse_duration(const std::string &in, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &out);
+LIBATAPP_MACRO_API void parse_timepoint(gsl::string_view in, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp &out);
+LIBATAPP_MACRO_API void parse_duration(gsl::string_view in, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &out);
 
 LIBATAPP_MACRO_API void ini_loader_dump_to(const util::config::ini_value &src,
                                            ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst);
 LIBATAPP_MACRO_API void ini_loader_dump_to(const util::config::ini_value &src,
                                            ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Map<std::string, std::string> &dst,
-                                           std::string prefix);
+                                           gsl::string_view prefix);
 
 LIBATAPP_MACRO_API void yaml_loader_dump_to(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst);
 LIBATAPP_MACRO_API void yaml_loader_dump_to(const YAML::Node &src,
                                             ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Map<std::string, std::string> &dst,
-                                            std::string prefix);
-LIBATAPP_MACRO_API const YAML::Node yaml_loader_get_child_by_path(const YAML::Node &src, const std::string &path);
+                                            gsl::string_view prefix);
+LIBATAPP_MACRO_API const YAML::Node yaml_loader_get_child_by_path(const YAML::Node &src, gsl::string_view path);
+
+LIBATAPP_MACRO_API const YAML::Node yaml_loader_get_child_by_path(const YAML::Node &src,
+                                                                  const std::vector<gsl::string_view> &path,
+                                                                  size_t start_path_index = 0);
 
 LIBATAPP_MACRO_API bool protobuf_equal(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &l,
                                        const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &r);
