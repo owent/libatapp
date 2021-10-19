@@ -7,9 +7,9 @@
 #include <chrono>
 #include <functional>
 #include <list>
-#include <map>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "atframe/atapp_conf.h"
@@ -311,7 +311,17 @@ class app {
   LIBATAPP_MACRO_API const yaml_conf_map_t &get_yaml_loaders() const noexcept;
 
   LIBATAPP_MACRO_API void parse_configures_into(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
-                                                const std::string &path) const;
+                                                gsl::string_view path) const;
+
+  /**
+   * @brief parse configure into atapp_log and return error message
+   *
+   * @param dst target
+   * @param path configure path
+   * @return error message if there is any error
+   */
+  LIBATAPP_MACRO_API void parse_log_configures_into(atapp::protocol::atapp_log &dst,
+                                                    std::vector<gsl::string_view> path) const noexcept;
 
   LIBATAPP_MACRO_API const atapp::protocol::atapp_configure &get_origin_configure() const noexcept;
   LIBATAPP_MACRO_API const atapp::protocol::atapp_log &get_log_configure() const noexcept;
@@ -430,6 +440,9 @@ class app {
   }
 
   LIBATAPP_MACRO_API bool match_gateway(const atapp::protocol::atapp_gateway &checked) const noexcept;
+
+  LIBATAPP_MACRO_API void setup_logger(util::log::log_wrapper &logger, const std::string &min_level,
+                                       const atapp::protocol::atapp_log_category &log_conf) const noexcept;
 
  private:
   static void ev_stop_timeout(uv_timer_t *handle);
@@ -578,7 +591,7 @@ class app {
   tick_timer_t tick_timer_;
 
   std::vector<module_ptr_t> modules_;
-  std::map<std::string, log_sink_maker::log_reg_t>
+  std::unordered_map<std::string, log_sink_maker::log_reg_t>
       log_reg_;  // log reg will not changed or be checked outside the init, so std::map is enough
 
   // callbacks

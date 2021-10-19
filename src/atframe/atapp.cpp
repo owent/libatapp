@@ -1107,7 +1107,7 @@ LIBATAPP_MACRO_API app::yaml_conf_map_t &app::get_yaml_loaders() { return yaml_l
 LIBATAPP_MACRO_API const app::yaml_conf_map_t &app::get_yaml_loaders() const noexcept { return yaml_loader_; }
 
 LIBATAPP_MACRO_API void app::parse_configures_into(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
-                                                   const std::string &path) const {
+                                                   gsl::string_view path) const {
   if (!path.empty()) {
     util::config::ini_value::ptr_t cfg_value = cfg_loader_.get_root_node().get_child_by_path(path);
     if (cfg_value) {
@@ -1122,6 +1122,304 @@ LIBATAPP_MACRO_API void app::parse_configures_into(ATBUS_MACRO_PROTOBUF_NAMESPAC
       yaml_loader_dump_to(yaml_loader_get_child_by_path(iter->second[i], path), dst);
     }
   }
+}
+
+static void setup_load_sink(const YAML::Node &log_sink_yaml_src, atapp::protocol::atapp_log_sink &out) {
+  // yaml_loader_dump_to(src, out); // already dumped before in setup_load_category(...)
+
+  if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_file_sink_name().data())) {
+    // Inner file sink
+    yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_log_backend_file());
+  } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stdout_sink_name().data())) {
+    // Inner stdout sink
+    yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_log_backend_stdout());
+  } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stderr_sink_name().data())) {
+    // Inner stderr sink
+    yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_log_backend_stderr());
+  } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_syslog_sink_name().data())) {
+    // Inner syslog sink
+    yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_log_backend_syslog());
+  } else {
+    // Dump all configures into unresolved_key_values
+    yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_unresolved_key_values(), "");
+  }
+}
+
+static void setup_load_sink(const util::config::ini_value &log_sink_cfg_src, atapp::protocol::atapp_log_sink &out) {
+  // yaml_loader_dump_to(src, out); // already dumped before in setup_load_category(...)
+
+  if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_file_sink_name().data())) {
+    // Inner file sink
+    ini_loader_dump_to(log_sink_cfg_src, *out.mutable_log_backend_file());
+  } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stdout_sink_name().data())) {
+    // Inner stdout sink
+    ini_loader_dump_to(log_sink_cfg_src, *out.mutable_log_backend_stdout());
+  } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stderr_sink_name().data())) {
+    // Inner stderr sink
+    ini_loader_dump_to(log_sink_cfg_src, *out.mutable_log_backend_stderr());
+  } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_syslog_sink_name().data())) {
+    // Inner syslog sink
+    ini_loader_dump_to(log_sink_cfg_src, *out.mutable_log_backend_syslog());
+  } else {
+    // Dump all configures into unresolved_key_values
+    ini_loader_dump_to(log_sink_cfg_src, *out.mutable_unresolved_key_values(), "");
+  }
+}
+
+static void setup_load_category(
+    const YAML::Node &src,
+    ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::RepeatedPtrField<atapp::protocol::atapp_log_category> &out) {
+  if (!src || !src.IsMap()) {
+    return;
+  }
+
+  int32_t index = -1;
+  int32_t next_index = 0;
+  const YAML::Node name_node = src["name"];
+  if (!name_node || !name_node.IsScalar()) {
+    return;
+  }
+  const YAML::Node index_node = src["index"];
+  if (index_node && index_node.IsScalar()) {
+    if (!index_node.Scalar().empty()) {
+      util::string::str2int(index, index_node.Scalar());
+    }
+  }
+
+  if (name_node.Scalar().empty()) {
+    return;
+  }
+
+  atapp::protocol::atapp_log_category *log_cat = nullptr;
+  for (int i = 0; i < out.size() && nullptr == log_cat; ++i) {
+    if (out.Get(i).name() == name_node.Scalar() || index == out.Get(i).index()) {
+      log_cat = out.Mutable(i);
+    }
+
+    if (out.Get(i).index() >= next_index) {
+      next_index = out.Get(i).index() + 1;
+    }
+  }
+
+  if (nullptr == log_cat) {
+    log_cat = out.Add();
+    if (nullptr != log_cat) {
+      if (index < 0) {
+        index = next_index;
+      }
+      log_cat->set_index(index);
+      log_cat->set_name(name_node.Scalar());
+    }
+  }
+
+  if (nullptr == log_cat) {
+    FWLOGERROR("log {} malloc category failed, skipped.", name_node.Scalar());
+    return;
+  }
+
+  index = log_cat->index();
+  int old_sink_count = log_cat->sink_size();
+  yaml_loader_dump_to(src, *log_cat);
+
+  // Restore index
+  log_cat->set_index(index);
+
+  const YAML::Node sink_node = src["sink"];
+  if (!sink_node) {
+    return;
+  }
+
+  if (sink_node.IsMap() && log_cat->sink_size() > old_sink_count) {
+    setup_load_sink(sink_node, *log_cat->mutable_sink(old_sink_count));
+  } else if (sink_node.IsSequence()) {
+    for (int i = 0; i + old_sink_count < log_cat->sink_size(); ++i) {
+      if (static_cast<size_t>(i) >= sink_node.size()) {
+        break;
+      }
+
+      setup_load_sink(sink_node[i], *log_cat->mutable_sink(i + old_sink_count));
+    }
+  }
+}
+
+static void setup_load_category(
+    const util::config::ini_value &src,
+    ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::RepeatedPtrField<atapp::protocol::atapp_log_category> &out) {
+  auto cat_array_node = src.get_children().find("cat");
+  if (src.get_children().end() == cat_array_node) {
+    return;
+  }
+  if (!cat_array_node->second) {
+    return;
+  }
+
+  for (int32_t cat_default_index = 0;; ++cat_default_index) {
+    auto cat_node = cat_array_node->second->get_children().find(util::log::format("{}", cat_default_index));
+    if (cat_node == cat_array_node->second->get_children().end()) {
+      break;
+    }
+    if (!cat_node->second) {
+      break;
+    }
+    if (cat_node->second->empty()) {
+      break;
+    }
+
+    std::string log_name = (*cat_node->second)["name"].as_cpp_string();
+    if (log_name.empty()) {
+      continue;
+    }
+
+    int32_t cat_index = cat_default_index;
+    {
+      auto cat_index_node = cat_node->second->get_children().find("index");
+      if (cat_node->second->get_children().end() != cat_index_node) {
+        cat_index = cat_index_node->second->as_int32();
+      }
+    }
+
+    atapp::protocol::atapp_log_category *log_cat = nullptr;
+    for (int i = 0; i < out.size(); ++i) {
+      if (out.Get(i).name() == log_name || out.Get(i).index() == cat_index) {
+        log_cat = out.Mutable(i);
+        cat_index = i;
+      }
+    }
+
+    if (nullptr == log_cat) {
+      log_cat = out.Add();
+    }
+
+    if (nullptr == log_cat) {
+      FWLOGERROR("log {} malloc category failed, skipped.", log_name);
+      return;
+    }
+
+    ini_loader_dump_to(*cat_node->second, *log_cat);
+    // overwrite index
+    log_cat->set_index(cat_index);
+
+    auto cat_handles_node = src.get_children().find(log_name);
+    if (cat_handles_node == src.get_children().end()) {
+      // No handles
+      continue;
+    }
+    if (!cat_handles_node->second) {
+      continue;
+    }
+
+    // register log handles
+    for (int32_t log_handle_index = 0;; ++log_handle_index) {
+      auto cat_handle_node = cat_handles_node->second->get_children().find(util::log::format("{}", log_handle_index));
+      if (cat_handle_node == cat_handles_node->second->get_children().end()) {
+        break;
+      }
+      if (!cat_handle_node->second) {
+        break;
+      }
+
+      std::string sink_type = (*cat_handle_node->second)["type"].as_cpp_string();
+      if (sink_type.empty()) {
+        break;
+      }
+
+      ::atapp::protocol::atapp_log_sink *log_sink = log_cat->add_sink();
+      if (nullptr == log_sink) {
+        FWLOGERROR("log {} malloc sink {} (index: {}) failed, skipped.", log_name, sink_type, log_handle_index);
+        continue;
+      }
+
+      ini_loader_dump_to(*cat_handle_node->second, *log_sink);
+      setup_load_sink(*cat_handle_node->second, *log_sink);
+    }
+  }
+}
+
+LIBATAPP_MACRO_API void app::parse_log_configures_into(atapp::protocol::atapp_log &dst,
+                                                       std::vector<gsl::string_view> path) const noexcept {
+  dst.Clear();
+
+  using log_cat_array_t = ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::RepeatedPtrField<::atapp::protocol::atapp_log_category>;
+  log_cat_array_t categories;
+  // load log configure - ini/conf
+  do {
+    const util::config::ini_value *log_root_node = nullptr;
+    for (auto &key : path) {
+      if (nullptr == log_root_node) {
+        auto iter = cfg_loader_.get_root_node().get_children().find(static_cast<std::string>(key));
+        if (iter == cfg_loader_.get_root_node().get_children().end()) {
+          break;
+        }
+        log_root_node = iter->second.get();
+      } else {
+        auto iter = log_root_node->get_children().find(static_cast<std::string>(key));
+        if (iter == log_root_node->get_children().end()) {
+          break;
+        }
+        log_root_node = iter->second.get();
+      }
+      if (nullptr == log_root_node) {
+        break;
+      }
+    }
+
+    if (nullptr == log_root_node) {
+      break;
+    }
+
+    {
+      auto level_node = log_root_node->get_children().find("level");
+      if (level_node != log_root_node->get_children().end() && level_node->second) {
+        dst.set_level(level_node->second->as_cpp_string());
+      }
+    }
+
+    setup_load_category(*log_root_node, *dst.mutable_category());
+  } while (false);
+
+  // load log configure - yaml
+  for (yaml_conf_map_t::const_iterator iter = yaml_loader_.begin(); iter != yaml_loader_.end(); ++iter) {
+    for (size_t i = 0; i < iter->second.size(); ++i) {
+#if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
+      try {
+#endif
+        const YAML::Node log_node = yaml_loader_get_child_by_path(iter->second[i], path);
+        if (!log_node || !log_node.IsMap()) {
+          continue;
+        }
+        const YAML::Node log_level_node = log_node["level"];
+        if (log_level_node && log_level_node.IsScalar() && !log_level_node.Scalar().empty()) {
+          dst.set_level(log_level_node.Scalar());
+        }
+
+        const YAML::Node log_category_node = log_node["category"];
+        if (!log_category_node) {
+          continue;
+        }
+        if (log_category_node.IsMap()) {
+          setup_load_category(log_category_node, *dst.mutable_category());
+        } else if (log_category_node.IsSequence()) {
+          size_t sz = log_category_node.size();
+          for (size_t j = 0; j < sz; ++j) {
+            const YAML::Node cat_node = log_category_node[j];
+            if (!cat_node || !cat_node.IsMap()) {
+              continue;
+            }
+            setup_load_category(cat_node, *dst.mutable_category());
+          }
+        }
+#if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
+      } catch (...) {
+        // Ignore error
+      }
+#endif
+    }
+  }
+
+  std::sort(dst.mutable_category()->begin(), dst.mutable_category()->end(),
+            [](const ::atapp::protocol::atapp_log_category &l, const ::atapp::protocol::atapp_log_category &r) {
+              return l.index() < r.index();
+            });
 }
 
 LIBATAPP_MACRO_API const atapp::protocol::atapp_configure &app::get_origin_configure() const noexcept {
@@ -1844,6 +2142,76 @@ LIBATAPP_MACRO_API bool app::match_gateway(const atapp::protocol::atapp_gateway 
   return true;
 }
 
+LIBATAPP_MACRO_API void app::setup_logger(util::log::log_wrapper &logger, const std::string &min_level,
+                                          const atapp::protocol::atapp_log_category &log_conf) const noexcept {
+  int log_level_id = util::log::log_wrapper::level_t::LOG_LW_INFO;
+  log_level_id = util::log::log_formatter::get_level_by_name(min_level.c_str());
+
+  // init and set prefix
+  if (0 != logger.init(WLOG_LEVELID(log_level_id))) {
+    FWLOGERROR("Log initialize for {}({}) failed, skipped", log_conf.name(), log_conf.index());
+    return;
+  }
+
+  if (!log_conf.prefix().empty()) {
+    logger.set_prefix_format(log_conf.prefix());
+  }
+
+  // load stacktrace configure
+  if (!log_conf.stacktrace().min().empty() || !log_conf.stacktrace().max().empty()) {
+    util::log::log_formatter::level_t::type stacktrace_level_min = util::log::log_formatter::level_t::LOG_LW_DISABLED;
+    util::log::log_formatter::level_t::type stacktrace_level_max = util::log::log_formatter::level_t::LOG_LW_DISABLED;
+    if (!log_conf.stacktrace().min().empty()) {
+      stacktrace_level_min = util::log::log_formatter::get_level_by_name(log_conf.stacktrace().min().c_str());
+    }
+
+    if (!log_conf.stacktrace().max().empty()) {
+      stacktrace_level_max = util::log::log_formatter::get_level_by_name(log_conf.stacktrace().max().c_str());
+    }
+
+    logger.set_stacktrace_level(stacktrace_level_max, stacktrace_level_min);
+  }
+
+  // For now, only log level can be reload
+  size_t old_sink_number = logger.sink_size();
+  size_t new_sink_number = 0;
+
+  // register log handles
+  for (int j = 0; j < log_conf.sink_size(); ++j) {
+    const ::atapp::protocol::atapp_log_sink &log_sink = log_conf.sink(j);
+    int log_handle_min = util::log::log_wrapper::level_t::LOG_LW_FATAL,
+        log_handle_max = util::log::log_wrapper::level_t::LOG_LW_DEBUG;
+    if (!log_sink.level().min().empty()) {
+      log_handle_min = util::log::log_formatter::get_level_by_name(log_sink.level().min().c_str());
+    }
+    if (!log_sink.level().max().empty()) {
+      log_handle_max = util::log::log_formatter::get_level_by_name(log_sink.level().max().c_str());
+    }
+
+    // register log sink
+    if (new_sink_number >= old_sink_number) {
+      std::unordered_map<std::string, log_sink_maker::log_reg_t>::const_iterator iter = log_reg_.find(log_sink.type());
+      if (iter != log_reg_.end()) {
+        util::log::log_wrapper::log_handler_t log_handler = iter->second(logger, j, conf_.log, log_conf, log_sink);
+        logger.add_sink(log_handler, static_cast<util::log::log_wrapper::level_t::type>(log_handle_min),
+                        static_cast<util::log::log_wrapper::level_t::type>(log_handle_max));
+        ++new_sink_number;
+      } else {
+        FWLOGERROR("Unavailable log type {} for log {}({}), you can add log type register handle before init.",
+                   log_sink.type(), log_conf.name(), log_conf.index());
+      }
+    } else {
+      logger.set_sink(new_sink_number, static_cast<util::log::log_wrapper::level_t::type>(log_handle_min),
+                      static_cast<util::log::log_wrapper::level_t::type>(log_handle_max));
+      ++new_sink_number;
+    }
+  }
+
+  while (logger.sink_size() > new_sink_number) {
+    logger.pop_sink();
+  }
+}
+
 void app::ev_stop_timeout(uv_timer_t *handle) {
   assert(handle && handle->data);
 
@@ -2267,80 +2635,6 @@ int app::setup_signal() {
   return 0;
 }
 
-static void setup_load_sink(const YAML::Node &log_sink_yaml_src, atapp::protocol::atapp_log_sink &out) {
-  // yaml_loader_dump_to(src, out); // already dumped before in setup_load_category(...)
-
-  if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_file_sink_name().data())) {
-    // Inner file sink
-    yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_log_backend_file());
-  } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stdout_sink_name().data())) {
-    // Inner stdout sink
-    yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_log_backend_stdout());
-  } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stderr_sink_name().data())) {
-    // Inner stderr sink
-    yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_log_backend_stderr());
-  } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_syslog_sink_name().data())) {
-    // Inner syslog sink
-    yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_log_backend_syslog());
-  } else {
-    // Dump all configures into unresolved_key_values
-    yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_unresolved_key_values(), std::string());
-  }
-}
-
-static void setup_load_category(
-    const YAML::Node &src,
-    ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::RepeatedPtrField<atapp::protocol::atapp_log_category> &out) {
-  if (!src || !src.IsMap()) {
-    return;
-  }
-
-  const YAML::Node name_node = src["name"];
-  if (!name_node || !name_node.IsScalar()) {
-    return;
-  }
-
-  if (name_node.Scalar().empty()) {
-    return;
-  }
-
-  atapp::protocol::atapp_log_category *log_cat = nullptr;
-  for (int i = 0; i < out.size() && nullptr == log_cat; ++i) {
-    if (out.Get(i).name() == name_node.Scalar()) {
-      log_cat = out.Mutable(i);
-    }
-  }
-
-  if (nullptr == log_cat) {
-    log_cat = out.Add();
-  }
-
-  if (nullptr == log_cat) {
-    FWLOGERROR("log {} malloc category failed, skipped.", name_node.Scalar());
-    return;
-  }
-
-  int old_sink_count = log_cat->sink_size();
-  yaml_loader_dump_to(src, *log_cat);
-
-  const YAML::Node sink_node = src["sink"];
-  if (!sink_node) {
-    return;
-  }
-
-  if (sink_node.IsMap() && log_cat->sink_size() > old_sink_count) {
-    setup_load_sink(sink_node, *log_cat->mutable_sink(old_sink_count));
-  } else if (sink_node.IsSequence()) {
-    for (int i = 0; i + old_sink_count < log_cat->sink_size(); ++i) {
-      if (static_cast<size_t>(i) >= sink_node.size()) {
-        break;
-      }
-
-      setup_load_sink(sink_node[i], *log_cat->mutable_sink(i + old_sink_count));
-    }
-  }
-}
-
 void app::setup_startup_log() {
   util::log::log_wrapper &wrapper = *WLOG_GETCAT(util::log::log_wrapper::categorize_t::DEFAULT);
 
@@ -2409,203 +2703,24 @@ int app::setup_log() {
       if (mod && mod->is_enabled()) {
         int res = mod->setup_log();
         if (0 != res) {
-          ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "setup log for module " << mod->name()
-               << " failed, result: " << res << "." << std::endl;
+          FWLOGERROR("Setup log for module {} failed, result: {}", mod->name(), res);
           return res;
         }
       }
     }
   }
 
-  using log_cat_array_t = ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::RepeatedPtrField<::atapp::protocol::atapp_log_category>;
-  log_cat_array_t categories;
-  // load log configure - ini/conf
-  {
-    cfg_loader_.dump_to("atapp.log.level", *conf_.log.mutable_level());
-    uint32_t log_cat_number = LOG_WRAPPER_CATEGORIZE_SIZE;
-    cfg_loader_.dump_to("atapp.log.cat.number", log_cat_number);
-    if (log_cat_number > LOG_WRAPPER_CATEGORIZE_SIZE) {
-      ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "log categorize should not be greater than "
-           << LOG_WRAPPER_CATEGORIZE_SIZE
-           << ". you can define LOG_WRAPPER_CATEGORIZE_SIZE to a greater number and rebuild atapp." << std::endl;
-      log_cat_number = LOG_WRAPPER_CATEGORIZE_SIZE;
-    }
-
-    char log_path[256] = {0};
-
-    for (uint32_t i = 0; i < log_cat_number; ++i) {
-      UTIL_STRFUNC_SNPRINTF(log_path, sizeof(log_path), "atapp.log.cat.%u", i);
-
-      util::config::ini_value &log_cat_conf_src = cfg_loader_.get_node(log_path);
-      std::string log_name = log_cat_conf_src["name"].as_cpp_string();
-      if (log_name.empty()) {
-        continue;
-      }
-
-      ::atapp::protocol::atapp_log_category *log_cat_conf = categories.Add();
-      if (nullptr == log_cat_conf) {
-        ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "log malloc " << log_name << "(" << i
-             << ") failed, skipped." << std::endl;
-        continue;
-      }
-      ini_loader_dump_to(log_cat_conf_src, *log_cat_conf);
-
-      // register log handles
-      for (uint32_t j = 0;; ++j) {
-        UTIL_STRFUNC_SNPRINTF(log_path, sizeof(log_path), "atapp.log.%s.%u", log_name.c_str(), j);
-
-        util::config::ini_value &log_sink_conf_src = cfg_loader_.get_node(log_path);
-        std::string sink_type = log_sink_conf_src["type"].as_cpp_string();
-
-        if (sink_type.empty()) {
-          break;
-        }
-
-        ::atapp::protocol::atapp_log_sink *log_sink = log_cat_conf->add_sink();
-        if (nullptr == log_sink) {
-          ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "log " << log_name << "(" << i
-               << ") malloc sink " << sink_type << "failed, skipped." << std::endl;
-          continue;
-        }
-
-        ini_loader_dump_to(log_sink_conf_src, *log_sink);
-
-        if (0 == UTIL_STRFUNC_STRCASE_CMP(sink_type.c_str(), log_sink_maker::get_file_sink_name().data())) {
-          // Inner file sink
-          ini_loader_dump_to(log_sink_conf_src, *log_sink->mutable_log_backend_file());
-        } else if (0 == UTIL_STRFUNC_STRCASE_CMP(sink_type.c_str(), log_sink_maker::get_stdout_sink_name().data())) {
-          // Inner stdout sink
-          ini_loader_dump_to(log_sink_conf_src, *log_sink->mutable_log_backend_stdout());
-        } else if (0 == UTIL_STRFUNC_STRCASE_CMP(sink_type.c_str(), log_sink_maker::get_stderr_sink_name().data())) {
-          // Inner stderr sink
-          ini_loader_dump_to(log_sink_conf_src, *log_sink->mutable_log_backend_stderr());
-        } else if (0 == UTIL_STRFUNC_STRCASE_CMP(sink_type.c_str(), log_sink_maker::get_syslog_sink_name().data())) {
-          // Inner syslog sink
-          ini_loader_dump_to(log_sink_conf_src, *log_sink->mutable_log_backend_syslog());
-        } else {
-          // Dump all configures into unresolved_key_values
-          ini_loader_dump_to(log_sink_conf_src, *log_sink->mutable_unresolved_key_values(), std::string());
-        }
-      }
-    }
-  }
-  conf_.log.mutable_category()->Swap(&categories);
-
-  // load log configure - yaml
-  for (yaml_conf_map_t::const_iterator iter = yaml_loader_.begin(); iter != yaml_loader_.end(); ++iter) {
-    for (size_t i = 0; i < iter->second.size(); ++i) {
-#if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
-      try {
-#endif
-        const YAML::Node atapp_node = yaml_loader_get_child_by_path(iter->second[i], "atapp");
-        if (!atapp_node || !atapp_node.IsMap()) {
-          continue;
-        }
-        const YAML::Node log_node = atapp_node["log"];
-        if (!log_node || !log_node.IsMap()) {
-          continue;
-        }
-        const YAML::Node log_level_node = log_node["level"];
-        if (log_level_node && log_level_node.IsScalar() && !log_level_node.Scalar().empty()) {
-          conf_.log.set_level(log_level_node.Scalar());
-        }
-
-        const YAML::Node log_category_node = log_node["category"];
-        if (!log_category_node) {
-          continue;
-        }
-        if (log_category_node.IsMap()) {
-          setup_load_category(log_category_node, *conf_.log.mutable_category());
-        } else if (log_category_node.IsSequence()) {
-          size_t sz = log_category_node.size();
-          for (size_t j = 0; j < sz; ++j) {
-            const YAML::Node cat_node = log_category_node[j];
-            if (!cat_node || !cat_node.IsMap()) {
-              continue;
-            }
-            setup_load_category(cat_node, *conf_.log.mutable_category());
-          }
-        }
-
-#if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
-      } catch (...) {
-        // Ignore error
-      }
-#endif
-    }
-  }
-
-  // copy to atapp
-  int log_level_id = util::log::log_wrapper::level_t::LOG_LW_INFO;
-  log_level_id = util::log::log_formatter::get_level_by_name(conf_.log.level().c_str());
-
+  parse_log_configures_into(conf_.log, std::vector<gsl::string_view>{"atapp", "log"});
   for (int i = 0; i < conf_.log.category_size() && i < util::log::log_wrapper::categorize_t::MAX; ++i) {
-    // init and set prefix
-    if (0 != (WLOG_INIT(i, WLOG_LEVELID(log_level_id)))) {
-      ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "log initialize " << conf_.log.category(i).name()
-           << "(" << i << ") failed, skipped." << std::endl;
+    int32_t log_index = conf_.log.category(i).index();
+    auto logger = WLOG_GETCAT(log_index);
+    if (nullptr == logger) {
+      FWLOGERROR("Internal log index {} is invalid, please use {} to create custom logger",
+                 "util::log::log_wrapper::create_user_logger(...)");
       continue;
     }
 
-    const ::atapp::protocol::atapp_log_category &log_cat = conf_.log.category(i);
-    if (!log_cat.prefix().empty()) {
-      WLOG_GETCAT(i)->set_prefix_format(log_cat.prefix());
-    }
-
-    // load stacktrace configure
-    if (!log_cat.stacktrace().min().empty() || !log_cat.stacktrace().max().empty()) {
-      util::log::log_formatter::level_t::type stacktrace_level_min = util::log::log_formatter::level_t::LOG_LW_DISABLED;
-      util::log::log_formatter::level_t::type stacktrace_level_max = util::log::log_formatter::level_t::LOG_LW_DISABLED;
-      if (!log_cat.stacktrace().min().empty()) {
-        stacktrace_level_min = util::log::log_formatter::get_level_by_name(log_cat.stacktrace().min().c_str());
-      }
-
-      if (!log_cat.stacktrace().max().empty()) {
-        stacktrace_level_max = util::log::log_formatter::get_level_by_name(log_cat.stacktrace().max().c_str());
-      }
-
-      WLOG_GETCAT(i)->set_stacktrace_level(stacktrace_level_max, stacktrace_level_min);
-    }
-
-    // For now, only log level can be reload
-    size_t old_sink_number = WLOG_GETCAT(i)->sink_size();
-    size_t new_sink_number = 0;
-
-    // register log handles
-    for (int j = 0; j < log_cat.sink_size(); ++j) {
-      const ::atapp::protocol::atapp_log_sink &log_sink = log_cat.sink(j);
-      int log_handle_min = util::log::log_wrapper::level_t::LOG_LW_FATAL,
-          log_handle_max = util::log::log_wrapper::level_t::LOG_LW_DEBUG;
-      if (!log_sink.level().min().empty()) {
-        log_handle_min = util::log::log_formatter::get_level_by_name(log_sink.level().min().c_str());
-      }
-      if (!log_sink.level().max().empty()) {
-        log_handle_max = util::log::log_formatter::get_level_by_name(log_sink.level().max().c_str());
-      }
-
-      // register log sink
-      if (new_sink_number >= old_sink_number) {
-        std::map<std::string, log_sink_maker::log_reg_t>::iterator iter = log_reg_.find(log_sink.type());
-        if (iter != log_reg_.end()) {
-          util::log::log_wrapper::log_handler_t log_handler =
-              iter->second(*WLOG_GETCAT(i), j, conf_.log, log_cat, log_sink);
-          WLOG_GETCAT(i)->add_sink(log_handler, static_cast<util::log::log_wrapper::level_t::type>(log_handle_min),
-                                   static_cast<util::log::log_wrapper::level_t::type>(log_handle_max));
-          ++new_sink_number;
-        } else {
-          ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "unavailable log type " << log_sink.type()
-               << ", you can add log type register handle before init." << std::endl;
-        }
-      } else {
-        WLOG_GETCAT(i)->set_sink(new_sink_number, static_cast<util::log::log_wrapper::level_t::type>(log_handle_min),
-                                 static_cast<util::log::log_wrapper::level_t::type>(log_handle_max));
-        ++new_sink_number;
-      }
-    }
-
-    while (WLOG_GETCAT(i)->sink_size() > new_sink_number) {
-      WLOG_GETCAT(i)->pop_sink();
-    }
+    setup_logger(*logger, conf_.log.level(), conf_.log.category(i));
   }
 
   return 0;

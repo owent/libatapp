@@ -15,7 +15,7 @@
 
 #include "frame/test_macros.h"
 
-static void check_configure(atapp::app &app, atapp::protocol::atapp_etcd sub_cfg) {
+static void check_origin_configure(atapp::app &app, atapp::protocol::atapp_etcd sub_cfg) {
   CASE_EXPECT_EQ(app.get_id(), 0x1234);
   CASE_EXPECT_EQ(app.get_origin_configure().id_mask(), "8.8.8.8");
   CASE_EXPECT_EQ(app.convert_app_id_by_string("1.2.3.4"), 0x01020304);
@@ -56,6 +56,25 @@ static void check_configure(atapp::app &app, atapp::protocol::atapp_etcd sub_cfg
   CASE_EXPECT_EQ(16000000, sub_cfg.init().tick_interval().nanos());
 }
 
+static void check_log_configure(const atapp::protocol::atapp_log &app_log) {
+  CASE_EXPECT_EQ(std::string("debug"), app_log.level());
+  CASE_EXPECT_EQ(2, app_log.category_size());
+  if (app_log.category_size() < 2) {
+    return;
+  }
+
+  CASE_EXPECT_EQ(std::string("default"), app_log.category(0).name());
+  CASE_EXPECT_EQ(4, app_log.category(0).sink_size());
+  CASE_EXPECT_EQ(0, app_log.category(1).sink_size());
+  CASE_EXPECT_EQ(std::string("db"), app_log.category(1).name());
+
+  if (app_log.category(0).sink_size() < 4) {
+    return;
+  }
+  CASE_EXPECT_EQ(std::string("file"), app_log.category(0).sink(0).type());
+  CASE_EXPECT_EQ(std::string("stdout"), app_log.category(0).sink(3).type());
+}
+
 CASE_TEST(atapp_configure, load_yaml) {
   atapp::app app;
   std::string conf_path;
@@ -74,7 +93,11 @@ CASE_TEST(atapp_configure, load_yaml) {
 
   atapp::protocol::atapp_etcd sub_cfg;
   app.parse_configures_into(sub_cfg, "atapp.etcd");
-  check_configure(app, sub_cfg);
+  check_origin_configure(app, sub_cfg);
+
+  atapp::protocol::atapp_log app_log;
+  app.parse_log_configures_into(app_log, std::vector<gsl::string_view>{"atapp", "log"});
+  check_log_configure(app_log);
 
   WLOG_GETCAT(0)->clear_sinks();
   WLOG_GETCAT(1)->clear_sinks();
@@ -98,7 +121,11 @@ CASE_TEST(atapp_configure, load_conf) {
 
   atapp::protocol::atapp_etcd sub_cfg;
   app.parse_configures_into(sub_cfg, "atapp.etcd");
-  check_configure(app, sub_cfg);
+  check_origin_configure(app, sub_cfg);
+
+  atapp::protocol::atapp_log app_log;
+  app.parse_log_configures_into(app_log, std::vector<gsl::string_view>{"atapp", "log"});
+  check_log_configure(app_log);
 
   WLOG_GETCAT(0)->clear_sinks();
   WLOG_GETCAT(1)->clear_sinks();

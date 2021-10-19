@@ -50,65 +50,64 @@
 
 namespace atapp {
 namespace detail {
-static const char *skip_space(const char *str) {
-  while (str && *str) {
-    if (::util::string::is_space(*str)) {
-      ++str;
+static const char *skip_space(const char *begin, const char *end) {
+  while (begin && begin < end && *begin) {
+    if (::util::string::is_space(*begin)) {
+      ++begin;
       continue;
     }
     break;
   }
 
-  return str;
+  return begin;
 }
 
 template <typename TINT>
-static const char *pick_number(TINT &out, const char *str) {
+static const char *pick_number(TINT &out, const char *begin, const char *end) {
   out = 0;
-  if (nullptr == str || !(*str)) {
-    return str;
+  if (nullptr == begin || begin >= end || !(*begin)) {
+    return begin;
   }
 
   // negative
   bool is_negative = false;
-  while (*str && *str == '-') {
+  while (begin < end && *begin && *begin == '-') {
     is_negative = !is_negative;
-    ++str;
+    ++begin;
   }
 
-  if (!(*str)) {
-    return str;
+  if (begin >= end || !(*begin)) {
+    return begin;
   }
 
-  // dec only
-  if ('0' == str[0] && 'x' == util::string::tolower(str[1])) {  // hex
-    str += 2;
-    while (str && *str) {
-      char c = util::string::tolower(*str);
+  if (begin + 1 < end && '0' == begin[0] && 'x' == util::string::tolower(begin[1])) {  // hex
+    begin += 2;
+    while (begin < end && begin && *begin) {
+      char c = util::string::tolower(*begin);
       if (c >= '0' && c <= '9') {
         out <<= 4;
         out += c - '0';
-        ++str;
+        ++begin;
       } else if (c >= 'a' && c <= 'f') {
         out <<= 4;
         out += c - 'a' + 10;
-        ++str;
+        ++begin;
       } else {
         break;
       }
     }
-  } else if ('\\' == str[0]) {
-    ++str;
-    while (str && *str >= '0' && *str <= '7') {
+  } else if ('\\' == begin[0]) {
+    ++begin;
+    while (begin < end && begin && *begin >= '0' && *begin <= '7') {
       out <<= 3;
-      out += *str - '0';
-      ++str;
+      out += *begin - '0';
+      ++begin;
     }
   } else {
-    while (str && *str >= '0' && *str <= '9') {
+    while (begin < end && begin && *begin >= '0' && *begin <= '9') {
       out *= 10;
-      out += *str - '0';
-      ++str;
+      out += *begin - '0';
+      ++begin;
     }
   }
 
@@ -116,7 +115,7 @@ static const char *pick_number(TINT &out, const char *str) {
     out = (~out) + 1;
   }
 
-  return str;
+  return begin;
 }
 
 /*
@@ -126,17 +125,17 @@ r)? 0: r->number(); return lv < rv;
 }
 */
 
-static void pick_const_data(const std::string &value, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &dur) {
+static void pick_const_data(gsl::string_view value, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &dur) {
   dur.set_seconds(0);
   dur.set_nanos(0);
 
   int64_t tm_val = 0;
-  const char *word_begin = value.c_str();
-  word_begin = skip_space(word_begin);
-  word_begin = pick_number(tm_val, word_begin);
-  word_begin = skip_space(word_begin);
+  const char *word_begin = value.data();
+  const char *word_end = word_begin + value.size();
+  word_begin = skip_space(word_begin, word_end);
+  word_begin = pick_number(tm_val, word_begin, word_end);
+  word_begin = skip_space(word_begin, word_end);
 
-  const char *word_end = value.c_str() + value.size();
   std::string unit;
   if (word_begin && word_end && word_end > word_begin) {
     unit.assign(word_begin, word_end);
@@ -202,94 +201,95 @@ static void pick_const_data(const std::string &value, ATBUS_MACRO_PROTOBUF_NAMES
   }
 }
 
-static void pick_const_data(const std::string &value, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp &timepoint) {
+static void pick_const_data(gsl::string_view value, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp &timepoint) {
   timepoint.set_seconds(0);
   timepoint.set_nanos(0);
 
-  const char *word_begin = value.c_str();
-  word_begin = skip_space(word_begin);
+  const char *word_begin = value.data();
+  const char *word_end = word_begin + value.size();
+  word_begin = skip_space(word_begin, word_end);
 
   struct tm t;
   memset(&t, 0, sizeof(t));
 
   // year
   {
-    word_begin = pick_number(t.tm_year, word_begin);
-    word_begin = skip_space(word_begin);
-    if (*word_begin == '-') {
+    word_begin = pick_number(t.tm_year, word_begin, word_end);
+    word_begin = skip_space(word_begin, word_end);
+    if (word_begin < word_end && *word_begin == '-') {
       ++word_begin;
-      word_begin = skip_space(word_begin);
+      word_begin = skip_space(word_begin, word_end);
     }
     t.tm_year -= 1900;  // years since 1900
   }
   // month
   {
-    word_begin = pick_number(t.tm_mon, word_begin);
-    word_begin = skip_space(word_begin);
-    if (*word_begin == '-') {
+    word_begin = pick_number(t.tm_mon, word_begin, word_end);
+    word_begin = skip_space(word_begin, word_end);
+    if (word_begin < word_end && *word_begin == '-') {
       ++word_begin;
-      word_begin = skip_space(word_begin);
+      word_begin = skip_space(word_begin, word_end);
     }
 
     --t.tm_mon;  // [0, 11]
   }
   // day
   {
-    word_begin = pick_number(t.tm_mday, word_begin);
-    word_begin = skip_space(word_begin);
-    if (*word_begin == 'T') {  // skip T charactor, some format is YYYY-MM-DDThh:mm:ss
+    word_begin = pick_number(t.tm_mday, word_begin, word_end);
+    word_begin = skip_space(word_begin, word_end);
+    if (word_begin < word_end && *word_begin == 'T') {  // skip T charactor, some format is YYYY-MM-DDThh:mm:ss
       ++word_begin;
-      word_begin = skip_space(word_begin);
+      word_begin = skip_space(word_begin, word_end);
     }
   }
 
   // tm_hour
   {
-    word_begin = pick_number(t.tm_hour, word_begin);
-    word_begin = skip_space(word_begin);
-    if (*word_begin == ':') {  // skip T charactor, some format is YYYY-MM-DDThh:mm:ss
+    word_begin = pick_number(t.tm_hour, word_begin, word_end);
+    word_begin = skip_space(word_begin, word_end);
+    if (word_begin < word_end && *word_begin == ':') {  // skip T charactor, some format is YYYY-MM-DDThh:mm:ss
       ++word_begin;
-      word_begin = skip_space(word_begin);
+      word_begin = skip_space(word_begin, word_end);
     }
   }
 
   // tm_min
   {
-    word_begin = pick_number(t.tm_min, word_begin);
-    word_begin = skip_space(word_begin);
-    if (*word_begin == ':') {  // skip T charactor, some format is YYYY-MM-DDThh:mm:ss
+    word_begin = pick_number(t.tm_min, word_begin, word_end);
+    word_begin = skip_space(word_begin, word_end);
+    if (word_begin < word_end && *word_begin == ':') {  // skip T charactor, some format is YYYY-MM-DDThh:mm:ss
       ++word_begin;
-      word_begin = skip_space(word_begin);
+      word_begin = skip_space(word_begin, word_end);
     }
   }
 
   // tm_sec
   {
-    word_begin = pick_number(t.tm_sec, word_begin);
-    word_begin = skip_space(word_begin);
+    word_begin = pick_number(t.tm_sec, word_begin, word_end);
+    word_begin = skip_space(word_begin, word_end);
   }
 
   time_t res = mktime(&t);
 
-  if (*word_begin == 'Z') {  // UTC timezone
+  if (word_begin < word_end && *word_begin == 'Z') {  // UTC timezone
     res -= ::util::time::time_utility::get_sys_zone_offset();
-  } else if (*word_begin == '+') {
+  } else if (word_begin < word_end && *word_begin == '+') {
     res -= ::util::time::time_utility::get_sys_zone_offset();
     time_t offset = 0;
-    word_begin = pick_number(offset, word_begin + 1);
+    word_begin = pick_number(offset, word_begin + 1, word_end);
     res -= offset * 60;
-    if (*word_begin && ':' == *word_begin) {
-      pick_number(offset, word_begin + 1);
+    if (word_begin < word_end && *word_begin && ':' == *word_begin) {
+      pick_number(offset, word_begin + 1, word_end);
       res -= offset;
     }
     timepoint.set_seconds(timepoint.seconds() - offset);
-  } else if (*word_begin == '-') {
+  } else if (word_begin < word_end && *word_begin == '-') {
     res -= ::util::time::time_utility::get_sys_zone_offset();
     time_t offset = 0;
-    word_begin = pick_number(offset, word_begin + 1);
+    word_begin = pick_number(offset, word_begin + 1, word_end);
     res += offset * 60;
-    if (*word_begin && ':' == *word_begin) {
-      pick_number(offset, word_begin + 1);
+    if (word_begin < word_end && *word_begin && ':' == *word_begin) {
+      pick_number(offset, word_begin + 1, word_end);
       res += offset;
     }
   }
@@ -327,25 +327,37 @@ static inline void dump_pick_field_max(Ty &out) {
   out = std::numeric_limits<Ty>::max();
 }
 
-static inline void dump_pick_field_from_str(float &out, const std::string &input, bool) {
+static inline void dump_pick_field_from_str(float &out, gsl::string_view input, bool) {
   if (input.empty()) {
     out = 0.0f;
     return;
   }
+  char input_string[32] = {0};
+  if (input.size() < sizeof(input_string) - 1) {
+    memcpy(input_string, input.data(), input.size());
+  } else {
+    memcpy(input_string, input.data(), sizeof(input_string) - 1);
+  }
   char *end;
-  out = static_cast<float>(strtod(input.c_str(), &end));
+  out = static_cast<float>(strtod(input_string, &end));
 }
 
-static inline void dump_pick_field_from_str(double &out, const std::string &input, bool) {
+static inline void dump_pick_field_from_str(double &out, gsl::string_view input, bool) {
   if (input.empty()) {
     out = 0.0;
     return;
   }
+  char input_string[32] = {0};
+  if (input.size() < sizeof(input_string) - 1) {
+    memcpy(input_string, input.data(), input.size());
+  } else {
+    memcpy(input_string, input.data(), sizeof(input_string) - 1);
+  }
   char *end;
-  out = strtod(input.c_str(), &end);
+  out = strtod(input_string, &end);
 }
 
-static inline void dump_pick_field_from_str(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &out, const std::string &input,
+static inline void dump_pick_field_from_str(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &out, gsl::string_view input,
                                             bool) {
   if (input.empty()) {
     out.set_seconds(0);
@@ -354,7 +366,7 @@ static inline void dump_pick_field_from_str(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::D
   }
   pick_const_data(input, out);
 }
-static inline void dump_pick_field_from_str(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp &out, const std::string &input,
+static inline void dump_pick_field_from_str(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp &out, gsl::string_view input,
                                             bool) {
   if (input.empty()) {
     out.set_seconds(0);
@@ -431,12 +443,12 @@ struct scale_size_mode_t {
 };
 
 template <class Ty>
-static inline void dump_pick_field_from_str(Ty &out, const std::string &input, bool size_mode) {
+static inline void dump_pick_field_from_str(Ty &out, gsl::string_view input, bool size_mode) {
   if (input.empty()) {
     out = 0;
     return;
   }
-  const char *left = util::string::str2int(out, input.c_str());
+  const char *left = util::string::str2int(out, input);
 
   if (size_mode) {
     while (left && *left && util::string::is_space(*left)) {
@@ -473,7 +485,7 @@ static inline bool dump_pick_field_less(const Ty &l, const Ty &r) {
 }
 
 template <class TRET>
-static TRET dump_pick_field_with_extensions(const std::string &val_str,
+static TRET dump_pick_field_with_extensions(gsl::string_view val_str,
                                             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds) {
   TRET value, min_value, max_value;
   dump_pick_field_min(min_value);
@@ -523,17 +535,35 @@ static inline TRET dump_pick_field_with_extensions(const util::config::ini_value
   return dump_pick_field_with_extensions<TRET>(val.as_cpp_string(index), fds);
 }
 
-static inline bool dump_pick_logic_bool(std::string &trans) {
-  std::transform(trans.begin(), trans.end(), trans.begin(), util::string::tolower<char>);
+static inline bool dump_pick_logic_bool(gsl::string_view trans) {
+  if (trans.empty()) {
+    return false;
+  }
 
-  if ("0" == trans || "false" == trans || "no" == trans || "disable" == trans || "disabled" == trans || "" == trans) {
+  if (0 == UTIL_STRFUNC_STRNCASE_CMP("0", trans.data(), trans.size())) {
+    return false;
+  }
+
+  if (0 == UTIL_STRFUNC_STRNCASE_CMP("false", trans.data(), trans.size())) {
+    return false;
+  }
+
+  if (0 == UTIL_STRFUNC_STRNCASE_CMP("no", trans.data(), trans.size())) {
+    return false;
+  }
+
+  if (0 == UTIL_STRFUNC_STRNCASE_CMP("disable", trans.data(), trans.size())) {
+    return false;
+  }
+
+  if (0 == UTIL_STRFUNC_STRNCASE_CMP("disabled", trans.data(), trans.size())) {
     return false;
   }
 
   return true;
 }
 
-static void dump_pick_map_key_field(const std::string &val_str, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
+static void dump_pick_map_key_field(gsl::string_view val_str, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                                     const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds) {
   if (nullptr == fds) {
     return;
@@ -565,12 +595,11 @@ static void dump_pick_map_key_field(const std::string &val_str, ATBUS_MACRO_PROT
       break;
     };
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_STRING: {
-      dst.GetReflection()->SetString(&dst, fds, val_str);
+      dst.GetReflection()->SetString(&dst, fds, static_cast<std::string>(val_str));
       break;
     };
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_BOOL: {
-      std::string trans = val_str;
-      bool jval = dump_pick_logic_bool(trans);
+      bool jval = dump_pick_logic_bool(val_str);
 
       dst.GetReflection()->SetBool(&dst, fds, jval);
       break;
@@ -1157,11 +1186,11 @@ static void dump_message_item(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESP
 }
 }  // namespace detail
 
-LIBATAPP_MACRO_API void parse_timepoint(const std::string &in, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp &out) {
+LIBATAPP_MACRO_API void parse_timepoint(gsl::string_view in, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp &out) {
   detail::pick_const_data(in, out);
 }
 
-LIBATAPP_MACRO_API void parse_duration(const std::string &in, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &out) {
+LIBATAPP_MACRO_API void parse_duration(gsl::string_view in, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &out) {
   detail::pick_const_data(in, out);
 }
 
@@ -1179,10 +1208,10 @@ LIBATAPP_MACRO_API void ini_loader_dump_to(const util::config::ini_value &src,
 
 LIBATAPP_MACRO_API void ini_loader_dump_to(const util::config::ini_value &src,
                                            ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Map<std::string, std::string> &dst,
-                                           std::string prefix) {
+                                           gsl::string_view prefix) {
   if (src.size() > 0) {
     if (1 == src.size()) {
-      dst[prefix] = src.as_cpp_string();
+      dst[static_cast<std::string>(prefix)] = src.as_cpp_string();
     } else {
       for (size_t i = 0; i < src.size(); ++i) {
         std::string sub_prefix =
@@ -1217,7 +1246,7 @@ LIBATAPP_MACRO_API void yaml_loader_dump_to(const YAML::Node &src, ATBUS_MACRO_P
 
 LIBATAPP_MACRO_API void yaml_loader_dump_to(const YAML::Node &src,
                                             ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Map<std::string, std::string> &dst,
-                                            std::string prefix) {
+                                            gsl::string_view prefix) {
 #if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
   try {
 #endif
@@ -1226,7 +1255,7 @@ LIBATAPP_MACRO_API void yaml_loader_dump_to(const YAML::Node &src,
     }
 
     if (src.IsScalar()) {
-      dst[prefix] = src.Scalar();
+      dst[static_cast<std::string>(prefix)] = src.Scalar();
     } else if (src.IsMap()) {
       for (YAML::Node::const_iterator iter = src.begin(); iter != src.end(); ++iter) {
         if (!iter->first || !iter->first.IsScalar()) {
@@ -1256,8 +1285,8 @@ LIBATAPP_MACRO_API void yaml_loader_dump_to(const YAML::Node &src,
 #endif
 }
 
-LIBATAPP_MACRO_API const YAML::Node yaml_loader_get_child_by_path(const YAML::Node &src, const std::string &path) {
-  if (path.empty()) {
+LIBATAPP_MACRO_API const YAML::Node yaml_loader_get_child_by_path(const YAML::Node &src, gsl::string_view path) {
+  if (!src || path.empty()) {
     return src;
   }
 
@@ -1265,72 +1294,90 @@ LIBATAPP_MACRO_API const YAML::Node yaml_loader_get_child_by_path(const YAML::No
     return src;
   }
 
+  std::vector<std::string> keys_storage;
+  std::vector<gsl::string_view> keys_span;
+
+  const char *begin = path.data();
+  const char *end = begin + path.size();
+
+  for (begin = detail::skip_space(begin, end); end > begin && *begin; begin = detail::skip_space(begin, end)) {
+    const char *old_begin = begin;
+    ++begin;
+    while (*begin && end > begin && '.' != *begin && ' ' != *begin && '\t' != *begin && '\r' != *begin &&
+           '\n' != *begin) {
+      ++begin;
+    }
+
+    std::string key;
+    key.assign(old_begin, begin);
+
+    if (*begin) {
+      begin = detail::skip_space(begin, end);
+      if ('.' == *begin) {
+        begin = detail::skip_space(begin + 1, end);
+      }
+    }
+
+    if (key.empty()) {
+      continue;
+    }
+
+    keys_storage.emplace_back(std::move(key));
+  }
+
+  keys_span.reserve(keys_storage.size());
+  for (auto &key : keys_storage) {
+    keys_span.push_back(key);
+  }
+
+  return yaml_loader_get_child_by_path(src, keys_span);
+}
+
+LIBATAPP_MACRO_API const YAML::Node yaml_loader_get_child_by_path(const YAML::Node &src,
+                                                                  const std::vector<gsl::string_view> &path,
+                                                                  size_t start_path_index) {
+  if (!src || start_path_index >= path.size()) {
+    return src;
+  }
+
+  YAML::Node ret = src;
 #if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
   try {
 #endif
-
-    YAML::Node ret = src;
-    const char *begin = path.c_str();
-    const char *end = begin + path.size();
-
-    for (begin = detail::skip_space(begin); end > begin && *begin; begin = detail::skip_space(begin)) {
-      const char *old_begin = begin;
-      ++begin;
-      while (*begin && end > begin && '.' != *begin && ' ' != *begin && '\t' != *begin && '\r' != *begin &&
-             '\n' != *begin) {
-        ++begin;
-      }
-
-      std::string key;
-      key.assign(old_begin, begin);
-
-      if (*begin) {
-        begin = detail::skip_space(begin);
-        if ('.' == *begin) {
-          begin = detail::skip_space(begin + 1);
-        }
-      }
-
+    for (; start_path_index < path.size(); ++start_path_index) {
+      std::string key = static_cast<std::string>(path[start_path_index]);
       if (key.empty()) {
         continue;
       }
 
-      if (key[0] >= '0' && key[0] <= '9') {
+      if (ret.IsSequence() && key[0] >= '0' && key[0] <= '9') {
         size_t idx = util::string::to_int<size_t>(key.c_str());
-        if (ret.IsSequence() && ret.size() > idx) {
+        if (ret.size() > idx) {
           YAML::Node child = ret[idx];
           if (child) {
             ret.reset(child);
           } else {
-            ret.reset(YAML::Node(YAML::NodeType::Undefined));
+            break;
           }
-        } else {
-          ret.reset(YAML::Node(YAML::NodeType::Undefined));
         }
       } else if (ret.IsMap()) {
         YAML::Node child = ret[key];
         if (child) {
           ret.reset(child);
         } else {
-          ret.reset(YAML::Node(YAML::NodeType::Undefined));
+          break;
         }
       } else {
-        ret = YAML::Node(YAML::NodeType::Undefined);
-      }
-
-      if (!ret) {
-        return ret;
+        break;
       }
     }
-
-    return ret;
 #if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
   } catch (...) {
     // Ignore error
   }
 #endif
 
-  return YAML::Node(YAML::NodeType::Undefined);
+  return ret;
 }
 
 static bool protobuf_equal_inner_message(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &l,
