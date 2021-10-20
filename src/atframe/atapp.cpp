@@ -2715,7 +2715,7 @@ int app::setup_log() {
     int32_t log_index = conf_.log.category(i).index();
     auto logger = WLOG_GETCAT(log_index);
     if (nullptr == logger) {
-      FWLOGERROR("Internal log index {} is invalid, please use {} to create custom logger",
+      FWLOGERROR("Internal log index {} is invalid, please use {} to create custom logger", log_index,
                  "util::log::log_wrapper::create_user_logger(...)");
       continue;
     }
