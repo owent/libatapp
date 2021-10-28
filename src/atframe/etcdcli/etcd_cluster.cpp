@@ -62,8 +62,8 @@ namespace atapp {
  *   Authorization Header => curl -H "Authorization: TOKEN"
  *   Authorization => curl http://localhost:2379/v3/auth/authenticate -XPOST -d '{"name": "username", "password":
  * "pass"}' # Response {"header":{...}, "token": "TOKEN"} # Return 401 if auth token invalid # Return 400 with {"error":
- * "etcdserver: user name is empty", "code": 3} if need TOKEN # Return 400 with {"error": "etcdserver: authentication
- * failed, ...", "code": 3} if username of password invalid Authorization Enable: curl -L
+ * "etcdserver: user name is empty", "code": 3} if need TOKEN # Return 400 with {"error": "etcdsrm -rf erver:
+ * authentication failed, ...", "code": 3} if username of password invalid Authorization Enable: curl -L
  * http://127.0.0.1:2379/v3/auth/user/add -XPOST -d '{"name": "root", "password": "3d91123233ffd36825bf2aca17808bfe"}'
  *       curl -L http://127.0.0.1:2379/v3/auth/role/add -XPOST -d '{"name": "root"}'
  *       curl -L http://127.0.0.1:2379/v3/auth/user/grant -XPOST -d '{"user": "root", "role": "root"}'
