@@ -132,6 +132,23 @@ LIBATAPP_MACRO_API void etcd_discovery_node::copy_from(const atapp::protocol::at
   name_hash_ = consistent_hash_calc(input.name().c_str(), input.name().size(), LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
 }
 
+LIBATAPP_MACRO_API void etcd_discovery_node::copy_to(atapp::protocol::atapp_discovery &output) const {
+  output.CopyFrom(node_info_);
+}
+
+LIBATAPP_MACRO_API void etcd_discovery_node::copy_key_to(atapp::protocol::atapp_discovery &output) const {
+  output.set_id(node_info_.id());
+  output.set_name(node_info_.name());
+  output.set_identity(node_info_.identity());
+  output.set_hash_code(node_info_.hash_code());
+
+  output.set_type_name(node_info_.type_name());
+  output.set_type_id(node_info_.type_id());
+
+  output.set_pid(node_info_.pid());
+  output.set_hostname(node_info_.hostname());
+}
+
 LIBATAPP_MACRO_API void etcd_discovery_node::set_on_destroy(on_destroy_fn_t fn) { on_destroy_fn_ = fn; }
 
 LIBATAPP_MACRO_API const etcd_discovery_node::on_destroy_fn_t &etcd_discovery_node::get_on_destroy() const {

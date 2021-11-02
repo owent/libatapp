@@ -1710,9 +1710,7 @@ LIBATAPP_MACRO_API util::network::http_request::ptr_t etcd_cluster::create_reque
       create_request.AddMember("prev_kv", prev_kv, doc.GetAllocator());
     }
 
-    if (progress_notify) {
-      create_request.AddMember("progress_notify", progress_notify, doc.GetAllocator());
-    }
+    create_request.AddMember("progress_notify", progress_notify, doc.GetAllocator());
 
     if (0 != start_revision) {
       create_request.AddMember("start_revision", start_revision, doc.GetAllocator());
