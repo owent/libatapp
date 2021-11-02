@@ -9,9 +9,9 @@
 
 #include <rapidjson/document.h>
 
-#include <atframe/atapp_conf.h>
-
 #include <config/compiler/template_suffix.h>
+
+#include <atframe/atapp_conf.h>
 
 #include <network/http_request.h>
 #include <random/random_generator.h>
@@ -181,6 +181,11 @@ class etcd_module : public ::atapp::module_impl {
 
   bool update_inner_watcher_event(node_info_t &node);
   void reset_inner_watchers_and_keepalives();
+
+  struct watcher_internal_access_t {
+    static void cleanup_old_nodes(etcd_module &mod, etcd_discovery_set::node_by_name_t &old_names,
+                                  etcd_discovery_set::node_by_id_t &old_ids);
+  };
 
  private:
   std::string conf_path_cache_;

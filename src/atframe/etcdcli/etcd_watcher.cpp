@@ -106,7 +106,8 @@ void etcd_watcher::process() {
   rpc_.rpc_opr_ = owner_->create_request_watch(path_, range_end_, rpc_.last_revision + 1, rpc_.enable_prev_kv,
                                                rpc_.enable_progress_notify);
   if (!rpc_.rpc_opr_) {
-    FWLOGERROR("Etcd watcher {} create watch request to {} failed", reinterpret_cast<const void *>(this), path_);
+    FWLOGERROR("Etcd watcher {} create watch request to {} from revision {} failed",
+               reinterpret_cast<const void *>(this), path_, rpc_.last_revision + 1);
     rpc_.watcher_next_request_time = util::time::time_utility::sys_now() + rpc_.retry_interval;
     return;
   }
@@ -124,12 +125,12 @@ void etcd_watcher::process() {
   if (res != 0) {
     rpc_.rpc_opr_->set_on_complete(nullptr);
     rpc_.rpc_opr_->set_on_write(nullptr);
-    FWLOGERROR("Etcd watcher {} start request to {} failed, res: {}", reinterpret_cast<const void *>(this),
-               rpc_.rpc_opr_->get_url(), res);
+    FWLOGERROR("Etcd watcher {} start watch request to {} from revision {} failed, res: {}",
+               reinterpret_cast<const void *>(this), rpc_.rpc_opr_->get_url(), rpc_.last_revision + 1, res);
     rpc_.rpc_opr_.reset();
   } else {
-    FWLOGDEBUG("Etcd watcher {} start request to {} success.", reinterpret_cast<const void *>(this),
-               rpc_.rpc_opr_->get_url());
+    FWLOGINFO("Etcd watcher {} start watch request to {} from revision {} success.",
+              reinterpret_cast<const void *>(this), rpc_.rpc_opr_->get_url(), rpc_.last_revision + 1);
   }
 
   return;
@@ -208,6 +209,7 @@ int etcd_watcher::libcurl_callback_on_range_completed(util::network::http_reques
   response.watch_id = 0;
   response.created = false;
   response.canceled = false;
+  response.snapshot = true;
   response.compact_revision = 0;
   {
     rapidjson::Document::ConstMemberIterator res = doc.FindMember("kvs");
@@ -270,7 +272,9 @@ int etcd_watcher::libcurl_callback_on_watch_completed(util::network::http_reques
   if (0 != req.get_error_code() || util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
                                        util::network::http_request::get_status_code_group(req.get_response_code())) {
     // timeout是正常的保活流程
-    if (CURLE_OPERATION_TIMEDOUT != req.get_error_code()) {
+    if (CURLE_OPERATION_TIMEDOUT != req.get_error_code() &&
+        util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
+            util::network::http_request::get_status_code_group(req.get_response_code())) {
       FWLOGERROR("Etcd watcher {} watch request failed, error code: {}, http code: {}\n{}",
                  reinterpret_cast<const void *>(self), req.get_error_code(), req.get_response_code(),
                  req.get_error_msg());
@@ -278,8 +282,8 @@ int etcd_watcher::libcurl_callback_on_watch_completed(util::network::http_reques
       self->rpc_.watcher_next_request_time = util::time::time_utility::sys_now() + self->rpc_.retry_interval;
 
     } else {
-      FWLOGDEBUG("Etcd watcher {} watch request finished, start another request later, msg: {}.",
-                 reinterpret_cast<const void *>(self), req.get_error_msg());
+      FWLOGINFO("Etcd watcher {} watch request finished, start another request later, msg: {}.",
+                reinterpret_cast<const void *>(self), req.get_error_msg());
       self->rpc_.watcher_next_request_time = util::time::time_utility::sys_now();
     }
 
@@ -376,6 +380,7 @@ int etcd_watcher::libcurl_callback_on_watch_write(util::network::http_request &r
     }
 
     // unpack header
+    int64_t previous_revision = self->rpc_.last_revision;
     etcd_response_header header;
     {
       rapidjson::Document::ConstMemberIterator res = result->FindMember("header");
@@ -391,6 +396,7 @@ int etcd_watcher::libcurl_callback_on_watch_write(util::network::http_request &r
     }
 
     response_t response;
+    response.snapshot = false;
     // decode basic info
     etcd_packer::unpack_int(*result, "watch_id", response.watch_id);
     etcd_packer::unpack_int(*result, "compact_revision", response.compact_revision);
@@ -444,9 +450,8 @@ int etcd_watcher::libcurl_callback_on_watch_write(util::network::http_request &r
                                             util::log::log_wrapper::level_t::LOG_LW_DEBUG)) {
       FWLOGDEBUG(
           "Etcd watcher {} got response: watch_id: {}, compact_revision: {}, created: {}, canceled: {}, event: {}",
-          reinterpret_cast<const void *>(self), static_cast<long long>(response.watch_id),
-          static_cast<long long>(response.compact_revision), response.created ? "Yes" : "No",
-          response.canceled ? "Yes" : "No", static_cast<unsigned long long>(response.events.size()));
+          reinterpret_cast<const void *>(self), response.watch_id, response.compact_revision,
+          response.created ? "Yes" : "No", response.canceled ? "Yes" : "No", response.events.size());
       for (size_t i = 0; i < response.events.size(); ++i) {
         etcd_key_value *kv = &response.events[i].kv;
         const char *name;
@@ -466,6 +471,19 @@ int etcd_watcher::libcurl_callback_on_watch_write(util::network::http_request &r
 
     // stopped if canceled and wait to start another watcher later
     if (response.canceled) {
+      std::string cancel_reason;
+      etcd_packer::unpack_string(*result, "cancel_reason", cancel_reason);
+      FWLOGINFO(
+          "Etcd watcher {} got cancel response: watch_id: {}, previous_revision: {}, compact_revision: {}, "
+          "cancel_reason: {}",
+          reinterpret_cast<const void *>(self), response.watch_id, previous_revision, response.compact_revision,
+          cancel_reason);
+
+      // Watch revision compacted, must get data by range again
+      if (previous_revision < response.compact_revision) {
+        self->rpc_.last_revision = 0;
+      }
+
       req.stop();
     }
   }

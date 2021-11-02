@@ -32,6 +32,7 @@ class etcd_watcher {
     int64_t watch_id;
     bool created;
     bool canceled;
+    bool snapshot;
     int64_t compact_revision;
     std::vector<event_t> events;
   };

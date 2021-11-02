@@ -1,13 +1,12 @@
 // Copyright 2021 atframework
 // Created by owent
 
-#include <sstream>
-#include <vector>
+#include "atframe/modules/etcd_module.h"
 
 #include <config/compiler/protobuf_prefix.h>
 
-#include "rapidjson/stringbuffer.h"
-#include "rapidjson/writer.h"
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/writer.h>
 
 #include <config/compiler/protobuf_suffix.h>
 
@@ -21,7 +20,10 @@
 #include <atframe/etcdcli/etcd_keepalive.h>
 #include <atframe/etcdcli/etcd_watcher.h>
 
-#include "atframe/modules/etcd_module.h"
+#include <sstream>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 #define ETCD_MODULE_STARTUP_RETRY_TIMES 5
 #define ETCD_MODULE_BY_ID_DIR "by_id"
@@ -1045,6 +1047,51 @@ int etcd_module::http_callback_on_etcd_closed(util::network::http_request &req) 
   return 0;
 }
 
+static void _collect_old_nodes(etcd_module &mod, etcd_discovery_set::node_by_name_t &old_names,
+                               etcd_discovery_set::node_by_id_t &old_ids) {
+  old_ids.reserve(mod.get_global_discovery().get_sorted_nodes().size());
+  old_names.reserve(mod.get_global_discovery().get_sorted_nodes().size());
+  for (auto &node : mod.get_global_discovery().get_sorted_nodes()) {
+    if (!node) {
+      continue;
+    }
+    if (0 != node->get_discovery_info().id()) {
+      old_ids[node->get_discovery_info().id()] = node;
+    } else if (!node->get_discovery_info().name().empty()) {
+      old_names[node->get_discovery_info().name()] = node;
+    }
+  }
+}
+
+static void _remove_old_node_index(const atapp::protocol::atapp_discovery &node_discovery,
+                                   etcd_discovery_set::node_by_name_t &old_names,
+                                   etcd_discovery_set::node_by_id_t &old_ids) {
+  if (0 != node_discovery.id()) {
+    old_ids.erase(node_discovery.id());
+  }
+  if (!node_discovery.name().empty()) {
+    old_names.erase(node_discovery.name());
+  }
+}
+
+void etcd_module::watcher_internal_access_t::cleanup_old_nodes(etcd_module &mod,
+                                                               etcd_discovery_set::node_by_name_t &old_names,
+                                                               etcd_discovery_set::node_by_id_t &old_ids) {
+  for (auto &node : old_names) {
+    etcd_module::node_info_t evt_node;
+    evt_node.action = etcd_module::node_action_t::EN_NAT_DELETE;
+    node.second->copy_key_to(evt_node.node_discovery);
+    mod.update_inner_watcher_event(evt_node);
+  }
+
+  for (auto &node : old_ids) {
+    etcd_module::node_info_t evt_node;
+    evt_node.action = etcd_module::node_action_t::EN_NAT_DELETE;
+    node.second->copy_key_to(evt_node.node_discovery);
+    mod.update_inner_watcher_event(evt_node);
+  }
+}
+
 etcd_module::watcher_callback_list_wrapper_t::watcher_callback_list_wrapper_t(etcd_module &m,
                                                                               std::list<watcher_list_callback_t> &cbks)
     : mod(&m), callbacks(&cbks) {}
@@ -1053,6 +1100,13 @@ void etcd_module::watcher_callback_list_wrapper_t::operator()(const ::atapp::etc
   if (nullptr == mod) {
     return;
   }
+
+  etcd_discovery_set::node_by_name_t old_names;
+  etcd_discovery_set::node_by_id_t old_ids;
+  if (body.snapshot) {
+    _collect_old_nodes(*mod, old_names, old_ids);
+  }
+
   // decode data
   for (size_t i = 0; i < body.events.size(); ++i) {
     const ::atapp::etcd_watcher::event_t &evt_data = body.events[i];
@@ -1064,6 +1118,10 @@ void etcd_module::watcher_callback_list_wrapper_t::operator()(const ::atapp::etc
     }
     if (node.node_discovery.id() == 0 && node.node_discovery.name().empty()) {
       continue;
+    }
+
+    if (body.snapshot) {
+      _remove_old_node_index(node.node_discovery, old_names, old_ids);
     }
 
     if (evt_data.evt_type == ::atapp::etcd_watch_event::EN_WEVT_DELETE) {
@@ -1089,6 +1147,9 @@ void etcd_module::watcher_callback_list_wrapper_t::operator()(const ::atapp::etc
       }
     }
   }
+
+  // cleanup old nodes when receive snapshot response
+  etcd_module::watcher_internal_access_t::cleanup_old_nodes(*mod, old_names, old_ids);
 }
 
 etcd_module::watcher_callback_one_wrapper_t::watcher_callback_one_wrapper_t(etcd_module &m, watcher_one_callback_t cbk)
@@ -1097,6 +1158,12 @@ void etcd_module::watcher_callback_one_wrapper_t::operator()(const ::atapp::etcd
                                                              const ::atapp::etcd_watcher::response_t &body) {
   if (nullptr == mod) {
     return;
+  }
+
+  etcd_discovery_set::node_by_name_t old_names;
+  etcd_discovery_set::node_by_id_t old_ids;
+  if (body.snapshot) {
+    _collect_old_nodes(*mod, old_names, old_ids);
   }
 
   // decode data
@@ -1113,6 +1180,10 @@ void etcd_module::watcher_callback_one_wrapper_t::operator()(const ::atapp::etcd
       continue;
     }
 
+    if (body.snapshot) {
+      _remove_old_node_index(node.node_discovery, old_names, old_ids);
+    }
+
     if (evt_data.evt_type == ::atapp::etcd_watch_event::EN_WEVT_DELETE) {
       node.action = node_action_t::EN_NAT_DELETE;
     } else {
@@ -1127,6 +1198,9 @@ void etcd_module::watcher_callback_one_wrapper_t::operator()(const ::atapp::etcd
     watcher_sender_one_t sender(*mod, header, body, evt_data, node);
     callback(std::ref(sender));
   }
+
+  // cleanup old nodes when receive snapshot response
+  etcd_module::watcher_internal_access_t::cleanup_old_nodes(*mod, old_names, old_ids);
 }
 
 bool etcd_module::update_inner_watcher_event(node_info_t &node) {

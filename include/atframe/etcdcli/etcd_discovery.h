@@ -38,6 +38,8 @@ class etcd_discovery_node {
 
   UTIL_FORCEINLINE const atapp::protocol::atapp_discovery &get_discovery_info() const { return node_info_; }
   LIBATAPP_MACRO_API void copy_from(const atapp::protocol::atapp_discovery &input);
+  LIBATAPP_MACRO_API void copy_to(atapp::protocol::atapp_discovery &output) const;
+  LIBATAPP_MACRO_API void copy_key_to(atapp::protocol::atapp_discovery &output) const;
 
   UTIL_FORCEINLINE const std::pair<uint64_t, uint64_t> &get_name_hash() const { return name_hash_; }
 
