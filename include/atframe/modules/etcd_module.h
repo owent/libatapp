@@ -9,9 +9,9 @@
 
 #include <rapidjson/document.h>
 
-#include <atframe/atapp_conf.h>
-
 #include <config/compiler/template_suffix.h>
+
+#include <atframe/atapp_conf.h>
 
 #include <network/http_request.h>
 #include <random/random_generator.h>
