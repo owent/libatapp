@@ -166,16 +166,18 @@ class etcd_module : public ::atapp::module_impl {
   struct watcher_callback_list_wrapper_t {
     etcd_module *mod;
     std::list<watcher_list_callback_t> *callbacks;
+    int64_t snapshot_index;
 
-    watcher_callback_list_wrapper_t(etcd_module &m, std::list<watcher_list_callback_t> &cbks);
+    watcher_callback_list_wrapper_t(etcd_module &m, std::list<watcher_list_callback_t> &cbks, int64_t index);
     void operator()(const ::atapp::etcd_response_header &header, const ::atapp::etcd_watcher::response_t &evt_data);
   };
 
   struct watcher_callback_one_wrapper_t {
     etcd_module *mod;
     watcher_one_callback_t callback;
+    int64_t snapshot_index;
 
-    watcher_callback_one_wrapper_t(etcd_module &m, watcher_one_callback_t cbk);
+    watcher_callback_one_wrapper_t(etcd_module &m, watcher_one_callback_t cbk, int64_t index);
     void operator()(const ::atapp::etcd_response_header &header, const ::atapp::etcd_watcher::response_t &evt_data);
   };
 
@@ -201,6 +203,8 @@ class etcd_module : public ::atapp::module_impl {
   std::list<etcd_keepalive::ptr_t> inner_keepalive_actors_;
   std::string inner_keepalive_value_;
 
+  int64_t watcher_enable_snapshot_index_;
+  int64_t watcher_snapshot_index_allocator_;
   std::list<watcher_list_callback_t> watcher_by_id_callbacks_;
   std::list<watcher_list_callback_t> watcher_by_name_callbacks_;
 

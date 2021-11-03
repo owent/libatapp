@@ -88,7 +88,11 @@ static void init_timer_closed_callback(uv_handle_t *handle) {
 
 }  // namespace detail
 
-LIBATAPP_MACRO_API etcd_module::etcd_module() : etcd_ctx_enabled_(false), maybe_update_inner_keepalive_value_(true) {
+LIBATAPP_MACRO_API etcd_module::etcd_module()
+    : etcd_ctx_enabled_(false),
+      maybe_update_inner_keepalive_value_(true),
+      watcher_enable_snapshot_index_(0),
+      watcher_snapshot_index_allocator_(0) {
   tick_next_timepoint_ = util::time::time_utility::sys_now();
   tick_interval_ = std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::milliseconds(128));
 }
@@ -740,7 +744,8 @@ LIBATAPP_MACRO_API int etcd_module::add_watcher_by_id(watcher_list_callback_t fn
     etcd_ctx_.add_watcher(inner_watcher_by_id_);
     FWLOGINFO("create etcd_watcher for by_id index {} success", watch_path);
 
-    inner_watcher_by_id_->set_evt_handle(watcher_callback_list_wrapper_t(*this, watcher_by_id_callbacks_));
+    inner_watcher_by_id_->set_evt_handle(
+        watcher_callback_list_wrapper_t(*this, watcher_by_id_callbacks_, ++watcher_snapshot_index_allocator_));
   }
 
   if (fn) {
@@ -769,7 +774,7 @@ LIBATAPP_MACRO_API int etcd_module::add_watcher_by_type_id(uint64_t type_id, wat
   etcd_ctx_.add_watcher(p);
   FWLOGINFO("create etcd_watcher for by_type_id index {} success", watch_path);
 
-  p->set_evt_handle(watcher_callback_one_wrapper_t(*this, fn));
+  p->set_evt_handle(watcher_callback_one_wrapper_t(*this, fn, ++watcher_snapshot_index_allocator_));
   return 0;
 }
 
@@ -789,7 +794,7 @@ LIBATAPP_MACRO_API int etcd_module::add_watcher_by_type_name(const std::string &
   etcd_ctx_.add_watcher(p);
   FWLOGINFO("create etcd_watcher for by_type_name index {} success", watch_path);
 
-  p->set_evt_handle(watcher_callback_one_wrapper_t(*this, fn));
+  p->set_evt_handle(watcher_callback_one_wrapper_t(*this, fn, ++watcher_snapshot_index_allocator_));
   return 0;
 }
 
@@ -818,7 +823,8 @@ LIBATAPP_MACRO_API int etcd_module::add_watcher_by_name(watcher_list_callback_t 
     etcd_ctx_.add_watcher(inner_watcher_by_name_);
     FWLOGINFO("create etcd_watcher for by_name index {} success", watch_path);
 
-    inner_watcher_by_name_->set_evt_handle(watcher_callback_list_wrapper_t(*this, watcher_by_name_callbacks_));
+    inner_watcher_by_name_->set_evt_handle(
+        watcher_callback_list_wrapper_t(*this, watcher_by_name_callbacks_, ++watcher_snapshot_index_allocator_));
   }
 
   if (fn) {
@@ -840,7 +846,7 @@ LIBATAPP_MACRO_API int etcd_module::add_watcher_by_tag(const std::string &tag_na
   etcd_ctx_.add_watcher(p);
   FWLOGINFO("create etcd_watcher for by_tag index {} success", watch_path);
 
-  p->set_evt_handle(watcher_callback_one_wrapper_t(*this, fn));
+  p->set_evt_handle(watcher_callback_one_wrapper_t(*this, fn, ++watcher_snapshot_index_allocator_));
   return 0;
 }
 
@@ -860,7 +866,7 @@ LIBATAPP_MACRO_API atapp::etcd_watcher::ptr_t etcd_module::add_watcher_by_custom
     return nullptr;
   }
 
-  p->set_evt_handle(watcher_callback_one_wrapper_t(*this, fn));
+  p->set_evt_handle(watcher_callback_one_wrapper_t(*this, fn, ++watcher_snapshot_index_allocator_));
   if (etcd_ctx_.add_watcher(p)) {
     FWLOGINFO("create etcd_watcher by custom path {} success", custom_path);
   } else {
@@ -1093,17 +1099,27 @@ void etcd_module::watcher_internal_access_t::cleanup_old_nodes(etcd_module &mod,
 }
 
 etcd_module::watcher_callback_list_wrapper_t::watcher_callback_list_wrapper_t(etcd_module &m,
-                                                                              std::list<watcher_list_callback_t> &cbks)
-    : mod(&m), callbacks(&cbks) {}
+                                                                              std::list<watcher_list_callback_t> &cbks,
+                                                                              int64_t index)
+    : mod(&m), callbacks(&cbks), snapshot_index(index) {}
 void etcd_module::watcher_callback_list_wrapper_t::operator()(const ::atapp::etcd_response_header &header,
                                                               const ::atapp::etcd_watcher::response_t &body) {
   if (nullptr == mod) {
     return;
   }
 
+  bool enable_snapshot = body.snapshot && 0 != snapshot_index;
+  if (enable_snapshot) {
+    if (mod->watcher_enable_snapshot_index_ != 0 && mod->watcher_enable_snapshot_index_ < snapshot_index) {
+      enable_snapshot = false;
+    } else if (mod->watcher_enable_snapshot_index_ != snapshot_index) {
+      mod->watcher_enable_snapshot_index_ = snapshot_index;
+    }
+  }
+
   etcd_discovery_set::node_by_name_t old_names;
   etcd_discovery_set::node_by_id_t old_ids;
-  if (body.snapshot) {
+  if (enable_snapshot) {
     _collect_old_nodes(*mod, old_names, old_ids);
   }
 
@@ -1120,7 +1136,7 @@ void etcd_module::watcher_callback_list_wrapper_t::operator()(const ::atapp::etc
       continue;
     }
 
-    if (body.snapshot) {
+    if (enable_snapshot) {
       _remove_old_node_index(node.node_discovery, old_names, old_ids);
     }
 
@@ -1149,20 +1165,32 @@ void etcd_module::watcher_callback_list_wrapper_t::operator()(const ::atapp::etc
   }
 
   // cleanup old nodes when receive snapshot response
-  etcd_module::watcher_internal_access_t::cleanup_old_nodes(*mod, old_names, old_ids);
+  if (enable_snapshot) {
+    etcd_module::watcher_internal_access_t::cleanup_old_nodes(*mod, old_names, old_ids);
+  }
 }
 
-etcd_module::watcher_callback_one_wrapper_t::watcher_callback_one_wrapper_t(etcd_module &m, watcher_one_callback_t cbk)
-    : mod(&m), callback(cbk) {}
+etcd_module::watcher_callback_one_wrapper_t::watcher_callback_one_wrapper_t(etcd_module &m, watcher_one_callback_t cbk,
+                                                                            int64_t index)
+    : mod(&m), callback(cbk), snapshot_index(index) {}
 void etcd_module::watcher_callback_one_wrapper_t::operator()(const ::atapp::etcd_response_header &header,
                                                              const ::atapp::etcd_watcher::response_t &body) {
   if (nullptr == mod) {
     return;
   }
 
+  bool enable_snapshot = body.snapshot && 0 != snapshot_index;
+  if (enable_snapshot) {
+    if (mod->watcher_enable_snapshot_index_ != 0 && mod->watcher_enable_snapshot_index_ < snapshot_index) {
+      enable_snapshot = false;
+    } else if (mod->watcher_enable_snapshot_index_ != snapshot_index) {
+      mod->watcher_enable_snapshot_index_ = snapshot_index;
+    }
+  }
+
   etcd_discovery_set::node_by_name_t old_names;
   etcd_discovery_set::node_by_id_t old_ids;
-  if (body.snapshot) {
+  if (enable_snapshot) {
     _collect_old_nodes(*mod, old_names, old_ids);
   }
 
@@ -1180,7 +1208,7 @@ void etcd_module::watcher_callback_one_wrapper_t::operator()(const ::atapp::etcd
       continue;
     }
 
-    if (body.snapshot) {
+    if (enable_snapshot) {
       _remove_old_node_index(node.node_discovery, old_names, old_ids);
     }
 
@@ -1200,7 +1228,9 @@ void etcd_module::watcher_callback_one_wrapper_t::operator()(const ::atapp::etcd
   }
 
   // cleanup old nodes when receive snapshot response
-  etcd_module::watcher_internal_access_t::cleanup_old_nodes(*mod, old_names, old_ids);
+  if (enable_snapshot) {
+    etcd_module::watcher_internal_access_t::cleanup_old_nodes(*mod, old_names, old_ids);
+  }
 }
 
 bool etcd_module::update_inner_watcher_event(node_info_t &node) {
