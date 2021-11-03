@@ -50,6 +50,9 @@ LIBATAPP_MACRO_API void etcd_watcher::close() {
   rpc_.is_actived = false;
   rpc_.is_retry_mode = false;
   rpc_.last_revision = 0;
+
+  // destroy watcher handle
+  evt_handle_ = nullptr;
 }
 
 LIBATAPP_MACRO_API const std::string &etcd_watcher::get_path() const { return path_; }

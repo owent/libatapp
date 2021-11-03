@@ -89,10 +89,7 @@ static void init_timer_closed_callback(uv_handle_t *handle) {
 }  // namespace detail
 
 LIBATAPP_MACRO_API etcd_module::etcd_module()
-    : etcd_ctx_enabled_(false),
-      maybe_update_inner_keepalive_value_(true),
-      watcher_enable_snapshot_index_(0),
-      watcher_snapshot_index_allocator_(0) {
+    : etcd_ctx_enabled_(false), maybe_update_inner_keepalive_value_(true), watcher_snapshot_index_allocator_(0) {
   tick_next_timepoint_ = util::time::time_utility::sys_now();
   tick_interval_ = std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::milliseconds(128));
 }
@@ -535,7 +532,7 @@ LIBATAPP_MACRO_API int etcd_module::reload() {
 }
 
 LIBATAPP_MACRO_API int etcd_module::stop() {
-  if (!cleanup_request_) {
+  if (!cleanup_request_ && !etcd_ctx_.check_flag(etcd_cluster::flag_t::CLOSING)) {
     bool revoke_lease = true;
     if (get_app() && get_app()->is_current_upgrade_mode()) {
       revoke_lease = false;
@@ -550,7 +547,7 @@ LIBATAPP_MACRO_API int etcd_module::stop() {
     reset_inner_watchers_and_keepalives();
   }
 
-  if (cleanup_request_) {
+  if (cleanup_request_ && cleanup_request_->is_running()) {
     return 1;
   }
 
@@ -595,12 +592,8 @@ LIBATAPP_MACRO_API int etcd_module::tick() {
   }
 
   // previous closing not finished, wait for it
-  if (cleanup_request_) {
-    if (cleanup_request_->is_running()) {
-      return 0;
-    } else {
-      cleanup_request_.reset();
-    }
+  if (cleanup_request_ || owner->is_closing()) {
+    return etcd_ctx_.tick();
   }
 
   // first startup when reloaded
@@ -1101,7 +1094,14 @@ void etcd_module::watcher_internal_access_t::cleanup_old_nodes(etcd_module &mod,
 etcd_module::watcher_callback_list_wrapper_t::watcher_callback_list_wrapper_t(etcd_module &m,
                                                                               std::list<watcher_list_callback_t> &cbks,
                                                                               int64_t index)
-    : mod(&m), callbacks(&cbks), snapshot_index(index) {}
+    : mod(&m), callbacks(&cbks), snapshot_index(index), has_insert_snapshot_index(false) {}
+
+etcd_module::watcher_callback_list_wrapper_t::~watcher_callback_list_wrapper_t() {
+  if (nullptr != mod && 0 != snapshot_index) {
+    mod->watcher_snapshot_index_.erase(snapshot_index);
+  }
+}
+
 void etcd_module::watcher_callback_list_wrapper_t::operator()(const ::atapp::etcd_response_header &header,
                                                               const ::atapp::etcd_watcher::response_t &body) {
   if (nullptr == mod) {
@@ -1110,10 +1110,14 @@ void etcd_module::watcher_callback_list_wrapper_t::operator()(const ::atapp::etc
 
   bool enable_snapshot = body.snapshot && 0 != snapshot_index;
   if (enable_snapshot) {
-    if (mod->watcher_enable_snapshot_index_ != 0 && mod->watcher_enable_snapshot_index_ < snapshot_index) {
+    if (!has_insert_snapshot_index) {
+      mod->watcher_snapshot_index_.insert(snapshot_index);
+    }
+
+    // We just accept the earliest watcher as snapshot notifier.
+    // So just enable by_id or by_name when initializing and they will has the smallest index.
+    if (!mod->watcher_snapshot_index_.empty() && *mod->watcher_snapshot_index_.begin() != snapshot_index) {
       enable_snapshot = false;
-    } else if (mod->watcher_enable_snapshot_index_ != snapshot_index) {
-      mod->watcher_enable_snapshot_index_ = snapshot_index;
     }
   }
 
@@ -1172,7 +1176,14 @@ void etcd_module::watcher_callback_list_wrapper_t::operator()(const ::atapp::etc
 
 etcd_module::watcher_callback_one_wrapper_t::watcher_callback_one_wrapper_t(etcd_module &m, watcher_one_callback_t cbk,
                                                                             int64_t index)
-    : mod(&m), callback(cbk), snapshot_index(index) {}
+    : mod(&m), callback(cbk), snapshot_index(index), has_insert_snapshot_index(false) {}
+
+etcd_module::watcher_callback_one_wrapper_t::~watcher_callback_one_wrapper_t() {
+  if (nullptr != mod && 0 != snapshot_index) {
+    mod->watcher_snapshot_index_.erase(snapshot_index);
+  }
+}
+
 void etcd_module::watcher_callback_one_wrapper_t::operator()(const ::atapp::etcd_response_header &header,
                                                              const ::atapp::etcd_watcher::response_t &body) {
   if (nullptr == mod) {
@@ -1181,10 +1192,14 @@ void etcd_module::watcher_callback_one_wrapper_t::operator()(const ::atapp::etcd
 
   bool enable_snapshot = body.snapshot && 0 != snapshot_index;
   if (enable_snapshot) {
-    if (mod->watcher_enable_snapshot_index_ != 0 && mod->watcher_enable_snapshot_index_ < snapshot_index) {
+    if (!has_insert_snapshot_index) {
+      mod->watcher_snapshot_index_.insert(snapshot_index);
+    }
+
+    // We just accept the earliest watcher as snapshot notifier.
+    // So just enable by_id or by_name when initializing and they will has the smallest index.
+    if (!mod->watcher_snapshot_index_.empty() && *mod->watcher_snapshot_index_.begin() != snapshot_index) {
       enable_snapshot = false;
-    } else if (mod->watcher_enable_snapshot_index_ != snapshot_index) {
-      mod->watcher_enable_snapshot_index_ = snapshot_index;
     }
   }
 
