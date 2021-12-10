@@ -7,9 +7,11 @@
 #include <chrono>
 #include <functional>
 #include <list>
+#include <map>
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "atframe/atapp_conf.h"
@@ -154,9 +156,14 @@ class app {
   using callback_fn_on_connected_t = std::function<int(app &, atbus::endpoint &, int)>;
   using callback_fn_on_disconnected_t = std::function<int(app &, atbus::endpoint &, int)>;
   using callback_fn_on_all_module_inited_t = std::function<int(app &)>;
+  using callback_fn_on_all_module_cleaned_t = std::function<int(app &)>;
+  using callback_fn_on_finally_t = std::function<void(app &)>;
+  using callback_fn_on_finally_list_t = std::list<callback_fn_on_finally_t>;
+  using callback_fn_on_finally_handle = callback_fn_on_finally_list_t::iterator;
 
   UTIL_DESIGN_PATTERN_NOCOPYABLE(app)
   UTIL_DESIGN_PATTERN_NOMOVABLE(app)
+
  public:
   LIBATAPP_MACRO_API app();
   LIBATAPP_MACRO_API ~app();
@@ -411,12 +418,30 @@ class app {
   LIBATAPP_MACRO_API void set_evt_on_app_connected(callback_fn_on_connected_t fn);
   LIBATAPP_MACRO_API void set_evt_on_app_disconnected(callback_fn_on_disconnected_t fn);
   LIBATAPP_MACRO_API void set_evt_on_all_module_inited(callback_fn_on_all_module_inited_t fn);
+  LIBATAPP_MACRO_API void set_evt_on_all_module_cleaned(callback_fn_on_all_module_cleaned_t fn);
+  /**
+   * @brief add finally callback function after cleanup and exited
+   * @note this can be used to cleanup reources which have the same lifetime as atapp
+   *
+   * @param fn callback function
+   * @return callback handle which can be removed in the future
+   */
+  LIBATAPP_MACRO_API callback_fn_on_finally_handle add_evt_on_finally(callback_fn_on_finally_t fn);
+
+  /**
+   * @brief remove finally callback function after cleanup and exited
+   *
+   * @param handle
+   */
+  LIBATAPP_MACRO_API void remove_evt_on_finally(callback_fn_on_finally_handle &handle);
+  LIBATAPP_MACRO_API void clear_evt_on_finally();
 
   LIBATAPP_MACRO_API const callback_fn_on_forward_request_t &get_evt_on_forward_request() const noexcept;
   LIBATAPP_MACRO_API const callback_fn_on_forward_response_t &get_evt_on_forward_response() const noexcept;
   LIBATAPP_MACRO_API const callback_fn_on_connected_t &get_evt_on_app_connected() const noexcept;
   LIBATAPP_MACRO_API const callback_fn_on_disconnected_t &get_evt_on_app_disconnected() const noexcept;
   LIBATAPP_MACRO_API const callback_fn_on_all_module_inited_t &get_evt_on_all_module_inited() const noexcept;
+  LIBATAPP_MACRO_API const callback_fn_on_all_module_cleaned_t &get_evt_on_all_module_cleaned() const noexcept;
 
   LIBATAPP_MACRO_API bool add_endpoint_waker(util::time::time_utility::raw_time_t wakeup_time,
                                              const atapp_endpoint::weak_ptr_t &ep_watcher);
@@ -538,12 +563,17 @@ class app {
   int bus_evt_callback_on_shutdown(const atbus::node &, int);
   int bus_evt_callback_on_available(const atbus::node &, int);
   int bus_evt_callback_on_invalid_connection(const atbus::node &, const atbus::connection *, int);
-  int bus_evt_callback_on_custom_cmd(const atbus::node &, const atbus::endpoint *, const atbus::connection *, app_id_t,
-                                     const std::vector<std::pair<const void *, size_t> > &, std::list<std::string> &);
+  int bus_evt_callback_on_custom_command_request(const atbus::node &, const atbus::endpoint *,
+                                                 const atbus::connection *, app_id_t,
+                                                 const std::vector<std::pair<const void *, size_t> > &,
+                                                 std::list<std::string> &);
   int bus_evt_callback_on_add_endpoint(const atbus::node &, atbus::endpoint *, int);
   int bus_evt_callback_on_remove_endpoint(const atbus::node &, atbus::endpoint *, int);
-  int bus_evt_callback_on_custom_rsp(const atbus::node &, const atbus::endpoint *, const atbus::connection *, app_id_t,
-                                     const std::vector<std::pair<const void *, size_t> > &, uint64_t);
+  int bus_evt_callback_on_custom_command_response(const atbus::node &, const atbus::endpoint *,
+                                                  const atbus::connection *, app_id_t,
+                                                  const std::vector<std::pair<const void *, size_t> > &, uint64_t);
+
+  void app_evt_on_finally();
 
   LIBATAPP_MACRO_API void add_connector_inner(std::shared_ptr<atapp_connector_impl> connector);
 
@@ -579,7 +609,6 @@ class app {
     MAX_SIGNAL_COUNT = 32,
   };
   int pending_signals_[MAX_SIGNAL_COUNT];
-  uint64_t last_proc_event_count_;
 
   app_conf conf_;
   mutable std::string build_version_;
@@ -600,16 +629,21 @@ class app {
   callback_fn_on_connected_t evt_on_app_connected_;
   callback_fn_on_disconnected_t evt_on_app_disconnected_;
   callback_fn_on_all_module_inited_t evt_on_all_module_inited_;
+  callback_fn_on_all_module_cleaned_t evt_on_all_module_cleaned_;
+  callback_fn_on_finally_list_t evt_on_finally_;
 
   // stat
-  struct stat_data_t {
+  struct stats_data_t {
     uv_rusage_t last_checkpoint_usage;
     time_t last_checkpoint_min;
+    uint64_t last_proc_event_count;
+    uint64_t receive_custom_command_request_count;
+    uint64_t receive_custom_command_reponse_count;
 
     size_t endpoint_wake_count;
     ::atapp::etcd_cluster::stats_t inner_etcd;
   };
-  stat_data_t stat_;
+  stats_data_t stats_;
 
   // inner modules
   std::shared_ptr< ::atapp::etcd_module> inner_module_etcd_;
