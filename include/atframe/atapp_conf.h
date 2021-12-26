@@ -28,13 +28,9 @@
 
 #include "gsl/select-gsl.h"
 
-#include "atframe/atapp_config.h"
+#include "config/ini_loader.h"
 
-namespace util {
-namespace config {
-class ini_value;
-}
-}  // namespace util
+#include "atframe/atapp_config.h"
 
 namespace atapp {
 struct app_conf {
