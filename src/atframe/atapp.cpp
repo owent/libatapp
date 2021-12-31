@@ -331,7 +331,7 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
   ret = setup_signal();
   if (ret < 0) {
     FWLOGERROR("setup signal failed");
-    write_pidfile();
+    write_pidfile(ret);
     return setup_result_ = ret;
   }
 
@@ -341,7 +341,7 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
       ret = mod->setup(conf_);
       if (ret < 0) {
         FWLOGERROR("setup module {} failed", mod->name());
-        write_pidfile();
+        write_pidfile(ret);
         return setup_result_ = ret;
       }
     }
@@ -359,7 +359,7 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
   ret = setup_log();
   if (ret < 0) {
     FWLOGERROR("setup log failed");
-    write_pidfile();
+    write_pidfile(ret);
     return setup_result_ = ret;
   }
 
@@ -371,7 +371,7 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
   if (setup_tick_timer() < 0) {
     FWLOGERROR("setup timer failed");
     bus_node_.reset();
-    write_pidfile();
+    write_pidfile(EN_ATAPP_ERR_SETUP_TIMER);
     return setup_result_ = EN_ATAPP_ERR_SETUP_TIMER;
   }
 
@@ -379,7 +379,7 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
   if (ret < 0) {
     FWLOGERROR("setup atbus failed");
     bus_node_.reset();
-    write_pidfile();
+    write_pidfile(ret);
     return setup_result_ = ret;
   }
 
@@ -389,7 +389,7 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
       ret = mod->reload();
       if (ret < 0) {
         FWLOGERROR("load configure of {} failed", mod->name());
-        write_pidfile();
+        write_pidfile(ret);
         return setup_result_ = ret;
       }
     }
@@ -450,12 +450,12 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
       evt_on_all_module_cleaned_(*this);
     }
 
-    write_pidfile();
+    write_pidfile(mod_init_res);
     return setup_result_ = mod_init_res;
   }
 
   // write pid file
-  if (false == write_pidfile()) {
+  if (false == write_pidfile(atbus::node::get_pid())) {
     return EN_ATAPP_ERR_WRITE_PID_FILE;
   }
 
@@ -2985,7 +2985,7 @@ bool app::setup_timeout_timer(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration 
   }
 }
 
-bool app::write_pidfile() {
+bool app::write_pidfile(int pid) {
   if (!conf_.pid_file.empty()) {
     std::fstream pid_file;
     pid_file.open(conf_.pid_file.c_str(), std::ios::out | std::ios::trunc);
@@ -2997,7 +2997,7 @@ bool app::write_pidfile() {
       // failed and skip running
       return false;
     } else {
-      pid_file << atbus::node::get_pid();
+      pid_file << pid;
       pid_file.close();
     }
   }

@@ -500,7 +500,7 @@ class app {
 
   int send_last_command(ev_loop_t *ev_loop);
 
-  bool write_pidfile();
+  bool write_pidfile(int pid);
   bool cleanup_pidfile();
   void print_help();
 
