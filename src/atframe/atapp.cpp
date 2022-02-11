@@ -2466,7 +2466,7 @@ void app::parse_environment_log_categories_into(atapp::protocol::atapp_log &dst,
                                                 gsl::string_view load_environemnt_prefix) const noexcept {
   std::string env_level_name;
   env_level_name.reserve(load_environemnt_prefix.size() + 6);
-  env_level_name = load_environemnt_prefix;
+  env_level_name = static_cast<std::string>(load_environemnt_prefix);
   env_level_name += "_LEVEL";
 
   std::string level_value = util::file_system::getenv(env_level_name.c_str());

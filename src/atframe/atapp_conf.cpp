@@ -1410,7 +1410,7 @@ static bool dump_environment_field_item(gsl::string_view prefix, ATBUS_MACRO_PRO
   std::string env_key_prefix;
   env_key_prefix.reserve(prefix.size() + 1 + fds->name().size());
   if (!prefix.empty()) {
-    env_key_prefix = prefix;
+    env_key_prefix = static_cast<std::string>(prefix);
     env_key_prefix += "_";
   }
 
