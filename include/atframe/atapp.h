@@ -51,10 +51,10 @@ class app {
  public:
   using app_id_t = LIBATAPP_MACRO_BUSID_TYPE;
   using module_ptr_t = std::shared_ptr<module_impl>;
-  using yaml_conf_map_t = atbus::detail::auto_select_map<std::string, std::vector<YAML::Node> >::type;
+  using yaml_conf_map_t = atbus::detail::auto_select_map<std::string, std::vector<YAML::Node>>::type;
   using endpoint_index_by_id_t = std::unordered_map<uint64_t, atapp_endpoint::ptr_t>;
   using endpoint_index_by_name_t = std::unordered_map<std::string, atapp_endpoint::ptr_t>;
-  using connector_protocol_map_t = std::unordered_map<std::string, std::shared_ptr<atapp_connector_impl> >;
+  using connector_protocol_map_t = std::unordered_map<std::string, std::shared_ptr<atapp_connector_impl>>;
   using address_type_t = atapp_connector_impl::address_type_t;
   using ev_loop_t = uv_loop_t;
 
@@ -317,18 +317,27 @@ class app {
    */
   LIBATAPP_MACRO_API const yaml_conf_map_t &get_yaml_loaders() const noexcept;
 
+  /**
+   * @brief Load configure from ini/conf/yaml and enviroment variables into protobuf message
+   *
+   * @param dst store the result
+   * @param configure_prefix_path path prefix from configure file(ini/yaml)
+   * @param load_environemnt_prefix environemnt prefix, if empty, we will ignore environemnt variables
+   */
   LIBATAPP_MACRO_API void parse_configures_into(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
-                                                gsl::string_view path) const;
+                                                gsl::string_view configure_prefix_path,
+                                                gsl::string_view load_environemnt_prefix = "") const;
 
   /**
    * @brief parse configure into atapp_log and return error message
    *
    * @param dst target
-   * @param path configure path
-   * @return error message if there is any error
+   * @param configure_prefix_paths path prefix from configure(ini/yaml)
+   * @param load_environemnt_prefix environemnt prefix, if empty, we will ignore environemnt variables
    */
   LIBATAPP_MACRO_API void parse_log_configures_into(atapp::protocol::atapp_log &dst,
-                                                    std::vector<gsl::string_view> path) const noexcept;
+                                                    std::vector<gsl::string_view> configure_prefix_paths,
+                                                    gsl::string_view load_environemnt_prefix = "") const noexcept;
 
   LIBATAPP_MACRO_API const atapp::protocol::atapp_configure &get_origin_configure() const noexcept;
   LIBATAPP_MACRO_API const atapp::protocol::atapp_log &get_log_configure() const noexcept;
@@ -340,7 +349,7 @@ class app {
 
   LIBATAPP_MACRO_API void pack(atapp::protocol::atapp_discovery &out) const;
 
-  LIBATAPP_MACRO_API std::shared_ptr< ::atapp::etcd_module> get_etcd_module() const noexcept;
+  LIBATAPP_MACRO_API std::shared_ptr<::atapp::etcd_module> get_etcd_module() const noexcept;
 
   LIBATAPP_MACRO_API uint32_t get_address_type(const std::string &addr) const noexcept;
 
@@ -565,13 +574,13 @@ class app {
   int bus_evt_callback_on_invalid_connection(const atbus::node &, const atbus::connection *, int);
   int bus_evt_callback_on_custom_command_request(const atbus::node &, const atbus::endpoint *,
                                                  const atbus::connection *, app_id_t,
-                                                 const std::vector<std::pair<const void *, size_t> > &,
+                                                 const std::vector<std::pair<const void *, size_t>> &,
                                                  std::list<std::string> &);
   int bus_evt_callback_on_add_endpoint(const atbus::node &, atbus::endpoint *, int);
   int bus_evt_callback_on_remove_endpoint(const atbus::node &, atbus::endpoint *, int);
   int bus_evt_callback_on_custom_command_response(const atbus::node &, const atbus::endpoint *,
                                                   const atbus::connection *, app_id_t,
-                                                  const std::vector<std::pair<const void *, size_t> > &, uint64_t);
+                                                  const std::vector<std::pair<const void *, size_t>> &, uint64_t);
 
   void app_evt_on_finally();
 
@@ -585,6 +594,15 @@ class app {
   int64_t process_inner_events(const util::time::time_utility::raw_time_t &end_tick);
 
   atapp_endpoint::ptr_t auto_mutable_self_endpoint();
+
+  void parse_environment_log_categories_into(atapp::protocol::atapp_log &dst,
+                                             gsl::string_view load_environemnt_prefix) const noexcept;
+
+  void parse_ini_log_categories_into(atapp::protocol::atapp_log &dst,
+                                     const std::vector<gsl::string_view> &path) const noexcept;
+
+  void parse_yaml_log_categories_into(atapp::protocol::atapp_log &dst,
+                                      const std::vector<gsl::string_view> &path) const noexcept;
 
  public:
   LIBATAPP_MACRO_API int trigger_event_on_forward_request(const message_sender_t &source, const message_t &msg);
@@ -646,7 +664,7 @@ class app {
   stats_data_t stats_;
 
   // inner modules
-  std::shared_ptr< ::atapp::etcd_module> inner_module_etcd_;
+  std::shared_ptr<::atapp::etcd_module> inner_module_etcd_;
 
   // inner endpoints
   endpoint_index_by_id_t endpoint_index_by_id_;
@@ -654,7 +672,7 @@ class app {
   std::multimap<util::time::time_utility::raw_time_t, atapp_endpoint::weak_ptr_t> endpoint_waker_;
 
   // inner connectors
-  std::list<std::shared_ptr<atapp_connector_impl> > connectors_;
+  std::list<std::shared_ptr<atapp_connector_impl>> connectors_;
   connector_protocol_map_t connector_protocols_;
   std::shared_ptr<atapp_connector_atbus> atbus_connector_;
   std::shared_ptr<atapp_connector_loopback> loopback_connector_;

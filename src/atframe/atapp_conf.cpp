@@ -26,6 +26,7 @@
 
 #include <libatbus.h>
 
+#include <common/file_system.h>
 #include <common/string_oprs.h>
 #include <config/atframe_utils_build_feature.h>
 #include <config/ini_loader.h>
@@ -192,7 +193,6 @@ static void pick_const_data(gsl::string_view value, ATBUS_MACRO_PROTOBUF_NAMESPA
       dur.set_seconds(tm_val * 3600 * 24 * 7);
       break;
     }
-
   } while (false);
 
   // fallback to second
@@ -1158,6 +1158,284 @@ static void dump_field_item(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPAC
 #endif
 }
 
+static bool dump_environment_message_item(gsl::string_view prefix, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst);
+static bool dump_environment_pick_field(const std::string &key, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
+                                        const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds) {
+  if (nullptr == fds) {
+    return false;
+  }
+
+  bool ret = false;
+  switch (fds->cpp_type()) {
+    case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_INT32: {
+      std::string val = util::file_system::getenv(key.c_str());
+      if (val.empty()) {
+        break;
+      }
+      int32_t value = dump_pick_field_with_extensions<int32_t>(val, fds);
+      if (fds->is_repeated()) {
+        dst.GetReflection()->AddInt32(&dst, fds, value);
+      } else {
+        dst.GetReflection()->SetInt32(&dst, fds, value);
+      }
+      ret = true;
+      break;
+    };
+    case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_INT64: {
+      std::string val = util::file_system::getenv(key.c_str());
+      if (val.empty()) {
+        break;
+      }
+      int64_t value = dump_pick_field_with_extensions<int64_t>(val, fds);
+      if (fds->is_repeated()) {
+        dst.GetReflection()->AddInt64(&dst, fds, value);
+      } else {
+        dst.GetReflection()->SetInt64(&dst, fds, value);
+      }
+      ret = true;
+      break;
+    };
+    case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_UINT32: {
+      std::string val = util::file_system::getenv(key.c_str());
+      if (val.empty()) {
+        break;
+      }
+      uint32_t value = dump_pick_field_with_extensions<uint32_t>(val, fds);
+      if (fds->is_repeated()) {
+        dst.GetReflection()->AddUInt32(&dst, fds, value);
+      } else {
+        dst.GetReflection()->SetUInt32(&dst, fds, value);
+      }
+      ret = true;
+      break;
+    };
+    case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_UINT64: {
+      std::string val = util::file_system::getenv(key.c_str());
+      if (val.empty()) {
+        break;
+      }
+      uint64_t value = dump_pick_field_with_extensions<uint64_t>(val, fds);
+      if (fds->is_repeated()) {
+        dst.GetReflection()->AddUInt64(&dst, fds, value);
+      } else {
+        dst.GetReflection()->SetUInt64(&dst, fds, value);
+      }
+      ret = true;
+      break;
+    };
+    case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_STRING: {
+      std::string val = util::file_system::getenv(key.c_str());
+      if (val.empty()) {
+        break;
+      }
+
+      const std::string *value = &val;
+      if (nullptr == value || value->empty()) {
+        if (fds->options().HasExtension(atapp::protocol::CONFIGURE)) {
+          const std::string &default_str = fds->options().GetExtension(atapp::protocol::CONFIGURE).default_value();
+          value = &default_str;
+        }
+      }
+      if (nullptr != value) {
+        if (fds->is_repeated()) {
+          dst.GetReflection()->AddString(&dst, fds, val);
+        } else {
+          dst.GetReflection()->SetString(&dst, fds, val);
+        }
+      }
+
+      ret = true;
+      break;
+    };
+    case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_MESSAGE: {
+      std::string val = util::file_system::getenv(key.c_str());
+      // special message
+      if (!val.empty()) {
+        if (fds->message_type()->full_name() ==
+            ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration::descriptor()->full_name()) {
+          ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration value =
+              dump_pick_field_with_extensions<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration>(val, fds);
+          if (fds->is_repeated()) {
+            dst.GetReflection()->AddMessage(&dst, fds)->CopyFrom(value);
+          } else {
+            dst.GetReflection()->MutableMessage(&dst, fds)->CopyFrom(value);
+          }
+          ret = true;
+        } else if (fds->message_type()->full_name() ==
+                   ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp::descriptor()->full_name()) {
+          ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp value =
+              dump_pick_field_with_extensions<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp>(val, fds);
+          if (fds->is_repeated()) {
+            dst.GetReflection()->AddMessage(&dst, fds)->CopyFrom(value);
+          } else {
+            dst.GetReflection()->MutableMessage(&dst, fds)->CopyFrom(value);
+          }
+          ret = true;
+        }
+
+        break;
+      }
+
+      ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *submsg;
+      if (fds->is_repeated()) {
+        submsg = dst.GetReflection()->AddMessage(&dst, fds);
+        if (nullptr == submsg) {
+          break;
+        }
+        if (dump_environment_message_item(key, *submsg)) {
+          ret = true;
+        } else {
+          dst.GetReflection()->RemoveLast(&dst, fds);
+        }
+      } else {
+        submsg = dst.GetReflection()->MutableMessage(&dst, fds);
+        if (nullptr == submsg) {
+          break;
+        }
+        if (dump_environment_message_item(key, *submsg)) {
+          ret = true;
+        }
+      }
+
+      break;
+    };
+    case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_DOUBLE: {
+      std::string val = util::file_system::getenv(key.c_str());
+      if (val.empty()) {
+        break;
+      }
+      double value = dump_pick_field_with_extensions<double>(val, fds);
+      if (fds->is_repeated()) {
+        dst.GetReflection()->AddDouble(&dst, fds, value);
+      } else {
+        dst.GetReflection()->SetDouble(&dst, fds, value);
+      }
+      ret = true;
+      break;
+    };
+    case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_FLOAT: {
+      std::string val = util::file_system::getenv(key.c_str());
+      if (val.empty()) {
+        break;
+      }
+      float value = dump_pick_field_with_extensions<float>(val, fds);
+      if (fds->is_repeated()) {
+        dst.GetReflection()->AddFloat(&dst, fds, value);
+      } else {
+        dst.GetReflection()->SetFloat(&dst, fds, value);
+      }
+      ret = true;
+      break;
+    };
+    case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_BOOL: {
+      std::string val = util::file_system::getenv(key.c_str());
+      if (val.empty()) {
+        break;
+      }
+
+      bool jval = true;
+      std::string trans;
+      if (val.empty()) {
+        if (fds->options().HasExtension(atapp::protocol::CONFIGURE)) {
+          trans = fds->options().GetExtension(atapp::protocol::CONFIGURE).default_value();
+        }
+      } else {
+        trans = val;
+      }
+      std::transform(trans.begin(), trans.end(), trans.begin(), util::string::tolower<char>);
+
+      if ("0" == trans || "false" == trans || "no" == trans || "disable" == trans || "disabled" == trans ||
+          "" == trans) {
+        jval = false;
+      }
+
+      if (fds->is_repeated()) {
+        dst.GetReflection()->AddBool(&dst, fds, jval);
+      } else {
+        dst.GetReflection()->SetBool(&dst, fds, jval);
+      }
+      ret = true;
+      break;
+    };
+    case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_ENUM: {
+      std::string val = util::file_system::getenv(key.c_str());
+      if (val.empty()) {
+        break;
+      }
+
+      const std::string *value = &val;
+      if (nullptr == value || value->empty()) {
+        if (fds->options().HasExtension(atapp::protocol::CONFIGURE)) {
+          const std::string &default_str = fds->options().GetExtension(atapp::protocol::CONFIGURE).default_value();
+          value = &default_str;
+        }
+      }
+
+      const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::EnumValueDescriptor *jval = nullptr;
+      if (nullptr == value || value->empty() || ((*value)[0] >= '0' && (*value)[0] <= '9')) {
+        jval = fds->enum_type()->FindValueByNumber(util::string::to_int<int32_t>(val.c_str()));
+      } else {
+        jval = fds->enum_type()->FindValueByName(*value);
+      }
+
+      if (jval == nullptr) {
+        // invalid value
+        break;
+      }
+      // fds->enum_type
+      if (fds->is_repeated()) {
+        dst.GetReflection()->AddEnum(&dst, fds, jval);
+      } else {
+        dst.GetReflection()->SetEnum(&dst, fds, jval);
+      }
+      ret = true;
+      break;
+    };
+    default: {
+      FWLOGERROR("{} in {} with type={} is not supported now", fds->name(), dst.GetDescriptor()->full_name(),
+                 fds->type_name());
+      break;
+    }
+  }
+
+  return ret;
+}
+
+static bool dump_environment_field_item(gsl::string_view prefix, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
+                                        const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds) {
+  if (nullptr == fds) {
+    return false;
+  }
+
+  std::string env_key_prefix;
+  env_key_prefix.reserve(prefix.size() + 1 + fds->name().size());
+  if (!prefix.empty()) {
+    env_key_prefix = prefix;
+    env_key_prefix += "_";
+  }
+
+  env_key_prefix += fds->name();
+  std::transform(env_key_prefix.begin(), env_key_prefix.end(), env_key_prefix.begin(), util::string::toupper<char>);
+
+  if (fds->is_repeated()) {
+    bool has_value = false;
+    for (size_t i = 0;; ++i) {
+      if (dump_environment_pick_field(util::log::format("{}_{}", env_key_prefix, i), dst, fds)) {
+        has_value = true;
+      } else {
+        break;
+      }
+    }
+    // Fallback to no-index key
+    if (!has_value) {
+      return dump_environment_pick_field(env_key_prefix, dst, fds);
+    }
+    return true;
+  } else {
+    return dump_environment_pick_field(env_key_prefix, dst, fds);
+  }
+}
+
 static void dump_message_item(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst) {
   const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Descriptor *desc = dst.GetDescriptor();
   if (nullptr == desc) {
@@ -1184,6 +1462,22 @@ static void dump_message_item(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESP
     detail::dump_field_item(src, dst, desc->field(i));
   }
 }
+
+static bool dump_environment_message_item(gsl::string_view prefix, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst) {
+  const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Descriptor *desc = dst.GetDescriptor();
+  if (nullptr == desc) {
+    return false;
+  }
+
+  bool ret = false;
+  for (int i = 0; i < desc->field_count(); ++i) {
+    bool res = detail::dump_environment_field_item(prefix, dst, desc->field(i));
+    ret = ret || res;
+  }
+
+  return ret;
+}
+
 }  // namespace detail
 
 LIBATAPP_MACRO_API void parse_timepoint(gsl::string_view in, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp &out) {
@@ -1378,6 +1672,11 @@ LIBATAPP_MACRO_API const YAML::Node yaml_loader_get_child_by_path(const YAML::No
 #endif
 
   return ret;
+}
+
+LIBATAPP_MACRO_API bool environment_loader_dump_to(gsl::string_view prefix,
+                                                   ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst) {
+  return detail::dump_environment_message_item(prefix, dst);
 }
 
 static bool protobuf_equal_inner_message(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &l,

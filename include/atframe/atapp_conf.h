@@ -93,6 +93,9 @@ LIBATAPP_MACRO_API const YAML::Node yaml_loader_get_child_by_path(const YAML::No
                                                                   const std::vector<gsl::string_view> &path,
                                                                   size_t start_path_index = 0);
 
+LIBATAPP_MACRO_API bool environment_loader_dump_to(gsl::string_view prefix,
+                                                   ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst);
+
 LIBATAPP_MACRO_API bool protobuf_equal(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &l,
                                        const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &r);
 }  // namespace atapp

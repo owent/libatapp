@@ -14,15 +14,10 @@
 #include <gsl/select-gsl.h>
 
 #include <list>
+#include <memory>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
-
-#if defined(LIBATFRAME_UTILS_ENABLE_UNORDERED_MAP_SET) && LIBATFRAME_UTILS_ENABLE_UNORDERED_MAP_SET
-#  include <unordered_map>
-#  include <unordered_set>
-#else
-#  include <map>
-#  include <set>
-#endif
 
 #include "atframe/atapp_conf.h"
 #include "atframe/etcdcli/etcd_discovery.h"
@@ -54,6 +49,12 @@ class atapp_endpoint {
     uint64_t message_sequence;
     std::vector<unsigned char> data;
     std::unique_ptr<atapp::protocol::atapp_metadata> metadata;
+  };
+
+  class internal_accessor {
+   private:
+    friend class app;
+    static void close(atapp_endpoint &endpoint);
   };
 
   UTIL_DESIGN_PATTERN_NOCOPYABLE(atapp_endpoint)

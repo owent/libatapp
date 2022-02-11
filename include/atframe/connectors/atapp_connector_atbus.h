@@ -3,6 +3,12 @@
 
 #pragma once
 
+#include <stdint.h>
+#include <list>
+#include <memory>
+#include <unordered_map>
+#include <vector>
+
 #include "atframe/connectors/atapp_connector_impl.h"
 
 namespace atbus {

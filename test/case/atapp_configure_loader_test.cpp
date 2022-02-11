@@ -1,3 +1,9 @@
+// Copyright 2022 atframework
+
+#include <atframe/atapp.h>
+
+#include <common/file_system.h>
+
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
@@ -7,13 +13,16 @@
 #include <map>
 #include <memory>
 #include <numeric>
+#include <string>
+#include <unordered_set>
 #include <vector>
 
-#include <atframe/atapp.h>
-
-#include <common/file_system.h>
-
 #include "frame/test_macros.h"
+
+#if defined(_MSC_VER)
+inline int setenv(const char *name, const char *value, int) { return _putenv_s(name, value); }
+inline int unsetenv(const char *name) { return setenv(name, "", 1); }
+#endif
 
 static void check_origin_configure(atapp::app &app, atapp::protocol::atapp_etcd sub_cfg) {
   CASE_EXPECT_EQ(app.get_id(), 0x1234);
@@ -129,4 +138,68 @@ CASE_TEST(atapp_configure, load_conf) {
 
   WLOG_GETCAT(0)->clear_sinks();
   WLOG_GETCAT(1)->clear_sinks();
+}
+
+CASE_TEST(atapp_configure, load_environment) {
+  atapp::app app;
+  std::string conf_path;
+  util::file_system::dirname(__FILE__, 0, conf_path);
+  conf_path += "/atapp_configure_loader_test.env.txt";
+
+  if (!util::file_system::is_exist(conf_path.c_str())) {
+    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path << " not found, skip atapp_configure.load_environment"
+                    << std::endl;
+    return;
+  }
+
+  std::fstream fs(conf_path.c_str(), std::ios::in);
+  std::string line;
+  std::unordered_set<std::string> env_vars;
+  while (std::getline(fs, line)) {
+    auto trimed_line = util::string::trim(line.c_str(), line.size());
+    if (trimed_line.second == 0) {
+      continue;
+    }
+
+    auto equal_index = std::find(trimed_line.first, trimed_line.first + trimed_line.second, '=');
+    if (equal_index == trimed_line.first + trimed_line.second) {
+      continue;
+    }
+
+    std::string key{trimed_line.first, equal_index};
+    std::string value{equal_index + 1, trimed_line.first + trimed_line.second};
+    env_vars.insert(key);
+    setenv(key.c_str(), value.c_str(), 1);
+  }
+
+  const char *argv[] = {"unit-test", "--version"};
+  app.init(nullptr, 2, argv);
+  app.reload();
+
+  atapp::protocol::atapp_etcd sub_cfg;
+  app.parse_configures_into(sub_cfg, "atapp.etcd", "ATAPP_ETCD");
+  check_origin_configure(app, sub_cfg);
+
+  atapp::protocol::atapp_log app_log;
+  app.parse_log_configures_into(app_log, std::vector<gsl::string_view>{"atapp", "log"}, "ATAPP_LOG");
+  check_log_configure(app_log);
+
+  WLOG_GETCAT(0)->clear_sinks();
+  WLOG_GETCAT(1)->clear_sinks();
+
+  for (auto &env_var : env_vars) {
+    unsetenv(env_var.c_str());
+  }
+}
+
+CASE_TEST_EVENT_ON_EXIT(unit_test_event_on_exit_shutdown_protobuf) {
+  ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::ShutdownProtobufLibrary();
+}
+
+CASE_TEST_EVENT_ON_EXIT(unit_test_event_on_exit_close_libuv) {
+  int finish_event = 2048;
+  while (0 != uv_loop_alive(uv_default_loop()) && finish_event-- > 0) {
+    uv_run(uv_default_loop(), UV_RUN_NOWAIT);
+  }
+  uv_loop_close(uv_default_loop());
 }

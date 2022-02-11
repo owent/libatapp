@@ -17,6 +17,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <unordered_set>
 
 #include "atframe/atapp_config.h"
 #include "atframe/etcdcli/etcd_discovery.h"
@@ -112,6 +113,7 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE atapp_connector_impl {
 
   UTIL_DESIGN_PATTERN_NOCOPYABLE(atapp_connector_impl)
   UTIL_DESIGN_PATTERN_NOMOVABLE(atapp_connector_impl)
+
  protected:
   LIBATAPP_MACRO_API atapp_connector_impl(app &owner);
 

@@ -1,8 +1,6 @@
 // Copyright 2021 atframework
 // Created by owent
 
-#include <limits>
-
 #include <detail/libatbus_error.h>
 
 #include <atframe/atapp.h>
@@ -10,11 +8,16 @@
 #include <atframe/connectors/atapp_connector_impl.h>
 #include <atframe/connectors/atapp_endpoint.h>
 
+#include <limits>
+
 #ifdef max
 #  undef max
 #endif
 
 namespace atapp {
+
+void atapp_endpoint::internal_accessor::close(atapp_endpoint &endpoint) { endpoint.reset(); }
+
 LIBATAPP_MACRO_API atapp_endpoint::atapp_endpoint(app &owner, construct_helper_t &)
     : closing_(false),
       owner_(&owner),

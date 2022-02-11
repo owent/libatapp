@@ -26,6 +26,7 @@ LIBATAPP_MACRO_API_SYMBOL_HIDDEN void atapp_connector_bind_helper::unbind(atapp_
     handle.close();
 
     // child shoud call cleanup() to trigger on_close_connect event
+    // This callback must be called at last, because it may destroy handle
     if (!connect.is_destroying_) {
       connect.on_close_connect(handle);
     }
@@ -91,29 +92,38 @@ LIBATAPP_MACRO_API atapp_connection_handle::atapp_connection_handle()
   private_data_uptr_ = 0;
 
   FWLOGDEBUG("atapp handle {} created", reinterpret_cast<const void *>(this));
+  // printf("====== Initialize atapp_connection_handle %p\n", this);
 }
 
 LIBATAPP_MACRO_API atapp_connection_handle::~atapp_connection_handle() {
   FWLOGDEBUG("atapp handle {} destroying", reinterpret_cast<const void *>(this));
 
-  close();
   if (on_destroy_fn_) {
     on_destroy_fn_(*this);
   }
+
+  // printf("====== Destroy atapp_connection_handle %p\n", this);
+  close();
 }
 
 LIBATAPP_MACRO_API void atapp_connection_handle::close() {
+  if (is_closing()) {
+    return;
+  }
+  // printf("====== Visit atapp_connection_handle::close %p\n", this);
+
   flags_ |= flags_t::EN_ACH_CLOSING;
   flags_ &= ~static_cast<uint32_t>(flags_t::EN_ACH_READY);
-
-  // Maybe recursive call, check connector_ first
-  if (nullptr != connector_) {
-    atapp_connector_bind_helper::unbind(*this, *connector_);
-  }
 
   // Maybe recursive call, check endpiont_ first
   if (nullptr != endpiont_) {
     atapp_endpoint_bind_helper::unbind(*this, *endpiont_);
+  }
+
+  // Maybe recursive call, check connector_ first
+  // atapp_connector_bind_helper::unbind must be called at last, because it may destroy this object
+  if (nullptr != connector_) {
+    atapp_connector_bind_helper::unbind(*this, *connector_);
   }
 }
 

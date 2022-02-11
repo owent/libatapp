@@ -3,6 +3,12 @@
 
 #pragma once
 
+#include <stdint.h>
+#include <list>
+#include <memory>
+#include <unordered_map>
+#include <vector>
+
 #include "atframe/connectors/atapp_connector_impl.h"
 
 namespace atapp {
@@ -33,7 +39,8 @@ class atapp_connector_loopback : public atapp_connector_impl {
                                                       size_t data_size,
                                                       const atapp::protocol::atapp_metadata *metadata) override;
 
-  LIBATAPP_MACRO_API int32_t process(const util::time::time_utility::raw_time_t &max_end_timepoint, int32_t max_loop_messages);
+  LIBATAPP_MACRO_API int32_t process(const util::time::time_utility::raw_time_t &max_end_timepoint,
+                                     int32_t max_loop_messages);
 
  private:
   std::unordered_map<uintptr_t, atapp_connection_handle::ptr_t> handles_;
