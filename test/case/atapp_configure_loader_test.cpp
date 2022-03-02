@@ -19,7 +19,7 @@
 
 #include "frame/test_macros.h"
 
-#if defined(_MSC_VER)
+#if defined(_WIN32)
 inline int setenv(const char *name, const char *value, int) { return _putenv_s(name, value); }
 inline int unsetenv(const char *name) { return setenv(name, "", 1); }
 #endif
