@@ -351,6 +351,8 @@ class app {
 
   LIBATAPP_MACRO_API std::shared_ptr<::atapp::etcd_module> get_etcd_module() const noexcept;
 
+  LIBATAPP_MACRO_API const etcd_discovery_set &get_global_discovery() const noexcept;
+
   LIBATAPP_MACRO_API uint32_t get_address_type(const std::string &addr) const noexcept;
 
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_discovery_node_by_id(uint64_t id) const noexcept;
@@ -664,7 +666,8 @@ class app {
   stats_data_t stats_;
 
   // inner modules
-  std::shared_ptr<::atapp::etcd_module> inner_module_etcd_;
+  std::shared_ptr<::atapp::etcd_module> internal_module_etcd_;
+  etcd_discovery_set internal_empty_discovery_set_;
 
   // inner endpoints
   endpoint_index_by_id_t endpoint_index_by_id_;

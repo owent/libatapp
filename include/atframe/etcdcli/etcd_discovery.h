@@ -13,6 +13,13 @@
 
 #include <random/random_generator.h>
 
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
+#include <vector>
+
 #include "atframe/atapp_conf.h"
 
 namespace atapp {
@@ -91,6 +98,7 @@ class etcd_discovery_set {
 
   UTIL_DESIGN_PATTERN_NOCOPYABLE(etcd_discovery_set)
   UTIL_DESIGN_PATTERN_NOMOVABLE(etcd_discovery_set)
+
  public:
   LIBATAPP_MACRO_API etcd_discovery_set();
   LIBATAPP_MACRO_API ~etcd_discovery_set();
