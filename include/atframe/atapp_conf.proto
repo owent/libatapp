@@ -58,6 +58,7 @@ message atbus_configure {
   repeated string access_tokens = 108;
   // repeated string        gateway                 = 109 [ deprecated = true ];
   repeated atapp_gateway gateways = 110;
+  bool overwrite_listen_path = 111 [(atapp.protocol.CONFIGURE) = { default_value: "false" }];
 
   google.protobuf.Duration first_idle_timeout = 201 [(atapp.protocol.CONFIGURE) = { default_value: "30s" }];
   google.protobuf.Duration ping_interval = 202 [(atapp.protocol.CONFIGURE) = { default_value: "60s" }];
