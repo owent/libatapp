@@ -17,6 +17,7 @@ atapp:
     backlog: 256 # tcp backlog
     access_token_max_number: 5 # max number of access tokens
     # access_tokens:           # access tokens
+    overwrite_listen_path: false # do not overwrite listen path
     first_idle_timeout: 30s # first idle timeout when have new connection(second)
     ping_interval: 60s # ping interval(second)
     retry_interval: 3s # retry interval when error happen(second)

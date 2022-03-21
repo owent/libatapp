@@ -2138,6 +2138,7 @@ int app::apply_configure() {
           reinterpret_cast<const unsigned char *>(access_token.data()) + access_token.size());
     }
   }
+  conf_.bus_conf.overwrite_listen_path = conf_.origin.bus().overwrite_listen_path();
 
   conf_.bus_conf.first_idle_timeout = conf_.origin.bus().first_idle_timeout().seconds();
   conf_.bus_conf.ping_interval = conf_.origin.bus().ping_interval().seconds();

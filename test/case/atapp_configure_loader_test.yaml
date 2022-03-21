@@ -11,6 +11,7 @@ atapp:
     proxy: ""
     backlog: 256
     access_token_max_number: 5
+    overwrite_listen_path: false
     first_idle_timeout: 30s
     ping_interval: 60s
     retry_interval: 3s
