@@ -57,7 +57,13 @@ add_custom_command(
   COMMENT
     "Generate ${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_conf.pb.h and ${PROJECT_LIBATAPP_ROOT_SRC_DIR}/atframe/atapp_conf.pb.cc"
 )
-add_library("${PROJECT_LIBATAPP_LIB_LINK}-protocol" STATIC ${PROJECT_LIBATAPP_PROTOCOL_SRC_LIST})
+
+if(NOT CMAKE_SYSTEM_NAME MATCHES "Windows|MinGW|WindowsStore" AND (BUILD_SHARED_LIBS OR ATFRAMEWORK_USE_DYNAMIC_LIBRARY
+                                                                  ))
+  add_library("${PROJECT_LIBATAPP_LIB_LINK}-protocol" SHARED ${PROJECT_LIBATAPP_PROTOCOL_SRC_LIST})
+else()
+  add_library("${PROJECT_LIBATAPP_LIB_LINK}-protocol" STATIC ${PROJECT_LIBATAPP_PROTOCOL_SRC_LIST})
+endif()
 set_target_properties(
   "${PROJECT_LIBATAPP_LIB_LINK}-protocol"
   PROPERTIES C_VISIBILITY_PRESET "default"
