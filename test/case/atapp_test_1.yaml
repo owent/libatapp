@@ -23,6 +23,7 @@ atapp:
   timer:
     tick_interval: 8ms
     stop_timeout: 3s
+    stop_interval: 256ms
   etcd:
     enable: false
 

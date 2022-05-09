@@ -151,7 +151,8 @@ LIBATAPP_MACRO_API app::app() : setup_result_(0), ev_loop_(nullptr), mode_(mode_
   conf_.upgrade_mode = false;
 
   util::time::time_utility::update();
-  tick_timer_.sec_update = util::time::time_utility::sys_now();
+  tick_timer_.last_tick_timepoint = util::time::time_utility::sys_now();
+  tick_timer_.last_stop_timepoint = std::chrono::system_clock::from_time_t(0);
   tick_timer_.sec = util::time::time_utility::get_sys_now();
   tick_timer_.usec = 0;
   tick_timer_.inner_break = nullptr;
@@ -797,6 +798,9 @@ LIBATAPP_MACRO_API int app::stop() {
   } else {
     FWLOGWARNING("============ receive stop signal and ready to stop all modules ============");
   }
+
+  tick_timer_.last_stop_timepoint = tick_timer_.last_tick_timepoint;
+
   // step 1. set stop flag.
   // bool is_stoping = set_flag(flag_t::STOPING, true);
   set_flag(flag_t::STOPING, true);
@@ -830,16 +834,13 @@ LIBATAPP_MACRO_API int app::tick() {
       std::chrono::nanoseconds(conf_.origin.timer().tick_interval().nanos()));
   end_tp += conf_tick_interval;
 
+  tick_timer_.last_tick_timepoint = util::time::time_utility::sys_now();
   do {
-    if (tick_timer_.sec != util::time::time_utility::get_sys_now()) {
-      tick_timer_.sec = util::time::time_utility::get_sys_now();
-      tick_timer_.usec = 0;
-      tick_timer_.sec_update = util::time::time_utility::sys_now();
-    } else {
-      tick_timer_.usec = static_cast<time_t>(std::chrono::duration_cast<std::chrono::microseconds>(
-                                                 util::time::time_utility::sys_now() - tick_timer_.sec_update)
-                                                 .count());
-    }
+    tick_timer_.sec = util::time::time_utility::get_sys_now();
+    tick_timer_.usec = static_cast<time_t>(
+        std::chrono::duration_cast<std::chrono::microseconds>(util::time::time_utility::sys_now() -
+                                                              std::chrono::system_clock::from_time_t(tick_timer_.sec))
+            .count());
 
     active_count = 0;
     int res;
@@ -877,11 +878,20 @@ LIBATAPP_MACRO_API int app::tick() {
   } while (active_count > 0 && util::time::time_utility::sys_now() < end_tp);
 
   ev_loop_t *loop = get_evloop();
-  // if is stoping, quit loop  every tick
+  // if is stoping, quit loop every tick
   if (nullptr != loop) {
     if (check_flag(flag_t::STOPING)) {
-      uv_stop(loop);
-    } else if (nullptr != tick_timer_.inner_break && tick_timer_.sec_update >= *tick_timer_.inner_break) {
+      auto stop_interval = std::chrono::seconds{conf_.origin.timer().stop_interval().seconds()} +
+                           std::chrono::nanoseconds{conf_.origin.timer().stop_interval().nanos()};
+      auto stop_offset = tick_timer_.last_tick_timepoint - tick_timer_.last_stop_timepoint;
+      if ((stop_offset.count() > 0 && stop_offset > stop_interval) ||
+          (stop_offset.count() < 0 && -stop_offset > stop_interval)) {
+        tick_timer_.last_stop_timepoint = tick_timer_.last_tick_timepoint;
+        uv_stop(loop);
+      }
+    }
+
+    if (nullptr != tick_timer_.inner_break && tick_timer_.last_tick_timepoint >= *tick_timer_.inner_break) {
       tick_timer_.inner_break = nullptr;
       uv_stop(loop);
     }
@@ -890,77 +900,79 @@ LIBATAPP_MACRO_API int app::tick() {
   // stat log
   do {
     time_t now_min = util::time::time_utility::get_sys_now() / util::time::time_utility::MINITE_SECONDS;
-    if (now_min != stats_.last_checkpoint_min) {
-      time_t last_min = stats_.last_checkpoint_min;
-      stats_.last_checkpoint_min = now_min;
-      if (last_min + 1 == now_min) {
-        uv_rusage_t last_usage;
-        memcpy(&last_usage, &stats_.last_checkpoint_usage, sizeof(uv_rusage_t));
-        if (0 != uv_getrusage(&stats_.last_checkpoint_usage)) {
-          break;
-        }
-        auto offset_usr = stats_.last_checkpoint_usage.ru_utime.tv_sec - last_usage.ru_utime.tv_sec;
-        auto offset_sys = stats_.last_checkpoint_usage.ru_stime.tv_sec - last_usage.ru_stime.tv_sec;
-        offset_usr *= 1000000;
-        offset_sys *= 1000000;
-        offset_usr += stats_.last_checkpoint_usage.ru_utime.tv_usec - last_usage.ru_utime.tv_usec;
-        offset_sys += stats_.last_checkpoint_usage.ru_stime.tv_usec - last_usage.ru_stime.tv_usec;
+    if (now_min == stats_.last_checkpoint_min) {
+      break;
+    }
 
-        std::pair<uint64_t, const char *> max_rss = details::make_size_showup(last_usage.ru_maxrss);
+    time_t last_min = stats_.last_checkpoint_min;
+    stats_.last_checkpoint_min = now_min;
+    if (last_min + 1 == now_min) {
+      uv_rusage_t last_usage;
+      memcpy(&last_usage, &stats_.last_checkpoint_usage, sizeof(uv_rusage_t));
+      if (0 != uv_getrusage(&stats_.last_checkpoint_usage)) {
+        break;
+      }
+      auto offset_usr = stats_.last_checkpoint_usage.ru_utime.tv_sec - last_usage.ru_utime.tv_sec;
+      auto offset_sys = stats_.last_checkpoint_usage.ru_stime.tv_sec - last_usage.ru_stime.tv_sec;
+      offset_usr *= 1000000;
+      offset_sys *= 1000000;
+      offset_usr += stats_.last_checkpoint_usage.ru_utime.tv_usec - last_usage.ru_utime.tv_usec;
+      offset_sys += stats_.last_checkpoint_usage.ru_stime.tv_usec - last_usage.ru_stime.tv_usec;
+
+      std::pair<uint64_t, const char *> max_rss = details::make_size_showup(last_usage.ru_maxrss);
 #ifdef WIN32
-        FWLOGINFO(
-            "[STATISTICS]: {} CPU usage: user {:02.3}%, sys {:02.3}%, max rss: {}{}, page faults: {}", get_app_name(),
-            offset_usr / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f),  // usec and add %
-            offset_sys / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f),  // usec and add %
-            max_rss.first, max_rss.second, last_usage.ru_majflt);
+      FWLOGINFO(
+          "[STATISTICS]: {} CPU usage: user {:02.3}%, sys {:02.3}%, max rss: {}{}, page faults: {}", get_app_name(),
+          offset_usr / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f),  // usec and add %
+          offset_sys / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f),  // usec and add %
+          max_rss.first, max_rss.second, last_usage.ru_majflt);
 #else
-        std::pair<uint64_t, const char *> ru_ixrss = details::make_size_showup(last_usage.ru_ixrss);
-        std::pair<uint64_t, const char *> ru_idrss = details::make_size_showup(last_usage.ru_idrss);
-        std::pair<uint64_t, const char *> ru_isrss = details::make_size_showup(last_usage.ru_isrss);
+      std::pair<uint64_t, const char *> ru_ixrss = details::make_size_showup(last_usage.ru_ixrss);
+      std::pair<uint64_t, const char *> ru_idrss = details::make_size_showup(last_usage.ru_idrss);
+      std::pair<uint64_t, const char *> ru_isrss = details::make_size_showup(last_usage.ru_isrss);
+      FWLOGINFO(
+          "[STATISTICS]: {} CPU usage: user {:02.3}%, sys {:02.3}%, max rss: {}{}, shared size: {}{}, unshared data "
+          "size: "
+          "{}{}, unshared "
+          "stack size: {}{}, page faults: {}",
+          get_app_name(),
+          offset_usr / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f),  // usec and add %
+          offset_sys / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f),  // usec and add %
+          max_rss.first, max_rss.second, ru_ixrss.first, ru_ixrss.second, ru_idrss.first, ru_idrss.second,
+          ru_isrss.first, ru_isrss.second, last_usage.ru_majflt);
+      if (internal_module_etcd_) {
+        const ::atapp::etcd_cluster::stats_t &current = internal_module_etcd_->get_raw_etcd_ctx().get_stats();
         FWLOGINFO(
-            "[STATISTICS]: {} CPU usage: user {:02.3}%, sys {:02.3}%, max rss: {}{}, shared size: {}{}, unshared data "
-            "size: "
-            "{}{}, unshared "
-            "stack size: {}{}, page faults: {}",
-            get_app_name(),
-            offset_usr / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f),  // usec and add %
-            offset_sys / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f),  // usec and add %
-            max_rss.first, max_rss.second, ru_ixrss.first, ru_ixrss.second, ru_idrss.first, ru_idrss.second,
-            ru_isrss.first, ru_isrss.second, last_usage.ru_majflt);
-        if (internal_module_etcd_) {
-          const ::atapp::etcd_cluster::stats_t &current = internal_module_etcd_->get_raw_etcd_ctx().get_stats();
-          FWLOGINFO(
-              "\tetcd module(last minite): request count: {}, failed request: {}, continue failed: {}, success "
-              "request: "
-              "{}, continue success request {}",
-              current.sum_create_requests - stats_.inner_etcd.sum_create_requests,
-              current.sum_error_requests - stats_.inner_etcd.sum_error_requests,
-              current.continue_error_requests - stats_.inner_etcd.continue_error_requests,
-              current.sum_success_requests - stats_.inner_etcd.sum_success_requests,
-              current.continue_success_requests - stats_.inner_etcd.continue_success_requests);
-          FWLOGINFO(
-              "\tetcd module(sum): request count: {}, failed request: {}, continue failed: {}, success request: "
-              "{}, continue success request {}",
-              current.sum_create_requests, current.sum_error_requests, current.continue_error_requests,
-              current.sum_success_requests, current.continue_success_requests);
-          stats_.inner_etcd = current;
-        }
+            "\tetcd module(last minite): request count: {}, failed request: {}, continue failed: {}, success "
+            "request: "
+            "{}, continue success request {}",
+            current.sum_create_requests - stats_.inner_etcd.sum_create_requests,
+            current.sum_error_requests - stats_.inner_etcd.sum_error_requests,
+            current.continue_error_requests - stats_.inner_etcd.continue_error_requests,
+            current.sum_success_requests - stats_.inner_etcd.sum_success_requests,
+            current.continue_success_requests - stats_.inner_etcd.continue_success_requests);
+        FWLOGINFO(
+            "\tetcd module(sum): request count: {}, failed request: {}, continue failed: {}, success request: "
+            "{}, continue success request {}",
+            current.sum_create_requests, current.sum_error_requests, current.continue_error_requests,
+            current.sum_success_requests, current.continue_success_requests);
+        stats_.inner_etcd = current;
+      }
 
-        FWLOGINFO("\tendpoint wake count: {}, by_id index size: {}, by_name index size: {}, waker size: {}",
-                  stats_.endpoint_wake_count, endpoint_index_by_id_.size(), endpoint_index_by_name_.size(),
-                  endpoint_waker_.size());
-        stats_.endpoint_wake_count = 0;
+      FWLOGINFO("\tendpoint wake count: {}, by_id index size: {}, by_name index size: {}, waker size: {}",
+                stats_.endpoint_wake_count, endpoint_index_by_id_.size(), endpoint_index_by_name_.size(),
+                endpoint_waker_.size());
+      stats_.endpoint_wake_count = 0;
 #endif
-      } else {
-        uv_getrusage(&stats_.last_checkpoint_usage);
-        if (internal_module_etcd_) {
-          stats_.inner_etcd = internal_module_etcd_->get_raw_etcd_ctx().get_stats();
-        }
+    } else {
+      uv_getrusage(&stats_.last_checkpoint_usage);
+      if (internal_module_etcd_) {
+        stats_.inner_etcd = internal_module_etcd_->get_raw_etcd_ctx().get_stats();
       }
+    }
 
-      if (nullptr != loop) {
-        uv_stop(loop);
-      }
+    if (nullptr != loop) {
+      uv_stop(loop);
     }
   } while (false);
   return 0;
@@ -1125,7 +1137,7 @@ LIBATAPP_MACRO_API bool app::is_fallback_to_atbus_connector_enabled() const noex
 }
 
 LIBATAPP_MACRO_API util::time::time_utility::raw_time_t app::get_last_tick_time() const noexcept {
-  return tick_timer_.sec_update;
+  return tick_timer_.last_tick_timepoint;
 }
 
 LIBATAPP_MACRO_API util::config::ini_loader &app::get_configure_loader() { return cfg_loader_; }
@@ -2188,17 +2200,25 @@ void app::run_ev_loop(int run_mode) {
       } else {
         // step X. notify all modules to finish and wait for all modules stop
         for (module_ptr_t &mod : modules_) {
-          if (mod->is_enabled()) {
-            int res = mod->stop();
-            if (0 == res) {
-              mod->disable();
-            } else if (res < 0) {
-              mod->disable();
-              FWLOGERROR("try to stop module {} but failed and return {}", mod->name(), res);
-            } else {
-              // any module stop running will make app wait
-              set_flag(flag_t::STOPPED, false);
-            }
+          if (!mod->is_enabled()) {
+            continue;
+          }
+
+          if (mod->check_suspend_stop()) {
+            // any module stop running will make app wait
+            set_flag(flag_t::STOPPED, false);
+            continue;
+          }
+
+          int res = mod->stop();
+          if (0 == res) {
+            mod->disable();
+          } else if (res < 0) {
+            mod->disable();
+            FWLOGERROR("try to stop module {} but failed and return {}", mod->name(), res);
+          } else {
+            // any module stop running will make app wait
+            set_flag(flag_t::STOPPED, false);
           }
         }
 
@@ -2335,7 +2355,7 @@ int64_t app::process_inner_events(const util::time::time_utility::raw_time_t &en
   while ((first_round || util::time::time_utility::sys_now() < end_tick) && more_messages) {
     first_round = false;
     int64_t round_res = 0;
-    if (!endpoint_waker_.empty() && endpoint_waker_.begin()->first <= tick_timer_.sec_update) {
+    if (!endpoint_waker_.empty() && endpoint_waker_.begin()->first <= tick_timer_.last_tick_timepoint) {
       atapp_endpoint::ptr_t ep = endpoint_waker_.begin()->second.lock();
       endpoint_waker_.erase(endpoint_waker_.begin());
       ++stats_.endpoint_wake_count;
@@ -2343,7 +2363,7 @@ int64_t app::process_inner_events(const util::time::time_utility::raw_time_t &en
       if (ep) {
         FWLOGDEBUG("atapp {:#x}({}) wakeup endpint {:#x}({})", get_app_id(), get_app_name(), ep->get_id(),
                    ep->get_name());
-        int32_t res = ep->retry_pending_messages(tick_timer_.sec_update, conf_.origin.bus().loop_times());
+        int32_t res = ep->retry_pending_messages(tick_timer_.last_tick_timepoint, conf_.origin.bus().loop_times());
         if (res > 0) {
           round_res += res;
         }

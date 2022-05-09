@@ -37,6 +37,7 @@ atapp:
   timer:
     tick_interval: 32ms # 32ms for tick active
     stop_timeout: 10s # 10s for stop operation
+    stop_interval: 256ms
   # =========== etcd service for discovery ===========
   etcd:
     enable: false
@@ -70,9 +71,9 @@ atapp:
       # ssl_cipher_list:       # CURLOPT_SSL_CIPHER_LIST
       # ssl_cipher_list_tls13  # CURLOPT_TLS13_CIPHERS
     cluster:
-      auto_update: true   # set false when etcd service is behind a safe cluster(Kubernetes etc.)
+      auto_update: true # set false when etcd service is behind a safe cluster(Kubernetes etc.)
       update_interval: 5m # unit: ms/milliseconds, s(econd), m(inute), h(our), d(ay)
-      retry_interval: 1m  # unit: ms/milliseconds, s(econd), m(inute), h(our), d(ay)
+      retry_interval: 1m # unit: ms/milliseconds, s(econd), m(inute), h(our), d(ay)
     keepalive:
       timeout: 31s # unit: ms/milliseconds, s(econd), m(inute), h(our), d(ay)
       ttl: 10s # unit: ms/milliseconds, s(econd), m(inute), h(our), d(ay)

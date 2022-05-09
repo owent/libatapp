@@ -139,7 +139,8 @@ class app {
   using timer_ptr_t = std::shared_ptr<timer_info_t>;
 
   struct tick_timer_t {
-    util::time::time_utility::raw_time_t sec_update;
+    util::time::time_utility::raw_time_t last_tick_timepoint;
+    util::time::time_utility::raw_time_t last_stop_timepoint;
     time_t sec;
     time_t usec;
     util::time::time_utility::raw_time_t *inner_break;
