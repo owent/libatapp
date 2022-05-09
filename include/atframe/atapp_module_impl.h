@@ -11,6 +11,8 @@
 
 #include <common/demangle.h>
 
+#include <chrono>
+#include <functional>
 #include <memory>
 
 #include "atframe/atapp_config.h"
@@ -124,6 +126,24 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE module_impl {
    */
   LIBATAPP_MACRO_API bool is_actived() const;
 
+  /**
+   * @brief suspend for a while when stop command is received
+   * @param timeout suspend timeout, it should not be greater than stop_timeout
+   * @param fn callback to check if it should be suspended, return true to suspend and call stop later
+   */
+  LIBATAPP_MACRO_API void suspend_stop(std::chrono::system_clock::duration timeout, std::function<bool()> fn);
+
+  /**
+   * @brief suspend for a while when stop command is received
+   * @param timeout suspend timeout, it should not be greater than stop_timeout
+   * @param fn callback to check if it should be suspended, return true to suspend and call stop later
+   */
+  template <class REP, class PERIOD>
+  LIBATAPP_MACRO_API_HEAD_ONLY inline void suspend_stop(std::chrono::duration<REP, PERIOD> timeout,
+                                                        std::function<bool()> fn) {
+    suspend_stop(std::chrono::duration_cast<std::chrono::system_clock::duration>(timeout), std::move(fn));
+  }
+
  protected:
   /**
    * @brief get owner atapp object
@@ -148,10 +168,19 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE module_impl {
 
   LIBATAPP_MACRO_API bool deactive();
 
+  LIBATAPP_MACRO_API bool check_suspend_stop();
+
  private:
   bool enabled_;
   bool actived_;
   app *owner_;
+
+  struct suspended_stop_info {
+    std::function<bool()> stop_suspend_callback;
+    std::chrono::system_clock::time_point stop_suspend_timeout;
+    std::chrono::system_clock::duration stop_suspend_duration;
+  };
+  suspended_stop_info suspended_stop_;
 
   mutable std::unique_ptr<util::scoped_demangled_name> auto_demangled_name_;
 

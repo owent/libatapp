@@ -73,9 +73,10 @@ message atbus_configure {
 
 message atapp_timer {
   google.protobuf.Duration stop_timeout = 1 [(atapp.protocol.CONFIGURE) = { default_value: "10s" }];
-  google.protobuf.Duration tick_interval = 2 [(atapp.protocol.CONFIGURE) = { default_value: "16ms" }];
-  google.protobuf.Duration message_timeout = 3 [(atapp.protocol.CONFIGURE) = { default_value: "8s" }];
-  google.protobuf.Duration initialize_timeout = 4 [(atapp.protocol.CONFIGURE) = { default_value: "10s" }];
+  google.protobuf.Duration stop_interval = 2 [(atapp.protocol.CONFIGURE) = { default_value: "128ms" }];
+  google.protobuf.Duration tick_interval = 3 [(atapp.protocol.CONFIGURE) = { default_value: "16ms" }];
+  google.protobuf.Duration message_timeout = 4 [(atapp.protocol.CONFIGURE) = { default_value: "8s" }];
+  google.protobuf.Duration initialize_timeout = 5 [(atapp.protocol.CONFIGURE) = { default_value: "10s" }];
 }
 
 message atapp_log_level_range {
