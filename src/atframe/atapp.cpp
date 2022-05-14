@@ -1022,9 +1022,7 @@ LIBATAPP_MACRO_API util::cli::cmd_option::ptr_type app::get_option_manager() {
 LIBATAPP_MACRO_API bool app::is_current_upgrade_mode() const noexcept { return conf_.upgrade_mode; }
 
 LIBATAPP_MACRO_API util::network::http_request::curl_m_bind_ptr_t app::get_shared_curl_multi_context() const noexcept {
-  if (likely(internal_module_etcd_)) {
-    return internal_module_etcd_->get_shared_curl_multi_context();
-  }
+  UTIL_LIKELY_IF(internal_module_etcd_) { return internal_module_etcd_->get_shared_curl_multi_context(); }
 
   return nullptr;
 }
@@ -3154,11 +3152,12 @@ bool app::setup_timeout_timer(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration 
 
   int res = uv_timer_start(&timer->timer, ev_stop_timeout,
                            details::chrono_to_libuv_duration(duration, ATAPP_DEFAULT_STOP_TIMEOUT), 0);
-  if (likely(0 == res)) {
+  UTIL_LIKELY_IF(0 == res) {
     tick_timer_.timeout_timer = timer;
 
     return true;
-  } else {
+  }
+  else {
     FWLOGERROR("setup timeout timer failed, res: {}", res);
     set_flag(flag_t::TIMEOUT, false);
 

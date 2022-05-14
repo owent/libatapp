@@ -274,9 +274,8 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::retry_pending_messages(const util::ti
 
     ++ret;
 
-    if (likely(pending_message_size_ >= msg.data.size())) {
-      pending_message_size_ -= msg.data.size();
-    } else {
+    UTIL_LIKELY_IF(pending_message_size_ >= msg.data.size()) { pending_message_size_ -= msg.data.size(); }
+    else {
       pending_message_size_ = 0;
     }
 #if defined(LIBATAPP_ENABLE_CUSTOM_COUNT_FOR_STD_LIST) && LIBATAPP_ENABLE_CUSTOM_COUNT_FOR_STD_LIST
@@ -342,9 +341,8 @@ void atapp_endpoint::cancel_pending_messages() {
                                         reinterpret_cast<const void *>(msg.data.data()), msg.data.size(),
                                         msg.metadata.get());
 
-    if (likely(pending_message_size_ >= msg.data.size())) {
-      pending_message_size_ -= msg.data.size();
-    } else {
+    UTIL_LIKELY_IF(pending_message_size_ >= msg.data.size()) { pending_message_size_ -= msg.data.size(); }
+    else {
       pending_message_size_ = 0;
     }
 #if defined(LIBATAPP_ENABLE_CUSTOM_COUNT_FOR_STD_LIST) && LIBATAPP_ENABLE_CUSTOM_COUNT_FOR_STD_LIST
