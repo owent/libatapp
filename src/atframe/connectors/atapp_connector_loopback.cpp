@@ -195,7 +195,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_loopback::process(
       }
 
       ++ret;
-      if (likely(pending_message_size_ >= pending_msg.data.size())) {
+      UTIL_LIKELY_IF(pending_message_size_ >= pending_msg.data.size()) {
         pending_message_size_ -= pending_msg.data.size();
       } else {
         pending_message_size_ = 0;

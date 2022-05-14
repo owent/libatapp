@@ -1255,7 +1255,7 @@ bool etcd_module::update_inner_watcher_event(node_info_t &node) {
 
   bool has_event = false;
 
-  if (likely(local_cache_by_id == local_cache_by_name)) {
+  UTIL_LIKELY_IF(local_cache_by_id == local_cache_by_name) {
     if (node_action_t::EN_NAT_DELETE == node.action) {
       if (local_cache_by_id) {
         global_discovery_.remove_node(local_cache_by_id);
@@ -1278,7 +1278,8 @@ bool etcd_module::update_inner_watcher_event(node_info_t &node) {
 
       has_event = true;
     }
-  } else {
+  }
+  else {
     if (node_action_t::EN_NAT_DELETE == node.action) {
       if (local_cache_by_id) {
         global_discovery_.remove_node(local_cache_by_id);
