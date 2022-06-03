@@ -99,7 +99,7 @@ static void sort_string_map(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Map<std::st
   output.clear();
   output.reserve(input.size());
   for (auto it = input.begin(); it != input.end(); ++it) {
-    output.push_back(std::make_pair(it->first, it->second));
+    output.push_back(std::pair<gsl::string_view, gsl::string_view>(it->first, it->second));
   }
 
   std::sort(output.begin(), output.end(),
@@ -287,6 +287,10 @@ etcd_discovery_set::metadata_hash_type::operator()(const metadata_type &metadata
 
 LIBATAPP_MACRO_API bool etcd_discovery_set::metadata_equal_type::operator()(const metadata_type &l,
                                                                             const metadata_type &r) const noexcept {
+  if (&l == &r) {
+    return true;
+  }
+
   if (l.namespace_name().size() != r.namespace_name().size()) {
     return false;
   }
@@ -645,7 +649,9 @@ LIBATAPP_MACRO_API void etcd_discovery_set::add_node(const etcd_discovery_node::
       }
     }
 
-    clear_cache(&node->get_discovery_info().metadata());
+    if (node->get_discovery_info().has_metadata()) {
+      clear_cache(node->get_discovery_info().metadata());
+    }
   }
 }
 
@@ -672,7 +678,9 @@ LIBATAPP_MACRO_API void etcd_discovery_set::remove_node(const etcd_discovery_nod
   }
 
   if (has_cleanup) {
-    clear_cache(&node->get_discovery_info().metadata());
+    if (node->get_discovery_info().has_metadata()) {
+      clear_cache(node->get_discovery_info().metadata());
+    }
   }
 }
 
@@ -689,7 +697,9 @@ LIBATAPP_MACRO_API void etcd_discovery_set::remove_node(uint64_t id) {
     }
   }
 
-  clear_cache(&iter_id->second->get_discovery_info().metadata());
+  if (iter_id->second->get_discovery_info().has_metadata()) {
+    clear_cache(iter_id->second->get_discovery_info().metadata());
+  }
 
   node_by_id_.erase(iter_id);
 }
@@ -707,7 +717,9 @@ LIBATAPP_MACRO_API void etcd_discovery_set::remove_node(const std::string &name)
     }
   }
 
-  clear_cache(&iter_name->second->get_discovery_info().metadata());
+  if (iter_name->second->get_discovery_info().has_metadata()) {
+    clear_cache(iter_name->second->get_discovery_info().metadata());
+  }
 
   node_by_name_.erase(iter_name);
 }
@@ -772,15 +784,12 @@ void etcd_discovery_set::rebuild_cache(index_cache_type &cache_set, const metada
   std::sort(cache_set.hashing_cache.begin(), cache_set.hashing_cache.end(), consistent_hash_compare_index);
 }
 
-void etcd_discovery_set::clear_cache(const metadata_type *rule) const {
+void etcd_discovery_set::clear_cache(const metadata_type &metadata) const {
   clear_cache(default_index_);
-  if (nullptr == rule) {
-    return;
-  }
 
   std::vector<const metadata_type *> pending_to_delete;
   for (auto &metadata_index : metadata_index_) {
-    if (metadata_equal_type::filter(*rule, metadata_index.first)) {
+    if (metadata_equal_type::filter(metadata_index.first, metadata)) {
       pending_to_delete.push_back(&metadata_index.first);
     }
   }

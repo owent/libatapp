@@ -71,10 +71,10 @@ if ( $RUN_MODE -eq "msvc.2019+.test" ) {
   if ( $LastExitCode -ne 0 ) {
     exit $LastExitCode
   }
-  # & ctest . -V -C $Env:CONFIGURATION
-  # if ( $LastExitCode -ne 0 ) {
-  #   exit $LastExitCode
-  # }
+  & ctest . -V -C $Env:CONFIGURATION -L libatapp.sample
+  if ( $LastExitCode -ne 0 ) {
+    exit $LastExitCode
+  }
 }
 elseif ( $RUN_MODE -eq "msvc.2017.test" ) {
   Invoke-Environment "call ""$vsInstallationPath/VC/Auxiliary/Build/vcvars64.bat"""
@@ -98,10 +98,10 @@ elseif ( $RUN_MODE -eq "msvc.2017.test" ) {
   if ( $LastExitCode -ne 0 ) {
     exit $LastExitCode
   }
-  # & ctest . -V -C $Env:CONFIGURATION
-  # if ( $LastExitCode -ne 0 ) {
-  #   exit $LastExitCode
-  # }
+  & ctest . -V -C $Env:CONFIGURATION -L libatapp.sample
+  if ( $LastExitCode -ne 0 ) {
+    exit $LastExitCode
+  }
 }
 
 Set-Location $WORK_DIR

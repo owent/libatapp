@@ -26,4 +26,5 @@ atframe_add_test_executable(atapp_unit_test ${PROJECT_TEST_SRC_LIST})
 target_compile_options(atapp_unit_test PRIVATE ${PROJECT_LIBATAPP_PRIVATE_COMPILE_OPTIONS})
 target_link_libraries(atapp_unit_test atapp)
 
-add_test(test atapp_unit_test)
+add_test(NAME "libatapp.unit_test" COMMAND "$<TARGET_FILE:atapp_unit_test>")
+set_tests_properties("libatapp.unit_test" PROPERTIES LABELS "libatapp;libatapp.unit_test")
