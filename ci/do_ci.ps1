@@ -71,7 +71,7 @@ if ( $RUN_MODE -eq "msvc.2019+.test" ) {
   if ( $LastExitCode -ne 0 ) {
     exit $LastExitCode
   }
-  & ctest . -V -C $Env:CONFIGURATION -L libatapp.sample
+  & ctest . -V -C $Env:CONFIGURATION -L libatapp.unit_test
   if ( $LastExitCode -ne 0 ) {
     exit $LastExitCode
   }
@@ -98,7 +98,7 @@ elseif ( $RUN_MODE -eq "msvc.2017.test" ) {
   if ( $LastExitCode -ne 0 ) {
     exit $LastExitCode
   }
-  & ctest . -V -C $Env:CONFIGURATION -L libatapp.sample
+  & ctest . -V -C $Env:CONFIGURATION -L libatapp.unit_test
   if ( $LastExitCode -ne 0 ) {
     exit $LastExitCode
   }
