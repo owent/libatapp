@@ -148,14 +148,14 @@ LIBATAPP_MACRO_API bool atapp_connection_handle::is_ready() const noexcept {
   return 0 != (flags_ & flags_t::EN_ACH_READY);
 }
 
-LIBATAPP_MACRO_API void atapp_connection_handle::set_on_destroy(on_destroy_fn_t fn) { on_destroy_fn_ = fn; }
+LIBATAPP_MACRO_API void atapp_connection_handle::set_on_destroy(on_destroy_fn_type fn) { on_destroy_fn_ = fn; }
 
-LIBATAPP_MACRO_API const atapp_connection_handle::on_destroy_fn_t &atapp_connection_handle::get_on_destroy() const {
+LIBATAPP_MACRO_API const atapp_connection_handle::on_destroy_fn_type &atapp_connection_handle::get_on_destroy() const {
   return on_destroy_fn_;
 }
 
 LIBATAPP_MACRO_API void atapp_connection_handle::reset_on_destroy() {
-  on_destroy_fn_t empty;
+  on_destroy_fn_type empty;
   on_destroy_fn_.swap(empty);
 }
 

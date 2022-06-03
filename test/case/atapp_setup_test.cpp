@@ -1,3 +1,5 @@
+// Copyright 2022 atframework
+
 #include <atframe/atapp.h>
 #include <atframe/atapp_module_impl.h>
 

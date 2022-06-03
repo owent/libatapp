@@ -1046,8 +1046,8 @@ int etcd_module::http_callback_on_etcd_closed(util::network::http_request &req) 
   return 0;
 }
 
-static void _collect_old_nodes(etcd_module &mod, etcd_discovery_set::node_by_name_t &old_names,
-                               etcd_discovery_set::node_by_id_t &old_ids) {
+static void _collect_old_nodes(etcd_module &mod, etcd_discovery_set::node_by_name_type &old_names,
+                               etcd_discovery_set::node_by_id_type &old_ids) {
   old_ids.reserve(mod.get_global_discovery().get_sorted_nodes().size());
   old_names.reserve(mod.get_global_discovery().get_sorted_nodes().size());
   for (auto &node : mod.get_global_discovery().get_sorted_nodes()) {
@@ -1063,8 +1063,8 @@ static void _collect_old_nodes(etcd_module &mod, etcd_discovery_set::node_by_nam
 }
 
 static void _remove_old_node_index(const atapp::protocol::atapp_discovery &node_discovery,
-                                   etcd_discovery_set::node_by_name_t &old_names,
-                                   etcd_discovery_set::node_by_id_t &old_ids) {
+                                   etcd_discovery_set::node_by_name_type &old_names,
+                                   etcd_discovery_set::node_by_id_type &old_ids) {
   if (0 != node_discovery.id()) {
     old_ids.erase(node_discovery.id());
   }
@@ -1074,8 +1074,8 @@ static void _remove_old_node_index(const atapp::protocol::atapp_discovery &node_
 }
 
 void etcd_module::watcher_internal_access_t::cleanup_old_nodes(etcd_module &mod,
-                                                               etcd_discovery_set::node_by_name_t &old_names,
-                                                               etcd_discovery_set::node_by_id_t &old_ids) {
+                                                               etcd_discovery_set::node_by_name_type &old_names,
+                                                               etcd_discovery_set::node_by_id_type &old_ids) {
   for (auto &node : old_names) {
     etcd_module::node_info_t evt_node;
     evt_node.action = etcd_module::node_action_t::EN_NAT_DELETE;
@@ -1121,8 +1121,8 @@ void etcd_module::watcher_callback_list_wrapper_t::operator()(const ::atapp::etc
     }
   }
 
-  etcd_discovery_set::node_by_name_t old_names;
-  etcd_discovery_set::node_by_id_t old_ids;
+  etcd_discovery_set::node_by_name_type old_names;
+  etcd_discovery_set::node_by_id_type old_ids;
   if (enable_snapshot) {
     _collect_old_nodes(*mod, old_names, old_ids);
   }
@@ -1203,8 +1203,8 @@ void etcd_module::watcher_callback_one_wrapper_t::operator()(const ::atapp::etcd
     }
   }
 
-  etcd_discovery_set::node_by_name_t old_names;
-  etcd_discovery_set::node_by_id_t old_ids;
+  etcd_discovery_set::node_by_name_type old_names;
+  etcd_discovery_set::node_by_id_type old_ids;
   if (enable_snapshot) {
     _collect_old_nodes(*mod, old_names, old_ids);
   }

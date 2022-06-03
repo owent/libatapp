@@ -215,7 +215,7 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::push_forward_message(int32_t type, ui
   if (nullptr != metadata) {
     msg.metadata.reset(new atapp::protocol::atapp_metadata());
     if (msg.metadata) {
-      msg.metadata->CopyFrom(*metadata);
+      *msg.metadata = *metadata;
     }
   }
 

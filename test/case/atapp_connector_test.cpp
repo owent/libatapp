@@ -1,3 +1,7 @@
+// Copyright 2022 atframework
+
+#include <atframe/atapp.h>
+
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
@@ -8,8 +12,6 @@
 #include <memory>
 #include <numeric>
 #include <vector>
-
-#include <atframe/atapp.h>
 
 #include "frame/test_macros.h"
 

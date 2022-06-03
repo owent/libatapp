@@ -273,9 +273,8 @@ message atapp_configure {
   string name = 103;
   uint64 type_id = 104;
   string type_name = 105;
-  atapp_area area = 106;  // Some service is splited by area
-  bool configure_metadata = 107 [(atapp.protocol.CONFIGURE) = { default_value: "10s" }];
-  atapp_metadata metadata = 108;  // Just like in kubernetes
+  atapp_area area = 106;          // Some service is splited by area
+  atapp_metadata metadata = 107;  // Just like in kubernetes
 
   string hostname = 121;
   // The same identity means the same instance of a app.

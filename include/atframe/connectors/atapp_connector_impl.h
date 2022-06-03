@@ -40,7 +40,7 @@ class atapp_connection_handle {
  public:
   using ptr_t = std::shared_ptr<atapp_connection_handle>;
   using weak_ptr_t = std::weak_ptr<atapp_connection_handle>;
-  using on_destroy_fn_t = std::function<void(atapp_connection_handle &)>;
+  using on_destroy_fn_type = std::function<void(atapp_connection_handle &)>;
 
   struct LIBATAPP_MACRO_API_HEAD_ONLY flags_t {
     enum type {
@@ -72,8 +72,8 @@ class atapp_connection_handle {
   UTIL_FORCEINLINE void set_private_data_iptr(intptr_t input) noexcept { private_data_iptr_ = input; }
   UTIL_FORCEINLINE intptr_t get_private_data_iptr() const noexcept { return private_data_iptr_; }
 
-  LIBATAPP_MACRO_API void set_on_destroy(on_destroy_fn_t fn);
-  LIBATAPP_MACRO_API const on_destroy_fn_t &get_on_destroy() const;
+  LIBATAPP_MACRO_API void set_on_destroy(on_destroy_fn_type fn);
+  LIBATAPP_MACRO_API const on_destroy_fn_type &get_on_destroy() const;
   LIBATAPP_MACRO_API void reset_on_destroy();
 
   UTIL_FORCEINLINE atapp_connector_impl *get_connector() const noexcept { return connector_; }
@@ -90,7 +90,7 @@ class atapp_connection_handle {
   };
   atapp_connector_impl *connector_;
   atapp_endpoint *endpiont_;
-  on_destroy_fn_t on_destroy_fn_;
+  on_destroy_fn_type on_destroy_fn_;
 
   friend struct atapp_connector_bind_helper;
   friend struct atapp_endpoint_bind_helper;
