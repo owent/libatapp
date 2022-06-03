@@ -40,6 +40,8 @@ CASE_TEST(atapp_discovery, metadata_filter) {
   // full match
   rule = metadata;
   CASE_EXPECT_TRUE(etcd_discovery_set::metadata_equal_type::filter(rule, metadata));
+  CASE_EXPECT_EQ(etcd_discovery_set::metadata_hash_type()(rule), etcd_discovery_set::metadata_hash_type()(metadata));
+  CASE_EXPECT_TRUE(etcd_discovery_set::metadata_equal_type()(rule, metadata));
 
   // partly match - namespace_name
   rule.clear_namespace_name();
