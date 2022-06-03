@@ -1535,7 +1535,7 @@ LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(const etcd_disco
                                                                 const void *data, size_t data_size,
                                                                 uint64_t *msg_sequence,
                                                                 const atapp::protocol::atapp_metadata *metadata) {
-  etcd_discovery_node::ptr_t node = discovery_set.get_node_by_consistent_hash(hash_buf, hash_bufsz);
+  etcd_discovery_node::ptr_t node = discovery_set.get_node_by_consistent_hash(hash_buf, hash_bufsz, metadata);
   if (!node) {
     return EN_ATBUS_ERR_ATNODE_NOT_FOUND;
   }
@@ -1547,7 +1547,7 @@ LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(const etcd_disco
                                                                 uint64_t hash_key, int32_t type, const void *data,
                                                                 size_t data_size, uint64_t *msg_sequence,
                                                                 const atapp::protocol::atapp_metadata *metadata) {
-  etcd_discovery_node::ptr_t node = discovery_set.get_node_by_consistent_hash(hash_key);
+  etcd_discovery_node::ptr_t node = discovery_set.get_node_by_consistent_hash(hash_key, metadata);
   if (!node) {
     return EN_ATBUS_ERR_ATNODE_NOT_FOUND;
   }
@@ -1559,7 +1559,7 @@ LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(const etcd_disco
                                                                 int64_t hash_key, int32_t type, const void *data,
                                                                 size_t data_size, uint64_t *msg_sequence,
                                                                 const atapp::protocol::atapp_metadata *metadata) {
-  etcd_discovery_node::ptr_t node = discovery_set.get_node_by_consistent_hash(hash_key);
+  etcd_discovery_node::ptr_t node = discovery_set.get_node_by_consistent_hash(hash_key, metadata);
   if (!node) {
     return EN_ATBUS_ERR_ATNODE_NOT_FOUND;
   }
@@ -1572,7 +1572,7 @@ LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(const etcd_disco
                                                                 const void *data, size_t data_size,
                                                                 uint64_t *msg_sequence,
                                                                 const atapp::protocol::atapp_metadata *metadata) {
-  etcd_discovery_node::ptr_t node = discovery_set.get_node_by_consistent_hash(hash_key);
+  etcd_discovery_node::ptr_t node = discovery_set.get_node_by_consistent_hash(hash_key, metadata);
   if (!node) {
     return EN_ATBUS_ERR_ATNODE_NOT_FOUND;
   }
@@ -1583,7 +1583,7 @@ LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(const etcd_disco
 LIBATAPP_MACRO_API int32_t app::send_message_by_random(const etcd_discovery_set &discovery_set, int32_t type,
                                                        const void *data, size_t data_size, uint64_t *msg_sequence,
                                                        const atapp::protocol::atapp_metadata *metadata) {
-  etcd_discovery_node::ptr_t node = discovery_set.get_node_by_random();
+  etcd_discovery_node::ptr_t node = discovery_set.get_node_by_random(metadata);
   if (!node) {
     return EN_ATBUS_ERR_ATNODE_NOT_FOUND;
   }
@@ -1594,7 +1594,7 @@ LIBATAPP_MACRO_API int32_t app::send_message_by_random(const etcd_discovery_set 
 LIBATAPP_MACRO_API int32_t app::send_message_by_round_robin(const etcd_discovery_set &discovery_set, int32_t type,
                                                             const void *data, size_t data_size, uint64_t *msg_sequence,
                                                             const atapp::protocol::atapp_metadata *metadata) {
-  etcd_discovery_node::ptr_t node = discovery_set.get_node_by_round_robin();
+  etcd_discovery_node::ptr_t node = discovery_set.get_node_by_round_robin(metadata);
   if (!node) {
     return EN_ATBUS_ERR_ATNODE_NOT_FOUND;
   }
@@ -2111,8 +2111,8 @@ int app::apply_configure() {
   }
 
   // reset metadata from configure
-  if (conf_.origin.configure_metadata()) {
-    mutable_metadata().CopyFrom(conf_.origin.metadata());
+  if (conf_.origin.has_metadata()) {
+    mutable_metadata() = conf_.origin.metadata();
   }
 
   // atbus configure
