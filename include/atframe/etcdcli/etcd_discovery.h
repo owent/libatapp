@@ -119,7 +119,7 @@ class etcd_discovery_set {
   LIBATAPP_MACRO_API size_t metadata_index_size() const noexcept;
 
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_id(uint64_t id) const;
-  LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_name(gsl::string_view name) const;
+  LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_name(const std::string& name) const;
 
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_consistent_hash(
       const void *buf, size_t bufsz, const metadata_type *metadata = nullptr) const;
@@ -150,7 +150,7 @@ class etcd_discovery_set {
   LIBATAPP_MACRO_API void add_node(const etcd_discovery_node::ptr_t &node);
   LIBATAPP_MACRO_API void remove_node(const etcd_discovery_node::ptr_t &node);
   LIBATAPP_MACRO_API void remove_node(uint64_t id);
-  LIBATAPP_MACRO_API void remove_node(gsl::string_view name);
+  LIBATAPP_MACRO_API void remove_node(const std::string& name);
 
  private:
   typedef struct {

@@ -100,9 +100,9 @@ LIBATAPP_MACRO_API uint64_t atapp_endpoint::get_id() const noexcept {
   return discovery_->get_discovery_info().id();
 }
 
-LIBATAPP_MACRO_API gsl::string_view atapp_endpoint::get_name() const noexcept {
+LIBATAPP_MACRO_API const std::string &atapp_endpoint::get_name() const noexcept {
   if (!discovery_) {
-    return {};
+    return atapp::protocol::atapp_discovery::default_instance().name();
   }
 
   return discovery_->get_discovery_info().name();

@@ -141,7 +141,7 @@ LIBATAPP_MACRO_API void atapp_connector_loopback::on_receive_forward_response(
     if (0 != sender.id) {
       sender.remote = owner->get_endpoint(sender.id);
     } else {
-      sender.remote = owner->get_endpoint(sender.name);
+      sender.remote = owner->get_endpoint(static_cast<std::string>(sender.name));
     }
   }
 
@@ -180,7 +180,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_loopback::process(
       sender.name = owner->get_app_name();
       // endpoint maybe replaced in callback , so we need refind it every time
       if (0 == sender.id) {
-        sender.remote = owner->get_endpoint(sender.name);
+        sender.remote = owner->get_endpoint(static_cast<std::string>(sender.name));
       } else {
         sender.remote = owner->get_endpoint(sender.id);
       }
@@ -197,7 +197,8 @@ LIBATAPP_MACRO_API int32_t atapp_connector_loopback::process(
       ++ret;
       UTIL_LIKELY_IF(pending_message_size_ >= pending_msg.data.size()) {
         pending_message_size_ -= pending_msg.data.size();
-      } else {
+      }
+      else {
         pending_message_size_ = 0;
       }
 #if defined(LIBATAPP_ENABLE_CUSTOM_COUNT_FOR_STD_LIST) && LIBATAPP_ENABLE_CUSTOM_COUNT_FOR_STD_LIST

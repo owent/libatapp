@@ -1319,7 +1319,7 @@ LIBATAPP_MACRO_API etcd_discovery_node::ptr_t app::get_discovery_node_by_id(uint
   return internal_module_etcd_->get_global_discovery().get_node_by_id(id);
 }
 
-LIBATAPP_MACRO_API etcd_discovery_node::ptr_t app::get_discovery_node_by_name(gsl::string_view name) const noexcept {
+LIBATAPP_MACRO_API etcd_discovery_node::ptr_t app::get_discovery_node_by_name(const std::string &name) const noexcept {
   if (!internal_module_etcd_) {
     return nullptr;
   }
@@ -1396,7 +1396,7 @@ LIBATAPP_MACRO_API int32_t app::send_message(uint64_t target_node_id, int32_t ty
   return bus_node_->send_data(target_node_id, type, data, data_size, msg_sequence);
 }
 
-LIBATAPP_MACRO_API int32_t app::send_message(gsl::string_view target_node_name, int32_t type, const void *data,
+LIBATAPP_MACRO_API int32_t app::send_message(const std::string &target_node_name, int32_t type, const void *data,
                                              size_t data_size, uint64_t *msg_sequence,
                                              const atapp::protocol::atapp_metadata *metadata) {
   if (!check_flag(flag_t::INITIALIZED)) {
@@ -1687,12 +1687,12 @@ LIBATAPP_MACRO_API void app::remove_endpoint(uint64_t by_id) {
   atapp_endpoint::ptr_t res = iter_id->second;
   endpoint_index_by_id_.erase(iter_id);
 
-  std::string name;
+  const std::string *name = nullptr;
   if (res) {
-    name = std::string(res->get_name());
+    name = &res->get_name();
   }
-  if (!name.empty()) {
-    endpoint_index_by_name_t::const_iterator iter_name = endpoint_index_by_name_.find(name);
+  if (nullptr != name && !name->empty()) {
+    endpoint_index_by_name_t::const_iterator iter_name = endpoint_index_by_name_.find(*name);
     if (iter_name != endpoint_index_by_name_.end() && iter_name->second == res) {
       endpoint_index_by_name_.erase(iter_name);
     }
@@ -1746,7 +1746,7 @@ LIBATAPP_MACRO_API void app::remove_endpoint(const atapp_endpoint::ptr_t &enpoin
   }
 
   {
-    std::string name{enpoint->get_name()};
+    const std::string &name = enpoint->get_name();
     if (!name.empty()) {
       endpoint_index_by_name_t::const_iterator iter_name = endpoint_index_by_name_.find(name);
       if (iter_name != endpoint_index_by_name_.end() && iter_name->second == enpoint) {
@@ -1911,9 +1911,8 @@ LIBATAPP_MACRO_API const atapp_endpoint *app::get_endpoint(uint64_t by_id) const
   return nullptr;
 }
 
-LIBATAPP_MACRO_API atapp_endpoint *app::get_endpoint(gsl::string_view by_name) {
-  endpoint_index_by_name_t::iterator iter_name =
-      endpoint_index_by_name_.find(std::string(by_name.data(), by_name.size()));
+LIBATAPP_MACRO_API atapp_endpoint *app::get_endpoint(const std::string &by_name) {
+  endpoint_index_by_name_t::iterator iter_name = endpoint_index_by_name_.find(by_name);
   if (iter_name != endpoint_index_by_name_.end()) {
     return iter_name->second.get();
   }
@@ -1921,9 +1920,8 @@ LIBATAPP_MACRO_API atapp_endpoint *app::get_endpoint(gsl::string_view by_name) {
   return nullptr;
 }
 
-LIBATAPP_MACRO_API const atapp_endpoint *app::get_endpoint(gsl::string_view by_name) const noexcept {
-  endpoint_index_by_name_t::const_iterator iter_name =
-      endpoint_index_by_name_.find(std::string(by_name.data(), by_name.size()));
+LIBATAPP_MACRO_API const atapp_endpoint *app::get_endpoint(const std::string &by_name) const noexcept {
+  endpoint_index_by_name_t::const_iterator iter_name = endpoint_index_by_name_.find(by_name);
   if (iter_name != endpoint_index_by_name_.end()) {
     return iter_name->second.get();
   }
