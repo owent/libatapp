@@ -130,7 +130,7 @@ class etcd_discovery_set {
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_consistent_hash(
       gsl::string_view key, const metadata_type *metadata = nullptr) const;
 
-  template <class TKEY, class = std::enable_if<std::is_integral<TKEY>::value>::type>
+  template <class TKEY, class = typename std::enable_if<std::is_integral<TKEY>::value>::type>
   LIBATAPP_MACRO_API_HEAD_ONLY etcd_discovery_node::ptr_t get_node_by_consistent_hash(
       TKEY &&key, const metadata_type *metadata = nullptr) const {
     return get_node_by_consistent_hash(
