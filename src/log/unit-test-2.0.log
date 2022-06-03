@@ -1,0 +1,182 @@
+[Log     Info][2022-06-04 03:22:32.37869][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:3111(atapp::app::setup_tick_timer)]: setup tick interval to 8ms.
+[Log     Info][2022-06-04 03:22:32.37869][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:3854(atapp::app::bus_evt_callback_on_info_log)]: bus node 0x2 endpoint 0x0(0x0) connection ipv4://127.0.0.1:21538(0x184cca90d80) message: channel connected(listen callback)
+[Log     Info][2022-06-04 03:22:32.39014][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:3887(atapp::app::bus_evt_callback_on_available)]: bus node 0x2 initialze done, res: 0
+[Log     Info][2022-06-04 03:22:32.39014][D:\workspace\github\atframework\libatapp\src\atframe\modules\etcd_module.cpp:132(atapp::etcd_module::init)]: etcd disabled, start single mode
+[Log     Info][2022-06-04 03:22:32.40356][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_endpoint.cpp:39(atapp::atapp_endpoint::create)]: create atapp endpoint 0x184cc5a2580
+[Log     Info][2022-06-04 03:22:32.40356][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_endpoint.cpp:124(atapp::atapp_endpoint::update_discovery)]: update atapp endpoint 0x184cc5a2580 with 2(unit-test-2)
+[Log    Debug][2022-06-04 03:22:32.40356][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_endpoint.cpp:311(atapp::atapp_endpoint::add_waker)]: atapp 0x1(unit-test-1) update waker for 0x2(unit-test-2) to 0us later
+[Log    Debug][2022-06-04 03:22:32.40356][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_connector_impl.cpp:94(atapp::atapp_connection_handle::atapp_connection_handle)]: atapp handle 0x184cca10c90 created
+[Log    Error][2022-06-04 03:22:32.40356][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:3834(atapp::app::bus_evt_callback_on_error)]: bus node 0x1 connection 0x184ce3758e0(ipv4://127.0.0.1:21538) error, status: -403, error code: 0
+Call stacks:
+Frame #00: (util::v2005::log::log_wrapper::format_log<char const (&)[67],unsigned __int64,void const *,std::basic_string<char,std::char_traits<char>,std::allocator<char> > const &,int &,int &>+0x219) [0x7ffbbf1bedb0]
+Frame #01: (atapp::app::bus_evt_callback_on_error+0x678) [0x7ffbbf149b70]
+Frame #02: (std::invoke<int (__cdecl atapp::app::*&)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),atapp::app * &,atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>+0x6a) [0x7ffbbf1dc0b0]
+Frame #03: (std::_Invoker_ret<std::_Unforced,0>::_Call<int (__cdecl atapp::app::*&)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),atapp::app * &,atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>+0x53) [0x7ffbbf16ea90]
+Frame #04: (std::_Call_binder<std::_Unforced,0,1,2,3,4,5,int (__cdecl atapp::app::*)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),std::tuple<atapp::app *,std::_Ph<1>,std::_Ph<2>,std::_Ph<3>,std::_Ph<4>,std::_Ph<5> >,std::tuple<atbus::node const &,atbus::endpoint const * &&,atbus::connection const * &&,int &&,int &&> >+0x1e0) [0x7ffbbf16f930]
+Frame #05: (std::_Binder<std::_Unforced,int (__cdecl atapp::app::*)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),atapp::app *,std::_Ph<1> const &,std::_Ph<2> const &,std::_Ph<3> const &,std::_Ph<4> const &,std::_Ph<5> const &>::operator()<atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>+0x142) [0x7ffbbf168210]
+Frame #06: (std::invoke<std::_Binder<std::_Unforced,int (__cdecl atapp::app::*)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),atapp::app *,std::_Ph<1> const &,std::_Ph<2> const &,std::_Ph<3> const &,std::_Ph<4> const &,std::_Ph<5> const &> &,atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>+0x46) [0x7ffbbf1dc610]
+Frame #07: (std::_Invoker_ret<int,0>::_Call<std::_Binder<std::_Unforced,int (__cdecl atapp::app::*)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),atapp::app *,std::_Ph<1> const &,std::_Ph<2> const &,std::_Ph<3> const &,std::_Ph<4> const &,std::_Ph<5> const &> &,atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>+0x46) [0x7ffbbf16ee70]
+Frame #08: (std::_Func_impl_no_alloc<std::_Binder<std::_Unforced,int (__cdecl atapp::app::*)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),atapp::app *,std::_Ph<1> const &,std::_Ph<2> const &,std::_Ph<3> const &,std::_Ph<4> const &,std::_Ph<5> const &>,int,atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>::_Do_call+0xa4) [0x7ffbbf212ea0]
+Frame #09: (std::_Func_class<int,atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>::operator()+0xdb) [0x7ffbbe88b630]
+Frame #10: (atbus::node::on_error+0xf7) [0x7ffbbe86aff0]
+Frame #11: (atbus::connection::connect+0xaa6) [0x7ffbbe83b580]
+Frame #12: (atbus::node::connect+0x2fd) [0x7ffbbe866560]
+Frame #13: (atapp::atapp_connector_atbus::on_start_connect+0x462) [0x7ffbbf290dd0]
+Frame #14: (atapp::app::mutable_endpoint+0xd35) [0x7ffbbf13c550]
+Frame #15: (test_func_test_atapp_message_case_send_message_remote_+0x708) [0x7ff714d2cbc0]
+Frame #16: (test_case_base::run+0x50) [0x7ff714cd36f0]
+Frame #17: (test_manager::run+0xc12) [0x7ff714cd6130]
+Frame #18: (run_tests+0x5be) [0x7ff714cd8120]
+Frame #19: (main+0x1c) [0x7ff714cd2d90]
+Frame #20: (invoke_main+0x39) [0x7ff71503b6b0]
+Frame #21: (__scrt_common_main_seh+0x12e) [0x7ff71503b4a0]
+Frame #22: (__scrt_common_main+0xe) [0x7ff71503b480]
+Frame #23: (mainCRTStartup+0xe) [0x7ff71503b770]
+Frame #24: (BaseThreadInitThunk+0x10) [0x7ffc8fcb54d0]
+Frame #25: (RtlUserThreadStart+0x2b) [0x7ffc91304830]
+
+[Log     Info][2022-06-04 03:22:32.40356][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:1871(atapp::app::mutable_endpoint)]: skip address 2 of atapp endpoint unit-test-2(ipv4://127.0.0.1:21538) with handle 0x184cca10c90, connect result -403
+[Log    Debug][2022-06-04 03:22:32.40356][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_connector_impl.cpp:99(atapp::atapp_connection_handle::~atapp_connection_handle)]: atapp handle 0x184cca10c90 destroying
+[Log     Info][2022-06-04 03:22:32.40356][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_endpoint.cpp:39(atapp::atapp_endpoint::create)]: create atapp endpoint 0x184d55a9360
+[Log     Info][2022-06-04 03:22:32.40356][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_endpoint.cpp:124(atapp::atapp_endpoint::update_discovery)]: update atapp endpoint 0x184d55a9360 with 1(unit-test-1)
+[Log    Debug][2022-06-04 03:22:32.40356][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_endpoint.cpp:311(atapp::atapp_endpoint::add_waker)]: atapp 0x2(unit-test-2) update waker for 0x1(unit-test-1) to 0us later
+[Log    Debug][2022-06-04 03:22:32.40356][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_connector_impl.cpp:94(atapp::atapp_connection_handle::atapp_connection_handle)]: atapp handle 0x184cf8de340 created
+[Log    Error][2022-06-04 03:22:32.40356][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:3834(atapp::app::bus_evt_callback_on_error)]: bus node 0x2 connection 0x184ce4edfb0(ipv4://127.0.0.1:21537) error, status: -403, error code: 0
+Call stacks:
+Frame #00: (util::v2005::log::log_wrapper::format_log<char const (&)[67],unsigned __int64,void const *,std::basic_string<char,std::char_traits<char>,std::allocator<char> > const &,int &,int &>+0x219) [0x7ffbbf1bedb0]
+Frame #01: (atapp::app::bus_evt_callback_on_error+0x678) [0x7ffbbf149b70]
+Frame #02: (std::invoke<int (__cdecl atapp::app::*&)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),atapp::app * &,atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>+0x6a) [0x7ffbbf1dc0b0]
+Frame #03: (std::_Invoker_ret<std::_Unforced,0>::_Call<int (__cdecl atapp::app::*&)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),atapp::app * &,atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>+0x53) [0x7ffbbf16ea90]
+Frame #04: (std::_Call_binder<std::_Unforced,0,1,2,3,4,5,int (__cdecl atapp::app::*)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),std::tuple<atapp::app *,std::_Ph<1>,std::_Ph<2>,std::_Ph<3>,std::_Ph<4>,std::_Ph<5> >,std::tuple<atbus::node const &,atbus::endpoint const * &&,atbus::connection const * &&,int &&,int &&> >+0x1e0) [0x7ffbbf16f930]
+Frame #05: (std::_Binder<std::_Unforced,int (__cdecl atapp::app::*)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),atapp::app *,std::_Ph<1> const &,std::_Ph<2> const &,std::_Ph<3> const &,std::_Ph<4> const &,std::_Ph<5> const &>::operator()<atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>+0x142) [0x7ffbbf168210]
+Frame #06: (std::invoke<std::_Binder<std::_Unforced,int (__cdecl atapp::app::*)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),atapp::app *,std::_Ph<1> const &,std::_Ph<2> const &,std::_Ph<3> const &,std::_Ph<4> const &,std::_Ph<5> const &> &,atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>+0x46) [0x7ffbbf1dc610]
+Frame #07: (std::_Invoker_ret<int,0>::_Call<std::_Binder<std::_Unforced,int (__cdecl atapp::app::*)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),atapp::app *,std::_Ph<1> const &,std::_Ph<2> const &,std::_Ph<3> const &,std::_Ph<4> const &,std::_Ph<5> const &> &,atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>+0x46) [0x7ffbbf16ee70]
+Frame #08: (std::_Func_impl_no_alloc<std::_Binder<std::_Unforced,int (__cdecl atapp::app::*)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),atapp::app *,std::_Ph<1> const &,std::_Ph<2> const &,std::_Ph<3> const &,std::_Ph<4> const &,std::_Ph<5> const &>,int,atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>::_Do_call+0xa4) [0x7ffbbf212ea0]
+Frame #09: (std::_Func_class<int,atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>::operator()+0xdb) [0x7ffbbe88b630]
+Frame #10: (atbus::node::on_error+0xf7) [0x7ffbbe86aff0]
+Frame #11: (atbus::connection::connect+0xaa6) [0x7ffbbe83b580]
+Frame #12: (atbus::node::connect+0x2fd) [0x7ffbbe866560]
+Frame #13: (atapp::atapp_connector_atbus::on_start_connect+0x462) [0x7ffbbf290dd0]
+Frame #14: (atapp::app::mutable_endpoint+0xd35) [0x7ffbbf13c550]
+Frame #15: (test_func_test_atapp_message_case_send_message_remote_+0x800) [0x7ff714d2cbc0]
+Frame #16: (test_case_base::run+0x50) [0x7ff714cd36f0]
+Frame #17: (test_manager::run+0xc12) [0x7ff714cd6130]
+Frame #18: (run_tests+0x5be) [0x7ff714cd8120]
+Frame #19: (main+0x1c) [0x7ff714cd2d90]
+Frame #20: (invoke_main+0x39) [0x7ff71503b6b0]
+Frame #21: (__scrt_common_main_seh+0x12e) [0x7ff71503b4a0]
+Frame #22: (__scrt_common_main+0xe) [0x7ff71503b480]
+Frame #23: (mainCRTStartup+0xe) [0x7ff71503b770]
+Frame #24: (BaseThreadInitThunk+0x10) [0x7ffc8fcb54d0]
+Frame #25: (RtlUserThreadStart+0x2b) [0x7ffc91304830]
+
+[Log     Info][2022-06-04 03:22:32.40356][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:1871(atapp::app::mutable_endpoint)]: skip address 1 of atapp endpoint unit-test-1(ipv4://127.0.0.1:21537) with handle 0x184cf8de340, connect result -403
+[Log    Debug][2022-06-04 03:22:32.40356][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_connector_impl.cpp:99(atapp::atapp_connection_handle::~atapp_connection_handle)]: atapp handle 0x184cf8de340 destroying
+[Log    Debug][2022-06-04 03:22:32.62678][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:2361(atapp::app::process_inner_events)]: atapp 0x1(unit-test-1) wakeup endpint 0x2(unit-test-2)
+[Log    Debug][2022-06-04 03:22:32.62678][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_endpoint.cpp:311(atapp::atapp_endpoint::add_waker)]: atapp 0x1(unit-test-1) update waker for 0x2(unit-test-2) to 4776664us later
+[Log     Info][2022-06-04 03:22:32.62678][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_endpoint.cpp:45(atapp::atapp_endpoint::~atapp_endpoint)]: destroy atapp endpoint  0x2(unit-test-2) - 0x184cc5a2580
+[Log    Debug][2022-06-04 03:22:32.62866][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:2361(atapp::app::process_inner_events)]: atapp 0x2(unit-test-2) wakeup endpint 0x1(unit-test-1)
+[Log     Info][2022-06-04 03:22:32.62866][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_endpoint.cpp:45(atapp::atapp_endpoint::~atapp_endpoint)]: destroy atapp endpoint  0x1(unit-test-1) - 0x184d55a9360
+[Log     Info][2022-06-04 03:22:35.40356][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_endpoint.cpp:39(atapp::atapp_endpoint::create)]: create atapp endpoint 0x184d55aaa60
+[Log     Info][2022-06-04 03:22:35.40356][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_endpoint.cpp:124(atapp::atapp_endpoint::update_discovery)]: update atapp endpoint 0x184d55aaa60 with 2(unit-test-2)
+[Log    Debug][2022-06-04 03:22:35.40356][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_endpoint.cpp:311(atapp::atapp_endpoint::add_waker)]: atapp 0x1(unit-test-1) update waker for 0x2(unit-test-2) to 0us later
+[Log    Debug][2022-06-04 03:22:35.40356][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_connector_impl.cpp:94(atapp::atapp_connection_handle::atapp_connection_handle)]: atapp handle 0x184cf8de8c0 created
+[Log     Info][2022-06-04 03:22:35.40356][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:1867(atapp::app::mutable_endpoint)]: connect address 2 of atapp endpoint unit-test-2(ipv4://127.0.0.1:21538) success and use handle 0x184cf8de8c0
+[Log     Warn][2022-06-04 03:22:35.40356][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:799(atapp::app::stop)]: ============ receive stop signal and ready to stop all modules ============
+[Log     Info][2022-06-04 03:22:35.40699][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:3882(atapp::app::bus_evt_callback_on_shutdown)]: bus node 0x2 shutdown, reason: 0
+[Log     Warn][2022-06-04 03:22:35.40699][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:797(atapp::app::stop)]: ============= recall stop after some event action(s) finished =============
+[Log     Info][2022-06-04 03:22:35.40813][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:3854(atapp::app::bus_evt_callback_on_info_log)]: bus node 0x2 endpoint 0x0(0x0) connection (0x0) message: node reset
+[Log     Info][2022-06-04 03:22:35.40813][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:3903(atapp::app::bus_evt_callback_on_invalid_connection)]: bus node 0x2 make a invalid connection 0x184ce4edfb0(ipv4://127.0.0.1:21537) when closing, all unfinished connection will be aborted. res: -211
+[Log     Info][2022-06-04 03:22:35.40813][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:3854(atapp::app::bus_evt_callback_on_info_log)]: bus node 0x2 endpoint 0x0(0x0) connection ipv4://127.0.0.1:21537(0x184ce4edfb0) message: connection deallocated
+[Log     Info][2022-06-04 03:22:35.40813][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:3854(atapp::app::bus_evt_callback_on_info_log)]: bus node 0x2 endpoint 0x0(0x0) connection ipv4://127.0.0.1:21538(0x184cca90d80) message: connection deallocated
+[Log     Info][2022-06-04 03:23:35.51743][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:3111(atapp::app::setup_tick_timer)]: setup tick interval to 8ms.
+[Log     Info][2022-06-04 03:23:35.51743][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:3854(atapp::app::bus_evt_callback_on_info_log)]: bus node 0x2 endpoint 0x0(0x0) connection ipv4://127.0.0.1:21538(0x12fb39a3060) message: channel connected(listen callback)
+[Log     Info][2022-06-04 03:23:35.53363][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:3887(atapp::app::bus_evt_callback_on_available)]: bus node 0x2 initialze done, res: 0
+[Log     Info][2022-06-04 03:23:35.53363][D:\workspace\github\atframework\libatapp\src\atframe\modules\etcd_module.cpp:132(atapp::etcd_module::init)]: etcd disabled, start single mode
+[Log     Info][2022-06-04 03:23:35.56841][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_endpoint.cpp:39(atapp::atapp_endpoint::create)]: create atapp endpoint 0x12fb1af2f80
+[Log     Info][2022-06-04 03:23:35.56841][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_endpoint.cpp:124(atapp::atapp_endpoint::update_discovery)]: update atapp endpoint 0x12fb1af2f80 with 2(unit-test-2)
+[Log    Debug][2022-06-04 03:23:35.56841][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_endpoint.cpp:311(atapp::atapp_endpoint::add_waker)]: atapp 0x1(unit-test-1) update waker for 0x2(unit-test-2) to 0us later
+[Log    Debug][2022-06-04 03:23:35.56841][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_connector_impl.cpp:94(atapp::atapp_connection_handle::atapp_connection_handle)]: atapp handle 0x12fb381b8f0 created
+[Log    Error][2022-06-04 03:23:35.56841][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:3834(atapp::app::bus_evt_callback_on_error)]: bus node 0x1 connection 0x12fb1bd4110(ipv4://127.0.0.1:21538) error, status: -403, error code: 0
+Call stacks:
+Frame #00: (util::v2005::log::log_wrapper::format_log<char const (&)[67],unsigned __int64,void const *,std::basic_string<char,std::char_traits<char>,std::allocator<char> > const &,int &,int &>+0x219) [0x7ffbbf1bedb0]
+Frame #01: (atapp::app::bus_evt_callback_on_error+0x678) [0x7ffbbf149b70]
+Frame #02: (std::invoke<int (__cdecl atapp::app::*&)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),atapp::app * &,atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>+0x6a) [0x7ffbbf1dc0b0]
+Frame #03: (std::_Invoker_ret<std::_Unforced,0>::_Call<int (__cdecl atapp::app::*&)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),atapp::app * &,atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>+0x53) [0x7ffbbf16ea90]
+Frame #04: (std::_Call_binder<std::_Unforced,0,1,2,3,4,5,int (__cdecl atapp::app::*)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),std::tuple<atapp::app *,std::_Ph<1>,std::_Ph<2>,std::_Ph<3>,std::_Ph<4>,std::_Ph<5> >,std::tuple<atbus::node const &,atbus::endpoint const * &&,atbus::connection const * &&,int &&,int &&> >+0x1e0) [0x7ffbbf16f930]
+Frame #05: (std::_Binder<std::_Unforced,int (__cdecl atapp::app::*)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),atapp::app *,std::_Ph<1> const &,std::_Ph<2> const &,std::_Ph<3> const &,std::_Ph<4> const &,std::_Ph<5> const &>::operator()<atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>+0x142) [0x7ffbbf168210]
+Frame #06: (std::invoke<std::_Binder<std::_Unforced,int (__cdecl atapp::app::*)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),atapp::app *,std::_Ph<1> const &,std::_Ph<2> const &,std::_Ph<3> const &,std::_Ph<4> const &,std::_Ph<5> const &> &,atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>+0x46) [0x7ffbbf1dc610]
+Frame #07: (std::_Invoker_ret<int,0>::_Call<std::_Binder<std::_Unforced,int (__cdecl atapp::app::*)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),atapp::app *,std::_Ph<1> const &,std::_Ph<2> const &,std::_Ph<3> const &,std::_Ph<4> const &,std::_Ph<5> const &> &,atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>+0x46) [0x7ffbbf16ee70]
+Frame #08: (std::_Func_impl_no_alloc<std::_Binder<std::_Unforced,int (__cdecl atapp::app::*)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),atapp::app *,std::_Ph<1> const &,std::_Ph<2> const &,std::_Ph<3> const &,std::_Ph<4> const &,std::_Ph<5> const &>,int,atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>::_Do_call+0xa4) [0x7ffbbf212ea0]
+Frame #09: (std::_Func_class<int,atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>::operator()+0xdb) [0x7ffbbe88b630]
+Frame #10: (atbus::node::on_error+0xf7) [0x7ffbbe86aff0]
+Frame #11: (atbus::connection::connect+0xaa6) [0x7ffbbe83b580]
+Frame #12: (atbus::node::connect+0x2fd) [0x7ffbbe866560]
+Frame #13: (atapp::atapp_connector_atbus::on_start_connect+0x462) [0x7ffbbf290dd0]
+Frame #14: (atapp::app::mutable_endpoint+0xd35) [0x7ffbbf13c550]
+Frame #15: (test_func_test_atapp_message_case_send_message_remote_+0x708) [0x7ff714d2cbc0]
+Frame #16: (test_case_base::run+0x50) [0x7ff714cd36f0]
+Frame #17: (test_manager::run+0xc12) [0x7ff714cd6130]
+Frame #18: (run_tests+0x5be) [0x7ff714cd8120]
+Frame #19: (main+0x1c) [0x7ff714cd2d90]
+Frame #20: (invoke_main+0x39) [0x7ff71503b6b0]
+Frame #21: (__scrt_common_main_seh+0x12e) [0x7ff71503b4a0]
+Frame #22: (__scrt_common_main+0xe) [0x7ff71503b480]
+Frame #23: (mainCRTStartup+0xe) [0x7ff71503b770]
+Frame #24: (BaseThreadInitThunk+0x10) [0x7ffc8fcb54d0]
+Frame #25: (RtlUserThreadStart+0x2b) [0x7ffc91304830]
+
+[Log     Info][2022-06-04 03:23:35.56841][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:1871(atapp::app::mutable_endpoint)]: skip address 2 of atapp endpoint unit-test-2(ipv4://127.0.0.1:21538) with handle 0x12fb381b8f0, connect result -403
+[Log    Debug][2022-06-04 03:23:35.56841][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_connector_impl.cpp:99(atapp::atapp_connection_handle::~atapp_connection_handle)]: atapp handle 0x12fb381b8f0 destroying
+[Log     Info][2022-06-04 03:23:35.56841][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_endpoint.cpp:39(atapp::atapp_endpoint::create)]: create atapp endpoint 0x12fbaabf0b0
+[Log     Info][2022-06-04 03:23:35.56841][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_endpoint.cpp:124(atapp::atapp_endpoint::update_discovery)]: update atapp endpoint 0x12fbaabf0b0 with 1(unit-test-1)
+[Log    Debug][2022-06-04 03:23:35.56841][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_endpoint.cpp:311(atapp::atapp_endpoint::add_waker)]: atapp 0x2(unit-test-2) update waker for 0x1(unit-test-1) to 0us later
+[Log    Debug][2022-06-04 03:23:35.56841][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_connector_impl.cpp:94(atapp::atapp_connection_handle::atapp_connection_handle)]: atapp handle 0x12fb4603490 created
+[Log    Error][2022-06-04 03:23:35.56841][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:3834(atapp::app::bus_evt_callback_on_error)]: bus node 0x2 connection 0x12fb39cd3c0(ipv4://127.0.0.1:21537) error, status: -403, error code: 0
+Call stacks:
+Frame #00: (util::v2005::log::log_wrapper::format_log<char const (&)[67],unsigned __int64,void const *,std::basic_string<char,std::char_traits<char>,std::allocator<char> > const &,int &,int &>+0x219) [0x7ffbbf1bedb0]
+Frame #01: (atapp::app::bus_evt_callback_on_error+0x678) [0x7ffbbf149b70]
+Frame #02: (std::invoke<int (__cdecl atapp::app::*&)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),atapp::app * &,atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>+0x6a) [0x7ffbbf1dc0b0]
+Frame #03: (std::_Invoker_ret<std::_Unforced,0>::_Call<int (__cdecl atapp::app::*&)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),atapp::app * &,atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>+0x53) [0x7ffbbf16ea90]
+Frame #04: (std::_Call_binder<std::_Unforced,0,1,2,3,4,5,int (__cdecl atapp::app::*)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),std::tuple<atapp::app *,std::_Ph<1>,std::_Ph<2>,std::_Ph<3>,std::_Ph<4>,std::_Ph<5> >,std::tuple<atbus::node const &,atbus::endpoint const * &&,atbus::connection const * &&,int &&,int &&> >+0x1e0) [0x7ffbbf16f930]
+Frame #05: (std::_Binder<std::_Unforced,int (__cdecl atapp::app::*)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),atapp::app *,std::_Ph<1> const &,std::_Ph<2> const &,std::_Ph<3> const &,std::_Ph<4> const &,std::_Ph<5> const &>::operator()<atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>+0x142) [0x7ffbbf168210]
+Frame #06: (std::invoke<std::_Binder<std::_Unforced,int (__cdecl atapp::app::*)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),atapp::app *,std::_Ph<1> const &,std::_Ph<2> const &,std::_Ph<3> const &,std::_Ph<4> const &,std::_Ph<5> const &> &,atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>+0x46) [0x7ffbbf1dc610]
+Frame #07: (std::_Invoker_ret<int,0>::_Call<std::_Binder<std::_Unforced,int (__cdecl atapp::app::*)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),atapp::app *,std::_Ph<1> const &,std::_Ph<2> const &,std::_Ph<3> const &,std::_Ph<4> const &,std::_Ph<5> const &> &,atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>+0x46) [0x7ffbbf16ee70]
+Frame #08: (std::_Func_impl_no_alloc<std::_Binder<std::_Unforced,int (__cdecl atapp::app::*)(atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int),atapp::app *,std::_Ph<1> const &,std::_Ph<2> const &,std::_Ph<3> const &,std::_Ph<4> const &,std::_Ph<5> const &>,int,atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>::_Do_call+0xa4) [0x7ffbbf212ea0]
+Frame #09: (std::_Func_class<int,atbus::node const &,atbus::endpoint const *,atbus::connection const *,int,int>::operator()+0xdb) [0x7ffbbe88b630]
+Frame #10: (atbus::node::on_error+0xf7) [0x7ffbbe86aff0]
+Frame #11: (atbus::connection::connect+0xaa6) [0x7ffbbe83b580]
+Frame #12: (atbus::node::connect+0x2fd) [0x7ffbbe866560]
+Frame #13: (atapp::atapp_connector_atbus::on_start_connect+0x462) [0x7ffbbf290dd0]
+Frame #14: (atapp::app::mutable_endpoint+0xd35) [0x7ffbbf13c550]
+Frame #15: (test_func_test_atapp_message_case_send_message_remote_+0x800) [0x7ff714d2cbc0]
+Frame #16: (test_case_base::run+0x50) [0x7ff714cd36f0]
+Frame #17: (test_manager::run+0xc12) [0x7ff714cd6130]
+Frame #18: (run_tests+0x5be) [0x7ff714cd8120]
+Frame #19: (main+0x1c) [0x7ff714cd2d90]
+Frame #20: (invoke_main+0x39) [0x7ff71503b6b0]
+Frame #21: (__scrt_common_main_seh+0x12e) [0x7ff71503b4a0]
+Frame #22: (__scrt_common_main+0xe) [0x7ff71503b480]
+Frame #23: (mainCRTStartup+0xe) [0x7ff71503b770]
+Frame #24: (BaseThreadInitThunk+0x10) [0x7ffc8fcb54d0]
+Frame #25: (RtlUserThreadStart+0x2b) [0x7ffc91304830]
+
+[Log     Info][2022-06-04 03:23:35.56841][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:1871(atapp::app::mutable_endpoint)]: skip address 1 of atapp endpoint unit-test-1(ipv4://127.0.0.1:21537) with handle 0x12fb4603490, connect result -403
+[Log    Debug][2022-06-04 03:23:35.56841][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_connector_impl.cpp:99(atapp::atapp_connection_handle::~atapp_connection_handle)]: atapp handle 0x12fb4603490 destroying
+[Log    Debug][2022-06-04 03:23:35.86005][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:2361(atapp::app::process_inner_events)]: atapp 0x1(unit-test-1) wakeup endpint 0x2(unit-test-2)
+[Log    Debug][2022-06-04 03:23:35.86005][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_endpoint.cpp:311(atapp::atapp_endpoint::add_waker)]: atapp 0x1(unit-test-1) update waker for 0x2(unit-test-2) to 4708254us later
+[Log     Info][2022-06-04 03:23:35.86005][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_endpoint.cpp:45(atapp::atapp_endpoint::~atapp_endpoint)]: destroy atapp endpoint  0x2(unit-test-2) - 0x12fb1af2f80
+[Log    Debug][2022-06-04 03:23:35.86187][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:2361(atapp::app::process_inner_events)]: atapp 0x2(unit-test-2) wakeup endpint 0x1(unit-test-1)
+[Log     Info][2022-06-04 03:23:35.86187][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_endpoint.cpp:45(atapp::atapp_endpoint::~atapp_endpoint)]: destroy atapp endpoint  0x1(unit-test-1) - 0x12fbaabf0b0
+[Log     Info][2022-06-04 03:23:38.56841][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_endpoint.cpp:39(atapp::atapp_endpoint::create)]: create atapp endpoint 0x12fbaabf6b0
+[Log     Info][2022-06-04 03:23:38.56841][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_endpoint.cpp:124(atapp::atapp_endpoint::update_discovery)]: update atapp endpoint 0x12fbaabf6b0 with 2(unit-test-2)
+[Log    Debug][2022-06-04 03:23:38.56841][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_endpoint.cpp:311(atapp::atapp_endpoint::add_waker)]: atapp 0x1(unit-test-1) update waker for 0x2(unit-test-2) to 0us later
+[Log    Debug][2022-06-04 03:23:38.56841][D:\workspace\github\atframework\libatapp\src\atframe\connectors\atapp_connector_impl.cpp:94(atapp::atapp_connection_handle::atapp_connection_handle)]: atapp handle 0x12fb4602af0 created
+[Log     Info][2022-06-04 03:23:38.56841][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:1867(atapp::app::mutable_endpoint)]: connect address 2 of atapp endpoint unit-test-2(ipv4://127.0.0.1:21538) success and use handle 0x12fb4602af0
+[Log     Warn][2022-06-04 03:23:38.56841][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:799(atapp::app::stop)]: ============ receive stop signal and ready to stop all modules ============
+[Log     Info][2022-06-04 03:23:38.57236][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:3882(atapp::app::bus_evt_callback_on_shutdown)]: bus node 0x2 shutdown, reason: 0
+[Log     Warn][2022-06-04 03:23:38.57236][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:797(atapp::app::stop)]: ============= recall stop after some event action(s) finished =============
+[Log     Info][2022-06-04 03:23:38.57408][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:3854(atapp::app::bus_evt_callback_on_info_log)]: bus node 0x2 endpoint 0x0(0x0) connection (0x0) message: node reset
+[Log     Info][2022-06-04 03:23:38.57408][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:3903(atapp::app::bus_evt_callback_on_invalid_connection)]: bus node 0x2 make a invalid connection 0x12fb39cd3c0(ipv4://127.0.0.1:21537) when closing, all unfinished connection will be aborted. res: -211
+[Log     Info][2022-06-04 03:23:38.57408][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:3854(atapp::app::bus_evt_callback_on_info_log)]: bus node 0x2 endpoint 0x0(0x0) connection ipv4://127.0.0.1:21537(0x12fb39cd3c0) message: connection deallocated
+[Log     Info][2022-06-04 03:23:38.57408][D:\workspace\github\atframework\libatapp\src\atframe\atapp.cpp:3854(atapp::app::bus_evt_callback_on_info_log)]: bus node 0x2 endpoint 0x0(0x0) connection ipv4://127.0.0.1:21538(0x12fb39a3060) message: connection deallocated

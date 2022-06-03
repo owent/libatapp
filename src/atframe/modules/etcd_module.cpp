@@ -889,7 +889,7 @@ LIBATAPP_MACRO_API const std::string &etcd_module::get_configure_path() const {
         self->conf_path_cache_ += '/';
       }
     } else {
-      self->conf_path_cache_ = "/";
+      self->conf_path_cache_ = std::string("/");
     }
   }
 

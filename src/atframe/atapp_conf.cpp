@@ -63,6 +63,44 @@ static const char *skip_space(const char *begin, const char *end) {
   return begin;
 }
 
+static void dynamic_copy_protobuf_duration(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *duration_ptr,
+                                           const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &value) {
+  // Database may be different and so descriptor may also be different
+  // We can't use CopyFrom here
+  if (duration_ptr->GetDescriptor() == value.GetDescriptor()) {
+    duration_ptr->CopyFrom(value);
+  } else {
+    value.nanos();
+    duration_ptr->GetReflection()->SetInt64(duration_ptr,
+                                            duration_ptr->GetDescriptor()->FindFieldByNumber(
+                                                ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration::kSecondsFieldNumber),
+                                            value.seconds());
+    duration_ptr->GetReflection()->SetInt32(duration_ptr,
+                                            duration_ptr->GetDescriptor()->FindFieldByNumber(
+                                                ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration::kNanosFieldNumber),
+                                            value.nanos());
+  }
+}
+
+static void dynamic_copy_protobuf_timestamp(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *timestamp_ptr,
+                                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp &value) {
+  // Database may be different and so descriptor may also be different
+  // We can't use CopyFrom here
+  if (timestamp_ptr->GetDescriptor() == value.GetDescriptor()) {
+    timestamp_ptr->CopyFrom(value);
+  } else {
+    value.nanos();
+    timestamp_ptr->GetReflection()->SetInt64(timestamp_ptr,
+                                             timestamp_ptr->GetDescriptor()->FindFieldByNumber(
+                                                 ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp::kSecondsFieldNumber),
+                                             value.seconds());
+    timestamp_ptr->GetReflection()->SetInt32(timestamp_ptr,
+                                             timestamp_ptr->GetDescriptor()->FindFieldByNumber(
+                                                 ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp::kNanosFieldNumber),
+                                             value.nanos());
+  }
+}
+
 template <typename TINT>
 static const char *pick_number(TINT &out, const char *begin, const char *end) {
   out = 0;
@@ -679,21 +717,25 @@ static void dump_pick_field(const util::config::ini_value &val, ATBUS_MACRO_PROT
       if (fds->message_type()->full_name() == ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration::descriptor()->full_name()) {
         ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration value =
             dump_pick_field_with_extensions<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration>(val, fds, index);
+        ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *duration_ptr;
         if (fds->is_repeated()) {
-          dst.GetReflection()->AddMessage(&dst, fds)->CopyFrom(value);
+          duration_ptr = dst.GetReflection()->AddMessage(&dst, fds);
         } else {
-          dst.GetReflection()->MutableMessage(&dst, fds)->CopyFrom(value);
+          duration_ptr = dst.GetReflection()->MutableMessage(&dst, fds);
         }
+        detail::dynamic_copy_protobuf_duration(duration_ptr, value);
         break;
       } else if (fds->message_type()->full_name() ==
                  ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp::descriptor()->full_name()) {
         ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp value =
             dump_pick_field_with_extensions<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp>(val, fds, index);
+        ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *timestamp_ptr;
         if (fds->is_repeated()) {
-          dst.GetReflection()->AddMessage(&dst, fds)->CopyFrom(value);
+          timestamp_ptr = dst.GetReflection()->AddMessage(&dst, fds);
         } else {
-          dst.GetReflection()->MutableMessage(&dst, fds)->CopyFrom(value);
+          timestamp_ptr = dst.GetReflection()->MutableMessage(&dst, fds);
         }
+        detail::dynamic_copy_protobuf_timestamp(timestamp_ptr, value);
         break;
       }
 
@@ -969,20 +1011,24 @@ static void dump_pick_field(const YAML::Node &val, ATBUS_MACRO_PROTOBUF_NAMESPAC
               ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration::descriptor()->full_name()) {
             ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration value =
                 dump_pick_field_with_extensions<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration>(val, fds);
+            ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *duration_ptr;
             if (fds->is_repeated()) {
-              dst.GetReflection()->AddMessage(&dst, fds)->CopyFrom(value);
+              duration_ptr = dst.GetReflection()->AddMessage(&dst, fds);
             } else {
-              dst.GetReflection()->MutableMessage(&dst, fds)->CopyFrom(value);
+              duration_ptr = dst.GetReflection()->MutableMessage(&dst, fds);
             }
+            detail::dynamic_copy_protobuf_duration(duration_ptr, value);
           } else if (fds->message_type()->full_name() ==
                      ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp::descriptor()->full_name()) {
             ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp value =
                 dump_pick_field_with_extensions<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp>(val, fds);
+            ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *timestamp_ptr;
             if (fds->is_repeated()) {
-              dst.GetReflection()->AddMessage(&dst, fds)->CopyFrom(value);
+              timestamp_ptr = dst.GetReflection()->AddMessage(&dst, fds);
             } else {
-              dst.GetReflection()->MutableMessage(&dst, fds)->CopyFrom(value);
+              timestamp_ptr = dst.GetReflection()->MutableMessage(&dst, fds);
             }
+            detail::dynamic_copy_protobuf_timestamp(timestamp_ptr, value);
           }
 
           break;
@@ -1255,21 +1301,25 @@ static bool dump_environment_pick_field(const std::string &key, ATBUS_MACRO_PROT
             ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration::descriptor()->full_name()) {
           ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration value =
               dump_pick_field_with_extensions<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration>(val, fds);
+          ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *duration_ptr;
           if (fds->is_repeated()) {
-            dst.GetReflection()->AddMessage(&dst, fds)->CopyFrom(value);
+            duration_ptr = dst.GetReflection()->AddMessage(&dst, fds);
           } else {
-            dst.GetReflection()->MutableMessage(&dst, fds)->CopyFrom(value);
+            duration_ptr = dst.GetReflection()->MutableMessage(&dst, fds);
           }
+          detail::dynamic_copy_protobuf_duration(duration_ptr, value);
           ret = true;
         } else if (fds->message_type()->full_name() ==
                    ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp::descriptor()->full_name()) {
           ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp value =
               dump_pick_field_with_extensions<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp>(val, fds);
+          ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *timestamp_ptr;
           if (fds->is_repeated()) {
-            dst.GetReflection()->AddMessage(&dst, fds)->CopyFrom(value);
+            timestamp_ptr = dst.GetReflection()->AddMessage(&dst, fds);
           } else {
-            dst.GetReflection()->MutableMessage(&dst, fds)->CopyFrom(value);
+            timestamp_ptr = dst.GetReflection()->MutableMessage(&dst, fds);
           }
+          detail::dynamic_copy_protobuf_timestamp(timestamp_ptr, value);
           ret = true;
         }
 

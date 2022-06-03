@@ -65,7 +65,8 @@ if ( $RUN_MODE -eq "msvc.2019+.test" ) {
   $ALL_DLL_DIRS = $(foreach ($dll_file in $ALL_DLL_FILES) {
       $dll_file.Directory.FullName
     }) | Sort-Object | Get-Unique
-  $Env:PATH = ($ALL_DLL_DIRS + $Env:PATH) -Join [IO.Path]::PathSeparator
+  $Env:PATH = ($ALL_DLL_DIRS -Join [IO.Path]::PathSeparator) + [IO.Path]::PathSeparator + $Env:PATH
+  Write-Output "PATH=$Env:PATH"
 
   & cmake --build . --config $Env:CONFIGURATION
   if ( $LastExitCode -ne 0 ) {
@@ -92,7 +93,8 @@ elseif ( $RUN_MODE -eq "msvc.2017.test" ) {
   $ALL_DLL_DIRS = $(foreach ($dll_file in $ALL_DLL_FILES) {
       $dll_file.Directory.FullName
     }) | Sort-Object | Get-Unique
-  $Env:PATH = ($ALL_DLL_DIRS + $Env:PATH) -Join [IO.Path]::PathSeparator
+  $Env:PATH = ($ALL_DLL_DIRS -Join [IO.Path]::PathSeparator) + [IO.Path]::PathSeparator + $Env:PATH
+  Write-Output "PATH=$Env:PATH"
 
   & cmake --build . --config $Env:CONFIGURATION
   if ( $LastExitCode -ne 0 ) {
