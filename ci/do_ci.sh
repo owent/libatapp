@@ -95,19 +95,23 @@ elif [[ "$1" == "clang.test" ]]; then
   cmake --build . -j2 --config $CONFIGURATION || cmake --build . --config $CONFIGURATION
   ctest -VV . -C $CONFIGURATION -L libatapp.unit_test
 elif [[ "$1" == "msys2.mingw.test" ]]; then
-  pacman -S --needed --noconfirm mingw-w64-x86_64-cmake git m4 curl wget tar autoconf automake \
-    mingw-w64-x86_64-git-lfs mingw-w64-x86_64-toolchain mingw-w64-x86_64-libtool \
-    mingw-w64-x86_64-python mingw-w64-x86_64-python-pip mingw-w64-x86_64-python-setuptools || true
+  # pacman -S --needed --noconfirm mingw-w64-x86_64-cmake git m4 curl wget tar autoconf automake \
+  #   mingw-w64-x86_64-git-lfs mingw-w64-x86_64-toolchain mingw-w64-x86_64-libtool \
+  #   mingw-w64-x86_64-python mingw-w64-x86_64-python-pip mingw-w64-x86_64-python-setuptools || true
   export ATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_PROTOBUF_ALLOW_LOCAL=1
-  pacman -S --needed --noconfirm mingw-w64-x86_64-protobuf
-  git config --global http.sslBackend openssl
+  # pacman -S --needed --noconfirm mingw-w64-x86_64-protobuf
+  # git config --global http.sslBackend openssl
   mkdir -p build_jobs_ci
   cd build_jobs_ci
   cmake .. -G 'MinGW Makefiles' "-DBUILD_SHARED_LIBS=$BUILD_SHARED_LIBS" -DPROJECT_ENABLE_UNITTEST=ON -DPROJECT_ENABLE_SAMPLE=ON \
     -DPROJECT_ENABLE_TOOLS=ON -DATBUS_MACRO_ABORT_ON_PROTECTED_ERROR=ON "-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_LOW_MEMORY_MODE=ON"
   cmake --build . -j2 --config $CONFIGURATION || cmake --build . --config $CONFIGURATION
-  # for EXT_PATH in $(find ../third_party/install/ -name "*.dll" | xargs dirname | sort -u); do
-  #   export PATH="$PWD/$EXT_PATH:$PATH"
-  # done
-  # ctest -VV . -C $CONFIGURATION -L libatapp.unit_test ;
+  for EXT_PATH in $(find "$PWD" -name "*.dll" | xargs dirname | sort -u); do
+    export PATH="$EXT_PATH:$PATH"
+  done
+  for EXT_PATH in $(find "$PROJECT_DIR/third_party/install/" -name "*.dll" | xargs dirname | sort -u); do
+    export PATH="$EXT_PATH:$PATH"
+  done
+  echo "PATH=$PATH"
+  ctest -VV . -C $CONFIGURATION -L libatapp.unit_test
 fi
