@@ -69,7 +69,7 @@ class atapp_endpoint {
   LIBATAPP_MACRO_API ~atapp_endpoint();
 
   LIBATAPP_MACRO_API uint64_t get_id() const noexcept;
-  LIBATAPP_MACRO_API gsl::string_view get_name() const noexcept;
+  LIBATAPP_MACRO_API const std::string &get_name() const noexcept;
 
   UTIL_FORCEINLINE bool has_connection_handle() const noexcept { return !refer_connections_.empty(); }
   LIBATAPP_MACRO_API const etcd_discovery_node::ptr_t &get_discovery() const noexcept;

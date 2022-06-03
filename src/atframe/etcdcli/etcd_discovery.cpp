@@ -450,8 +450,8 @@ LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_id
   return iter->second;
 }
 
-LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_name(gsl::string_view name) const {
-  node_by_name_type::const_iterator iter = node_by_name_.find(std::string(name.data(), name.size()));
+LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_name(const std::string &name) const {
+  node_by_name_type::const_iterator iter = node_by_name_.find(name);
   if (iter == node_by_name_.end()) {
     return nullptr;
   }
@@ -694,8 +694,8 @@ LIBATAPP_MACRO_API void etcd_discovery_set::remove_node(uint64_t id) {
   node_by_id_.erase(iter_id);
 }
 
-LIBATAPP_MACRO_API void etcd_discovery_set::remove_node(gsl::string_view name) {
-  node_by_name_type::iterator iter_name = node_by_name_.find(std::string(name.data(), name.size()));
+LIBATAPP_MACRO_API void etcd_discovery_set::remove_node(const std::string &name) {
+  node_by_name_type::iterator iter_name = node_by_name_.find(name);
   if (iter_name == node_by_name_.end()) {
     return;
   }
