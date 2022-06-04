@@ -121,4 +121,6 @@ jobs:
         with:
           path: |
             third_party/install
+            C:/msys64/var/cache/pacman/pkg
+            C:/msys64/var/lib/pacman
           key: ${{ runner.os }}-${ hashFiles('.github/.cache-key') } }}
