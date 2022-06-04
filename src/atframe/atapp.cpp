@@ -198,7 +198,6 @@ LIBATAPP_MACRO_API app::app() : setup_result_(0), ev_loop_(nullptr), mode_(mode_
 
 #if defined(THREAD_TLS_USE_PTHREAD) && THREAD_TLS_USE_PTHREAD
   (void)pthread_once(&details::gt_atapp_global_init_once, details::atapp_global_init_once);
-}  // namespace detail
 #elif __cplusplus >= 201103L
   std::call_once(details::gt_atapp_global_init_once, details::atapp_global_init_once);
 #endif
