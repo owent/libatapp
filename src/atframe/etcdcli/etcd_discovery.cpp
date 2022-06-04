@@ -157,6 +157,13 @@ static const std::vector<etcd_discovery_node::ptr_t> &get_empty_discovery_set() 
   static std::vector<etcd_discovery_node::ptr_t> empty;
   return empty;
 }
+
+static bool is_empty(const etcd_discovery_set::metadata_type &metadata) noexcept {
+  return metadata.namespace_name().empty() && metadata.api_version().empty() && metadata.kind().empty() &&
+         metadata.group().empty() && metadata.service_subset().empty() && 0 == metadata.labels_size() &&
+         0 == metadata.annotations_size();
+}
+
 }  // namespace
 
 LIBATAPP_MACRO_API etcd_discovery_node::etcd_discovery_node() : name_hash_(0, 0), ingress_index_(0) {
@@ -806,7 +813,7 @@ void etcd_discovery_set::clear_cache(index_cache_type &cache_set) {
 
 etcd_discovery_set::index_cache_type *etcd_discovery_set::get_index_cache(
     const etcd_discovery_set::metadata_type *metadata) const {
-  if (nullptr == metadata) {
+  if (nullptr == metadata || is_empty(*metadata)) {
     return &default_index_;
   }
 
