@@ -29,6 +29,9 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#if !(defined(THREAD_TLS_USE_PTHREAD) && THREAD_TLS_USE_PTHREAD) && __cplusplus >= 201103L
+#  include <mutex>
+#endif
 
 #include "atframe/atapp_conf_rapidjson.h"
 #include "atframe/modules/etcd_module.h"
@@ -84,6 +87,24 @@ static uint64_t chrono_to_libuv_duration(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID
 
   return ret;
 }
+
+#if defined(THREAD_TLS_USE_PTHREAD) && THREAD_TLS_USE_PTHREAD
+static pthread_once_t gt_atapp_global_init_once = PTHREAD_ONCE_INIT;
+static void atapp_global_init_once() {
+  uv_loop_t loop;
+  // Call uv_loop_init() to initialize the global data.
+  uv_loop_init(&loop);
+  uv_loop_close(&loop);
+}
+#elif __cplusplus >= 201103L
+static std::once_flag gt_atapp_global_init_once;
+static void atapp_global_init_once() {
+  uv_loop_t loop;
+  // Call uv_loop_init() to initialize the global data.
+  uv_loop_init(&loop);
+  uv_loop_close(&loop);
+}
+#endif
 
 }  // namespace details
 
@@ -174,6 +195,13 @@ LIBATAPP_MACRO_API app::app() : setup_result_(0), ev_loop_(nullptr), mode_(mode_
   // inner modules
   internal_module_etcd_ = std::make_shared<atapp::etcd_module>();
   add_module(internal_module_etcd_);
+
+#if defined(THREAD_TLS_USE_PTHREAD) && THREAD_TLS_USE_PTHREAD
+  (void)pthread_once(&details::gt_atapp_global_init_once, details::atapp_global_init_once);
+}  // namespace detail
+#elif __cplusplus >= 201103L
+  std::call_once(details::gt_atapp_global_init_once, details::atapp_global_init_once);
+#endif
 }
 
 LIBATAPP_MACRO_API app::~app() {
