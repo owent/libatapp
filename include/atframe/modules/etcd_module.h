@@ -203,7 +203,7 @@ class etcd_module : public ::atapp::module_impl {
   bool maybe_update_inner_keepalive_value_;
   util::time::time_utility::raw_time_t tick_next_timepoint_;
   std::chrono::system_clock::duration tick_interval_;
-  ::atapp::etcd_cluster etcd_ctx_;
+  atapp::etcd_cluster etcd_ctx_;
 
   std::list<etcd_keepalive::ptr_t> inner_keepalive_actors_;
   std::string inner_keepalive_value_;

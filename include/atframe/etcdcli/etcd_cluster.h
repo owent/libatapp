@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <log/log_wrapper.h>
 #include <network/http_request.h>
 #include <random/random_generator.h>
 #include <time/time_utility.h>
@@ -37,6 +38,7 @@ class etcd_cluster {
     enum type {
       CLOSING = 0x0001,  // closeing
       RUNNING = 0x0002,
+      READY = 0x0004,         // ready
       ENABLE_LEASE = 0x0100,  // enable auto get lease
     };
   };
@@ -156,11 +158,17 @@ class etcd_cluster {
   LIBATAPP_MACRO_API void reset();
   LIBATAPP_MACRO_API int tick();
   LIBATAPP_MACRO_API bool is_available() const;
+  LIBATAPP_MACRO_API void resolve_ready() noexcept;
 
   UTIL_FORCEINLINE bool check_flag(uint32_t f) const { return 0 != (flags_ & f); };
   LIBATAPP_MACRO_API void set_flag(flag_t::type f, bool v);
 
   UTIL_FORCEINLINE const stats_t &get_stats() const { return stats_; };
+
+  LIBATAPP_MACRO_API void set_logger(const util::log::log_wrapper::ptr_t &logger,
+                                     util::log::log_formatter::level_t::type log_level) noexcept;
+  UTIL_FORCEINLINE const util::log::log_wrapper::ptr_t &get_logger() const noexcept { return logger_; }
+
   // ====================== apis for configure ==================
   UTIL_FORCEINLINE const std::vector<std::string> &get_available_hosts() const { return conf_.hosts; }
   UTIL_FORCEINLINE const std::string &get_selected_host() const { return conf_.path_node; }
@@ -183,7 +191,7 @@ class etcd_cluster {
     conf_.http_initialization_timeout = v;
   }
   UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_http_timeout() const {
-    if (check_flag(flag_t::RUNNING)) {
+    if (check_flag(flag_t::READY)) {
       return conf_.http_request_timeout;
     } else {
       return conf_.http_initialization_timeout;
@@ -500,6 +508,10 @@ class etcd_cluster {
   util::random::mt19937 random_generator_;
   conf_t conf_;
   stats_t stats_;
+  util::log::log_wrapper::ptr_t logger_;
+  util::log::log_formatter::level_t::type startup_log_level_;
+  util::log::log_formatter::level_t::type runtime_log_level_;
+
   util::network::http_request::curl_m_bind_ptr_t curl_multi_;
   util::network::http_request::ptr_t rpc_authenticate_;
   util::network::http_request::ptr_t rpc_update_members_;
@@ -512,4 +524,79 @@ class etcd_cluster {
   on_event_up_down_handle_set_t event_on_up_callbacks_;
   on_event_up_down_handle_set_t event_on_down_callbacks_;
 };
+
+#ifdef _MSC_VER
+#  define LIBATAPP_MACRO_ETCD_CLUSTER_LOG_TRACE(cluster, ...) \
+    FWLOGTRACE(__VA_ARGS__);                                  \
+    if ((cluster).get_logger()) {                             \
+      FWINSTLOGTRACE(*(cluster).get_logger(), __VA_ARGS__);   \
+    }
+#  define LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(cluster, ...) \
+    FWLOGDEBUG(__VA_ARGS__);                                  \
+    if ((cluster).get_logger()) {                             \
+      FWINSTLOGDEBUG(*(cluster).get_logger(), __VA_ARGS__);   \
+    }
+#  define LIBATAPP_MACRO_ETCD_CLUSTER_LOG_NOTICE(cluster, ...) \
+    FWLOGNOTICE(__VA_ARGS__);                                  \
+    if ((cluster).get_logger()) {                              \
+      FWINSTLOGNOTICE(*(cluster).get_logger(), __VA_ARGS__);   \
+    }
+#  define LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(cluster, ...) \
+    FWLOGINFO(__VA_ARGS__);                                  \
+    if ((cluster).get_logger()) {                            \
+      FWINSTLOGINFO(*(cluster).get_logger(), __VA_ARGS__);   \
+    }
+#  define LIBATAPP_MACRO_ETCD_CLUSTER_LOG_WARNING(cluster, ...) \
+    FWLOGWARNING(__VA_ARGS__);                                  \
+    if ((cluster).get_logger()) {                               \
+      FWINSTLOGWARNING(*(cluster).get_logger(), __VA_ARGS__);   \
+    }
+#  define LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(cluster, ...) \
+    FWLOGERROR(__VA_ARGS__);                                  \
+    if ((cluster).get_logger()) {                             \
+      FWINSTLOGERROR(*(cluster).get_logger(), __VA_ARGS__);   \
+    }
+#  define LIBATAPP_MACRO_ETCD_CLUSTER_LOG_FATAL(cluster, ...) \
+    FWLOGFATAL(__VA_ARGS__);                                  \
+    if ((cluster).get_logger()) {                             \
+      FWINSTLOGFATAL(*(cluster).get_logger(), __VA_ARGS__);   \
+    }
+#else
+#  define LIBATAPP_MACRO_ETCD_CLUSTER_LOG_TRACE(cluster, args...) \
+    FWLOGTRACE(args);                                             \
+    if ((cluster).get_logger()) {                                 \
+      FWINSTLOGTRACE(*(cluster).get_logger(), ##args);            \
+    }
+#  define LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(cluster, args...) \
+    FWLOGDEBUG(args);                                             \
+    if ((cluster).get_logger()) {                                 \
+      FWINSTLOGDEBUG(*(cluster).get_logger(), ##args);            \
+    }
+#  define LIBATAPP_MACRO_ETCD_CLUSTER_LOG_NOTICE(cluster, args...) \
+    FWLOGNOTICE(args);                                             \
+    if ((cluster).get_logger()) {                                  \
+      FWINSTLOGNOTICE(*(cluster).get_logger(), ##args);            \
+    }
+#  define LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(cluster, args...) \
+    FWLOGINFO(args);                                             \
+    if ((cluster).get_logger()) {                                \
+      FWINSTLOGINFO(*(cluster).get_logger(), ##args);            \
+    }
+#  define LIBATAPP_MACRO_ETCD_CLUSTER_LOG_WARNING(cluster, args...) \
+    FWLOGWARNING(args);                                             \
+    if ((cluster).get_logger()) {                                   \
+      FWINSTLOGWARNING(*(cluster).get_logger(), ##args);            \
+    }
+#  define LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(cluster, args...) \
+    FWLOGERROR(args);                                             \
+    if ((cluster).get_logger()) {                                 \
+      FWINSTLOGERROR(*(cluster).get_logger(), ##args);            \
+    }
+#  define LIBATAPP_MACRO_ETCD_CLUSTER_LOG_FATAL(cluster, args...) \
+    FWLOGFATAL(args);                                             \
+    if ((cluster).get_logger()) {                                 \
+      FWINSTLOGFATAL(*(cluster).get_logger(), ##args);            \
+    }
+#endif
+
 }  // namespace atapp

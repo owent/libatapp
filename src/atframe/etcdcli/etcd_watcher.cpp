@@ -40,7 +40,8 @@ LIBATAPP_MACRO_API etcd_watcher::ptr_t etcd_watcher::create(etcd_cluster &owner,
 
 LIBATAPP_MACRO_API void etcd_watcher::close() {
   if (rpc_.rpc_opr_) {
-    FWLOGDEBUG("Etcd watcher {} cancel http request.", reinterpret_cast<const void *>(this));
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(*owner_, "Etcd watcher {} cancel http request.",
+                                          reinterpret_cast<const void *>(this));
     rpc_.rpc_opr_->set_on_complete(nullptr);
     rpc_.rpc_opr_->set_on_write(nullptr);
     rpc_.rpc_opr_->set_priv_data(nullptr);
@@ -83,7 +84,8 @@ void etcd_watcher::process() {
       rpc_.rpc_opr_ = owner_->create_request_kv_get(path_, range_end_);
     }
     if (!rpc_.rpc_opr_) {
-      FWLOGERROR("Etcd watcher {} create range request to {} failed", reinterpret_cast<const void *>(this), path_);
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*owner_, "Etcd watcher {} create range request to {} failed",
+                                            reinterpret_cast<const void *>(this), path_);
       rpc_.watcher_next_request_time = util::time::time_utility::sys_now() + rpc_.retry_interval;
       return;
     }
@@ -94,12 +96,12 @@ void etcd_watcher::process() {
     int res = rpc_.rpc_opr_->start(util::network::http_request::method_t::EN_MT_POST, false);
     if (res != 0) {
       rpc_.rpc_opr_->set_on_complete(nullptr);
-      FWLOGERROR("Etcd watcher {} start request to {} failed, res: {}", reinterpret_cast<const void *>(this),
-                 rpc_.rpc_opr_->get_url(), res);
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*owner_, "Etcd watcher {} start request to {} failed, res: {}",
+                                            reinterpret_cast<const void *>(this), rpc_.rpc_opr_->get_url(), res);
       rpc_.rpc_opr_.reset();
     } else {
-      FWLOGDEBUG("Etcd watcher {} start request to {} success.", reinterpret_cast<const void *>(this),
-                 rpc_.rpc_opr_->get_url());
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(*owner_, "Etcd watcher {} start request to {} success.",
+                                            reinterpret_cast<const void *>(this), rpc_.rpc_opr_->get_url());
     }
 
     return;
@@ -109,8 +111,8 @@ void etcd_watcher::process() {
   rpc_.rpc_opr_ = owner_->create_request_watch(path_, range_end_, rpc_.last_revision + 1, rpc_.enable_prev_kv,
                                                rpc_.enable_progress_notify);
   if (!rpc_.rpc_opr_) {
-    FWLOGERROR("Etcd watcher {} create watch request to {} from revision {} failed",
-               reinterpret_cast<const void *>(this), path_, rpc_.last_revision + 1);
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*owner_, "Etcd watcher {} create watch request to {} from revision {} failed",
+                                          reinterpret_cast<const void *>(this), path_, rpc_.last_revision + 1);
     rpc_.watcher_next_request_time = util::time::time_utility::sys_now() + rpc_.retry_interval;
     return;
   }
@@ -128,8 +130,9 @@ void etcd_watcher::process() {
   if (res != 0) {
     rpc_.rpc_opr_->set_on_complete(nullptr);
     rpc_.rpc_opr_->set_on_write(nullptr);
-    FWLOGERROR("Etcd watcher {} start watch request to {} from revision {} failed, res: {}",
-               reinterpret_cast<const void *>(this), rpc_.rpc_opr_->get_url(), rpc_.last_revision + 1, res);
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(
+        *owner_, "Etcd watcher {} start watch request to {} from revision {} failed, res: {}",
+        reinterpret_cast<const void *>(this), rpc_.rpc_opr_->get_url(), rpc_.last_revision + 1, res);
     rpc_.rpc_opr_.reset();
   } else {
     FWLOGINFO("Etcd watcher {} start watch request to {} from revision {} success.",
@@ -151,9 +154,9 @@ int etcd_watcher::libcurl_callback_on_range_completed(util::network::http_reques
   // 服务器错误则过一段时间后重试
   if (0 != req.get_error_code() || util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
                                        util::network::http_request::get_status_code_group(req.get_response_code())) {
-    FWLOGERROR("Etcd watcher {} range request failed, error code: {}, http code: {}\n{}",
-               reinterpret_cast<const void *>(self), req.get_error_code(), req.get_response_code(),
-               req.get_error_msg());
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(
+        *self->owner_, "Etcd watcher {} range request failed, error code: {}, http code: {}\n{}",
+        reinterpret_cast<const void *>(self), req.get_error_code(), req.get_response_code(), req.get_error_msg());
 
     self->rpc_.watcher_next_request_time = util::time::time_utility::sys_now() + self->rpc_.retry_interval;
 
@@ -174,12 +177,13 @@ int etcd_watcher::libcurl_callback_on_range_completed(util::network::http_reques
 
   std::string http_content;
   req.get_response_stream().str().swap(http_content);
-  FWLOGTRACE("Etcd watcher {} got range http response: {}", reinterpret_cast<const void *>(self), http_content);
+  LIBATAPP_MACRO_ETCD_CLUSTER_LOG_TRACE(*self->owner_, "Etcd watcher {} got range http response: {}",
+                                        reinterpret_cast<const void *>(self), http_content);
 
   rapidjson::Document doc;
   if (false == atapp::etcd_packer::parse_object(doc, http_content.c_str())) {
-    FWLOGERROR("Etcd watcher {} got range response parse failed: {}", reinterpret_cast<const void *>(self),
-               http_content);
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self->owner_, "Etcd watcher {} got range response parse failed: {}",
+                                          reinterpret_cast<const void *>(self), http_content);
 
     self->rpc_.watcher_next_request_time = util::time::time_utility::sys_now() + self->rpc_.retry_interval;
     self->active();
@@ -197,7 +201,8 @@ int etcd_watcher::libcurl_callback_on_range_completed(util::network::http_reques
   }
 
   if (0 == header.revision) {
-    FWLOGERROR("Etcd watcher {} got range response without header", reinterpret_cast<const void *>(self));
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self->owner_, "Etcd watcher {} got range response without header",
+                                          reinterpret_cast<const void *>(self));
 
     self->rpc_.watcher_next_request_time = util::time::time_utility::sys_now() + self->rpc_.retry_interval;
     self->active();
@@ -241,10 +246,12 @@ int etcd_watcher::libcurl_callback_on_range_completed(util::network::http_reques
 
   if (util::log::log_wrapper::check_level(WDTLOGGETCAT(util::log::log_wrapper::categorize_t::DEFAULT),
                                           util::log::log_wrapper::level_t::LOG_LW_DEBUG)) {
-    FWLOGDEBUG("Etcd watcher {} got range response", reinterpret_cast<const void *>(self));
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(*self->owner_, "Etcd watcher {} got range response",
+                                          reinterpret_cast<const void *>(self));
     for (size_t i = 0; i < response.events.size(); ++i) {
       etcd_key_value *kv = &response.events[i].kv;
-      FWLOGDEBUG("    InitEvt => type: PUT, key: {}, value: {}", kv->key, kv->value);
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(*self->owner_, "    InitEvt => type: PUT, key: {}, value: {}", kv->key,
+                                            kv->value);
     }
   }
 
@@ -278,9 +285,9 @@ int etcd_watcher::libcurl_callback_on_watch_completed(util::network::http_reques
     if (CURLE_OPERATION_TIMEDOUT != req.get_error_code() &&
         util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
             util::network::http_request::get_status_code_group(req.get_response_code())) {
-      FWLOGERROR("Etcd watcher {} watch request failed, error code: {}, http code: {}\n{}",
-                 reinterpret_cast<const void *>(self), req.get_error_code(), req.get_response_code(),
-                 req.get_error_msg());
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(
+          *self->owner_, "Etcd watcher {} watch request failed, error code: {}, http code: {}\n{}",
+          reinterpret_cast<const void *>(self), req.get_error_code(), req.get_response_code(), req.get_error_msg());
 
       self->rpc_.watcher_next_request_time = util::time::time_utility::sys_now() + self->rpc_.retry_interval;
 
@@ -297,7 +304,8 @@ int etcd_watcher::libcurl_callback_on_watch_completed(util::network::http_reques
     return 0;
   }
 
-  FWLOGTRACE("Etcd watcher {} got watch http response", reinterpret_cast<const void *>(self));
+  LIBATAPP_MACRO_ETCD_CLUSTER_LOG_TRACE(*self->owner_, "Etcd watcher {} got watch http response",
+                                        reinterpret_cast<const void *>(self));
 
   // 立刻开启下一次watch
   self->active();
@@ -317,7 +325,8 @@ int etcd_watcher::libcurl_callback_on_watch_write(util::network::http_request &r
   }
 
   if (inbuf == nullptr || 0 == inbufsz) {
-    FWLOGDEBUG("Etcd watcher {} got http trunk without data", reinterpret_cast<const void *>(self));
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(*self->owner_, "Etcd watcher {} got http trunk without data",
+                                          reinterpret_cast<const void *>(self));
     return 0;
   }
 
@@ -367,7 +376,8 @@ int etcd_watcher::libcurl_callback_on_watch_write(util::network::http_request &r
     self->rpc_data_stream_.str("");
     self->rpc_data_brackets_ = 0;
 
-    FWLOGTRACE("Etcd watcher {} got http trunk: {}", reinterpret_cast<const void *>(self), value_json);
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_TRACE(*self->owner_, "Etcd watcher {} got http trunk: {}",
+                                          reinterpret_cast<const void *>(self), value_json);
     // 忽略空数据
     if (false == atapp::etcd_packer::parse_object(doc, value_json.c_str())) {
       continue;
@@ -394,7 +404,8 @@ int etcd_watcher::libcurl_callback_on_watch_write(util::network::http_request &r
           self->rpc_.last_revision = header.revision;
         }
       } else {
-        FWLOGERROR("Etcd watcher {} got http trunk without header", reinterpret_cast<const void *>(self));
+        LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self->owner_, "Etcd watcher {} got http trunk without header",
+                                              reinterpret_cast<const void *>(self));
       }
     }
 
@@ -432,8 +443,8 @@ int etcd_watcher::libcurl_callback_on_watch_write(util::network::http_request &r
               evt.evt_type = etcd_watch_event::EN_WEVT_DELETE;
             }
           } else {
-            FWLOGERROR("Etcd watcher {} got unknown event type. msg: {}", reinterpret_cast<const void *>(self),
-                       value_json);
+            LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self->owner_, "Etcd watcher {} got unknown event type. msg: {}",
+                                                  reinterpret_cast<const void *>(self), value_json);
           }
         }
 
@@ -451,7 +462,8 @@ int etcd_watcher::libcurl_callback_on_watch_write(util::network::http_request &r
 
     if (util::log::log_wrapper::check_level(WDTLOGGETCAT(util::log::log_wrapper::categorize_t::DEFAULT),
                                             util::log::log_wrapper::level_t::LOG_LW_DEBUG)) {
-      FWLOGDEBUG(
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(
+          *self->owner_,
           "Etcd watcher {} got response: watch_id: {}, compact_revision: {}, created: {}, canceled: {}, event: {}",
           reinterpret_cast<const void *>(self), response.watch_id, response.compact_revision,
           response.created ? "Yes" : "No", response.canceled ? "Yes" : "No", response.events.size());
@@ -463,7 +475,8 @@ int etcd_watcher::libcurl_callback_on_watch_write(util::network::http_request &r
         } else {
           name = "DELETE";
         }
-        FWLOGDEBUG("    Evt => type: {}, key: {}, value: {}", name, kv->key, kv->value);
+        LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(*self->owner_, "    Evt => type: {}, key: {}, value: {}", name, kv->key,
+                                              kv->value);
       }
     }
 

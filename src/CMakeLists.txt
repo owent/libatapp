@@ -53,6 +53,7 @@ add_custom_command(
           "${PROJECT_LIBATAPP_ROOT_SRC_DIR}/atframe/atapp_conf.pb.cc"
   COMMAND ${CMAKE_COMMAND} -E remove -f "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_conf.pb.cc"
   DEPENDS "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_conf.proto"
+          "${ATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_PROTOBUF_BIN_PROTOC}"
   WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
   COMMENT
     "Generate ${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_conf.pb.h and ${PROJECT_LIBATAPP_ROOT_SRC_DIR}/atframe/atapp_conf.pb.cc"

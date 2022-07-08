@@ -5,6 +5,7 @@
 
 #include <config/compiler_features.h>
 
+#include <gsl/select-gsl.h>
 #include <network/http_request.h>
 
 #include <functional>
@@ -69,7 +70,7 @@ class etcd_keepalive : public std::enable_shared_from_this<etcd_keepalive> {
   static int libcurl_callback_on_set_data(util::network::http_request &req);
 
  private:
-  etcd_cluster *owner_;
+  gsl::not_null<etcd_cluster *> owner_;
   std::string path_;
   std::string value_;
   struct rpc_data_t {

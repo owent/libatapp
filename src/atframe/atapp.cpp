@@ -3202,10 +3202,15 @@ bool app::write_pidfile(int pid) {
       ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "open and write pid file " << conf_.pid_file
            << " failed" << std::endl;
       FWLOGERROR("open and write pid file {} failed", conf_.pid_file);
-      // failed and skip running
+      // Failed and skip running
       return false;
     } else {
-      pid_file << pid;
+      // Write 0 when start failed
+      if (pid < 0) {
+        pid_file << 0;
+      } else {
+        pid_file << pid;
+      }
       pid_file.close();
     }
   }

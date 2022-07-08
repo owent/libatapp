@@ -64,7 +64,8 @@ LIBATAPP_MACRO_API etcd_keepalive::ptr_t etcd_keepalive::create(etcd_cluster &ow
 
 LIBATAPP_MACRO_API void etcd_keepalive::close(bool reset_has_data_flag) {
   if (rpc_.rpc_opr_) {
-    FWLOGDEBUG("Etcd watcher {} cancel http request.", reinterpret_cast<const void *>(this));
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(*owner_, "Etcd watcher {} cancel http request.",
+                                          reinterpret_cast<const void *>(this));
     rpc_.rpc_opr_->set_on_complete(nullptr);
     rpc_.rpc_opr_->set_priv_data(nullptr);
     rpc_.rpc_opr_->stop();
@@ -133,8 +134,8 @@ void etcd_keepalive::process() {
       if (!rpc_.rpc_opr_) {
         need_retry = true;
         ++checker_.retry_times;
-        FWLOGERROR("Etcd keepalive {} create get data request to {} failed", reinterpret_cast<const void *>(this),
-                   path_);
+        LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*owner_, "Etcd keepalive {} create get data request to {} failed",
+                                              reinterpret_cast<const void *>(this), path_);
         break;
       }
 
@@ -149,8 +150,8 @@ void etcd_keepalive::process() {
       rpc_.rpc_opr_ = owner_->create_request_kv_set(path_, value_, true);
       if (!rpc_.rpc_opr_) {
         need_retry = true;
-        FWLOGERROR("Etcd keepalive {} create set data request to {} failed", reinterpret_cast<const void *>(this),
-                   path_);
+        LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*owner_, "Etcd keepalive {} create set data request to {} failed",
+                                              reinterpret_cast<const void *>(this), path_);
         break;
       }
 
@@ -166,12 +167,12 @@ void etcd_keepalive::process() {
       need_retry = true;
       rpc_.rpc_opr_->set_priv_data(nullptr);
       rpc_.rpc_opr_->set_on_complete(nullptr);
-      FWLOGERROR("Etcd keepalive {} start request to {} failed, res: {}", reinterpret_cast<const void *>(this),
-                 rpc_.rpc_opr_->get_url(), res);
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*owner_, "Etcd keepalive {} start request to {} failed, res: {}",
+                                            reinterpret_cast<const void *>(this), rpc_.rpc_opr_->get_url(), res);
       rpc_.rpc_opr_.reset();
     } else {
-      FWLOGDEBUG("Etcd keepalive {} start request to {} success.", reinterpret_cast<const void *>(this),
-                 rpc_.rpc_opr_->get_url());
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(*owner_, "Etcd keepalive {} start request to {} success.",
+                                            reinterpret_cast<const void *>(this), rpc_.rpc_opr_->get_url());
     }
   }
 
@@ -194,9 +195,9 @@ int etcd_keepalive::libcurl_callback_on_get_data(util::network::http_request &re
   // 服务器错误则重试，预检查请求的404是正常的
   if (0 != req.get_error_code() || util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
                                        util::network::http_request::get_status_code_group(req.get_response_code())) {
-    FWLOGERROR("Etcd keepalive {} get request failed, error code: {}, http code: {}\n{}",
-               reinterpret_cast<const void *>(self), req.get_error_code(), req.get_response_code(),
-               req.get_error_msg());
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(
+        *self->owner_, "Etcd keepalive {} get request failed, error code: {}, http code: {}\n{}",
+        reinterpret_cast<const void *>(self), req.get_error_code(), req.get_response_code(), req.get_error_msg());
 
     self->owner_->add_retry_keepalive(self->shared_from_this());
     self->owner_->check_authorization_expired(req.get_response_code(), req.get_response_stream().str());
@@ -207,7 +208,8 @@ int etcd_keepalive::libcurl_callback_on_get_data(util::network::http_request &re
   std::string value_content;
 
   req.get_response_stream().str().swap(http_content);
-  FWLOGTRACE("Etcd keepalive {} got http response: {}", reinterpret_cast<const void *>(self), http_content);
+  LIBATAPP_MACRO_ETCD_CLUSTER_LOG_TRACE(*self->owner_, "Etcd keepalive {} got http response: {}",
+                                        reinterpret_cast<const void *>(self), http_content);
 
   // 如果lease不存在（没有TTL）则启动创建流程
   rapidjson::Document doc;
@@ -222,15 +224,16 @@ int etcd_keepalive::libcurl_callback_on_get_data(util::network::http_request &re
     if (count > 0) {
       rapidjson::Document::ConstMemberIterator kvs = root.FindMember("kvs");
       if (root.MemberEnd() == kvs) {
-        FWLOGERROR("Etcd keepalive {} get data count={}, but kvs not found", reinterpret_cast<const void *>(self),
-                   count);
+        LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self->owner_, "Etcd keepalive {} get data count={}, but kvs not found",
+                                              reinterpret_cast<const void *>(self), count);
         self->owner_->add_retry_keepalive(self->shared_from_this());
         return 0;
       }
 
       if (!kvs->value.IsArray()) {
-        FWLOGERROR("Etcd keepalive {} get data count={}, but kvs is not array", reinterpret_cast<const void *>(self),
-                   count);
+        LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self->owner_,
+                                              "Etcd keepalive {} get data count={}, but kvs is not array",
+                                              reinterpret_cast<const void *>(self), count);
         self->owner_->add_retry_keepalive(self->shared_from_this());
         return 0;
       }
@@ -250,10 +253,15 @@ int etcd_keepalive::libcurl_callback_on_get_data(util::network::http_request &re
   } else {
     self->checker_.is_check_passed = self->checker_.fn(value_content);
   }
-  FWLOGDEBUG("Etcd keepalive {} check data {}", reinterpret_cast<const void *>(self),
-             self->checker_.is_check_passed ? "passed" : "failed");
+  LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(*self->owner_, "Etcd keepalive {} check data {}",
+                                        reinterpret_cast<const void *>(self),
+                                        self->checker_.is_check_passed ? "passed" : "failed");
 
   self->active();
+
+  if (self->checker_.is_check_passed) {
+    self->owner_->resolve_ready();
+  }
   return 0;
 }
 
@@ -270,9 +278,9 @@ int etcd_keepalive::libcurl_callback_on_set_data(util::network::http_request &re
   // 服务器错误则忽略
   if (0 != req.get_error_code() || util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
                                        util::network::http_request::get_status_code_group(req.get_response_code())) {
-    FWLOGERROR("Etcd keepalive {} set request failed, error code: {}, http code: {}\n{}",
-               reinterpret_cast<const void *>(self), req.get_error_code(), req.get_response_code(),
-               req.get_error_msg());
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(
+        *self->owner_, "Etcd keepalive {} set request failed, error code: {}, http code: {}\n{}",
+        reinterpret_cast<const void *>(self), req.get_error_code(), req.get_response_code(), req.get_error_msg());
 
     self->rpc_.is_value_changed = true;
     self->owner_->add_retry_keepalive(self->shared_from_this());
@@ -281,8 +289,8 @@ int etcd_keepalive::libcurl_callback_on_set_data(util::network::http_request &re
   }
 
   self->rpc_.has_data = true;
-  FWLOGDEBUG("Etcd keepalive {} set data http response: {}", reinterpret_cast<const void *>(self),
-             req.get_response_stream().str());
+  LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(*self->owner_, "Etcd keepalive {} set data http response: {}",
+                                        reinterpret_cast<const void *>(self), req.get_response_stream().str());
   self->active();
   return 0;
 }
