@@ -95,7 +95,7 @@ LIBATAPP_MACRO_API void etcd_keepalive::set_value(const std::string &str) {
     value_ = str;
     rpc_.is_value_changed = true;
 
-    if (owner_ && owner_->check_flag(etcd_cluster::flag_t::RUNNING) && 0 != owner_->get_lease()) {
+    if (owner_->check_flag(etcd_cluster::flag_t::RUNNING) && 0 != owner_->get_lease()) {
       active();
     }
   }
