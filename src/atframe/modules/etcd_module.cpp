@@ -117,24 +117,24 @@ LIBATAPP_MACRO_API int etcd_module::init() {
   // init curl
   int res = curl_global_init(CURL_GLOBAL_ALL);
   if (res) {
-    FWLOGERROR("init cURL failed, errcode: {}", res);
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(etcd_ctx_, "init cURL failed, errcode: {}", res);
     return -1;
   }
 
   util::network::http_request::create_curl_multi(get_app()->get_bus_node()->get_evloop(), curl_multi_);
   if (!curl_multi_) {
-    FWLOGERROR("create curl multi instance failed.");
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(etcd_ctx_, "create curl multi instance failed.");
     return -1;
   }
 
   const atapp::protocol::atapp_etcd &conf = get_configure();
   if (!etcd_ctx_enabled_) {
-    FWLOGINFO("etcd disabled, start single mode");
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(etcd_ctx_, "etcd disabled, start single mode");
     return res;
   }
 
   if (etcd_ctx_.get_conf_hosts().empty()) {
-    FWLOGINFO("etcd host not found, start single mode");
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(etcd_ctx_, "etcd host not found, start single mode");
     return res;
   }
 
@@ -179,7 +179,7 @@ LIBATAPP_MACRO_API int etcd_module::init() {
          iter != inner_keepalive_actors_.end(); ++iter) {
       if ((*iter)->is_check_run()) {
         if (!(*iter)->is_check_passed()) {
-          FWLOGERROR("etcd_keepalive lock {} failed.", (*iter)->get_path());
+          LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(etcd_ctx_, "etcd_keepalive lock {} failed.", (*iter)->get_path());
           is_failed = true;
         }
 
@@ -205,8 +205,9 @@ LIBATAPP_MACRO_API int etcd_module::init() {
         if (etcd_ctx_.get_stats().continue_error_requests > retry_times) {
           retry_times = etcd_ctx_.get_stats().continue_error_requests > retry_times;
         }
-        FWLOGERROR("etcd_keepalive request {} for {} times (with {} ticks) failed.", (*iter)->get_path(), retry_times,
-                   ticks);
+        LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(etcd_ctx_,
+                                              "etcd_keepalive request {} for {} times (with {} ticks) failed.",
+                                              (*iter)->get_path(), retry_times, ticks);
         is_failed = true;
         break;
       }
@@ -226,11 +227,14 @@ LIBATAPP_MACRO_API int etcd_module::init() {
         retry_times = etcd_ctx_.get_stats().continue_error_requests;
       }
       if ((*iter)->is_check_passed()) {
-        FWLOGWARNING("etcd_keepalive request {} timeout, retry {} times (with {} ticks), check passed, has data: {}.",
-                     (*iter)->get_path(), retry_times, ticks, (*iter)->has_data() ? "true" : "false");
+        LIBATAPP_MACRO_ETCD_CLUSTER_LOG_WARNING(
+            etcd_ctx_, "etcd_keepalive request {} timeout, retry {} times (with {} ticks), check passed, has data: {}.",
+            (*iter)->get_path(), retry_times, ticks, (*iter)->has_data() ? "true" : "false");
       } else {
-        FWLOGERROR("etcd_keepalive request {} timeout, retry {} times (with {} ticks), check unpassed, has data: {}.",
-                   (*iter)->get_path(), retry_times, ticks, (*iter)->has_data() ? "true" : "false");
+        LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(
+            etcd_ctx_,
+            "etcd_keepalive request {} timeout, retry {} times (with {} ticks), check unpassed, has data: {}.",
+            (*iter)->get_path(), retry_times, ticks, (*iter)->has_data() ? "true" : "false");
       }
     }
   }
@@ -284,46 +288,46 @@ int etcd_module::init_keepalives() {
   if (conf.report_alive().by_id()) {
     atapp::etcd_keepalive::ptr_t actor = add_keepalive_actor(inner_keepalive_value_, get_by_id_path());
     if (!actor) {
-      FWLOGERROR("create etcd_keepalive for by_id index failed.");
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(etcd_ctx_, "create etcd_keepalive for by_id index failed.");
       return -1;
     }
 
     inner_keepalive_actors_.push_back(actor);
-    FWLOGINFO("create etcd_keepalive {} for by_id index {} success", reinterpret_cast<const void *>(actor.get()),
-              get_by_id_path());
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(etcd_ctx_, "create etcd_keepalive {} for by_id index {} success",
+                                         reinterpret_cast<const void *>(actor.get()), get_by_id_path());
   }
 
   if (conf.report_alive().by_type()) {
     atapp::etcd_keepalive::ptr_t actor = add_keepalive_actor(inner_keepalive_value_, get_by_type_id_path());
     if (!actor) {
-      FWLOGERROR("create etcd_keepalive for by_type_id index failed.");
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(etcd_ctx_, "create etcd_keepalive for by_type_id index failed.");
       return -1;
     }
     inner_keepalive_actors_.push_back(actor);
-    FWLOGINFO("create etcd_keepalive {} for by_type_id index {} success", reinterpret_cast<const void *>(actor.get()),
-              get_by_type_id_path());
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(etcd_ctx_, "create etcd_keepalive {} for by_type_id index {} success",
+                                         reinterpret_cast<const void *>(actor.get()), get_by_type_id_path());
 
     actor = add_keepalive_actor(inner_keepalive_value_, get_by_type_name_path());
     if (!actor) {
-      FWLOGERROR("create etcd_keepalive for by_type_name index failed.");
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(etcd_ctx_, "create etcd_keepalive for by_type_name index failed.");
       return -1;
     }
     inner_keepalive_actors_.push_back(actor);
 
-    FWLOGINFO("create etcd_keepalive {} for by_type_name index {} success", reinterpret_cast<const void *>(actor.get()),
-              get_by_type_name_path());
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(etcd_ctx_, "create etcd_keepalive {} for by_type_name index {} success",
+                                         reinterpret_cast<const void *>(actor.get()), get_by_type_name_path());
   }
 
   if (conf.report_alive().by_name()) {
     atapp::etcd_keepalive::ptr_t actor = add_keepalive_actor(inner_keepalive_value_, get_by_name_path());
     if (!actor) {
-      FWLOGERROR("create etcd_keepalive for by_name index failed.");
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(etcd_ctx_, "create etcd_keepalive for by_name index failed.");
       return -1;
     }
 
     inner_keepalive_actors_.push_back(actor);
-    FWLOGINFO("create etcd_keepalive {} for by_name index {} success", reinterpret_cast<const void *>(actor.get()),
-              get_by_name_path());
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(etcd_ctx_, "create etcd_keepalive {} for by_name index {} success",
+                                         reinterpret_cast<const void *>(actor.get()), get_by_name_path());
   }
 
   for (int i = 0; i < conf.report_alive().by_tag_size(); ++i) {
@@ -335,13 +339,13 @@ int etcd_module::init_keepalives() {
 
     atapp::etcd_keepalive::ptr_t actor = add_keepalive_actor(inner_keepalive_value_, get_by_tag_path(tag_name));
     if (!actor) {
-      FWLOGERROR("create etcd_keepalive for by_tag {} index failed.", tag_name);
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(etcd_ctx_, "create etcd_keepalive for by_tag {} index failed.", tag_name);
       return -1;
     }
 
     inner_keepalive_actors_.push_back(actor);
-    FWLOGINFO("create etcd_keepalive {} for by_tag index {} success", reinterpret_cast<const void *>(actor.get()),
-              get_by_tag_path(tag_name));
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(etcd_ctx_, "create etcd_keepalive {} for by_tag index {} success",
+                                         reinterpret_cast<const void *>(actor.get()), get_by_tag_path(tag_name));
   }
 
   return 0;
@@ -389,9 +393,37 @@ int etcd_module::init_watchers() {
 
 LIBATAPP_MACRO_API int etcd_module::reload() {
   // load configure
-  const atapp::protocol::atapp_etcd &conf = get_configure();
   conf_path_cache_.clear();
+  const atapp::protocol::atapp_etcd &conf = get_configure();
 
+  // load logger
+  util::log::log_wrapper::ptr_t logger;
+  util::log::log_formatter::level_t::type startup_level = util::log::log_formatter::level_t::LOG_LW_DISABLED;
+  do {
+    atapp::protocol::atapp_log etcd_log_conf;
+    get_app()->parse_log_configures_into(etcd_log_conf, std::vector<gsl::string_view>{"atapp", "etcd", "log"},
+                                         "ATAPP_ETCD_LOG");
+    if (etcd_log_conf.category_size() <= 0) {
+      break;
+    }
+
+    startup_level = util::log::log_formatter::get_level_by_name(conf.log().startup_level().c_str());
+    if (startup_level <= util::log::log_formatter::level_t::LOG_LW_DISABLED &&
+        util::log::log_formatter::get_level_by_name(etcd_log_conf.level().c_str()) <=
+            util::log::log_formatter::level_t::LOG_LW_DISABLED) {
+      break;
+    }
+
+    logger = util::log::log_wrapper::create_user_logger();
+    if (!logger) {
+      break;
+    }
+    logger->init(util::log::log_formatter::get_level_by_name(etcd_log_conf.level().c_str()));
+    get_app()->setup_logger(*logger, etcd_log_conf.level(), etcd_log_conf.category(0));
+  } while (false);
+  etcd_ctx_.set_logger(logger, startup_level);
+
+  // etcd context configure
   {
     std::vector<std::string> conf_hosts;
     conf_hosts.reserve(static_cast<size_t>(conf.hosts_size()));
@@ -600,7 +632,7 @@ LIBATAPP_MACRO_API int etcd_module::tick() {
   if (!curl_multi_) {
     int res = init();
     if (res < 0) {
-      FWLOGERROR("initialize etcd failed, res: {}", res);
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(etcd_ctx_, "initialize etcd failed, res: {}", res);
       owner->stop();
       return res;
     }
@@ -609,12 +641,12 @@ LIBATAPP_MACRO_API int etcd_module::tick() {
     // generate keepalives
     int res = init_keepalives();
     if (res < 0) {
-      FWLOGERROR("reinitialize etcd keepalives failed, res: {}", res);
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(etcd_ctx_, "reinitialize etcd keepalives failed, res: {}", res);
     }
     // generate watchers data
     res = init_watchers();
     if (res < 0) {
-      FWLOGERROR("reinitialize etcd watchers failed, res: {}", res);
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(etcd_ctx_, "reinitialize etcd watchers failed, res: {}", res);
     }
   }
 
@@ -726,7 +758,7 @@ LIBATAPP_MACRO_API int etcd_module::add_watcher_by_id(watcher_list_callback_t fn
 
     inner_watcher_by_id_ = atapp::etcd_watcher::create(etcd_ctx_, watch_path, "+1");
     if (!inner_watcher_by_id_) {
-      FWLOGERROR("create etcd_watcher by_id failed.");
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(etcd_ctx_, "create etcd_watcher by_id failed.");
       return EN_ATBUS_ERR_MALLOC;
     }
 
@@ -735,7 +767,7 @@ LIBATAPP_MACRO_API int etcd_module::add_watcher_by_id(watcher_list_callback_t fn
     inner_watcher_by_id_->set_conf_retry_interval(
         detail::convert_to_chrono(get_configure().watcher().retry_interval(), 15000));
     etcd_ctx_.add_watcher(inner_watcher_by_id_);
-    FWLOGINFO("create etcd_watcher for by_id index {} success", watch_path);
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(etcd_ctx_, "create etcd_watcher for by_id index {} success", watch_path);
 
     inner_watcher_by_id_->set_evt_handle(
         watcher_callback_list_wrapper_t(*this, watcher_by_id_callbacks_, ++watcher_snapshot_index_allocator_));
@@ -758,14 +790,14 @@ LIBATAPP_MACRO_API int etcd_module::add_watcher_by_type_id(uint64_t type_id, wat
 
   atapp::etcd_watcher::ptr_t p = atapp::etcd_watcher::create(etcd_ctx_, watch_path, "+1");
   if (!p) {
-    FWLOGERROR("create etcd_watcher by_type_id failed.");
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(etcd_ctx_, "create etcd_watcher by_type_id failed.");
     return EN_ATBUS_ERR_MALLOC;
   }
 
   p->set_conf_request_timeout(detail::convert_to_chrono(get_configure().watcher().request_timeout(), 3600000));
   p->set_conf_retry_interval(detail::convert_to_chrono(get_configure().watcher().retry_interval(), 15000));
   etcd_ctx_.add_watcher(p);
-  FWLOGINFO("create etcd_watcher for by_type_id index {} success", watch_path);
+  LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(etcd_ctx_, "create etcd_watcher for by_type_id index {} success", watch_path);
 
   p->set_evt_handle(watcher_callback_one_wrapper_t(*this, fn, ++watcher_snapshot_index_allocator_));
   return 0;
@@ -778,14 +810,14 @@ LIBATAPP_MACRO_API int etcd_module::add_watcher_by_type_name(const std::string &
 
   atapp::etcd_watcher::ptr_t p = atapp::etcd_watcher::create(etcd_ctx_, watch_path, "+1");
   if (!p) {
-    FWLOGERROR("create etcd_watcher by_type_name failed.");
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(etcd_ctx_, "create etcd_watcher by_type_name failed.");
     return EN_ATBUS_ERR_MALLOC;
   }
 
   p->set_conf_request_timeout(detail::convert_to_chrono(get_configure().watcher().request_timeout(), 3600000));
   p->set_conf_retry_interval(detail::convert_to_chrono(get_configure().watcher().retry_interval(), 15000));
   etcd_ctx_.add_watcher(p);
-  FWLOGINFO("create etcd_watcher for by_type_name index {} success", watch_path);
+  LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(etcd_ctx_, "create etcd_watcher for by_type_name index {} success", watch_path);
 
   p->set_evt_handle(watcher_callback_one_wrapper_t(*this, fn, ++watcher_snapshot_index_allocator_));
   return 0;
@@ -805,7 +837,7 @@ LIBATAPP_MACRO_API int etcd_module::add_watcher_by_name(watcher_list_callback_t 
 
     inner_watcher_by_name_ = atapp::etcd_watcher::create(etcd_ctx_, watch_path, "+1");
     if (!inner_watcher_by_name_) {
-      FWLOGERROR("create etcd_watcher by_name failed.");
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(etcd_ctx_, "create etcd_watcher by_name failed.");
       return EN_ATBUS_ERR_MALLOC;
     }
 
@@ -814,7 +846,7 @@ LIBATAPP_MACRO_API int etcd_module::add_watcher_by_name(watcher_list_callback_t 
     inner_watcher_by_name_->set_conf_retry_interval(
         detail::convert_to_chrono(get_configure().watcher().retry_interval(), 15000));
     etcd_ctx_.add_watcher(inner_watcher_by_name_);
-    FWLOGINFO("create etcd_watcher for by_name index {} success", watch_path);
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(etcd_ctx_, "create etcd_watcher for by_name index {} success", watch_path);
 
     inner_watcher_by_name_->set_evt_handle(
         watcher_callback_list_wrapper_t(*this, watcher_by_name_callbacks_, ++watcher_snapshot_index_allocator_));
@@ -832,12 +864,12 @@ LIBATAPP_MACRO_API int etcd_module::add_watcher_by_tag(const std::string &tag_na
 
   atapp::etcd_watcher::ptr_t p = atapp::etcd_watcher::create(etcd_ctx_, watch_path, "+1");
   if (!p) {
-    FWLOGERROR("create etcd_watcher by_tag failed.");
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(etcd_ctx_, "create etcd_watcher by_tag failed.");
     return EN_ATBUS_ERR_MALLOC;
   }
 
   etcd_ctx_.add_watcher(p);
-  FWLOGINFO("create etcd_watcher for by_tag index {} success", watch_path);
+  LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(etcd_ctx_, "create etcd_watcher for by_tag index {} success", watch_path);
 
   p->set_evt_handle(watcher_callback_one_wrapper_t(*this, fn, ++watcher_snapshot_index_allocator_));
   return 0;
@@ -848,22 +880,24 @@ LIBATAPP_MACRO_API atapp::etcd_watcher::ptr_t etcd_module::add_watcher_by_custom
   const std::string &configure_path = get_configure_path();
   if (custom_path.size() < configure_path.size() ||
       0 != UTIL_STRFUNC_STRNCMP(custom_path.c_str(), configure_path.c_str(), configure_path.size())) {
-    FWLOGERROR("create etcd_watcher by custom path {} failed. path must has prefix of {}.", custom_path,
-               configure_path);
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(etcd_ctx_,
+                                          "create etcd_watcher by custom path {} failed. path must has prefix of {}.",
+                                          custom_path, configure_path);
     return nullptr;
   }
 
   atapp::etcd_watcher::ptr_t p = atapp::etcd_watcher::create(etcd_ctx_, custom_path, "+1");
   if (!p) {
-    FWLOGERROR("create etcd_watcher by custom path {} failed. malloc etcd_watcher failed.", custom_path);
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(
+        etcd_ctx_, "create etcd_watcher by custom path {} failed. malloc etcd_watcher failed.", custom_path);
     return nullptr;
   }
 
   p->set_evt_handle(watcher_callback_one_wrapper_t(*this, fn, ++watcher_snapshot_index_allocator_));
   if (etcd_ctx_.add_watcher(p)) {
-    FWLOGINFO("create etcd_watcher by custom path {} success", custom_path);
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(etcd_ctx_, "create etcd_watcher by custom path {} success", custom_path);
   } else {
-    FWLOGINFO("add etcd_watcher by custom path {} failed", custom_path);
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(etcd_ctx_, "add etcd_watcher by custom path {} failed", custom_path);
     p->set_evt_handle(nullptr);
     p.reset();
   }
@@ -911,7 +945,7 @@ LIBATAPP_MACRO_API atapp::etcd_keepalive::ptr_t etcd_module::add_keepalive_actor
 
   ret = atapp::etcd_keepalive::create(etcd_ctx_, node_path);
   if (!ret) {
-    FWLOGERROR("create etcd_keepalive failed.");
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(etcd_ctx_, "create etcd_keepalive failed.");
     return ret;
   }
 
@@ -1036,7 +1070,7 @@ int etcd_module::http_callback_on_etcd_closed(util::network::http_request &req) 
 
   self->cleanup_request_.reset();
 
-  FWLOGDEBUG("Etcd revoke lease finished");
+  LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(self->etcd_ctx_, "Etcd revoke lease finished");
 
   // call stop to trigger stop process again.
   if (nullptr != self->get_app()) {

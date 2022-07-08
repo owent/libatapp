@@ -5,6 +5,7 @@
 
 #include <config/compiler_features.h>
 
+#include <gsl/select-gsl.h>
 #include <network/http_request.h>
 
 #include <chrono>
@@ -95,7 +96,7 @@ class etcd_watcher {
                                              const char *&outbuf, size_t &outbufsz);
 
  private:
-  etcd_cluster *owner_;
+  gsl::not_null<etcd_cluster *> owner_;
   std::string path_;
   std::string range_end_;
   std::stringstream rpc_data_stream_;

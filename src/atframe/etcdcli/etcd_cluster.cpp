@@ -136,14 +136,6 @@ static const std::string &get_default_user_agent() {
   return ret;
 }
 
-static int etcd_cluster_trace_porcess_callback(util::network::http_request &req,
-                                               const util::network::http_request::progress_t &process) {
-  FWLOGTRACE("Etcd cluster {} http request {} to {}, process: download {}/{}, upload {}/{}", req.get_priv_data(),
-             reinterpret_cast<const void *>(&req), req.get_url(), process.dlnow, process.dltotal, process.ulnow,
-             process.ultotal);
-  return 0;
-}
-
 EXPLICIT_UNUSED_ATTR static int etcd_cluster_verbose_callback(util::network::http_request &req, curl_infotype type,
                                                               char *data, size_t size) {
   if (util::log::log_wrapper::check_level(WDTLOGGETCAT(util::log::log_wrapper::categorize_t::DEFAULT),
@@ -186,7 +178,10 @@ EXPLICIT_UNUSED_ATTR static int etcd_cluster_verbose_callback(util::network::htt
 }
 }  // namespace details
 
-LIBATAPP_MACRO_API etcd_cluster::etcd_cluster() : flags_(0) {
+LIBATAPP_MACRO_API etcd_cluster::etcd_cluster()
+    : flags_(0),
+      startup_log_level_(util::log::log_formatter::level_t::LOG_LW_DISABLED),
+      runtime_log_level_(util::log::log_formatter::level_t::LOG_LW_DISABLED) {
   conf_.authorization_next_update_time = std::chrono::system_clock::from_time_t(0);
   conf_.authorization_retry_interval = std::chrono::seconds(5);
   conf_.auth_user_get_next_update_time = std::chrono::system_clock::from_time_t(0);
@@ -299,7 +294,7 @@ LIBATAPP_MACRO_API util::network::http_request::ptr_t etcd_cluster::close(bool w
 
         // wait to delete content
         if (ret) {
-          FWLOGDEBUG("Etcd start to revoke lease {}", get_lease());
+          LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(*this, "Etcd start to revoke lease {}", get_lease());
           ret->start(util::network::http_request::method_t::EN_MT_POST, wait);
         }
       }
@@ -428,6 +423,11 @@ LIBATAPP_MACRO_API int etcd_cluster::tick() {
   // run pending
   retry_pending_actions();
 
+  // resolve ready flag
+  if (!check_flag(flag_t::READY) && check_flag(flag_t::RUNNING)) {
+    resolve_ready();
+  }
+
   return ret;
 }
 
@@ -447,6 +447,27 @@ LIBATAPP_MACRO_API bool etcd_cluster::is_available() const {
 
   // check or start authorization
   return check_authorization();
+}
+
+LIBATAPP_MACRO_API void etcd_cluster::resolve_ready() noexcept {
+  if (check_flag(flag_t::READY) || !check_flag(flag_t::RUNNING)) {
+    return;
+  }
+
+  bool ready = true;
+  for (auto &keepalive : keepalive_actors_) {
+    if (!keepalive) {
+      continue;
+    }
+    if (!keepalive->is_check_run() || !keepalive->is_check_passed()) {
+      ready = false;
+      break;
+    }
+  }
+
+  if (ready) {
+    set_flag(flag_t::READY, true);
+  }
 }
 
 LIBATAPP_MACRO_API void etcd_cluster::set_flag(flag_t::type f, bool v) {
@@ -490,9 +511,28 @@ LIBATAPP_MACRO_API void etcd_cluster::set_flag(flag_t::type f, bool v) {
       }
       break;
     }
+    case flag_t::READY: {
+      if (v && logger_) {
+        logger_->set_level(runtime_log_level_);
+      }
+      break;
+    }
     default: {
       break;
     }
+  }
+}
+
+LIBATAPP_MACRO_API void etcd_cluster::set_logger(const util::log::log_wrapper::ptr_t &logger,
+                                                 util::log::log_formatter::level_t::type log_level) noexcept {
+  logger_ = logger;
+  startup_log_level_ = log_level;
+  if (logger) {
+    runtime_log_level_ = logger->get_level();
+  }
+
+  if (logger_ && !check_flag(flag_t::READY)) {
+    logger_->set_level(startup_log_level_);
   }
 }
 
@@ -616,8 +656,9 @@ LIBATAPP_MACRO_API bool etcd_cluster::remove_keepalive(std::shared_ptr<etcd_keep
     if (keepalive->has_data()) {
       etcd_keepalive_deletor *keepalive_deletor = new etcd_keepalive_deletor();
       if (nullptr == keepalive_deletor) {
-        FWLOGERROR("Etcd cluster try to delete keepalive {} path {} but malloc etcd_keepalive_deletor failed.",
-                   reinterpret_cast<const void *>(keepalive.get()), keepalive->get_path());
+        LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(
+            *this, "Etcd cluster try to delete keepalive {} path {} but malloc etcd_keepalive_deletor failed.",
+            reinterpret_cast<const void *>(keepalive.get()), keepalive->get_path());
       } else {
         keepalive_deletor->retry_times = 0;
         keepalive_deletor->path = keepalive->get_path();
@@ -718,16 +759,17 @@ void etcd_cluster::remove_keepalive_path(etcd_keepalive_deletor *keepalive_delet
       max_retry_times = 8;
     }
     if (keepalive_deletor->retry_times > max_retry_times) {
-      FWLOGERROR("Etcd cluster try to delete keepalive {} path {} too many times, skip to retry again.",
-                 keepalive_deletor->keepalive_addr, keepalive_deletor->path);
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(
+          *this, "Etcd cluster try to delete keepalive {} path {} too many times, skip to retry again.",
+          keepalive_deletor->keepalive_addr, keepalive_deletor->path);
       delete_keepalive_deletor(keepalive_deletor, true);
       break;
     }
 
     util::network::http_request::ptr_t rpc = create_request_kv_del(keepalive_deletor->path, "+1");
     if (!rpc) {
-      FWLOGERROR("Etcd cluster create delete keepalive {} path request to {} failed", keepalive_deletor->keepalive_addr,
-                 keepalive_deletor->path);
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*this, "Etcd cluster create delete keepalive {} path request to {} failed",
+                                            keepalive_deletor->keepalive_addr, keepalive_deletor->path);
 
       // insert and retry later
       keepalive_deletors_[keepalive_deletor->path] = keepalive_deletor;
@@ -740,8 +782,9 @@ void etcd_cluster::remove_keepalive_path(etcd_keepalive_deletor *keepalive_delet
 
     int res = rpc->start(util::network::http_request::method_t::EN_MT_POST, false);
     if (res != 0) {
-      FWLOGERROR("Etcd cluster start delete keepalive {} request to {} failed, res: {}",
-                 reinterpret_cast<const void *>(this), rpc->get_url(), res);
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*this,
+                                            "Etcd cluster start delete keepalive {} request to {} failed, res: {}",
+                                            reinterpret_cast<const void *>(this), rpc->get_url(), res);
       rpc->set_on_complete(nullptr);
       rpc->set_priv_data(nullptr);
       keepalive_deletor->rpc.reset();
@@ -749,8 +792,8 @@ void etcd_cluster::remove_keepalive_path(etcd_keepalive_deletor *keepalive_delet
       // insert and retry later
       keepalive_deletors_[keepalive_deletor->path] = keepalive_deletor;
     } else {
-      FWLOGDEBUG("Etcd cluster start delete keepalive {} request to {} success", reinterpret_cast<const void *>(this),
-                 rpc->get_url());
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(*this, "Etcd cluster start delete keepalive {} request to {} success",
+                                            reinterpret_cast<const void *>(this), rpc->get_url());
     }
 
   } while (false);
@@ -784,8 +827,15 @@ int etcd_cluster::libcurl_callback_on_remove_keepalive_path(util::network::http_
         (util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
              util::network::http_request::get_status_code_group(req.get_response_code()) &&
          util::network::http_request::status_code_t::EN_SCT_NOT_FOUND != req.get_response_code())) {
-      FWLOGERROR("Etcd cluster delete keepalive {} path {} failed, error code: {}, http code: {}\n{}",
-                 self->keepalive_addr, self->path, req.get_error_code(), req.get_response_code(), req.get_error_msg());
+      if (nullptr != self->owner) {
+        LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(
+            *self->owner, "Etcd cluster delete keepalive {} path {} finished, res: {}, http code: {}\n{}",
+            self->keepalive_addr, self->path, req.get_error_code(), req.get_response_code(), req.get_error_msg());
+      } else {
+        FWLOGERROR("Etcd cluster delete keepalive {} path {} failed, error code: {}, http code: {}\n{}",
+                   self->keepalive_addr, self->path, req.get_error_code(), req.get_response_code(),
+                   req.get_error_msg());
+      }
 
       if (nullptr != self->owner) {
         // only network error will trigger a etcd member update
@@ -804,8 +854,14 @@ int etcd_cluster::libcurl_callback_on_remove_keepalive_path(util::network::http_
       return 0;
     }
 
-    FWLOGINFO("Etcd cluster delete keepalive {} path {} finished, res: {}, http code: {}\n{}", self->keepalive_addr,
-              self->path, req.get_error_code(), req.get_response_code(), req.get_error_msg());
+    if (nullptr != self->owner) {
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(
+          *self->owner, "Etcd cluster delete keepalive {} path {} finished, res: {}, http code: {}\n{}",
+          self->keepalive_addr, self->path, req.get_error_code(), req.get_response_code(), req.get_error_msg());
+    } else {
+      FWLOGINFO("Etcd cluster delete keepalive {} path {} finished, res: {}, http code: {}\n{}", self->keepalive_addr,
+                self->path, req.get_error_code(), req.get_response_code(), req.get_error_msg());
+    }
   } while (false);
 
   delete_keepalive_deletor(self, false);
@@ -923,12 +979,14 @@ bool etcd_cluster::create_request_auth_authenticate() {
     int res = req->start(util::network::http_request::method_t::EN_MT_POST, false);
     if (res != 0) {
       req->set_on_complete(nullptr);
-      FWLOGERROR("Etcd start authenticate request for user {} to {} failed, res: {}", username, req->get_url(), res);
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*this, "Etcd start authenticate request for user {} to {} failed, res: {}",
+                                            username, req->get_url(), res);
       add_stats_error_request();
       return false;
     }
 
-    FWLOGINFO("Etcd start authenticate request for user {} to {}", username, req->get_url());
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(*this, "Etcd start authenticate request for user {} to {}", username,
+                                         req->get_url());
     rpc_authenticate_ = req;
     if (std::chrono::system_clock::duration::zero() >= conf_.auth_user_get_retry_interval) {
       conf_.auth_user_get_next_update_time = util::time::time_utility::sys_now() + std::chrono::seconds(3);
@@ -961,15 +1019,15 @@ int etcd_cluster::libcurl_callback_on_auth_authenticate(util::network::http_requ
     }
     self->add_stats_error_request();
 
-    FWLOGERROR("Etcd authenticate failed, error code: {}, http code: {}\n{}", req.get_error_code(),
-               req.get_response_code(), req.get_error_msg());
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self, "Etcd authenticate failed, error code: {}, http code: {}\n{}",
+                                          req.get_error_code(), req.get_response_code(), req.get_error_msg());
     self->check_authorization_expired(req.get_response_code(), req.get_response_stream().str());
     return 0;
   }
 
   std::string http_content;
   req.get_response_stream().str().swap(http_content);
-  FWLOGTRACE("Etcd cluster got http response: {}", http_content);
+  LIBATAPP_MACRO_ETCD_CLUSTER_LOG_TRACE(*self, "Etcd cluster got http response: {}", http_content);
 
   do {
     // 如果lease不存在（没有TTL）则启动创建流程
@@ -981,13 +1039,13 @@ int etcd_cluster::libcurl_callback_on_auth_authenticate(util::network::http_requ
 
     std::string token;
     if (false == etcd_packer::unpack_string(doc, "token", token)) {
-      FWLOGERROR("Etcd authenticate failed, token not found.({})", http_content);
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self, "Etcd authenticate failed, token not found.({})", http_content);
       self->add_stats_error_request();
       return 0;
     }
 
     self->conf_.authorization_header = "Authorization: " + token;
-    FWLOGDEBUG("Etcd cluster got authenticate token: {}", token);
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(*self, "Etcd cluster got authenticate token: {}", token);
 
     self->add_stats_success_request();
     self->retry_pending_actions();
@@ -1059,12 +1117,14 @@ bool etcd_cluster::create_request_auth_user_get() {
     int res = req->start(util::network::http_request::method_t::EN_MT_POST, false);
     if (res != 0) {
       req->set_on_complete(nullptr);
-      FWLOGERROR("Etcd start user get request for user {} to {} failed, res: {}", username, req->get_url(), res);
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*this, "Etcd start user get request for user {} to {} failed, res: {}",
+                                            username, req->get_url(), res);
       add_stats_error_request();
       return false;
     }
 
-    FWLOGINFO("Etcd start user get request for user {} to {}", username, req->get_url());
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(*this, "Etcd start user get request for user {} to {}", username,
+                                         req->get_url());
     rpc_authenticate_ = req;
   } else {
     add_stats_error_request();
@@ -1093,11 +1153,12 @@ int etcd_cluster::libcurl_callback_on_auth_user_get(util::network::http_request 
     self->add_stats_error_request();
 
     if (ETCD_API_V3_ERROR_HTTP_CODE_AUTH == req.get_response_code()) {
-      FWLOGINFO("Etcd user get failed with authentication code expired, we will try to obtain a new one.{}",
-                req.get_error_msg());
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(
+          *self, "Etcd user get failed with authentication code expired, we will try to obtain a new one.{}",
+          req.get_error_msg());
     } else {
-      FWLOGERROR("Etcd user get failed, error code: {}, http code: {}\n{}", req.get_error_code(),
-                 req.get_response_code(), req.get_error_msg());
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(*self, "Etcd user get failed, error code: {}, http code: {}\n{}",
+                                           req.get_error_code(), req.get_response_code(), req.get_error_msg());
     }
 
     self->check_authorization_expired(req.get_response_code(), req.get_response_stream().str());
@@ -1106,7 +1167,7 @@ int etcd_cluster::libcurl_callback_on_auth_user_get(util::network::http_request 
 
   std::string http_content;
   req.get_response_stream().str().swap(http_content);
-  FWLOGTRACE("Etcd cluster got http response: {}", http_content);
+  LIBATAPP_MACRO_ETCD_CLUSTER_LOG_TRACE(*self, "Etcd cluster got http response: {}", http_content);
 
   bool is_success = false;
   do {
@@ -1122,7 +1183,7 @@ int etcd_cluster::libcurl_callback_on_auth_user_get(util::network::http_request 
 
     rapidjson::Value::ConstMemberIterator iter = doc.FindMember("roles");
     if (iter == doc.MemberEnd() || false == iter->value.IsArray()) {
-      FWLOGDEBUG("Etcd user get {} without any role", username);
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(*self, "Etcd user get {} without any role", username);
       break;
     }
 
@@ -1135,7 +1196,8 @@ int etcd_cluster::libcurl_callback_on_auth_user_get(util::network::http_request 
       if (role_iter->IsString()) {
         self->conf_.authorization_user_roles.push_back(role_iter->GetString());
       } else {
-        FWLOGERROR("Etcd user get {} with bad role type: {}", username, etcd_packer::unpack_to_string(*role_iter));
+        LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self, "Etcd user get {} with bad role type: {}", username,
+                                              etcd_packer::unpack_to_string(*role_iter));
       }
     }
 
@@ -1148,7 +1210,9 @@ int etcd_cluster::libcurl_callback_on_auth_user_get(util::network::http_request 
       ss << self->conf_.authorization_user_roles[i];
     }
     ss << " ]";
-    FWLOGDEBUG("Etcd cluster got user {} with roles: {}", username, ss.str());
+    std::string authorization_user_roles = ss.str();
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(*self, "Etcd cluster got user {} with roles: {}", username,
+                                          authorization_user_roles);
 
     is_success = true;
   } while (false);
@@ -1254,13 +1318,15 @@ bool etcd_cluster::create_request_member_update() {
     int res = req->start(util::network::http_request::method_t::EN_MT_POST, false);
     if (res != 0) {
       req->set_on_complete(nullptr);
-      FWLOGERROR("Etcd start update member {} request to {} failed, res: {}", get_lease(), req->get_url().c_str(), res);
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*this, "Etcd start update member {} request to {} failed, res: {}",
+                                            get_lease(), req->get_url().c_str(), res);
 
       add_stats_error_request();
       return false;
     }
 
-    FWLOGTRACE("Etcd start update member {} request to {}", get_lease(), req->get_url());
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_TRACE(*this, "Etcd start update member {} request to {}", get_lease(),
+                                          req->get_url());
     rpc_update_members_ = req;
   } else {
     add_stats_error_request();
@@ -1286,8 +1352,8 @@ int etcd_cluster::libcurl_callback_on_member_update(util::network::http_request 
     if (0 != req.get_error_code()) {
       self->retry_request_member_update(req.get_url());
     }
-    FWLOGERROR("Etcd member list failed, error code: {}, http code: {}\n{}", req.get_error_code(),
-               req.get_response_code(), req.get_error_msg());
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self, "Etcd member list failed, error code: {}, http code: {}\n{}",
+                                          req.get_error_code(), req.get_response_code(), req.get_error_msg());
     self->add_stats_error_request();
 
     return 0;
@@ -1295,7 +1361,7 @@ int etcd_cluster::libcurl_callback_on_member_update(util::network::http_request 
 
   std::string http_content;
   req.get_response_stream().str().swap(http_content);
-  FWLOGTRACE("Etcd cluster got http response: {}", http_content);
+  LIBATAPP_MACRO_ETCD_CLUSTER_LOG_TRACE(*self, "Etcd cluster got http response: {}", http_content);
 
   do {
     // ignore empty data
@@ -1306,13 +1372,13 @@ int etcd_cluster::libcurl_callback_on_member_update(util::network::http_request 
 
     rapidjson::Document::ConstMemberIterator members = doc.FindMember("members");
     if (doc.MemberEnd() == members) {
-      FWLOGERROR("Etcd members not found");
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self, "Etcd members not found");
       self->add_stats_error_request();
       return 0;
     }
 
     if (!members->value.IsArray()) {
-      FWLOGERROR("Etcd members is not a array");
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self, "Etcd members is not a array");
       self->add_stats_error_request();
       return 0;
     }
@@ -1408,12 +1474,14 @@ bool etcd_cluster::create_request_lease_grant() {
     int res = req->start(util::network::http_request::method_t::EN_MT_POST, false);
     if (res != 0) {
       req->set_on_complete(nullptr);
-      FWLOGERROR("Etcd start keepalive lease {} request to {} failed, res: {}", get_lease(), req->get_url(), res);
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*this, "Etcd start keepalive lease {} request to {} failed, res: {}",
+                                            get_lease(), req->get_url(), res);
       add_stats_error_request();
       return false;
     }
 
-    FWLOGDEBUG("Etcd start keepalive lease {} request to {}", get_lease(), req->get_url());
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(*this, "Etcd start keepalive lease {} request to {}", get_lease(),
+                                          req->get_url());
     rpc_keepalive_ = req;
   } else {
     add_stats_error_request();
@@ -1466,13 +1534,14 @@ bool etcd_cluster::create_request_lease_keepalive() {
     int res = req->start(util::network::http_request::method_t::EN_MT_POST, false);
     if (res != 0) {
       req->set_on_complete(nullptr);
-      FWLOGERROR("Etcd start keepalive lease {} request to {} failed, res: {}", get_lease(), req->get_url().c_str(),
-                 res);
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*this, "Etcd start keepalive lease {} request to {} failed, res: {}",
+                                            get_lease(), req->get_url().c_str(), res);
       add_stats_error_request();
       return false;
     }
 
-    FWLOGTRACE("Etcd start keepalive lease {} request to {}", get_lease(), req->get_url());
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_TRACE(*this, "Etcd start keepalive lease {} request to {}", get_lease(),
+                                          req->get_url());
     rpc_keepalive_ = req;
   } else {
     add_stats_error_request();
@@ -1503,15 +1572,15 @@ int etcd_cluster::libcurl_callback_on_lease_keepalive(util::network::http_reques
     }
     self->add_stats_error_request();
 
-    FWLOGERROR("Etcd lease keepalive failed, error code: {}, http code: {}\n{}", req.get_error_code(),
-               req.get_response_code(), req.get_error_msg());
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self, "Etcd lease keepalive failed, error code: {}, http code: {}\n{}",
+                                          req.get_error_code(), req.get_response_code(), req.get_error_msg());
     self->check_authorization_expired(req.get_response_code(), req.get_response_stream().str());
     return 0;
   }
 
   std::string http_content;
   req.get_response_stream().str().swap(http_content);
-  FWLOGTRACE("Etcd cluster got http response: {}", http_content);
+  LIBATAPP_MACRO_ETCD_CLUSTER_LOG_TRACE(*self, "Etcd cluster got http response: {}", http_content);
 
   do {
     // 如果lease不存在（没有TTL）则启动创建流程
@@ -1532,9 +1601,9 @@ int etcd_cluster::libcurl_callback_on_lease_keepalive(util::network::http_reques
 
     if (root->MemberEnd() == root->FindMember("TTL")) {
       if (is_grant) {
-        FWLOGERROR("Etcd lease grant failed");
+        LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self, "Etcd lease grant failed");
       } else {
-        FWLOGERROR("Etcd lease keepalive failed because not found, try to grant one");
+        LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self, "Etcd lease keepalive failed because not found, try to grant one");
         self->set_lease(0, is_grant);
         self->create_request_lease_grant();
       }
@@ -1548,15 +1617,19 @@ int etcd_cluster::libcurl_callback_on_lease_keepalive(util::network::http_reques
     etcd_packer::unpack_int(*root, "ID", new_lease);
 
     if (0 == new_lease) {
-      FWLOGERROR("Etcd cluster got a error http response for grant or keepalive lease: {}", http_content);
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(
+          *self, "Etcd cluster got a error http response for grant or keepalive lease: {}", http_content);
       self->add_stats_error_request();
       break;
     }
 
     if (is_grant) {
-      FWLOGDEBUG("Etcd lease {} granted", new_lease);
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(*self, "Etcd lease {} granted", new_lease);
+      if (self->logger_) {
+        FWINSTLOGINFO(*self->logger_, "Etcd lease {} keepalive successed", new_lease);
+      }
     } else {
-      FWLOGDEBUG("Etcd lease {} keepalive successed", new_lease);
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(*self, "Etcd lease {} keepalive successed", new_lease);
     }
 
     self->add_stats_success_request();
@@ -1847,7 +1920,8 @@ bool etcd_cluster::select_cluster_member() {
       conf_.path_node = conf_.hosts[random_generator_.random_between<size_t>(0, conf_.hosts.size())];
     }
 
-    FWLOGINFO("Etcd cluster {} using node {}", reinterpret_cast<const void *>(this), conf_.path_node);
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(*this, "Etcd cluster {} using node {}", reinterpret_cast<const void *>(this),
+                                         conf_.path_node);
   } else {
     conf_.path_node.clear();
   }
@@ -2097,8 +2171,21 @@ LIBATAPP_MACRO_API void etcd_cluster::setup_http_request(util::network::http_req
   }
 
   if (util::log::log_wrapper::check_level(WDTLOGGETCAT(util::log::log_wrapper::categorize_t::DEFAULT),
-                                          util::log::log_wrapper::level_t::LOG_LW_TRACE)) {
-    req->set_on_progress(details::etcd_cluster_trace_porcess_callback);
+                                          util::log::log_wrapper::level_t::LOG_LW_TRACE) ||
+      (logger_ && logger_->check_level(util::log::log_wrapper::level_t::LOG_LW_TRACE))) {
+    auto logger = logger_;
+    req->set_on_progress(
+        [logger](util::network::http_request &req, const util::network::http_request::progress_t &process) {
+          FWLOGTRACE("Etcd cluster {} http request {} to {}, process: download {}/{}, upload {}/{}",
+                     req.get_priv_data(), reinterpret_cast<const void *>(&req), req.get_url(), process.dlnow,
+                     process.dltotal, process.ulnow, process.ultotal);
+          if (logger) {
+            FWINSTLOGTRACE(*logger, "Etcd cluster {} http request {} to {}, process: download {}/{}, upload {}/{}",
+                           req.get_priv_data(), reinterpret_cast<const void *>(&req), req.get_url(), process.dlnow,
+                           process.dltotal, process.ulnow, process.ultotal);
+          }
+          return 0;
+        });
   }
 
   // Stringify the DOM
@@ -2107,7 +2194,7 @@ LIBATAPP_MACRO_API void etcd_cluster::setup_http_request(util::network::http_req
   doc.Accept(writer);
 
   req->post_data().assign(buffer.GetString(), buffer.GetSize());
-  FWLOGTRACE("Etcd cluster setup request {} to {}, post data: {}", reinterpret_cast<const void *>(req.get()),
-             req->get_url(), req->post_data());
+  LIBATAPP_MACRO_ETCD_CLUSTER_LOG_TRACE(*this, "Etcd cluster setup request {} to {}, post data: {}",
+                                        reinterpret_cast<const void *>(req.get()), req->get_url(), req->post_data());
 }
 }  // namespace atapp

@@ -132,6 +132,10 @@ message atapp_log {
   repeated atapp_log_category category = 2;
 }
 
+message atapp_etcd_log_extend {
+  string startup_level = 1;
+}
+
 message atapp_etcd_http {
   bool debug = 1;
 
@@ -230,6 +234,7 @@ message atapp_etcd {
   atapp_etcd_init init = 10;
   atapp_etcd_watcher watcher = 11;
   atapp_etcd_report_alive report_alive = 12;
+  atapp_etcd_log_extend log = 13;
 }
 
 message atapp_grpc_stub_options {}
