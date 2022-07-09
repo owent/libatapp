@@ -137,7 +137,8 @@ static const std::string &get_default_user_agent() {
 }
 
 EXPLICIT_UNUSED_ATTR static int etcd_cluster_verbose_callback(util::network::http_request &req, curl_infotype type,
-                                                              char *data, size_t size) {
+                                                              char *data, size_t size,
+                                                              const util::log::log_wrapper::ptr_t &logger) {
   if (util::log::log_wrapper::check_level(WDTLOGGETCAT(util::log::log_wrapper::categorize_t::DEFAULT),
                                           util::log::log_wrapper::level_t::LOG_LW_TRACE)) {
     const char *verbose_type = "Unknown Action";
@@ -172,6 +173,11 @@ EXPLICIT_UNUSED_ATTR static int etcd_cluster_verbose_callback(util::network::htt
         ->log(caller, "Etcd cluster %p http request %p to %s => Verbose: %s", req.get_priv_data(), &req,
               req.get_url().c_str(), verbose_type);
     WDTLOGGETCAT(util::log::log_wrapper::categorize_t::DEFAULT)->write_log(caller, data, size);
+    if (logger && logger->check_level(util::log::log_wrapper::level_t::LOG_LW_TRACE)) {
+      logger->log(caller, "Etcd cluster %p http request %p to %s => Verbose: %s", req.get_priv_data(), &req,
+                  req.get_url().c_str(), verbose_type);
+      logger->write_log(caller, data, size);
+    }
   }
 
   return 0;
@@ -974,7 +980,10 @@ bool etcd_cluster::create_request_auth_authenticate() {
     req->set_on_complete(libcurl_callback_on_auth_authenticate);
 
     if (get_conf_http_debug_mode()) {
-      req->set_on_verbose(details::etcd_cluster_verbose_callback);
+      util::log::log_wrapper::ptr_t logger = logger_;
+      req->set_on_verbose([logger](util::network::http_request &req, curl_infotype type, char *data, size_t size) {
+        return details::etcd_cluster_verbose_callback(req, type, data, size, logger);
+      });
     }
     int res = req->start(util::network::http_request::method_t::EN_MT_POST, false);
     if (res != 0) {
@@ -1112,7 +1121,10 @@ bool etcd_cluster::create_request_auth_user_get() {
     req->set_on_complete(libcurl_callback_on_auth_user_get);
 
     if (get_conf_http_debug_mode()) {
-      req->set_on_verbose(details::etcd_cluster_verbose_callback);
+      util::log::log_wrapper::ptr_t logger = logger_;
+      req->set_on_verbose([logger](util::network::http_request &req, curl_infotype type, char *data, size_t size) {
+        return details::etcd_cluster_verbose_callback(req, type, data, size, logger);
+      });
     }
     int res = req->start(util::network::http_request::method_t::EN_MT_POST, false);
     if (res != 0) {
@@ -1469,7 +1481,10 @@ bool etcd_cluster::create_request_lease_grant() {
     req->set_on_complete(libcurl_callback_on_lease_keepalive);
 
     if (get_conf_http_debug_mode()) {
-      req->set_on_verbose(details::etcd_cluster_verbose_callback);
+      util::log::log_wrapper::ptr_t logger = logger_;
+      req->set_on_verbose([logger](util::network::http_request &req, curl_infotype type, char *data, size_t size) {
+        return details::etcd_cluster_verbose_callback(req, type, data, size, logger);
+      });
     }
     int res = req->start(util::network::http_request::method_t::EN_MT_POST, false);
     if (res != 0) {
@@ -2167,7 +2182,10 @@ LIBATAPP_MACRO_API void etcd_cluster::setup_http_request(util::network::http_req
   }
 
   if (get_conf_http_debug_mode()) {
-    req->set_on_verbose(details::etcd_cluster_verbose_callback);
+    util::log::log_wrapper::ptr_t logger = logger_;
+    req->set_on_verbose([logger](util::network::http_request &req, curl_infotype type, char *data, size_t size) {
+      return details::etcd_cluster_verbose_callback(req, type, data, size, logger);
+    });
   }
 
   if (util::log::log_wrapper::check_level(WDTLOGGETCAT(util::log::log_wrapper::categorize_t::DEFAULT),
