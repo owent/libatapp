@@ -140,7 +140,8 @@ EXPLICIT_UNUSED_ATTR static int etcd_cluster_verbose_callback(util::network::htt
                                                               char *data, size_t size,
                                                               const util::log::log_wrapper::ptr_t &logger) {
   if (util::log::log_wrapper::check_level(WDTLOGGETCAT(util::log::log_wrapper::categorize_t::DEFAULT),
-                                          util::log::log_wrapper::level_t::LOG_LW_TRACE)) {
+                                          util::log::log_wrapper::level_t::LOG_LW_TRACE) ||
+      (logger && logger->check_level(util::log::log_wrapper::level_t::LOG_LW_TRACE))) {
     const char *verbose_type = "Unknown Action";
     switch (type) {
       case CURLINFO_TEXT:
