@@ -847,6 +847,7 @@ int etcd_cluster::libcurl_callback_on_remove_keepalive_path(util::network::http_
       if (nullptr != self->owner) {
         // only network error will trigger a etcd member update
         if (0 != req.get_error_code()) {
+          self->owner->check_socket_error_code(req.get_error_code());
           self->owner->retry_request_member_update(req.get_url());
         }
         self->owner->add_stats_error_request();
@@ -1025,6 +1026,7 @@ int etcd_cluster::libcurl_callback_on_auth_authenticate(util::network::http_requ
                                        util::network::http_request::get_status_code_group(req.get_response_code())) {
     // only network error will trigger a etcd member update
     if (0 != req.get_error_code()) {
+      self->check_socket_error_code(req.get_error_code());
       self->retry_request_member_update(req.get_url());
     }
     self->add_stats_error_request();
@@ -1161,6 +1163,7 @@ int etcd_cluster::libcurl_callback_on_auth_user_get(util::network::http_request 
                                        util::network::http_request::get_status_code_group(req.get_response_code())) {
     // only network error will trigger a etcd member update
     if (0 != req.get_error_code()) {
+      self->check_socket_error_code(req.get_error_code());
       self->retry_request_member_update(req.get_url());
     }
     self->add_stats_error_request();
@@ -1456,10 +1459,20 @@ bool etcd_cluster::create_request_lease_grant() {
     rpc_keepalive_.reset();
   }
 
+  time_t request_timeout_ms = get_http_timeout_ms();
   if (check_flag(flag_t::RUNNING) && conf_.keepalive_interval > std::chrono::system_clock::duration::zero()) {
     conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + conf_.keepalive_interval;
+    if (request_timeout_ms > std::chrono::duration_cast<std::chrono::milliseconds>(conf_.keepalive_interval).count()) {
+      request_timeout_ms =
+          static_cast<time_t>(std::chrono::duration_cast<std::chrono::milliseconds>(conf_.keepalive_interval).count());
+    }
   } else if (conf_.keepalive_retry_interval > std::chrono::system_clock::duration::zero()) {
     conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + conf_.keepalive_retry_interval;
+    if (request_timeout_ms >
+        std::chrono::duration_cast<std::chrono::milliseconds>(conf_.keepalive_retry_interval).count()) {
+      request_timeout_ms = static_cast<time_t>(
+          std::chrono::duration_cast<std::chrono::milliseconds>(conf_.keepalive_retry_interval).count());
+    }
   } else {
     conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + std::chrono::seconds(3);
   }
@@ -1477,7 +1490,7 @@ bool etcd_cluster::create_request_lease_grant() {
         "TTL", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(conf_.keepalive_timeout).count()),
         doc.GetAllocator());
 
-    setup_http_request(req, doc, get_http_timeout_ms());
+    setup_http_request(req, doc, request_timeout_ms);
     req->set_priv_data(this);
     req->set_on_complete(libcurl_callback_on_lease_keepalive);
 
@@ -1529,10 +1542,15 @@ bool etcd_cluster::create_request_lease_keepalive() {
     rpc_keepalive_.reset();
   }
 
+  time_t request_timeout_ms = get_http_timeout_ms();
   if (std::chrono::system_clock::duration::zero() >= conf_.keepalive_interval) {
     conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + std::chrono::seconds(3);
   } else {
     conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + conf_.keepalive_interval;
+    if (request_timeout_ms > std::chrono::duration_cast<std::chrono::milliseconds>(conf_.keepalive_interval).count()) {
+      request_timeout_ms =
+          static_cast<time_t>(std::chrono::duration_cast<std::chrono::milliseconds>(conf_.keepalive_interval).count());
+    }
   }
 
   util::network::http_request::ptr_t req = util::network::http_request::create(
@@ -1545,7 +1563,7 @@ bool etcd_cluster::create_request_lease_keepalive() {
     doc.SetObject();
     doc.AddMember("ID", get_lease(), doc.GetAllocator());
 
-    setup_http_request(req, doc, get_http_timeout_ms());
+    setup_http_request(req, doc, request_timeout_ms);
     req->set_priv_data(this);
     req->set_on_complete(libcurl_callback_on_lease_keepalive);
 
@@ -1589,6 +1607,7 @@ int etcd_cluster::libcurl_callback_on_lease_keepalive(util::network::http_reques
                                        util::network::http_request::get_status_code_group(req.get_response_code())) {
     // only network error will trigger a etcd member update
     if (0 != req.get_error_code()) {
+      self->check_socket_error_code(req.get_error_code());
       self->retry_request_member_update(req.get_url());
     }
     self->add_stats_error_request();
@@ -1973,6 +1992,16 @@ LIBATAPP_MACRO_API void etcd_cluster::check_authorization_expired(int http_code,
   }
 }
 
+void etcd_cluster::check_socket_error_code(int socket_code) {
+  if (CURLE_OK == socket_code) {
+    return;
+  }
+
+  if (CURLE_OPERATION_TIMEDOUT == socket_code) {
+    set_flag(flag_t::PREVIOUS_REQUEST_TIMEOUT, true);
+  }
+}
+
 LIBATAPP_MACRO_API void etcd_cluster::setup_http_request(util::network::http_request::ptr_t &req,
                                                          rapidjson::Document &doc, time_t timeout) {
   if (!req) {
@@ -2018,7 +2047,13 @@ LIBATAPP_MACRO_API void etcd_cluster::setup_http_request(util::network::http_req
   } else {
     req->set_user_agent(conf_.user_agent);
   }
-  // req->set_opt_reuse_connection(false); // just enable connection reuse for all but watch request
+  if (check_flag(flag_t::PREVIOUS_REQUEST_TIMEOUT)) {
+    // Just enable connection reuse for all but watch request
+    // But if we got any timeout request, the socket may unstable, we should create another socket to handle this new
+    // request.
+    req->set_opt_reuse_connection(false);
+    set_flag(flag_t::PREVIOUS_REQUEST_TIMEOUT, false);
+  }
   req->set_opt_long(CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
   req->set_opt_no_signal(true);
   if (!conf_.authorization_header.empty()) {

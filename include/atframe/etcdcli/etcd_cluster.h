@@ -38,8 +38,9 @@ class etcd_cluster {
     enum type {
       CLOSING = 0x0001,  // closeing
       RUNNING = 0x0002,
-      READY = 0x0004,         // ready
-      ENABLE_LEASE = 0x0100,  // enable auto get lease
+      READY = 0x0004,                     // ready
+      ENABLE_LEASE = 0x0100,              // enable auto get lease
+      PREVIOUS_REQUEST_TIMEOUT = 0x0200,  // if previous request timeout, then do not reuse socket
     };
   };
 
@@ -497,6 +498,11 @@ class etcd_cluster {
    * @see https://golang.org/pkg/net/http/
    */
   LIBATAPP_MACRO_API void check_authorization_expired(int http_code, const std::string &content);
+
+  /**
+   * @see https://curl.se/libcurl/c/libcurl-errors.html
+   */
+  LIBATAPP_MACRO_API void check_socket_error_code(int socket_code);
 
   LIBATAPP_MACRO_API void setup_http_request(util::network::http_request::ptr_t &req, rapidjson::Document &doc,
                                              time_t timeout);

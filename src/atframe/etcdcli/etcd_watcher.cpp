@@ -160,6 +160,7 @@ int etcd_watcher::libcurl_callback_on_range_completed(util::network::http_reques
 
     self->rpc_.watcher_next_request_time = util::time::time_utility::sys_now() + self->rpc_.retry_interval;
 
+    self->owner_->check_socket_error_code(req.get_error_code());
     self->owner_->check_authorization_expired(req.get_response_code(), req.get_response_stream().str());
     return 0;
   }
@@ -297,6 +298,7 @@ int etcd_watcher::libcurl_callback_on_watch_completed(util::network::http_reques
       self->rpc_.watcher_next_request_time = util::time::time_utility::sys_now();
     }
 
+    self->owner_->check_socket_error_code(req.get_error_code());
     self->owner_->check_authorization_expired(req.get_response_code(), req.get_response_stream().str());
 
     // 立刻开启下一次watch
