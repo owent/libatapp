@@ -1490,20 +1490,22 @@ bool etcd_cluster::create_request_lease_grant() {
     int res = req->start(util::network::http_request::method_t::EN_MT_POST, false);
     if (res != 0) {
       req->set_on_complete(nullptr);
-      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*this, "Etcd start keepalive lease {} request to {} failed, res: {}",
-                                            get_lease(), req->get_url(), res);
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*this, "Etcd start to grant lease request to {} failed, res: {}",
+                                            req->get_url(), res);
       add_stats_error_request();
       return false;
     }
 
-    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(*this, "Etcd start keepalive lease {} request to {}", get_lease(),
-                                          req->get_url());
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(*this, "Etcd start grant lease request to {}", req->get_url());
     rpc_keepalive_ = req;
   } else {
     add_stats_error_request();
     if (std::chrono::system_clock::duration::zero() >= conf_.keepalive_retry_interval) {
       conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + conf_.keepalive_retry_interval;
     }
+
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(
+        *this, "Etcd start to grant lease request to {} failed, create http request failed", req->get_url());
   }
 
   return true;
@@ -1564,6 +1566,9 @@ bool etcd_cluster::create_request_lease_keepalive() {
     if (std::chrono::system_clock::duration::zero() >= conf_.keepalive_retry_interval) {
       conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + conf_.keepalive_retry_interval;
     }
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(
+        *this, "Etcd start to keepalive lease {} request to {} failed, create http request failed", get_lease(),
+        req->get_url());
   }
 
   return true;
@@ -1588,7 +1593,7 @@ int etcd_cluster::libcurl_callback_on_lease_keepalive(util::network::http_reques
     }
     self->add_stats_error_request();
 
-    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self, "Etcd lease keepalive failed, error code: {}, http code: {}\n{}",
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self, "Etcd lease grant/keepalive failed, error code: {}, http code: {}\n{}",
                                           req.get_error_code(), req.get_response_code(), req.get_error_msg());
     self->check_authorization_expired(req.get_response_code(), req.get_response_stream().str());
     return 0;
