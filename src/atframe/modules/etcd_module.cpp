@@ -70,6 +70,7 @@ static void init_timer_tick_callback(uv_timer_t *handle) {
   assert(handle);
   assert(handle->loop);
 
+  util::time::time_utility::update();
   etcd_cluster *cluster = reinterpret_cast<etcd_cluster *>(handle->data);
   cluster->tick();
 }
