@@ -199,6 +199,7 @@ int etcd_keepalive::libcurl_callback_on_get_data(util::network::http_request &re
         *self->owner_, "Etcd keepalive {} get request failed, error code: {}, http code: {}\n{}",
         reinterpret_cast<const void *>(self), req.get_error_code(), req.get_response_code(), req.get_error_msg());
 
+    self->owner_->check_socket_error_code(req.get_error_code());
     self->owner_->add_retry_keepalive(self->shared_from_this());
     self->owner_->check_authorization_expired(req.get_response_code(), req.get_response_stream().str());
     return 0;
@@ -283,6 +284,7 @@ int etcd_keepalive::libcurl_callback_on_set_data(util::network::http_request &re
         reinterpret_cast<const void *>(self), req.get_error_code(), req.get_response_code(), req.get_error_msg());
 
     self->rpc_.is_value_changed = true;
+    self->owner_->check_socket_error_code(req.get_error_code());
     self->owner_->add_retry_keepalive(self->shared_from_this());
     self->owner_->check_authorization_expired(req.get_response_code(), req.get_response_stream().str());
     return 0;
