@@ -53,26 +53,26 @@ static T convert_to_ms(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &in, T 
   return ret;
 }
 
-static void init_timer_timeout_callback(uv_timer_t *handle) {
-  assert(handle);
-  assert(handle->data);
-  assert(handle->loop);
-
-  bool *is_timeout = reinterpret_cast<bool *>(handle->data);
-  *is_timeout = true;
-  uv_stop(handle->loop);
-}
+struct init_timer_data_type {
+  etcd_cluster *cluster;
+  std::chrono::system_clock::time_point timeout;
+};
 
 static void init_timer_tick_callback(uv_timer_t *handle) {
   if (nullptr == handle->data) {
+    uv_stop(handle->loop);
     return;
   }
   assert(handle);
   assert(handle->loop);
 
   util::time::time_utility::update();
-  etcd_cluster *cluster = reinterpret_cast<etcd_cluster *>(handle->data);
-  cluster->tick();
+  init_timer_data_type *data = reinterpret_cast<init_timer_data_type *>(handle->data);
+  data->cluster->tick();
+
+  if (std::chrono::system_clock::now() > data->timeout) {
+    uv_stop(handle->loop);
+  }
 }
 
 static void init_timer_closed_callback(uv_handle_t *handle) {
@@ -154,22 +154,22 @@ LIBATAPP_MACRO_API int etcd_module::init() {
 
   // Setup for first, we must check if all resource available.
   bool is_failed = false;
-  bool is_timeout = false;
 
   // setup timer for timeout
-  uv_timer_t timeout_timer;
   uv_timer_t tick_timer;
-  uv_timer_init(get_app()->get_bus_node()->get_evloop(), &timeout_timer);
+  detail::init_timer_data_type tick_timer_data;
   uv_timer_init(get_app()->get_bus_node()->get_evloop(), &tick_timer);
-  timeout_timer.data = &is_timeout;
-  tick_timer.data = &etcd_ctx_;
+  tick_timer_data.cluster = &etcd_ctx_;
+  tick_timer_data.timeout = std::chrono::system_clock::now();
+  tick_timer_data.timeout += std::chrono::seconds(conf.init().timeout().seconds());
+  tick_timer_data.timeout += std::chrono::duration_cast<std::chrono::system_clock::duration>(
+      std::chrono::nanoseconds(conf.init().timeout().nanos()));
+  tick_timer.data = &tick_timer_data;
 
-  uint64_t timeout_ms = detail::convert_to_ms<uint64_t>(conf.init().timeout(), 5000);
-  uv_timer_start(&timeout_timer, detail::init_timer_timeout_callback, timeout_ms, 0);
   uv_timer_start(&tick_timer, detail::init_timer_tick_callback, 128, 128);
 
   int ticks = 0;
-  while (false == is_failed && false == is_timeout && nullptr != get_app()) {
+  while (false == is_failed && std::chrono::system_clock::now() <= tick_timer_data.timeout && nullptr != get_app()) {
     util::time::time_utility::update();
     etcd_ctx_.tick();
     ++ticks;
@@ -219,7 +219,7 @@ LIBATAPP_MACRO_API int etcd_module::init() {
     }
   }
 
-  if (is_timeout) {
+  if (std::chrono::system_clock::now() > tick_timer_data.timeout) {
     is_failed = true;
     for (std::list<etcd_keepalive::ptr_t>::iterator iter = inner_keepalive_actors_.begin();
          iter != inner_keepalive_actors_.end(); ++iter) {
@@ -241,11 +241,9 @@ LIBATAPP_MACRO_API int etcd_module::init() {
   }
 
   // close timer for timeout
-  uv_timer_stop(&timeout_timer);
   uv_timer_stop(&tick_timer);
-  uv_close((uv_handle_t *)&timeout_timer, detail::init_timer_closed_callback);
   uv_close((uv_handle_t *)&tick_timer, detail::init_timer_closed_callback);
-  while (timeout_timer.data || tick_timer.data) {
+  while (tick_timer.data) {
     uv_run(get_app()->get_bus_node()->get_evloop(), UV_RUN_ONCE);
   }
 
