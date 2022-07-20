@@ -765,6 +765,12 @@ LIBATAPP_MACRO_API int etcd_module::add_watcher_by_id(watcher_list_callback_t fn
         detail::convert_to_chrono(get_configure().watcher().request_timeout(), 3600000));
     inner_watcher_by_id_->set_conf_retry_interval(
         detail::convert_to_chrono(get_configure().watcher().retry_interval(), 15000));
+    inner_watcher_by_name_->set_conf_get_request_timeout(
+        detail::convert_to_chrono(get_configure().watcher().get_request_timeout(), 180000));
+    inner_watcher_by_name_->set_conf_startup_random_delay_min(
+        detail::convert_to_chrono(get_configure().watcher().startup_random_delay_min(), 0));
+    inner_watcher_by_name_->set_conf_startup_random_delay_max(
+        detail::convert_to_chrono(get_configure().watcher().startup_random_delay_max(), 0));
     etcd_ctx_.add_watcher(inner_watcher_by_id_);
     LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(etcd_ctx_, "create etcd_watcher for by_id index {} success", watch_path);
 
@@ -795,6 +801,11 @@ LIBATAPP_MACRO_API int etcd_module::add_watcher_by_type_id(uint64_t type_id, wat
 
   p->set_conf_request_timeout(detail::convert_to_chrono(get_configure().watcher().request_timeout(), 3600000));
   p->set_conf_retry_interval(detail::convert_to_chrono(get_configure().watcher().retry_interval(), 15000));
+  p->set_conf_get_request_timeout(detail::convert_to_chrono(get_configure().watcher().get_request_timeout(), 180000));
+  p->set_conf_startup_random_delay_min(
+      detail::convert_to_chrono(get_configure().watcher().startup_random_delay_min(), 0));
+  p->set_conf_startup_random_delay_max(
+      detail::convert_to_chrono(get_configure().watcher().startup_random_delay_max(), 0));
   etcd_ctx_.add_watcher(p);
   LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(etcd_ctx_, "create etcd_watcher for by_type_id index {} success", watch_path);
 
@@ -815,6 +826,11 @@ LIBATAPP_MACRO_API int etcd_module::add_watcher_by_type_name(const std::string &
 
   p->set_conf_request_timeout(detail::convert_to_chrono(get_configure().watcher().request_timeout(), 3600000));
   p->set_conf_retry_interval(detail::convert_to_chrono(get_configure().watcher().retry_interval(), 15000));
+  p->set_conf_get_request_timeout(detail::convert_to_chrono(get_configure().watcher().get_request_timeout(), 180000));
+  p->set_conf_startup_random_delay_min(
+      detail::convert_to_chrono(get_configure().watcher().startup_random_delay_min(), 0));
+  p->set_conf_startup_random_delay_max(
+      detail::convert_to_chrono(get_configure().watcher().startup_random_delay_max(), 0));
   etcd_ctx_.add_watcher(p);
   LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(etcd_ctx_, "create etcd_watcher for by_type_name index {} success", watch_path);
 
@@ -844,6 +860,12 @@ LIBATAPP_MACRO_API int etcd_module::add_watcher_by_name(watcher_list_callback_t 
         detail::convert_to_chrono(get_configure().watcher().request_timeout(), 3600000));
     inner_watcher_by_name_->set_conf_retry_interval(
         detail::convert_to_chrono(get_configure().watcher().retry_interval(), 15000));
+    inner_watcher_by_name_->set_conf_get_request_timeout(
+        detail::convert_to_chrono(get_configure().watcher().get_request_timeout(), 180000));
+    inner_watcher_by_name_->set_conf_startup_random_delay_min(
+        detail::convert_to_chrono(get_configure().watcher().startup_random_delay_min(), 0));
+    inner_watcher_by_name_->set_conf_startup_random_delay_max(
+        detail::convert_to_chrono(get_configure().watcher().startup_random_delay_max(), 0));
     etcd_ctx_.add_watcher(inner_watcher_by_name_);
     LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(etcd_ctx_, "create etcd_watcher for by_name index {} success", watch_path);
 
@@ -866,6 +888,14 @@ LIBATAPP_MACRO_API int etcd_module::add_watcher_by_tag(const std::string &tag_na
     LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(etcd_ctx_, "create etcd_watcher by_tag failed.");
     return EN_ATBUS_ERR_MALLOC;
   }
+
+  p->set_conf_request_timeout(detail::convert_to_chrono(get_configure().watcher().request_timeout(), 3600000));
+  p->set_conf_retry_interval(detail::convert_to_chrono(get_configure().watcher().retry_interval(), 15000));
+  p->set_conf_get_request_timeout(detail::convert_to_chrono(get_configure().watcher().get_request_timeout(), 180000));
+  p->set_conf_startup_random_delay_min(
+      detail::convert_to_chrono(get_configure().watcher().startup_random_delay_min(), 0));
+  p->set_conf_startup_random_delay_max(
+      detail::convert_to_chrono(get_configure().watcher().startup_random_delay_max(), 0));
 
   etcd_ctx_.add_watcher(p);
   LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(etcd_ctx_, "create etcd_watcher for by_tag index {} success", watch_path);
@@ -891,6 +921,14 @@ LIBATAPP_MACRO_API atapp::etcd_watcher::ptr_t etcd_module::add_watcher_by_custom
         etcd_ctx_, "create etcd_watcher by custom path {} failed. malloc etcd_watcher failed.", custom_path);
     return nullptr;
   }
+
+  p->set_conf_request_timeout(detail::convert_to_chrono(get_configure().watcher().request_timeout(), 3600000));
+  p->set_conf_retry_interval(detail::convert_to_chrono(get_configure().watcher().retry_interval(), 15000));
+  p->set_conf_get_request_timeout(detail::convert_to_chrono(get_configure().watcher().get_request_timeout(), 180000));
+  p->set_conf_startup_random_delay_min(
+      detail::convert_to_chrono(get_configure().watcher().startup_random_delay_min(), 0));
+  p->set_conf_startup_random_delay_max(
+      detail::convert_to_chrono(get_configure().watcher().startup_random_delay_max(), 0));
 
   p->set_evt_handle(watcher_callback_one_wrapper_t(*this, fn, ++watcher_snapshot_index_allocator_));
   if (etcd_ctx_.add_watcher(p)) {

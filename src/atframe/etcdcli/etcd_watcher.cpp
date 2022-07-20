@@ -5,11 +5,15 @@
 
 #include <algorithm/base64.h>
 
+#include <algorithm/murmur_hash.h>
 #include <common/string_oprs.h>
 #include <log/log_wrapper.h>
+#include <random/random_generator.h>
 
 #include <atframe/etcdcli/etcd_cluster.h>
 #include <atframe/etcdcli/etcd_watcher.h>
+
+#include <memory>
 
 #ifdef GetObject
 #  undef GetObject
@@ -22,6 +26,9 @@ LIBATAPP_MACRO_API etcd_watcher::etcd_watcher(etcd_cluster &owner, const std::st
     : owner_(&owner), path_(path), range_end_(range_end), rpc_data_brackets_(0) {
   rpc_.retry_interval = std::chrono::seconds(15);  // 重试间隔15秒
   rpc_.request_timeout = std::chrono::hours(1);    // 一小时超时时间，相当于每小时重新拉取数据
+  rpc_.get_request_timeout = std::chrono::minutes(3);  // 3分钟超时时间，这个数据量可能很大，需要单独设置超时
+  rpc_.startup_random_delay_min = std::chrono::system_clock::duration::zero();  // 随机启动延迟
+  rpc_.startup_random_delay_max = std::chrono::system_clock::duration::zero();  // 随机启动延迟
   rpc_.watcher_next_request_time = std::chrono::system_clock::from_time_t(0);
   rpc_.enable_progress_notify = true;
   rpc_.enable_prev_kv = false;
@@ -74,6 +81,34 @@ void etcd_watcher::process() {
     return;
   }
 
+  // Special delay on startup
+  if (rpc_.watcher_next_request_time <= std::chrono::system_clock::from_time_t(0)) {
+    util::time::time_utility::update();
+    if (rpc_.startup_random_delay_min > std::chrono::system_clock::duration::zero() &&
+        rpc_.startup_random_delay_max > rpc_.startup_random_delay_min) {
+      char buffer[sizeof(int) + sizeof(time_t)];
+      int pid = atbus::node::get_pid();
+      memcpy(&buffer[0], &pid, sizeof(pid));
+      time_t now_usec = util::time::time_utility::get_sys_now() * 1000000 + util::time::time_utility::get_now_usec();
+      memcpy(&buffer[sizeof(pid)], &now_usec, sizeof(now_usec));
+
+      uint32_t seed = util::hash::murmur_hash3_x86_32(buffer, sizeof(buffer), LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
+      util::random::xoshiro256_starstar random_generator{
+          static_cast<util::random::xoshiro256_starstar::result_type>(seed)};
+      int64_t offset = (rpc_.startup_random_delay_max - rpc_.startup_random_delay_min).count();
+      std::chrono::system_clock::duration select_offset =
+          std::chrono::system_clock::duration(random_generator.random_between<int64_t>(0, offset));
+      rpc_.watcher_next_request_time = util::time::time_utility::sys_now() + select_offset;
+
+      auto delay_timepoint =
+          std::chrono::duration_cast<std::chrono::microseconds>(rpc_.watcher_next_request_time.time_since_epoch())
+              .count();
+      FWLOGINFO("Etcd watcher {} delay range {} to {}.{}", reinterpret_cast<const void *>(this),
+                rpc_.rpc_opr_->get_url(), (delay_timepoint / 1000000), delay_timepoint % 1000000);
+      return;
+    }
+  }
+
   // ask for revision first
   if (0 == rpc_.last_revision || rpc_.is_retry_mode) {
     // create range request
@@ -88,6 +123,11 @@ void etcd_watcher::process() {
                                             reinterpret_cast<const void *>(this), path_);
       rpc_.watcher_next_request_time = util::time::time_utility::sys_now() + rpc_.retry_interval;
       return;
+    }
+
+    if (!rpc_.is_retry_mode && rpc_.get_request_timeout > std::chrono::milliseconds::zero()) {
+      rpc_.rpc_opr_->set_opt_timeout(
+          static_cast<time_t>(std::chrono::duration_cast<std::chrono::milliseconds>(rpc_.get_request_timeout).count()));
     }
 
     rpc_.rpc_opr_->set_priv_data(this);

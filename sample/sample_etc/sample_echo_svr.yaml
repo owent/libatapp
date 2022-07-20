@@ -106,6 +106,9 @@ atapp:
     watcher:
       retry_interval: 15s # unit: ms/milliseconds, s(econd), m(inute), h(our), d(ay)
       request_timeout: 30m # unit: ms/milliseconds, s(econd), m(inute), h(our), d(ay)
+      get_request_timeout: 3m # unit: ms/milliseconds, s(econd), m(inute), h(our), d(ay)
+      startup_random_delay_min: 0 # unit: ms/milliseconds, s(econd), m(inute), h(our), d(ay)
+      startup_random_delay_max: 30s # unit: ms/milliseconds, s(econd), m(inute), h(our), d(ay)
       by_id: false
       by_name: true
       # by_type_id: []
