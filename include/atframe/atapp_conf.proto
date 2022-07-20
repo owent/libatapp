@@ -206,6 +206,9 @@ message atapp_etcd_init {
 message atapp_etcd_watcher {
   google.protobuf.Duration retry_interval = 101 [(atapp.protocol.CONFIGURE) = { default_value: "15s" }];
   google.protobuf.Duration request_timeout = 102 [(atapp.protocol.CONFIGURE) = { default_value: "30m" }];
+  google.protobuf.Duration get_request_timeout = 103 [(atapp.protocol.CONFIGURE) = { default_value: "3m" }];
+  google.protobuf.Duration startup_random_delay_min = 104 [(atapp.protocol.CONFIGURE) = { default_value: "0s" }];
+  google.protobuf.Duration startup_random_delay_max = 105 [(atapp.protocol.CONFIGURE) = { default_value: "0s" }];
 
   bool by_id = 201 [(atapp.protocol.CONFIGURE) = { default_value: "false" }];   // add watcher by id
   bool by_name = 202 [(atapp.protocol.CONFIGURE) = { default_value: "true" }];  // add watcher by name
