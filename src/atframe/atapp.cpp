@@ -3974,7 +3974,7 @@ int app::bus_evt_callback_on_custom_command_request(const atbus::node &n, const 
   size_t use_size = 0;
   size_t sum_size = 0;
   bool is_truncated = false;
-  constexpr const size_t command_reserve_header = 4; // 4bytes for libatbus command header.
+  constexpr const size_t command_reserve_header = 8;  // 8 bytes for libatbus command header.
   for (std::list<std::string>::iterator iter = rsp.begin(); iter != rsp.end();) {
     std::list<std::string>::iterator cur = iter++;
     sum_size += (*cur).size();

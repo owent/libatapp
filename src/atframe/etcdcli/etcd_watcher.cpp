@@ -96,10 +96,15 @@ void etcd_watcher::process() {
       util::random::xoshiro256_starstar random_generator{
           static_cast<util::random::xoshiro256_starstar::result_type>(seed)};
       int64_t offset = (rpc_.startup_random_delay_max - rpc_.startup_random_delay_min).count();
-      rpc_.watcher_next_request_time =
-          util::time::time_utility::sys_now() +
+      std::chrono::system_clock::duration select_offset =
           std::chrono::system_clock::duration(random_generator.random_between<int64_t>(0, offset));
+      rpc_.watcher_next_request_time = util::time::time_utility::sys_now() + select_offset;
 
+      auto delay_timepoint =
+          std::chrono::duration_cast<std::chrono::microseconds>(rpc_.watcher_next_request_time.time_since_epoch())
+              .count();
+      FWLOGINFO("Etcd watcher {} delay range {} to {}.{}", reinterpret_cast<const void *>(this),
+                rpc_.rpc_opr_->get_url(), (delay_timepoint / 1000000), delay_timepoint % 1000000);
       return;
     }
   }
