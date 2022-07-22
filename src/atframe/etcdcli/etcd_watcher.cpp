@@ -84,21 +84,24 @@ void etcd_watcher::process() {
   // Special delay on startup
   if (rpc_.watcher_next_request_time <= std::chrono::system_clock::from_time_t(0)) {
     util::time::time_utility::update();
-    if (rpc_.startup_random_delay_min > std::chrono::system_clock::duration::zero() &&
-        rpc_.startup_random_delay_max > rpc_.startup_random_delay_min) {
-      char buffer[sizeof(int) + sizeof(time_t)];
-      int pid = atbus::node::get_pid();
-      memcpy(&buffer[0], &pid, sizeof(pid));
-      time_t now_usec = util::time::time_utility::get_sys_now() * 1000000 + util::time::time_utility::get_now_usec();
-      memcpy(&buffer[sizeof(pid)], &now_usec, sizeof(now_usec));
+    if (rpc_.startup_random_delay_min > std::chrono::system_clock::duration::zero()) {
+      if (rpc_.startup_random_delay_max > rpc_.startup_random_delay_min) {
+        char buffer[sizeof(int) + sizeof(time_t)];
+        int pid = atbus::node::get_pid();
+        memcpy(&buffer[0], &pid, sizeof(pid));
+        time_t now_usec = util::time::time_utility::get_sys_now() * 1000000 + util::time::time_utility::get_now_usec();
+        memcpy(&buffer[sizeof(pid)], &now_usec, sizeof(now_usec));
 
-      uint32_t seed = util::hash::murmur_hash3_x86_32(buffer, sizeof(buffer), LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
-      util::random::xoshiro256_starstar random_generator{
-          static_cast<util::random::xoshiro256_starstar::result_type>(seed)};
-      int64_t offset = (rpc_.startup_random_delay_max - rpc_.startup_random_delay_min).count();
-      std::chrono::system_clock::duration select_offset =
-          std::chrono::system_clock::duration(random_generator.random_between<int64_t>(0, offset));
-      rpc_.watcher_next_request_time = util::time::time_utility::sys_now() + select_offset;
+        uint32_t seed = util::hash::murmur_hash3_x86_32(buffer, sizeof(buffer), LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
+        util::random::xoshiro256_starstar random_generator{
+            static_cast<util::random::xoshiro256_starstar::result_type>(seed)};
+        int64_t offset = (rpc_.startup_random_delay_max - rpc_.startup_random_delay_min).count();
+        std::chrono::system_clock::duration select_offset =
+            std::chrono::system_clock::duration(random_generator.random_between<int64_t>(0, offset));
+        rpc_.watcher_next_request_time = util::time::time_utility::sys_now() + select_offset;
+      } else {
+        rpc_.watcher_next_request_time = util::time::time_utility::sys_now() + rpc_.startup_random_delay_min;
+      }
 
       auto delay_timepoint =
           std::chrono::duration_cast<std::chrono::microseconds>(rpc_.watcher_next_request_time.time_since_epoch())
