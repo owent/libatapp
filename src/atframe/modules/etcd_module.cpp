@@ -1031,6 +1031,44 @@ LIBATAPP_MACRO_API void etcd_module::remove_on_node_event(node_event_callback_ha
 LIBATAPP_MACRO_API etcd_discovery_set &etcd_module::get_global_discovery() { return global_discovery_; }
 LIBATAPP_MACRO_API const etcd_discovery_set &etcd_module::get_global_discovery() const { return global_discovery_; }
 
+LIBATAPP_MACRO_API bool etcd_module::has_snapshot() const { return !watcher_snapshot_index_.empty(); }
+
+LIBATAPP_MACRO_API etcd_module::snapshot_event_callback_handle_t etcd_module::add_on_load_snapshot(
+    snapshot_event_callback_t fn) {
+  if (!fn) {
+    return on_load_snapshot_callbacks_.end();
+  }
+
+  return on_load_snapshot_callbacks_.insert(on_load_snapshot_callbacks_.end(), fn);
+}
+
+LIBATAPP_MACRO_API void etcd_module::remove_on_load_snapshot(snapshot_event_callback_handle_t &handle) {
+  if (handle == on_load_snapshot_callbacks_.end()) {
+    return;
+  }
+
+  on_load_snapshot_callbacks_.erase(handle);
+  handle = on_load_snapshot_callbacks_.end();
+}
+
+LIBATAPP_MACRO_API etcd_module::snapshot_event_callback_handle_t etcd_module::add_on_snapshot_loaded(
+    snapshot_event_callback_t fn) {
+  if (!fn) {
+    return on_snapshot_loaded_callbacks_.end();
+  }
+
+  return on_snapshot_loaded_callbacks_.insert(on_snapshot_loaded_callbacks_.end(), fn);
+}
+
+LIBATAPP_MACRO_API void etcd_module::remove_on_snapshot_loaded(snapshot_event_callback_handle_t &handle) {
+  if (handle == on_snapshot_loaded_callbacks_.end()) {
+    return;
+  }
+
+  on_snapshot_loaded_callbacks_.erase(handle);
+  handle = on_snapshot_loaded_callbacks_.end();
+}
+
 bool etcd_module::unpack(node_info_t &out, const std::string &path, const std::string &json, bool reset_data) {
   if (reset_data) {
     out.node_discovery.Clear();
@@ -1196,6 +1234,14 @@ void etcd_module::watcher_callback_list_wrapper_t::operator()(const ::atapp::etc
   etcd_discovery_set::node_by_id_type old_ids;
   if (enable_snapshot) {
     _collect_old_nodes(*mod, old_names, old_ids);
+
+    for (auto iter = mod->on_load_snapshot_callbacks_.begin(); iter != mod->on_load_snapshot_callbacks_.end();) {
+      auto copy_iter = iter;
+      ++iter;
+      if (*copy_iter) {
+        (*copy_iter)(*mod);
+      }
+    }
   }
 
   // decode data
@@ -1242,6 +1288,14 @@ void etcd_module::watcher_callback_list_wrapper_t::operator()(const ::atapp::etc
   // cleanup old nodes when receive snapshot response
   if (enable_snapshot) {
     etcd_module::watcher_internal_access_t::cleanup_old_nodes(*mod, old_names, old_ids);
+
+    for (auto iter = mod->on_snapshot_loaded_callbacks_.begin(); iter != mod->on_snapshot_loaded_callbacks_.end();) {
+      auto copy_iter = iter;
+      ++iter;
+      if (*copy_iter) {
+        (*copy_iter)(*mod);
+      }
+    }
   }
 }
 
@@ -1278,6 +1332,14 @@ void etcd_module::watcher_callback_one_wrapper_t::operator()(const ::atapp::etcd
   etcd_discovery_set::node_by_id_type old_ids;
   if (enable_snapshot) {
     _collect_old_nodes(*mod, old_names, old_ids);
+
+    for (auto iter = mod->on_load_snapshot_callbacks_.begin(); iter != mod->on_load_snapshot_callbacks_.end();) {
+      auto copy_iter = iter;
+      ++iter;
+      if (*copy_iter) {
+        (*copy_iter)(*mod);
+      }
+    }
   }
 
   // decode data
@@ -1316,6 +1378,14 @@ void etcd_module::watcher_callback_one_wrapper_t::operator()(const ::atapp::etcd
   // cleanup old nodes when receive snapshot response
   if (enable_snapshot) {
     etcd_module::watcher_internal_access_t::cleanup_old_nodes(*mod, old_names, old_ids);
+
+    for (auto iter = mod->on_snapshot_loaded_callbacks_.begin(); iter != mod->on_snapshot_loaded_callbacks_.end();) {
+      auto copy_iter = iter;
+      ++iter;
+      if (*copy_iter) {
+        (*copy_iter)(*mod);
+      }
+    }
   }
 }
 

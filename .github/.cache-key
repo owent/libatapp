@@ -1,3 +1,3 @@
- 6bd04f8f2df60832b4b08fad1482ace2f28948de atframework/atframe_utils (v2.4.2-17-g6bd04f8)
- 79aae90d1d3ae9899b952ae1081dbf291849bba0 atframework/cmake-toolset (v1.9.12-21-g79aae90)
-+bb171cd59f872d90c0ea628bc62a4f2662d3cf78 atframework/libatbus (v2.2.1-35-gbb171cd)
++6cf7acc25c825de624add954309b0b9d67b987bd atframework/atframe_utils (v2.4.2-32-g6cf7acc)
++cf2d3d9269c02cea390b40ff72c899d8e9a79728 atframework/cmake-toolset (v1.9.17-5-gcf2d3d9)
+ 3e2d66d4d8d3c66893d6e2f9f1905c44a1268f02 atframework/libatbus (v2.2.1-37-g3e2d66d)
