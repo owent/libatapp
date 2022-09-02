@@ -81,6 +81,11 @@ class etcd_module : public ::atapp::module_impl {
 
   using watcher_list_callback_t = std::function<void(watcher_sender_list_t &)>;
   using watcher_one_callback_t = std::function<void(watcher_sender_one_t &)>;
+
+  using snapshot_event_callback_t = std::function<void(const etcd_module &)>;
+  using snapshot_event_callback_list_t = std::list<snapshot_event_callback_t>;
+  using snapshot_event_callback_handle_t = snapshot_event_callback_list_t::iterator;
+
   using node_event_callback_t = std::function<void(node_action_t::type, const etcd_discovery_node::ptr_t &)>;
   using node_event_callback_list_t = std::list<node_event_callback_t>;
   using node_event_callback_handle_t = node_event_callback_list_t::iterator;
@@ -158,6 +163,13 @@ class etcd_module : public ::atapp::module_impl {
   LIBATAPP_MACRO_API etcd_discovery_set &get_global_discovery();
   LIBATAPP_MACRO_API const etcd_discovery_set &get_global_discovery() const;
 
+  LIBATAPP_MACRO_API bool has_snapshot() const;
+
+  LIBATAPP_MACRO_API snapshot_event_callback_handle_t add_on_load_snapshot(snapshot_event_callback_t fn);
+  LIBATAPP_MACRO_API void remove_on_load_snapshot(snapshot_event_callback_handle_t &handle);
+  LIBATAPP_MACRO_API snapshot_event_callback_handle_t add_on_snapshot_loaded(snapshot_event_callback_t fn);
+  LIBATAPP_MACRO_API void remove_on_snapshot_loaded(snapshot_event_callback_handle_t &handle);
+
  private:
   static bool unpack(node_info_t &out, const std::string &path, const std::string &json, bool reset_data);
   static void pack(const node_info_t &out, std::string &json);
@@ -208,6 +220,8 @@ class etcd_module : public ::atapp::module_impl {
   std::list<etcd_keepalive::ptr_t> inner_keepalive_actors_;
   std::string inner_keepalive_value_;
 
+  snapshot_event_callback_list_t on_load_snapshot_callbacks_;
+  snapshot_event_callback_list_t on_snapshot_loaded_callbacks_;
   std::set<int64_t> watcher_snapshot_index_;
   int64_t watcher_snapshot_index_allocator_;
   std::list<watcher_list_callback_t> watcher_by_id_callbacks_;
