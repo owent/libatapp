@@ -654,6 +654,12 @@ class app {
   callback_fn_on_finally_list_t evt_on_finally_;
 
   // stat
+  struct stats_data_module_reload_t {
+    module_ptr_t module;
+    std::chrono::system_clock::duration cost;
+    int32_t result;
+  };
+
   struct stats_data_t {
     uv_rusage_t last_checkpoint_usage;
     time_t last_checkpoint_min;
@@ -663,6 +669,8 @@ class app {
 
     size_t endpoint_wake_count;
     ::atapp::etcd_cluster::stats_t inner_etcd;
+
+    std::vector<stats_data_module_reload_t> module_reload;
   };
   stats_data_t stats_;
 

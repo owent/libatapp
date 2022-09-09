@@ -426,9 +426,18 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
   }
 
   // all modules reload
+  stats_.module_reload.clear();
+  stats_.module_reload.reserve(modules_.size());
   for (module_ptr_t &mod : modules_) {
     if (mod->is_enabled()) {
+      std::chrono::system_clock::time_point previous_timepoint = std::chrono::system_clock::now();
       ret = mod->reload();
+      std::chrono::system_clock::time_point current_timepoint = std::chrono::system_clock::now();
+      stats_data_module_reload_t reload_stats;
+      reload_stats.module = mod;
+      reload_stats.cost = current_timepoint - previous_timepoint;
+      reload_stats.result = ret;
+      stats_.module_reload.emplace_back(std::move(reload_stats));
       if (ret < 0) {
         FWLOGERROR("load configure of {} failed", mod->name());
         write_pidfile(ret);
@@ -793,9 +802,21 @@ LIBATAPP_MACRO_API int app::reload() {
     setup_log();
 
     // step 7. if inited, let all modules reload
+    stats_.module_reload.clear();
+    stats_.module_reload.reserve(modules_.size());
     for (module_ptr_t &mod : modules_) {
       if (mod->is_enabled()) {
-        mod->reload();
+        std::chrono::system_clock::time_point previous_timepoint = std::chrono::system_clock::now();
+        int res = mod->reload();
+        std::chrono::system_clock::time_point current_timepoint = std::chrono::system_clock::now();
+        stats_data_module_reload_t reload_stats;
+        reload_stats.module = mod;
+        reload_stats.cost = current_timepoint - previous_timepoint;
+        reload_stats.result = res;
+        stats_.module_reload.emplace_back(std::move(reload_stats));
+        if (res < 0) {
+          FWLOGERROR("load configure of {} failed", mod->name());
+        }
       }
     }
 
@@ -3640,11 +3661,6 @@ int app::command_handler_stop(util::cli::callback_param params) {
 }
 
 int app::command_handler_reload(util::cli::callback_param params) {
-  char msg[256] = {0};
-  LOG_WRAPPER_FWAPI_FORMAT_TO_N(msg, sizeof(msg), "app node {:#x} run reload command success", get_app_id());
-  FWLOGINFO("{}", msg);
-  add_custom_command_rsp(params, msg);
-
   bool enable_upgrade_mode = false;
   for (util::cli::cmd_option_list::size_type i = 0; i < params.get_params_number(); ++i) {
     if (params[i]->to_cpp_string() == "--upgrade") {
@@ -3652,7 +3668,43 @@ int app::command_handler_reload(util::cli::callback_param params) {
     }
   }
   conf_.upgrade_mode = enable_upgrade_mode;
-  return reload();
+
+  std::chrono::system_clock::time_point previous_timepoint = std::chrono::system_clock::now();
+  int ret = reload();
+  std::chrono::system_clock::time_point current_timepoint = std::chrono::system_clock::now();
+
+  char msg[256] = {0};
+  if (ret >= 0) {
+    for (auto &reload_module : stats_.module_reload) {
+      const char *module_name = reload_module.module ? reload_module.module->name() : "[UNKNOWN]";
+      LOG_WRAPPER_FWAPI_FORMAT_TO_N(
+          msg, sizeof(msg), "app {}({:#x}) module {}({}) reload cost {}us, result: {}", get_app_name(), get_app_id(),
+          module_name, reinterpret_cast<const void *>(reload_module.module.get()),
+          std::chrono::duration_cast<std::chrono::microseconds>(reload_module.cost).count(), reload_module.result);
+      FWLOGINFO("{}", msg);
+      add_custom_command_rsp(params, msg);
+    }
+    LOG_WRAPPER_FWAPI_FORMAT_TO_N(
+        msg, sizeof(msg), "app {}({:#x}) run reload command success.({}us)", get_app_name(), get_app_id(),
+        std::chrono::duration_cast<std::chrono::microseconds>(current_timepoint - previous_timepoint).count());
+    FWLOGINFO("{}", msg);
+  } else {
+    for (auto &reload_module : stats_.module_reload) {
+      const char *module_name = reload_module.module ? reload_module.module->name() : "[UNKNOWN]";
+      LOG_WRAPPER_FWAPI_FORMAT_TO_N(
+          msg, sizeof(msg), "app {}({:#x}) module {}({}) reload cost {}us, result: {}", get_app_name(), get_app_id(),
+          module_name, reinterpret_cast<const void *>(reload_module.module.get()),
+          std::chrono::duration_cast<std::chrono::microseconds>(reload_module.cost).count(), reload_module.result);
+      FWLOGWARNING("{}", msg);
+      add_custom_command_rsp(params, msg);
+    }
+    LOG_WRAPPER_FWAPI_FORMAT_TO_N(
+        msg, sizeof(msg), "app {}({:#x}) run reload command failed.({}us)", get_app_name(), get_app_id(),
+        std::chrono::duration_cast<std::chrono::microseconds>(current_timepoint - previous_timepoint).count());
+    FWLOGERROR("{}", msg);
+  }
+  add_custom_command_rsp(params, msg);
+  return ret;
 }
 
 int app::command_handler_invalid(util::cli::callback_param params) {
