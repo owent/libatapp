@@ -3673,6 +3673,12 @@ int app::command_handler_reload(util::cli::callback_param params) {
   int ret = reload();
   std::chrono::system_clock::time_point current_timepoint = std::chrono::system_clock::now();
 
+  for (auto &reload_module : stats_.module_reload) {
+    if (ret >= 0 && reload_module.result < 0) {
+      ret = reload_module.result;
+    }
+  }
+
   char msg[256] = {0};
   if (ret >= 0) {
     for (auto &reload_module : stats_.module_reload) {
