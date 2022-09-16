@@ -3695,9 +3695,16 @@ int app::command_handler_reload(util::cli::callback_param params) {
       FWLOGINFO("{}", msg);
       add_custom_command_rsp(params, msg);
     }
-    LOG_WRAPPER_FWAPI_FORMAT_TO_N(
-        msg, sizeof(msg), "app {}({:#x}) run reload command success.({}us)", get_app_name(), get_app_id(),
-        std::chrono::duration_cast<std::chrono::microseconds>(current_timepoint - previous_timepoint).count());
+    {
+      auto format_result = LOG_WRAPPER_FWAPI_FORMAT_TO_N(
+          msg, sizeof(msg), "app {}({:#x}) run reload command success.({}us)", get_app_name(), get_app_id(),
+          std::chrono::duration_cast<std::chrono::microseconds>(current_timepoint - previous_timepoint).count());
+      if (format_result.size > 0 && format_result.size < sizeof(msg)) {
+        msg[format_result.size] = 0;
+      } else {
+        msg[sizeof(msg) - 1] = 0;
+      }
+    }
     FWLOGINFO("{}", msg);
   } else {
     for (auto &reload_module : stats_.module_reload) {
