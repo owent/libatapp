@@ -122,6 +122,11 @@ LIBATAPP_MACRO_API int etcd_module::init() {
     return -1;
   }
 
+  util::network::http_request::curl_share_options share_options;
+  util::network::http_request::curl_multi_options multi_options;
+  multi_options.ev_loop = get_app()->get_bus_node()->get_evloop();
+  // Share DNS cache, connection, TLS sessions and etc.
+  util::network::http_request::create_curl_share(share_options, multi_options.share_context);
   util::network::http_request::create_curl_multi(get_app()->get_bus_node()->get_evloop(), curl_multi_);
   if (!curl_multi_) {
     LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(etcd_ctx_, "create curl multi instance failed.");
