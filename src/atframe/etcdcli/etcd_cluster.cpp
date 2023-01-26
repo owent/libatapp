@@ -2054,7 +2054,11 @@ LIBATAPP_MACRO_API void etcd_cluster::setup_http_request(util::network::http_req
     req->set_opt_reuse_connection(false);
     set_flag(flag_t::PREVIOUS_REQUEST_TIMEOUT, false);
   }
+#if LIBCURL_VERSION_NUM >= 0x075500
+  req->set_opt_string(CURLOPT_PROTOCOLS_STR, "http,https");
+#else
   req->set_opt_long(CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
+#endif
   req->set_opt_no_signal(true);
   if (!conf_.authorization_header.empty()) {
     req->append_http_header(conf_.authorization_header.c_str());

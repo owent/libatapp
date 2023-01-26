@@ -70,7 +70,6 @@ static void dynamic_copy_protobuf_duration(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Me
   if (duration_ptr->GetDescriptor() == value.GetDescriptor()) {
     duration_ptr->CopyFrom(value);
   } else {
-    value.nanos();
     duration_ptr->GetReflection()->SetInt64(duration_ptr,
                                             duration_ptr->GetDescriptor()->FindFieldByNumber(
                                                 ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration::kSecondsFieldNumber),
@@ -89,7 +88,6 @@ static void dynamic_copy_protobuf_timestamp(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::M
   if (timestamp_ptr->GetDescriptor() == value.GetDescriptor()) {
     timestamp_ptr->CopyFrom(value);
   } else {
-    value.nanos();
     timestamp_ptr->GetReflection()->SetInt64(timestamp_ptr,
                                              timestamp_ptr->GetDescriptor()->FindFieldByNumber(
                                                  ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp::kSecondsFieldNumber),
