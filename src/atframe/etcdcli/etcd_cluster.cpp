@@ -983,8 +983,8 @@ bool etcd_cluster::create_request_auth_authenticate() {
 
     if (get_conf_http_debug_mode()) {
       util::log::log_wrapper::ptr_t logger = logger_;
-      req->set_on_verbose([logger](util::network::http_request &req, curl_infotype type, char *data, size_t size) {
-        return details::etcd_cluster_verbose_callback(req, type, data, size, logger);
+      req->set_on_verbose([logger](util::network::http_request &self_req, curl_infotype type, char *data, size_t size) {
+        return details::etcd_cluster_verbose_callback(self_req, type, data, size, logger);
       });
     }
     int res = req->start(util::network::http_request::method_t::EN_MT_POST, false);
@@ -1125,8 +1125,8 @@ bool etcd_cluster::create_request_auth_user_get() {
 
     if (get_conf_http_debug_mode()) {
       util::log::log_wrapper::ptr_t logger = logger_;
-      req->set_on_verbose([logger](util::network::http_request &req, curl_infotype type, char *data, size_t size) {
-        return details::etcd_cluster_verbose_callback(req, type, data, size, logger);
+      req->set_on_verbose([logger](util::network::http_request &self_req, curl_infotype type, char *data, size_t size) {
+        return details::etcd_cluster_verbose_callback(self_req, type, data, size, logger);
       });
     }
     int res = req->start(util::network::http_request::method_t::EN_MT_POST, false);
@@ -1496,8 +1496,8 @@ bool etcd_cluster::create_request_lease_grant() {
 
     if (get_conf_http_debug_mode()) {
       util::log::log_wrapper::ptr_t logger = logger_;
-      req->set_on_verbose([logger](util::network::http_request &req, curl_infotype type, char *data, size_t size) {
-        return details::etcd_cluster_verbose_callback(req, type, data, size, logger);
+      req->set_on_verbose([logger](util::network::http_request &self_req, curl_infotype type, char *data, size_t size) {
+        return details::etcd_cluster_verbose_callback(self_req, type, data, size, logger);
       });
     }
     int res = req->start(util::network::http_request::method_t::EN_MT_POST, false);
@@ -2228,8 +2228,8 @@ LIBATAPP_MACRO_API void etcd_cluster::setup_http_request(util::network::http_req
 
   if (get_conf_http_debug_mode()) {
     util::log::log_wrapper::ptr_t logger = logger_;
-    req->set_on_verbose([logger](util::network::http_request &req, curl_infotype type, char *data, size_t size) {
-      return details::etcd_cluster_verbose_callback(req, type, data, size, logger);
+    req->set_on_verbose([logger](util::network::http_request &self_req, curl_infotype type, char *data, size_t size) {
+      return details::etcd_cluster_verbose_callback(self_req, type, data, size, logger);
     });
   }
 
@@ -2238,14 +2238,14 @@ LIBATAPP_MACRO_API void etcd_cluster::setup_http_request(util::network::http_req
       (logger_ && logger_->check_level(util::log::log_wrapper::level_t::LOG_LW_TRACE))) {
     auto logger = logger_;
     req->set_on_progress(
-        [logger](util::network::http_request &req, const util::network::http_request::progress_t &process) {
+        [logger](util::network::http_request &self_req, const util::network::http_request::progress_t &process) {
           FWLOGTRACE("Etcd cluster {} http request {} to {}, process: download {}/{}, upload {}/{}",
-                     req.get_priv_data(), reinterpret_cast<const void *>(&req), req.get_url(), process.dlnow,
-                     process.dltotal, process.ulnow, process.ultotal);
+                     self_req.get_priv_data(), reinterpret_cast<const void *>(&self_req), self_req.get_url(),
+                     process.dlnow, process.dltotal, process.ulnow, process.ultotal);
           if (logger) {
             FWINSTLOGTRACE(*logger, "Etcd cluster {} http request {} to {}, process: download {}/{}, upload {}/{}",
-                           req.get_priv_data(), reinterpret_cast<const void *>(&req), req.get_url(), process.dlnow,
-                           process.dltotal, process.ulnow, process.ultotal);
+                           self_req.get_priv_data(), reinterpret_cast<const void *>(&self_req), self_req.get_url(),
+                           process.dlnow, process.dltotal, process.ulnow, process.ultotal);
           }
           return 0;
         });
