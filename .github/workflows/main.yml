@@ -54,7 +54,6 @@ jobs:
         env:
           USE_CC: ${{ matrix.cc }}
           VCPKG_TARGET_TRIPLET: ${{ matrix.triplet }}
-          USE_SSL: ${{ matrix.ssl }}
         run: |
           if [[ "xgcc-4.8" == "x$USE_CC" ]]; then
             sudo apt-get update ;
@@ -161,7 +160,6 @@ jobs:
         shell: bash
         env:
           USE_CC: ${{ matrix.cc }}
-          USE_SSL: ${{ matrix.ssl }}
           VCPKG_TARGET_TRIPLET: ${{ matrix.triplet }}
         run: |
           bash ci/do_ci.sh codeql.configure
@@ -173,7 +171,6 @@ jobs:
         shell: bash
         env:
           USE_CC: ${{ matrix.cc }}
-          USE_SSL: ${{ matrix.ssl }}
           VCPKG_TARGET_TRIPLET: ${{ matrix.triplet }}
         run: |
           bash ci/do_ci.sh codeql.build
