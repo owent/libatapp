@@ -113,10 +113,10 @@ elif [[ "$1" == "msys2.mingw.test" ]]; then
     -DPROJECT_ENABLE_TOOLS=ON -DATBUS_MACRO_ABORT_ON_PROTECTED_ERROR=ON "-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_LOW_MEMORY_MODE=ON"
   cmake --build . -j2 --config $CONFIGURATION || cmake --build . --config $CONFIGURATION
   for EXT_PATH in $(find "$PWD" -name "*.dll" | xargs dirname | sort -u); do
-    export PATH="$(cygpath -m "$EXT_PATH"):$PATH"
+    export PATH="$EXT_PATH:$PATH"
   done
   for EXT_PATH in $(find "$(readlink -f "$PWD/..")/third_party/install/" -name "*.dll" | xargs dirname | sort -u); do
-    export PATH="$(cygpath -m "$EXT_PATH"):$PATH"
+    export PATH="$EXT_PATH:$PATH"
   done
   echo "PATH=$PATH"
   ctest -VV . -C $CONFIGURATION -L libatapp.unit_test

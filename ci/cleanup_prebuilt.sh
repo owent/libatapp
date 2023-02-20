@@ -15,5 +15,7 @@ if [[ -e "third_party/install" ]]; then
   fi
 fi
 
+rm -rf "third_party/install"
 mkdir -p "third_party/install"
 echo "$EXCEPT_TOOLSET_VERSION" >"third_party/install/.cmake-toolset-version"
+echo "third_party/install/.cmake-toolset-version = $EXCEPT_TOOLSET_VERSION"
