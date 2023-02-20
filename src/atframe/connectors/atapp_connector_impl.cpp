@@ -184,9 +184,9 @@ LIBATAPP_MACRO_API const char *atapp_connector_impl::name() noexcept {
 }
 
 LIBATAPP_MACRO_API void atapp_connector_impl::register_protocol(const std::string &protocol_name) {
-  std::string name = protocol_name;
-  std::transform(name.begin(), name.end(), name.begin(), ::util::string::tolower<char>);
-  support_protocols_.insert(name);
+  std::string lower_name = protocol_name;
+  std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(), ::util::string::tolower<char>);
+  support_protocols_.insert(lower_name);
 }
 
 LIBATAPP_MACRO_API void atapp_connector_impl::cleanup() {
