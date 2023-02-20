@@ -64,53 +64,37 @@ if [[ "$1" == "format" ]]; then
   fi
   exit 0
 elif [[ "$1" == "coverage" ]]; then
-  bash "$(dirname "$0")/cleanup_prebuilt.sh"
   CONFIGURATION=Debug
-  vcpkg install --triplet=$VCPKG_TARGET_TRIPLET fmt openssl libuv grpc "prometheus-cpp[pull,push]"
-  CRYPTO_OPTIONS="-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_CRYPTO_USE_OPENSSL=ON"
-  bash cmake_dev.sh -lus -b $CONFIGURATION -r build_jobs_coverage -c $USE_CC -- $CRYPTO_OPTIONS "-DCMAKE_C_FLAGS=$GCOV_FLAGS" "-DCMAKE_CXX_FLAGS=$GCOV_FLAGS" \
-    "-DCMAKE_EXE_LINKER_FLAGS=$GCOV_FLAGS" -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake \
-    -DVCPKG_TARGET_TRIPLET=$VCPKG_TARGET_TRIPLET -DATBUS_MACRO_ABORT_ON_PROTECTED_ERROR=ON "-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_LOW_MEMORY_MODE=ON"
+  bash cmake_dev.sh -lus -b $CONFIGURATION -r build_jobs_coverage -c $USE_CC -- "-DCMAKE_C_FLAGS=$GCOV_FLAGS" "-DCMAKE_CXX_FLAGS=$GCOV_FLAGS" \
+    "-DCMAKE_EXE_LINKER_FLAGS=$GCOV_FLAGS"-DATBUS_MACRO_ABORT_ON_PROTECTED_ERROR=ON "-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_LOW_MEMORY_MODE=ON"
   cd build_jobs_coverage
   cmake --build . -j2 --config $CONFIGURATION || cmake --build . --config $CONFIGURATION
   ctest -VV . -C $CONFIGURATION -L libatapp.unit_test
-elif [[ "$1" == "ssl.openssl" ]]; then
-  bash "$(dirname "$0")/cleanup_prebuilt.sh"
-  CRYPTO_OPTIONS="-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_CRYPTO_USE_OPENSSL=ON"
-  vcpkg install --triplet=$VCPKG_TARGET_TRIPLET fmt openssl libuv grpc "prometheus-cpp[pull,push]"
-  bash cmake_dev.sh -lus -b $CONFIGURATION -r build_jobs_ci -c $USE_CC -- $CRYPTO_OPTIONS -DVCPKG_TARGET_TRIPLET=$VCPKG_TARGET_TRIPLET \
-    -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake -DATBUS_MACRO_ABORT_ON_PROTECTED_ERROR=ON \
+elif [[ "$1" == "gcc.test" ]]; then
+  bash cmake_dev.sh -lus -b $CONFIGURATION -r build_jobs_ci -c $USE_CC -- -DATBUS_MACRO_ABORT_ON_PROTECTED_ERROR=ON \
     "-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_LOW_MEMORY_MODE=ON"
   cd build_jobs_ci
   cmake --build . -j2 --config $CONFIGURATION || cmake --build . --config $CONFIGURATION
   ctest -VV . -C $CONFIGURATION -L libatapp.unit_test
 elif [[ "$1" == "codeql.configure" ]]; then
-  bash "$(dirname "$0")/cleanup_prebuilt.sh"
-  CRYPTO_OPTIONS="-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_CRYPTO_USE_OPENSSL=ON"
-  vcpkg install --triplet=$VCPKG_TARGET_TRIPLET fmt openssl libuv grpc "prometheus-cpp[pull,push]"
-  bash cmake_dev.sh -l -b $CONFIGURATION -r build_jobs_ci -c $USE_CC -- $CRYPTO_OPTIONS -DVCPKG_TARGET_TRIPLET=$VCPKG_TARGET_TRIPLET \
-    -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake -DATBUS_MACRO_ABORT_ON_PROTECTED_ERROR=ON \
+  bash cmake_dev.sh -l -b $CONFIGURATION -r build_jobs_ci -c $USE_CC -- -DATBUS_MACRO_ABORT_ON_PROTECTED_ERROR=ON \
     "-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_LOW_MEMORY_MODE=ON"
 elif [[ "$1" == "codeql.build" ]]; then
   cd build_jobs_ci
   cmake --build . -j2 --config $CONFIGURATION || cmake --build . --config $CONFIGURATION
   ctest -VV . -C $CONFIGURATION -L libatapp.unit_test
 elif [[ "$1" == "gcc.legacy.test" ]]; then
-  bash "$(dirname "$0")/cleanup_prebuilt.sh"
   bash cmake_dev.sh -lus -b $CONFIGURATION -r build_jobs_ci -c $USE_CC -- "-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_LOW_MEMORY_MODE=ON"
   cd build_jobs_ci
   cmake --build . -j2 --config $CONFIGURATION || cmake --build . --config $CONFIGURATION
   ctest -VV . -C $CONFIGURATION -L libatapp.unit_test
 elif [[ "$1" == "clang.test" ]]; then
-  bash "$(dirname "$0")/cleanup_prebuilt.sh"
-  CRYPTO_OPTIONS="-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_CRYPTO_USE_OPENSSL=ON"
-  bash cmake_dev.sh -lus -b $CONFIGURATION -r build_jobs_ci -c $USE_CC -- $CRYPTO_OPTIONS -DATBUS_MACRO_ABORT_ON_PROTECTED_ERROR=ON \
+  bash cmake_dev.sh -lus -b $CONFIGURATION -r build_jobs_ci -c $USE_CC -- -DATBUS_MACRO_ABORT_ON_PROTECTED_ERROR=ON \
     "-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_LOW_MEMORY_MODE=ON"
   cd build_jobs_ci
   cmake --build . -j2 --config $CONFIGURATION || cmake --build . --config $CONFIGURATION
   ctest -VV . -C $CONFIGURATION -L libatapp.unit_test
 elif [[ "$1" == "msys2.mingw.test" ]]; then
-  bash "$(dirname "$0")/cleanup_prebuilt.sh"
   pacman -S --needed --noconfirm mingw-w64-x86_64-cmake mingw-w64-x86_64-make \
     mingw-w64-x86_64-curl mingw-w64-x86_64-wget mingw-w64-x86_64-perl \
     mingw-w64-x86_64-git-lfs mingw-w64-x86_64-toolchain mingw-w64-x86_64-libtool \

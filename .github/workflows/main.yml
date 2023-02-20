@@ -62,7 +62,7 @@ jobs:
           elif [[ "x$USE_CC" =~ xclang.* ]]; then
             bash ci/do_ci.sh clang.test ;
           else
-            bash ci/do_ci.sh ssl.openssl ;
+            bash ci/do_ci.sh gcc.test ;
           fi
   vs2019_2022_build: # job id, can be any string
     name: "Visual Studio 2019/2022 Build"
