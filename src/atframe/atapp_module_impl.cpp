@@ -86,9 +86,9 @@ LIBATAPP_MACRO_API uint64_t module_impl::get_app_type_id() const {
 
 LIBATAPP_MACRO_API bool module_impl::is_actived() const { return actived_; }
 
-LIBATAPP_MACRO_API void module_impl::suspend_stop(std::chrono::system_clock::duration timeout,
+LIBATAPP_MACRO_API void module_impl::suspend_stop(std::chrono::system_clock::duration timeout_duration,
                                                   std::function<bool()> fn) {
-  suspended_stop_.stop_suspend_duration = timeout;
+  suspended_stop_.stop_suspend_duration = timeout_duration;
   suspended_stop_.stop_suspend_callback = std::move(fn);
 }
 
