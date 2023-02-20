@@ -84,7 +84,11 @@ elif [[ "$1" == "codeql.build" ]]; then
   cmake --build . -j2 --config $CONFIGURATION || cmake --build . --config $CONFIGURATION
   ctest -VV . -C $CONFIGURATION -L libatapp.unit_test
 elif [[ "$1" == "gcc.legacy.test" ]]; then
-  bash cmake_dev.sh -lus -b $CONFIGURATION -r build_jobs_ci -c $USE_CC -- "-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_LOW_MEMORY_MODE=ON"
+  bash cmake_dev.sh -lus -b $CONFIGURATION -r build_jobs_ci -c $USE_CC -- \
+    -DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_LOW_MEMORY_MODE=ON \
+    -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+    -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+    -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY
   cd build_jobs_ci
   cmake --build . -j2 --config $CONFIGURATION || cmake --build . --config $CONFIGURATION
   ctest -VV . -C $CONFIGURATION -L libatapp.unit_test
@@ -109,10 +113,10 @@ elif [[ "$1" == "msys2.mingw.test" ]]; then
     -DPROJECT_ENABLE_TOOLS=ON -DATBUS_MACRO_ABORT_ON_PROTECTED_ERROR=ON "-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_LOW_MEMORY_MODE=ON"
   cmake --build . -j2 --config $CONFIGURATION || cmake --build . --config $CONFIGURATION
   for EXT_PATH in $(find "$PWD" -name "*.dll" | xargs dirname | sort -u); do
-    export PATH="$EXT_PATH:$PATH"
+    export PATH="$(cygpath -m "$EXT_PATH"):$PATH"
   done
-  for EXT_PATH in $(find "$PROJECT_DIR/third_party/install/" -name "*.dll" | xargs dirname | sort -u); do
-    export PATH="$EXT_PATH:$PATH"
+  for EXT_PATH in $(find "$(readlink -f "$PWD/..")/third_party/install/" -name "*.dll" | xargs dirname | sort -u); do
+    export PATH="$(cygpath -m "$EXT_PATH"):$PATH"
   done
   echo "PATH=$PATH"
   ctest -VV . -C $CONFIGURATION -L libatapp.unit_test
