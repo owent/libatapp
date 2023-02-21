@@ -1846,24 +1846,28 @@ bool protobuf_equal_inner_field(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_DOUBLE: {
       if (fds->is_repeated()) {
         for (int i = 0; i < field_size; ++i) {
-          if (l.GetReflection()->GetRepeatedDouble(l, fds, i) != r.GetReflection()->GetRepeatedDouble(r, fds, i)) {
+          if (std::abs(l.GetReflection()->GetRepeatedDouble(l, fds, i) -
+                       r.GetReflection()->GetRepeatedDouble(r, fds, i)) > std::numeric_limits<double>::epsilon()) {
             return false;
           }
         }
       } else {
-        return l.GetReflection()->GetDouble(l, fds) == r.GetReflection()->GetDouble(r, fds);
+        return std::abs(l.GetReflection()->GetDouble(l, fds) - r.GetReflection()->GetDouble(r, fds)) <=
+               std::numeric_limits<double>::epsilon();
       }
       break;
     };
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_FLOAT: {
       if (fds->is_repeated()) {
         for (int i = 0; i < field_size; ++i) {
-          if (l.GetReflection()->GetRepeatedFloat(l, fds, i) != r.GetReflection()->GetRepeatedFloat(r, fds, i)) {
+          if (std::abs(l.GetReflection()->GetRepeatedFloat(l, fds, i) -
+                       r.GetReflection()->GetRepeatedFloat(r, fds, i)) > std::numeric_limits<float>::epsilon()) {
             return false;
           }
         }
       } else {
-        return l.GetReflection()->GetFloat(l, fds) == r.GetReflection()->GetFloat(r, fds);
+        return std::abs(l.GetReflection()->GetFloat(l, fds) - r.GetReflection()->GetFloat(r, fds)) <=
+               std::numeric_limits<float>::epsilon();
       }
       break;
     };

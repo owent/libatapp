@@ -128,20 +128,20 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE module_impl {
 
   /**
    * @brief suspend for a while when stop command is received
-   * @param timeout suspend timeout, it should not be greater than stop_timeout
+   * @param timeout_duration suspend timeout, it should not be greater than stop_timeout
    * @param fn callback to check if it should be suspended, return true to suspend and call stop later
    */
-  LIBATAPP_MACRO_API void suspend_stop(std::chrono::system_clock::duration timeout, std::function<bool()> fn);
+  LIBATAPP_MACRO_API void suspend_stop(std::chrono::system_clock::duration timeout_duration, std::function<bool()> fn);
 
   /**
    * @brief suspend for a while when stop command is received
-   * @param timeout suspend timeout, it should not be greater than stop_timeout
+   * @param timeout_duration suspend timeout, it should not be greater than stop_timeout
    * @param fn callback to check if it should be suspended, return true to suspend and call stop later
    */
   template <class REP, class PERIOD>
-  LIBATAPP_MACRO_API_HEAD_ONLY inline void suspend_stop(std::chrono::duration<REP, PERIOD> timeout,
+  LIBATAPP_MACRO_API_HEAD_ONLY inline void suspend_stop(std::chrono::duration<REP, PERIOD> timeout_duration,
                                                         std::function<bool()> fn) {
-    suspend_stop(std::chrono::duration_cast<std::chrono::system_clock::duration>(timeout), std::move(fn));
+    suspend_stop(std::chrono::duration_cast<std::chrono::system_clock::duration>(timeout_duration), std::move(fn));
   }
 
  protected:
