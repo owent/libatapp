@@ -84,7 +84,6 @@ jobs:
         shell: bash
         run: |
           git submodule > '.github/.cache-key'
-          bash ci/cleanup_prebuilt.sh
       - name: Cache packages
         uses: actions/cache@v3
         with:
@@ -120,7 +119,7 @@ jobs:
           path: |
             third_party/install
             C:/msys64/var/cache/pacman/pkg
-          key: ${{ runner.os }}-mingw64-${ hashFiles('.github/.cache-key') } }}
+          key: ${{ runner.os }}-mingw-${ hashFiles('.github/.cache-key') } }}
       - name: Build & Test
         shell: bash
         env:
@@ -151,7 +150,7 @@ jobs:
         with:
           path: |
             third_party/install
-          key: ${{ runner.os }}-${{ matrix.cc }}-${ hashFiles('.github/.cache-key') }) }}
+          key: ${{ runner.os }}-codeql-${{ matrix.cc }}-${ hashFiles('.github/.cache-key') }) }}
       - name: Build
         shell: bash
         env:
