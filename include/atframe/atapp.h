@@ -324,10 +324,13 @@ class app {
    * @param dst store the result
    * @param configure_prefix_path path prefix from configure file(ini/yaml)
    * @param load_environemnt_prefix environemnt prefix, if empty, we will ignore environemnt variables
+   * @param existed_keys this variable can be used to dump existing configure keys, and it's used to decide whether to
+   * dump default value
    */
   LIBATAPP_MACRO_API void parse_configures_into(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                                                 gsl::string_view configure_prefix_path,
-                                                gsl::string_view load_environemnt_prefix = "") const;
+                                                gsl::string_view load_environemnt_prefix = "",
+                                                configure_key_set *existed_keys = nullptr) const;
 
   /**
    * @brief parse configure into atapp_log and return error message
@@ -335,10 +338,13 @@ class app {
    * @param dst target
    * @param configure_prefix_paths path prefix from configure(ini/yaml)
    * @param load_environemnt_prefix environemnt prefix, if empty, we will ignore environemnt variables
+   * @param existed_keys this variable can be used to dump existing configure keys, and it's used to decide whether to
+   * dump default value
    */
   LIBATAPP_MACRO_API void parse_log_configures_into(atapp::protocol::atapp_log &dst,
                                                     std::vector<gsl::string_view> configure_prefix_paths,
-                                                    gsl::string_view load_environemnt_prefix = "") const noexcept;
+                                                    gsl::string_view load_environemnt_prefix = "",
+                                                    configure_key_set *existed_keys = nullptr) const noexcept;
 
   LIBATAPP_MACRO_API const atapp::protocol::atapp_configure &get_origin_configure() const noexcept;
   LIBATAPP_MACRO_API const atapp::protocol::atapp_log &get_log_configure() const noexcept;
@@ -598,14 +604,14 @@ class app {
 
   atapp_endpoint::ptr_t auto_mutable_self_endpoint();
 
-  void parse_environment_log_categories_into(atapp::protocol::atapp_log &dst,
-                                             gsl::string_view load_environemnt_prefix) const noexcept;
+  void parse_environment_log_categories_into(atapp::protocol::atapp_log &dst, gsl::string_view load_environemnt_prefix,
+                                             configure_key_set *dump_existed_set) const noexcept;
 
-  void parse_ini_log_categories_into(atapp::protocol::atapp_log &dst,
-                                     const std::vector<gsl::string_view> &path) const noexcept;
+  void parse_ini_log_categories_into(atapp::protocol::atapp_log &dst, const std::vector<gsl::string_view> &path,
+                                     configure_key_set *dump_existed_set) const noexcept;
 
-  void parse_yaml_log_categories_into(atapp::protocol::atapp_log &dst,
-                                      const std::vector<gsl::string_view> &path) const noexcept;
+  void parse_yaml_log_categories_into(atapp::protocol::atapp_log &dst, const std::vector<gsl::string_view> &path,
+                                      configure_key_set *dump_existed_set) const noexcept;
 
  public:
   LIBATAPP_MACRO_API int trigger_event_on_forward_request(const message_sender_t &source, const message_t &msg);

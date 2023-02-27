@@ -44,7 +44,7 @@ jobs:
         with:
           path: |
             third_party/install
-          key: ${{ runner.os }}-${{ matrix.cc }}-${ hashFiles('.github/.cache-key') }
+          key: ${{ matrix.os }}-${{ matrix.cc }}-${{ hashFiles('.github/.cache-key') }}
       - name: Build & Test
         shell: bash
         env:
@@ -89,7 +89,7 @@ jobs:
         with:
           path: |
             third_party/install
-          key: ${{ runner.os }}-shared-${{ matrix.build_shared_libs }}-${ hashFiles('.github/.cache-key') } }}
+          key: ${{ matrix.os }}-shared-${{ matrix.build_shared_libs }}-${{ hashFiles('.github/.cache-key') }}
       - name: Build & Test
         shell: pwsh
         env:
@@ -119,7 +119,7 @@ jobs:
           path: |
             third_party/install
             C:/msys64/var/cache/pacman/pkg
-          key: ${{ runner.os }}-mingw-${ hashFiles('.github/.cache-key') } }}
+          key: ${{ matrix.os }}-mingw-${{ hashFiles('.github/.cache-key') }}
       - name: Build & Test
         shell: bash
         env:
@@ -133,8 +133,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - cc: gcc
-    runs-on: ubuntu-latest
+          - os: ubuntu-latest
+            cc: gcc
+    runs-on: ${{ matrix.os }}
     permissions:
       actions: read
       contents: read
@@ -150,7 +151,7 @@ jobs:
         with:
           path: |
             third_party/install
-          key: ${{ runner.os }}-codeql-${{ matrix.cc }}-${ hashFiles('.github/.cache-key') }) }}
+          key: ${{ matrix.os }}-codeql-${{ matrix.cc }}-${{ hashFiles('.github/.cache-key') }) }}
       - name: Build
         shell: bash
         env:

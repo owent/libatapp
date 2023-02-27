@@ -24,7 +24,8 @@ inline int setenv(const char *name, const char *value, int) { return _putenv_s(n
 inline int unsetenv(const char *name) { return setenv(name, "", 1); }
 #endif
 
-static void check_origin_configure(atapp::app &app, atapp::protocol::atapp_etcd sub_cfg) {
+static void check_origin_configure(atapp::app &app, atapp::protocol::atapp_etcd sub_cfg,
+                                   const atapp::configure_key_set &existed_keys) {
   CASE_EXPECT_EQ(app.get_id(), 0x1234);
   CASE_EXPECT_EQ(app.get_origin_configure().id_mask(), "8.8.8.8");
   CASE_EXPECT_EQ(app.convert_app_id_by_string("1.2.3.4"), 0x01020304);
@@ -67,9 +68,36 @@ static void check_origin_configure(atapp::app &app, atapp::protocol::atapp_etcd 
   CASE_EXPECT_EQ(0, sub_cfg.init().tick_interval().seconds());
   CASE_EXPECT_EQ(16000000, sub_cfg.init().tick_interval().nanos());
   CASE_EXPECT_TRUE(sub_cfg.cluster().auto_update());
+
+  // Check app keys
+  std::string keys_path;
+  util::file_system::dirname(__FILE__, 0, keys_path);
+  keys_path += "/atapp_configure_loader_test_app_keys.txt";
+
+  if (!util::file_system::is_exist(keys_path.c_str())) {
+    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << keys_path << " not found, skip checking etcd keys" << std::endl;
+    return;
+  }
+
+  std::fstream keys_ss(keys_path.c_str(), std::ios::in);
+  std::string key_line;
+  while (std::getline(keys_ss, key_line)) {
+    auto trimed_line = util::string::trim(key_line.c_str(), key_line.size());
+    if (trimed_line.second == 0) {
+      continue;
+    }
+
+    bool check_exists = existed_keys.end() != existed_keys.find(std::string(trimed_line.first, trimed_line.second));
+    if (!check_exists) {
+      CASE_MSG_INFO() << CASE_MSG_FCOLOR(RED) << std::string(trimed_line.first, trimed_line.second) << " not found"
+                      << std::endl;
+    }
+    CASE_EXPECT_TRUE(check_exists);
+  }
 }
 
-static void check_log_configure(const atapp::protocol::atapp_log &app_log) {
+static void check_log_configure(const atapp::protocol::atapp_log &app_log,
+                                const atapp::configure_key_set &existed_keys) {
   CASE_EXPECT_EQ(std::string("debug"), app_log.level());
   CASE_EXPECT_EQ(2, app_log.category_size());
   if (app_log.category_size() < 2) {
@@ -86,6 +114,32 @@ static void check_log_configure(const atapp::protocol::atapp_log &app_log) {
   }
   CASE_EXPECT_EQ(std::string("file"), app_log.category(0).sink(0).type());
   CASE_EXPECT_EQ(std::string("stdout"), app_log.category(0).sink(3).type());
+
+  // Check app keys
+  std::string keys_path;
+  util::file_system::dirname(__FILE__, 0, keys_path);
+  keys_path += "/atapp_configure_loader_test_log_keys.txt";
+
+  if (!util::file_system::is_exist(keys_path.c_str())) {
+    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << keys_path << " not found, skip checking etcd keys" << std::endl;
+    return;
+  }
+
+  std::fstream keys_ss(keys_path.c_str(), std::ios::in);
+  std::string key_line;
+  while (std::getline(keys_ss, key_line)) {
+    auto trimed_line = util::string::trim(key_line.c_str(), key_line.size());
+    if (trimed_line.second == 0) {
+      continue;
+    }
+
+    bool check_exists = existed_keys.end() != existed_keys.find(std::string(trimed_line.first, trimed_line.second));
+    if (!check_exists) {
+      CASE_MSG_INFO() << CASE_MSG_FCOLOR(RED) << std::string(trimed_line.first, trimed_line.second) << " not found"
+                      << std::endl;
+    }
+    CASE_EXPECT_TRUE(check_exists);
+  }
 }
 
 CASE_TEST(atapp_configure, load_yaml) {
@@ -104,13 +158,15 @@ CASE_TEST(atapp_configure, load_yaml) {
   app.init(nullptr, 4, argv);
   app.reload();
 
+  atapp::configure_key_set existed_app_keys;
+  atapp::configure_key_set existed_log_keys;
   atapp::protocol::atapp_etcd sub_cfg;
-  app.parse_configures_into(sub_cfg, "atapp.etcd");
-  check_origin_configure(app, sub_cfg);
+  app.parse_configures_into(sub_cfg, "atapp.etcd", "", &existed_app_keys);
+  check_origin_configure(app, sub_cfg, existed_app_keys);
 
   atapp::protocol::atapp_log app_log;
-  app.parse_log_configures_into(app_log, std::vector<gsl::string_view>{"atapp", "log"});
-  check_log_configure(app_log);
+  app.parse_log_configures_into(app_log, std::vector<gsl::string_view>{"atapp", "log"}, "", &existed_log_keys);
+  check_log_configure(app_log, existed_log_keys);
 
   WLOG_GETCAT(0)->clear_sinks();
   WLOG_GETCAT(1)->clear_sinks();
@@ -132,13 +188,15 @@ CASE_TEST(atapp_configure, load_conf) {
   app.init(nullptr, 4, argv);
   app.reload();
 
+  atapp::configure_key_set existed_app_keys;
+  atapp::configure_key_set existed_log_keys;
   atapp::protocol::atapp_etcd sub_cfg;
-  app.parse_configures_into(sub_cfg, "atapp.etcd");
-  check_origin_configure(app, sub_cfg);
+  app.parse_configures_into(sub_cfg, "atapp.etcd", "", &existed_app_keys);
+  check_origin_configure(app, sub_cfg, existed_app_keys);
 
   atapp::protocol::atapp_log app_log;
-  app.parse_log_configures_into(app_log, std::vector<gsl::string_view>{"atapp", "log"});
-  check_log_configure(app_log);
+  app.parse_log_configures_into(app_log, std::vector<gsl::string_view>{"atapp", "log"}, "", &existed_log_keys);
+  check_log_configure(app_log, existed_log_keys);
 
   WLOG_GETCAT(0)->clear_sinks();
   WLOG_GETCAT(1)->clear_sinks();
@@ -180,13 +238,15 @@ CASE_TEST(atapp_configure, load_environment) {
   app.init(nullptr, 2, argv);
   app.reload();
 
+  atapp::configure_key_set existed_app_keys;
+  atapp::configure_key_set existed_log_keys;
   atapp::protocol::atapp_etcd sub_cfg;
-  app.parse_configures_into(sub_cfg, "atapp.etcd", "ATAPP_ETCD");
-  check_origin_configure(app, sub_cfg);
+  app.parse_configures_into(sub_cfg, "atapp.etcd", "ATAPP_ETCD", &existed_app_keys);
+  check_origin_configure(app, sub_cfg, existed_app_keys);
 
   atapp::protocol::atapp_log app_log;
-  app.parse_log_configures_into(app_log, std::vector<gsl::string_view>{"atapp", "log"}, "ATAPP_LOG");
-  check_log_configure(app_log);
+  app.parse_log_configures_into(app_log, std::vector<gsl::string_view>{"atapp", "log"}, "ATAPP_LOG", &existed_log_keys);
+  check_log_configure(app_log, existed_log_keys);
 
   WLOG_GETCAT(0)->clear_sinks();
   WLOG_GETCAT(1)->clear_sinks();

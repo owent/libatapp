@@ -82,16 +82,20 @@ LIBATAPP_MACRO_API void parse_duration(gsl::string_view in, ATBUS_MACRO_PROTOBUF
 
 LIBATAPP_MACRO_API void ini_loader_dump_to(const util::config::ini_value &src,
                                            ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
-                                           configure_key_set *dump_existed_set = nullptr);
+                                           configure_key_set *dump_existed_set = nullptr,
+                                           gsl::string_view existed_set_prefix = "");
 LIBATAPP_MACRO_API void ini_loader_dump_to(const util::config::ini_value &src,
                                            ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Map<std::string, std::string> &dst,
-                                           gsl::string_view prefix);
+                                           gsl::string_view prefix, configure_key_set *dump_existed_set = nullptr,
+                                           gsl::string_view existed_set_prefix = "");
 
 LIBATAPP_MACRO_API void yaml_loader_dump_to(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
-                                            configure_key_set *dump_existed_set = nullptr);
+                                            configure_key_set *dump_existed_set = nullptr,
+                                            gsl::string_view existed_set_prefix = "");
 LIBATAPP_MACRO_API void yaml_loader_dump_to(const YAML::Node &src,
                                             ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Map<std::string, std::string> &dst,
-                                            gsl::string_view prefix);
+                                            gsl::string_view prefix, configure_key_set *dump_existed_set = nullptr,
+                                            gsl::string_view existed_set_prefix = "");
 LIBATAPP_MACRO_API const YAML::Node yaml_loader_get_child_by_path(const YAML::Node &src, gsl::string_view path);
 
 LIBATAPP_MACRO_API const YAML::Node yaml_loader_get_child_by_path(const YAML::Node &src,
@@ -99,9 +103,11 @@ LIBATAPP_MACRO_API const YAML::Node yaml_loader_get_child_by_path(const YAML::No
                                                                   size_t start_path_index = 0);
 
 LIBATAPP_MACRO_API bool environment_loader_dump_to(gsl::string_view prefix,
-                                                   ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst);
+                                                   ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
+                                                   configure_key_set *dump_existed_set = nullptr,
+                                                   gsl::string_view existed_set_prefix = "");
 
-LIBATAPP_MACRO_API bool default_loader_dump_to(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
+LIBATAPP_MACRO_API void default_loader_dump_to(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                                                const configure_key_set &existed_set);
 
 LIBATAPP_MACRO_API bool protobuf_equal(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &l,
