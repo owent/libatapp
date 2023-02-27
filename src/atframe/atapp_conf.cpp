@@ -335,7 +335,7 @@ static void pick_const_data(gsl::string_view value, ATBUS_MACRO_PROTOBUF_NAMESPA
 
 static inline void dump_pick_field_min(bool &out) { out = false; }
 
-static inline void dump_pick_field_min(std::string &out) {}
+static inline void dump_pick_field_min(std::string &) {}
 
 static inline void dump_pick_field_min(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &out) {
   out.set_seconds(std::numeric_limits<int64_t>::min());
@@ -549,7 +549,7 @@ static inline bool dump_pick_field_less(const bool &l, const bool &r) {
   return r;
 }
 
-static inline bool dump_pick_field_less(const std::string &l, const std::string &r) { return false; }
+static inline bool dump_pick_field_less(const std::string &, const std::string &) { return false; }
 
 static inline bool dump_pick_field_less(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &l,
                                         const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &r) {
