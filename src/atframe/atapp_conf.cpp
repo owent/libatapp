@@ -333,6 +333,10 @@ static void pick_const_data(gsl::string_view value, ATBUS_MACRO_PROTOBUF_NAMESPA
   timepoint.set_seconds(res);
 }
 
+static inline void dump_pick_field_min(bool &out) { out = false; }
+
+static inline void dump_pick_field_min(std::string &out) {}
+
 static inline void dump_pick_field_min(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &out) {
   out.set_seconds(std::numeric_limits<int64_t>::min());
   out.set_nanos(std::numeric_limits<int32_t>::min());
@@ -348,6 +352,10 @@ static inline void dump_pick_field_min(Ty &out) {
   out = std::numeric_limits<Ty>::min();
 }
 
+static inline void dump_pick_field_max(bool &out) { out = true; }
+
+static inline void dump_pick_field_max(std::string &out) { out = true; }
+
 static inline void dump_pick_field_max(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &out) {
   out.set_seconds(std::numeric_limits<int64_t>::max());
   out.set_nanos(std::numeric_limits<int32_t>::max());
@@ -361,6 +369,42 @@ static inline void dump_pick_field_max(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timest
 template <class Ty>
 static inline void dump_pick_field_max(Ty &out) {
   out = std::numeric_limits<Ty>::max();
+}
+
+static inline bool dump_pick_logic_bool(gsl::string_view trans) {
+  if (trans.empty()) {
+    return false;
+  }
+
+  if (0 == UTIL_STRFUNC_STRNCASE_CMP("0", trans.data(), trans.size())) {
+    return false;
+  }
+
+  if (0 == UTIL_STRFUNC_STRNCASE_CMP("false", trans.data(), trans.size())) {
+    return false;
+  }
+
+  if (0 == UTIL_STRFUNC_STRNCASE_CMP("no", trans.data(), trans.size())) {
+    return false;
+  }
+
+  if (0 == UTIL_STRFUNC_STRNCASE_CMP("disable", trans.data(), trans.size())) {
+    return false;
+  }
+
+  if (0 == UTIL_STRFUNC_STRNCASE_CMP("disabled", trans.data(), trans.size())) {
+    return false;
+  }
+
+  return true;
+}
+
+static inline void dump_pick_field_from_str(bool &out, gsl::string_view input, bool) {
+  out = dump_pick_logic_bool(input);
+}
+
+static inline void dump_pick_field_from_str(std::string &out, gsl::string_view input, bool) {
+  out = static_cast<std::string>(input);
 }
 
 static inline void dump_pick_field_from_str(float &out, gsl::string_view input, bool) {
@@ -497,6 +541,16 @@ static inline void dump_pick_field_from_str(Ty &out, gsl::string_view input, boo
   }
 }
 
+static inline bool dump_pick_field_less(const bool &l, const bool &r) {
+  if (l == r) {
+    return false;
+  }
+
+  return r;
+}
+
+static inline bool dump_pick_field_less(const std::string &l, const std::string &r) { return false; }
+
 static inline bool dump_pick_field_less(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &l,
                                         const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &r) {
   if (l.seconds() != r.seconds()) {
@@ -521,9 +575,10 @@ static inline bool dump_pick_field_less(const Ty &l, const Ty &r) {
 }
 
 template <class TRET>
-static TRET dump_pick_field_with_extensions(gsl::string_view val_str,
-                                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds) {
+static std::pair<TRET, bool> dump_pick_field_with_extensions(
+    gsl::string_view val_str, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds) {
   TRET value, min_value, max_value;
+  bool is_default = false;
   dump_pick_field_min(min_value);
   dump_pick_field_max(max_value);
   if (val_str.empty()) {
@@ -534,6 +589,8 @@ static TRET dump_pick_field_with_extensions(gsl::string_view val_str,
     } else {
       dump_pick_field_from_str(value, std::string(), false);
     }
+
+    is_default = true;
   } else {
     if (fds->options().HasExtension(atapp::protocol::CONFIGURE)) {
       const atapp::protocol::atapp_configure_meta &meta = fds->options().GetExtension(atapp::protocol::CONFIGURE);
@@ -561,42 +618,124 @@ static TRET dump_pick_field_with_extensions(gsl::string_view val_str,
     value = max_value;
   }
 
-  return value;
+  return std::pair<TRET, bool>(value, is_default);
 }
 
 template <class TRET>
-static inline TRET dump_pick_field_with_extensions(const util::config::ini_value &val,
-                                                   const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds,
-                                                   size_t index) {
+static inline std::pair<TRET, bool> dump_pick_field_with_extensions(
+    const util::config::ini_value &val, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds, size_t index) {
   return dump_pick_field_with_extensions<TRET>(val.as_cpp_string(index), fds);
 }
 
-static inline bool dump_pick_logic_bool(gsl::string_view trans) {
-  if (trans.empty()) {
-    return false;
+static void dump_pick_default_field(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
+                                    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds,
+                                    const configure_key_set &existed_set, gsl::string_view prefix) {
+  if (nullptr == fds) {
+    return;
   }
 
-  if (0 == UTIL_STRFUNC_STRNCASE_CMP("0", trans.data(), trans.size())) {
-    return false;
+  if (!fds->options().HasExtension(atapp::protocol::CONFIGURE)) {
+    return;
   }
 
-  if (0 == UTIL_STRFUNC_STRNCASE_CMP("false", trans.data(), trans.size())) {
-    return false;
+  if (nullptr == fds->message_type() &&
+      fds->options().GetExtension(atapp::protocol::CONFIGURE).default_value().empty()) {
+    return;
   }
 
-  if (0 == UTIL_STRFUNC_STRNCASE_CMP("no", trans.data(), trans.size())) {
-    return false;
+  // Already has value, skip
+  if (existed_set.end() != existed_set.find(util::log::format("{}{}", prefix, fds->name()))) {
+    return;
   }
 
-  if (0 == UTIL_STRFUNC_STRNCASE_CMP("disable", trans.data(), trans.size())) {
-    return false;
+  if (fds->is_repeated()) {
+    FWLOGERROR("{} in {} is a repeated field, we do not support to set default value now", fds->name(),
+               dst.GetDescriptor()->full_name());
+    return;
   }
 
-  if (0 == UTIL_STRFUNC_STRNCASE_CMP("disabled", trans.data(), trans.size())) {
-    return false;
-  }
+  switch (fds->cpp_type()) {
+    case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_INT32: {
+      dst.GetReflection()->SetInt32(&dst, fds, dump_pick_field_with_extensions<int32_t>("", fds).first);
+      break;
+    };
+    case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_INT64: {
+      dst.GetReflection()->SetInt64(&dst, fds, dump_pick_field_with_extensions<int64_t>("", fds).first);
+      break;
+    };
+    case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_UINT32: {
+      dst.GetReflection()->SetUInt32(&dst, fds, dump_pick_field_with_extensions<uint32_t>("", fds).first);
+      break;
+    };
+    case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_UINT64: {
+      dst.GetReflection()->SetUInt64(&dst, fds, dump_pick_field_with_extensions<uint64_t>("", fds).first);
+      break;
+    };
+    case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_STRING: {
+      dst.GetReflection()->SetString(&dst, fds,
+                                     fds->options().GetExtension(atapp::protocol::CONFIGURE).default_value());
+      break;
+    };
+    case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_ENUM: {
+      const std::string &value = fds->options().GetExtension(atapp::protocol::CONFIGURE).default_value();
+      if (value.empty()) {
+        break;
+      }
+      const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::EnumValueDescriptor *jval = nullptr;
+      if ((value[0] >= '0' && value[0] <= '9')) {
+        jval = fds->enum_type()->FindValueByNumber(util::string::to_int<int32_t>(value));
+      } else {
+        jval = fds->enum_type()->FindValueByName(value);
+      }
 
-  return true;
+      if (jval == nullptr) {
+        // invalid value
+        break;
+      }
+      dst.GetReflection()->SetEnum(&dst, fds, jval);
+      break;
+    };
+    case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_BOOL: {
+      bool jval = dump_pick_logic_bool(fds->options().GetExtension(atapp::protocol::CONFIGURE).default_value());
+      dst.GetReflection()->SetBool(&dst, fds, jval);
+      break;
+    };
+    case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_MESSAGE: {
+      // special message
+      google::protobuf::Message *submsg = dst.GetReflection()->MutableMessage(&dst, fds);
+      if (fds->message_type()->full_name() == ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration::descriptor()->full_name()) {
+        ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration value =
+            dump_pick_field_with_extensions<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration>("", fds);
+        detail::dynamic_copy_protobuf_duration(submsg, value);
+      } else if (fds->message_type()->full_name() ==
+                 ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp::descriptor()->full_name()) {
+        ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp value =
+            dump_pick_field_with_extensions<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp>("", fds);
+        detail::dynamic_copy_protobuf_timestamp(submsg, value);
+      } else {
+        std::string new_prefix = util::log::format("{}{}.", prefix, fds->name());
+        for (int i = 0; submsg != nullptr && i < submsg->GetDescriptor()->field_count(); ++i) {
+          dump_pick_default_field(*submsg, submsg->GetDescriptor()->field(i), existed_set, new_prefix);
+        }
+      }
+      break;
+    };
+    case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_FLOAT: {
+      dst.GetReflection()->SetFloat(&dst, fds, dump_pick_field_with_extensions<float>("", fds));
+      break;
+    };
+    case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_DOUBLE: {
+      dst.GetReflection()->SetDouble(&dst, fds, dump_pick_field_with_extensions<double>("", fds));
+      break;
+    };
+    default: {
+      // See https://developers.google.com/protocol-buffers/docs/proto3#maps
+      // key_type can be any integral or string type (so, any scalar type except for floating point types and bytes).
+      FWLOGERROR("{} in {} with type={} is not supported now", fds->name(), dst.GetDescriptor()->full_name(),
+                 fds->type_name());
+      break;
+    }
+  }
 }
 
 static void dump_pick_map_key_field(gsl::string_view val_str, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
@@ -857,7 +996,8 @@ static void dump_pick_field(const util::config::ini_value &val, ATBUS_MACRO_PROT
 }
 
 static void dump_field_item(const util::config::ini_value &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
-                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds) {
+                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds,
+                            configure_key_set *dump_existed_set, gsl::string_view prefix) {
   if (nullptr == fds) {
     return;
   }
@@ -883,8 +1023,9 @@ static void dump_field_item(const util::config::ini_value &src, ATBUS_MACRO_PROT
 }
 
 template <class TRET>
-static TRET dump_pick_field_with_extensions(const YAML::Node &val,
-                                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds) {
+static std::pair<TRET, bool> dump_pick_field_with_extensions(
+    const YAML::Node &val, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds) {
+  bool is_default = false;
   TRET value, min_value, max_value;
   dump_pick_field_min(min_value);
   dump_pick_field_max(max_value);
@@ -923,10 +1064,11 @@ static TRET dump_pick_field_with_extensions(const YAML::Node &val,
     value = max_value;
   }
 
-  return value;
+  return std::pair<TRET, bool>(value, is_default);
 }
 
-static void dump_message_item(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst);
+static void dump_message_item(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
+                              configure_key_set *dump_existed_set, gsl::string_view prefix);
 static void dump_pick_field(const YAML::Node &val, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds) {
   if (nullptr == fds) {
@@ -1163,7 +1305,8 @@ static void dump_pick_field(const YAML::Node &val, ATBUS_MACRO_PROTOBUF_NAMESPAC
 }
 
 static void dump_field_item(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
-                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds) {
+                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds,
+                            configure_key_set *dump_existed_set, gsl::string_view prefix) {
   if (nullptr == fds) {
     return;
   }
@@ -1484,7 +1627,8 @@ static bool dump_environment_field_item(gsl::string_view prefix, ATBUS_MACRO_PRO
   }
 }
 
-static void dump_message_item(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst) {
+static void dump_message_item(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
+                              configure_key_set *dump_existed_set, gsl::string_view prefix) {
   const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Descriptor *desc = dst.GetDescriptor();
   if (nullptr == desc) {
     return;
@@ -1507,7 +1651,7 @@ static void dump_message_item(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESP
   }
 #endif
   for (int i = 0; i < desc->field_count(); ++i) {
-    detail::dump_field_item(src, dst, desc->field(i));
+    detail::dump_field_item(src, dst, desc->field(i), dump_existed_set, prefix);
   }
 }
 
@@ -1537,7 +1681,8 @@ LIBATAPP_MACRO_API void parse_duration(gsl::string_view in, ATBUS_MACRO_PROTOBUF
 }
 
 LIBATAPP_MACRO_API void ini_loader_dump_to(const util::config::ini_value &src,
-                                           ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst) {
+                                           ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
+                                           configure_key_set *dump_existed_set) {
   const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Descriptor *desc = dst.GetDescriptor();
   if (nullptr == desc) {
     return;
@@ -1582,7 +1727,8 @@ LIBATAPP_MACRO_API void ini_loader_dump_to(const util::config::ini_value &src,
   }
 }
 
-LIBATAPP_MACRO_API void yaml_loader_dump_to(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst) {
+LIBATAPP_MACRO_API void yaml_loader_dump_to(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
+                                            configure_key_set *dump_existed_set) {
   detail::dump_message_item(src, dst);
 }
 
@@ -1725,6 +1871,18 @@ LIBATAPP_MACRO_API const YAML::Node yaml_loader_get_child_by_path(const YAML::No
 LIBATAPP_MACRO_API bool environment_loader_dump_to(gsl::string_view prefix,
                                                    ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst) {
   return detail::dump_environment_message_item(prefix, dst);
+}
+
+LIBATAPP_MACRO_API bool default_loader_dump_to(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
+                                               const configure_key_set &existed_set) {
+  for (int i = 0; i < dst.GetDescriptor()->field_count(); ++i) {
+    auto fds = dst.GetDescriptor()->field(i);
+    if (fds == nullptr) {
+      continue;
+    }
+
+    detail::dump_pick_default_field(dst, dst.GetDescriptor()->field(i), existed_set, "");
+  }
 }
 
 static bool protobuf_equal_inner_message(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &l,

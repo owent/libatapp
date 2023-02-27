@@ -24,6 +24,7 @@
 #include <memory>
 #include <string>
 #include <type_traits>
+#include <unordered_set>
 #include <vector>
 
 #include "gsl/select-gsl.h"
@@ -74,16 +75,20 @@ enum ATAPP_ERROR_TYPE {
   EN_ATAPP_ERR_MIN = -1999,
 };
 
+using configure_key_set = std::unordered_set<std::string>;
+
 LIBATAPP_MACRO_API void parse_timepoint(gsl::string_view in, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp &out);
 LIBATAPP_MACRO_API void parse_duration(gsl::string_view in, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &out);
 
 LIBATAPP_MACRO_API void ini_loader_dump_to(const util::config::ini_value &src,
-                                           ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst);
+                                           ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
+                                           configure_key_set *dump_existed_set = nullptr);
 LIBATAPP_MACRO_API void ini_loader_dump_to(const util::config::ini_value &src,
                                            ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Map<std::string, std::string> &dst,
                                            gsl::string_view prefix);
 
-LIBATAPP_MACRO_API void yaml_loader_dump_to(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst);
+LIBATAPP_MACRO_API void yaml_loader_dump_to(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
+                                            configure_key_set *dump_existed_set = nullptr);
 LIBATAPP_MACRO_API void yaml_loader_dump_to(const YAML::Node &src,
                                             ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Map<std::string, std::string> &dst,
                                             gsl::string_view prefix);
@@ -95,6 +100,9 @@ LIBATAPP_MACRO_API const YAML::Node yaml_loader_get_child_by_path(const YAML::No
 
 LIBATAPP_MACRO_API bool environment_loader_dump_to(gsl::string_view prefix,
                                                    ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst);
+
+LIBATAPP_MACRO_API bool default_loader_dump_to(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
+                                               const configure_key_set &existed_set);
 
 LIBATAPP_MACRO_API bool protobuf_equal(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &l,
                                        const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &r);

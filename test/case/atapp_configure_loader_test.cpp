@@ -40,9 +40,12 @@ static void check_origin_configure(atapp::app &app, atapp::protocol::atapp_etcd 
   CASE_EXPECT_EQ(8388608, app.get_origin_configure().bus().recv_buffer_size());
   CASE_EXPECT_EQ(2097152, app.get_origin_configure().bus().send_buffer_size());
   CASE_EXPECT_EQ(0, app.get_origin_configure().bus().send_buffer_number());
+  CASE_EXPECT_EQ(1000, app.get_origin_configure().bus().loop_times());
 
   CASE_EXPECT_EQ(0, app.get_origin_configure().timer().tick_interval().seconds());
   CASE_EXPECT_EQ(32000000, app.get_origin_configure().timer().tick_interval().nanos());
+  CASE_EXPECT_EQ(8, app.get_origin_configure().timer().message_timeout().seconds());
+  CASE_EXPECT_EQ(10, app.get_origin_configure().timer().initialize_timeout().seconds());
 
   CASE_EXPECT_EQ(3, app.get_origin_configure().etcd().hosts_size());
   CASE_EXPECT_EQ("http://127.0.0.1:2375", app.get_origin_configure().etcd().hosts(0));
@@ -63,6 +66,7 @@ static void check_origin_configure(atapp::app &app, atapp::protocol::atapp_etcd 
   CASE_EXPECT_EQ("", sub_cfg.authorization());
   CASE_EXPECT_EQ(0, sub_cfg.init().tick_interval().seconds());
   CASE_EXPECT_EQ(16000000, sub_cfg.init().tick_interval().nanos());
+  CASE_EXPECT_TRUE(sub_cfg.cluster().auto_update());
 }
 
 static void check_log_configure(const atapp::protocol::atapp_log &app_log) {
