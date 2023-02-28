@@ -839,17 +839,14 @@ static void dump_pick_default_field(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &
     if (fds->options().GetExtension(atapp::protocol::CONFIGURE).default_value().empty()) {
       return;
     }
-  } else if (fds->is_repeated()) {
-    // repeated message and map are ignored
-    return;
+  } else {
+    // Already has value, skip. Only check leaf values
+    if (existed_set.end() != existed_set.find(util::log::format("{}{}", prefix, fds->name()))) {
+      return;
+    }
   }
 
-  // Already has value, skip
-  if (existed_set.end() != existed_set.find(util::log::format("{}{}", prefix, fds->name()))) {
-    return;
-  }
-
-  if (fds->is_repeated()) {
+  if (fds->is_repeated() && nullptr == fds->message_type()) {
     FWLOGERROR("{} in {} is a repeated field, we do not support to set default value now", fds->name(),
                dst.GetDescriptor()->full_name());
     return;
@@ -885,21 +882,34 @@ static void dump_pick_default_field(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &
       break;
     };
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_MESSAGE: {
-      // special message
-      google::protobuf::Message *submsg = dst.GetReflection()->MutableMessage(&dst, fds);
-      if (fds->message_type()->full_name() == ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration::descriptor()->full_name()) {
-        ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration value =
-            dump_pick_field_with_extensions<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration>("", fds).first;
-        dynamic_copy_protobuf_duration_or_timestamp(submsg, value);
-      } else if (fds->message_type()->full_name() ==
-                 ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp::descriptor()->full_name()) {
-        ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp value =
-            dump_pick_field_with_extensions<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp>("", fds).first;
-        dynamic_copy_protobuf_duration_or_timestamp(submsg, value);
+      // Recursive scan repeated messages
+      if (fds->is_repeated()) {
+        int list_size = dst.GetReflection()->FieldSize(dst, fds);
+        for (int i = 0; i < list_size; ++i) {
+          auto submsg = dst.GetReflection()->MutableRepeatedMessage(&dst, fds, i);
+          std::string new_prefix = util::log::format("{}{}.{}.", prefix, fds->name(), i);
+          for (int j = 0; submsg != nullptr && j < submsg->GetDescriptor()->field_count(); ++j) {
+            dump_pick_default_field(*submsg, submsg->GetDescriptor()->field(j), existed_set, new_prefix);
+          }
+        }
       } else {
-        std::string new_prefix = util::log::format("{}{}.", prefix, fds->name());
-        for (int i = 0; submsg != nullptr && i < submsg->GetDescriptor()->field_count(); ++i) {
-          dump_pick_default_field(*submsg, submsg->GetDescriptor()->field(i), existed_set, new_prefix);
+        // special message
+        google::protobuf::Message *submsg = dst.GetReflection()->MutableMessage(&dst, fds);
+        if (fds->message_type()->full_name() ==
+            ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration::descriptor()->full_name()) {
+          ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration value =
+              dump_pick_field_with_extensions<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration>("", fds).first;
+          dynamic_copy_protobuf_duration_or_timestamp(submsg, value);
+        } else if (fds->message_type()->full_name() ==
+                   ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp::descriptor()->full_name()) {
+          ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp value =
+              dump_pick_field_with_extensions<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp>("", fds).first;
+          dynamic_copy_protobuf_duration_or_timestamp(submsg, value);
+        } else {
+          std::string new_prefix = util::log::format("{}{}.", prefix, fds->name());
+          for (int i = 0; submsg != nullptr && i < submsg->GetDescriptor()->field_count(); ++i) {
+            dump_pick_default_field(*submsg, submsg->GetDescriptor()->field(i), existed_set, new_prefix);
+          }
         }
       }
       break;
