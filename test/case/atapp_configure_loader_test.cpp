@@ -42,9 +42,14 @@ static void check_origin_configure(atapp::app &app, atapp::protocol::atapp_etcd 
   CASE_EXPECT_EQ(2097152, app.get_origin_configure().bus().send_buffer_size());
   CASE_EXPECT_EQ(0, app.get_origin_configure().bus().send_buffer_number());
   CASE_EXPECT_EQ(1000, app.get_origin_configure().bus().loop_times());
+  CASE_EXPECT_EQ(16, app.get_origin_configure().bus().ttl());
 
   CASE_EXPECT_EQ(0, app.get_origin_configure().timer().tick_interval().seconds());
   CASE_EXPECT_EQ(32000000, app.get_origin_configure().timer().tick_interval().nanos());
+  CASE_EXPECT_EQ(10, app.get_origin_configure().timer().stop_timeout().seconds());
+  CASE_EXPECT_EQ(0, app.get_origin_configure().timer().stop_timeout().nanos());
+  CASE_EXPECT_EQ(0, app.get_origin_configure().timer().stop_interval().seconds());
+  CASE_EXPECT_EQ(256000000, app.get_origin_configure().timer().stop_interval().nanos());
   CASE_EXPECT_EQ(8, app.get_origin_configure().timer().message_timeout().seconds());
   CASE_EXPECT_EQ(10, app.get_origin_configure().timer().initialize_timeout().seconds());
 
@@ -56,6 +61,11 @@ static void check_origin_configure(atapp::app &app, atapp::protocol::atapp_etcd 
   CASE_EXPECT_EQ("", app.get_origin_configure().etcd().authorization());
   CASE_EXPECT_EQ(0, app.get_origin_configure().etcd().init().tick_interval().seconds());
   CASE_EXPECT_EQ(16000000, app.get_origin_configure().etcd().init().tick_interval().nanos());
+  CASE_EXPECT_EQ(10, app.get_origin_configure().etcd().init().timeout().seconds());
+  CASE_EXPECT_EQ(0, app.get_origin_configure().etcd().init().timeout().nanos());
+  CASE_EXPECT_TRUE(app.get_origin_configure().etcd().cluster().auto_update());
+  CASE_EXPECT_FALSE(app.get_origin_configure().etcd().watcher().by_id());
+  CASE_EXPECT_TRUE(app.get_origin_configure().etcd().watcher().by_name());
 
   CASE_EXPECT_EQ(3, sub_cfg.hosts_size());
   if (3 == sub_cfg.hosts_size()) {
@@ -67,7 +77,11 @@ static void check_origin_configure(atapp::app &app, atapp::protocol::atapp_etcd 
   CASE_EXPECT_EQ("", sub_cfg.authorization());
   CASE_EXPECT_EQ(0, sub_cfg.init().tick_interval().seconds());
   CASE_EXPECT_EQ(16000000, sub_cfg.init().tick_interval().nanos());
+  CASE_EXPECT_EQ(10, sub_cfg.init().timeout().seconds());
+  CASE_EXPECT_EQ(0, sub_cfg.init().timeout().nanos());
   CASE_EXPECT_TRUE(sub_cfg.cluster().auto_update());
+  CASE_EXPECT_FALSE(sub_cfg.watcher().by_id());
+  CASE_EXPECT_TRUE(sub_cfg.watcher().by_name());
 
   // Check app keys
   std::string keys_path;
@@ -81,12 +95,14 @@ static void check_origin_configure(atapp::app &app, atapp::protocol::atapp_etcd 
 
   std::fstream keys_ss(keys_path.c_str(), std::ios::in);
   std::string key_line;
+  size_t keys_size = 0;
   while (std::getline(keys_ss, key_line)) {
     auto trimed_line = util::string::trim(key_line.c_str(), key_line.size());
     if (trimed_line.second == 0) {
       continue;
     }
 
+    ++ keys_size;
     bool check_exists = existed_keys.end() != existed_keys.find(std::string(trimed_line.first, trimed_line.second));
     if (!check_exists) {
       CASE_MSG_INFO() << CASE_MSG_FCOLOR(RED) << std::string(trimed_line.first, trimed_line.second) << " not found"
@@ -94,6 +110,7 @@ static void check_origin_configure(atapp::app &app, atapp::protocol::atapp_etcd 
     }
     CASE_EXPECT_TRUE(check_exists);
   }
+  CASE_EXPECT_EQ(keys_size, existed_keys.size());
 }
 
 static void check_log_configure(const atapp::protocol::atapp_log &app_log,
@@ -127,12 +144,14 @@ static void check_log_configure(const atapp::protocol::atapp_log &app_log,
 
   std::fstream keys_ss(keys_path.c_str(), std::ios::in);
   std::string key_line;
+  size_t keys_size = 0;
   while (std::getline(keys_ss, key_line)) {
     auto trimed_line = util::string::trim(key_line.c_str(), key_line.size());
     if (trimed_line.second == 0) {
       continue;
     }
 
+    ++ keys_size;
     bool check_exists = existed_keys.end() != existed_keys.find(std::string(trimed_line.first, trimed_line.second));
     if (!check_exists) {
       CASE_MSG_INFO() << CASE_MSG_FCOLOR(RED) << std::string(trimed_line.first, trimed_line.second) << " not found"
@@ -140,6 +159,7 @@ static void check_log_configure(const atapp::protocol::atapp_log &app_log,
     }
     CASE_EXPECT_TRUE(check_exists);
   }
+  CASE_EXPECT_EQ(keys_size, existed_keys.size());
 }
 
 CASE_TEST(atapp_configure, load_yaml) {

@@ -839,17 +839,24 @@ static void dump_pick_default_field(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &
     if (fds->options().GetExtension(atapp::protocol::CONFIGURE).default_value().empty()) {
       return;
     }
-  } else {
+
+    if (fds->is_repeated()) {
+      FWLOGERROR("{} in {} is a repeated field, we do not support to set default value now", fds->name(),
+                 dst.GetDescriptor()->full_name());
+      return;
+    }
+
     // Already has value, skip. Only check leaf values
     if (existed_set.end() != existed_set.find(util::log::format("{}{}", prefix, fds->name()))) {
       return;
     }
-  }
-
-  if (fds->is_repeated() && nullptr == fds->message_type()) {
-    FWLOGERROR("{} in {} is a repeated field, we do not support to set default value now", fds->name(),
-               dst.GetDescriptor()->full_name());
-    return;
+  } else {
+    bool allow_string_value =
+        fds->message_type()->full_name() == ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration::descriptor()->full_name() ||
+        fds->message_type()->full_name() == ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp::descriptor()->full_name();
+    if (allow_string_value && existed_set.end() != existed_set.find(util::log::format("{}{}", prefix, fds->name()))) {
+      return;
+    }
   }
 
   switch (fds->cpp_type()) {
