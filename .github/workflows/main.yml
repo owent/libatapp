@@ -26,7 +26,7 @@ jobs:
         include:
           - os: ubuntu-latest
             cc: gcc
-          - os: ubuntu-18.04
+          - os: ubuntu-20.04
             cc: gcc-4.8
           - os: ubuntu-latest
             cc: clang-latest
@@ -51,6 +51,8 @@ jobs:
           USE_CC: ${{ matrix.cc }}
         run: |
           if [[ "xgcc-4.8" == "x$USE_CC" ]]; then
+            sudo apt-add-repository 'deb http://archive.ubuntu.com/ubuntu/ xenial main'
+            sudo apt-add-repository 'deb http://archive.ubuntu.com/ubuntu/ xenial universe'
             sudo apt-get update ;
             sudo apt-get install --no-install-recommends --no-install-suggests -y g++-4.8 ;
             bash ci/do_ci.sh gcc.legacy.test ;
