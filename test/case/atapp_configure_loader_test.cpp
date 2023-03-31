@@ -102,7 +102,7 @@ static void check_origin_configure(atapp::app &app, atapp::protocol::atapp_etcd 
       continue;
     }
 
-    ++ keys_size;
+    ++keys_size;
     bool check_exists = existed_keys.end() != existed_keys.find(std::string(trimed_line.first, trimed_line.second));
     if (!check_exists) {
       CASE_MSG_INFO() << CASE_MSG_FCOLOR(RED) << std::string(trimed_line.first, trimed_line.second) << " not found"
@@ -130,7 +130,9 @@ static void check_log_configure(const atapp::protocol::atapp_log &app_log,
     return;
   }
   CASE_EXPECT_EQ(std::string("file"), app_log.category(0).sink(0).type());
+  CASE_EXPECT_EQ(atapp::protocol::atapp_log_sink::kLogBackendFile, app_log.category(0).sink(0).backend_case());
   CASE_EXPECT_EQ(std::string("stdout"), app_log.category(0).sink(3).type());
+  CASE_EXPECT_EQ(atapp::protocol::atapp_log_sink::kLogBackendStdout, app_log.category(0).sink(3).backend_case());
 
   // Check app keys
   std::string keys_path;
@@ -151,7 +153,7 @@ static void check_log_configure(const atapp::protocol::atapp_log &app_log,
       continue;
     }
 
-    ++ keys_size;
+    ++keys_size;
     bool check_exists = existed_keys.end() != existed_keys.find(std::string(trimed_line.first, trimed_line.second));
     if (!check_exists) {
       CASE_MSG_INFO() << CASE_MSG_FCOLOR(RED) << std::string(trimed_line.first, trimed_line.second) << " not found"
