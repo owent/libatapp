@@ -831,6 +831,13 @@ static void dump_pick_default_field(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &
     return;
   }
 
+  // If it's oneof and other fields are set, skip
+  if (nullptr != fds->containing_oneof()) {
+    if (dst.GetReflection()->HasOneof(dst, fds->containing_oneof())) {
+      return;
+    }
+  }
+
   if (nullptr == fds->message_type()) {
     if (!fds->options().HasExtension(atapp::protocol::CONFIGURE)) {
       return;
