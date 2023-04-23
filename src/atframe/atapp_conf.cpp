@@ -2004,13 +2004,13 @@ bool protobuf_equal_inner_field(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message
       if (fds->is_repeated()) {
         for (int i = 0; i < field_size; ++i) {
           if (std::abs(l.GetReflection()->GetRepeatedDouble(l, fds, i) -
-                       r.GetReflection()->GetRepeatedDouble(r, fds, i)) > std::numeric_limits<double>::epsilon()) {
+                       r.GetReflection()->GetRepeatedDouble(r, fds, i)) > std::numeric_limits<float>::epsilon()) {
             return false;
           }
         }
       } else {
         return std::abs(l.GetReflection()->GetDouble(l, fds) - r.GetReflection()->GetDouble(r, fds)) <=
-               std::numeric_limits<double>::epsilon();
+               std::numeric_limits<float>::epsilon();
       }
       break;
     };
