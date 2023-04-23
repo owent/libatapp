@@ -2003,28 +2003,37 @@ bool protobuf_equal_inner_field(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_DOUBLE: {
       if (fds->is_repeated()) {
         for (int i = 0; i < field_size; ++i) {
-          if (std::abs(l.GetReflection()->GetRepeatedDouble(l, fds, i) -
-                       r.GetReflection()->GetRepeatedDouble(r, fds, i)) > std::numeric_limits<float>::epsilon()) {
+          auto lv = l.GetReflection()->GetRepeatedDouble(l, fds, i);
+          auto rv = r.GetReflection()->GetRepeatedDouble(r, fds, i);
+          if (std::abs(lv - rv) > std::numeric_limits<double>::epsilon() * std::abs(lv + rv) * 2 &&
+              std::abs(lv - rv) >= std::numeric_limits<double>::min()) {
             return false;
           }
         }
       } else {
-        return std::abs(l.GetReflection()->GetDouble(l, fds) - r.GetReflection()->GetDouble(r, fds)) <=
-               std::numeric_limits<float>::epsilon();
+        auto lv = l.GetReflection()->GetDouble(l, fds);
+        auto rv = r.GetReflection()->GetDouble(r, fds);
+
+        return std::abs(lv - rv) <= std::numeric_limits<double>::epsilon() * std::abs(lv + rv) * 2 ||
+               std::abs(lv - rv) < std::numeric_limits<double>::min();
       }
       break;
     };
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_FLOAT: {
       if (fds->is_repeated()) {
         for (int i = 0; i < field_size; ++i) {
-          if (std::abs(l.GetReflection()->GetRepeatedFloat(l, fds, i) -
-                       r.GetReflection()->GetRepeatedFloat(r, fds, i)) > std::numeric_limits<float>::epsilon()) {
+          auto lv = l.GetReflection()->GetRepeatedFloat(l, fds, i);
+          auto rv = r.GetReflection()->GetRepeatedFloat(r, fds, i);
+          if (std::abs(lv - rv) > std::numeric_limits<float>::epsilon() * std::abs(lv + rv) * 2 &&
+              std::abs(lv - rv) >= std::numeric_limits<float>::min()) {
             return false;
           }
         }
       } else {
-        return std::abs(l.GetReflection()->GetFloat(l, fds) - r.GetReflection()->GetFloat(r, fds)) <=
-               std::numeric_limits<float>::epsilon();
+        auto lv = l.GetReflection()->GetFloat(l, fds);
+        auto rv = r.GetReflection()->GetFloat(r, fds);
+        return std::abs(lv - rv) <= std::numeric_limits<float>::epsilon() * std::abs(lv + rv) * 2 ||
+               std::abs(lv - rv) < std::numeric_limits<float>::min();
       }
       break;
     };
