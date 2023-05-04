@@ -84,8 +84,14 @@ int main() {
       LIBATAPP_ENABLE_CUSTOM_COUNT_FOR_STD_LIST)
   endif()
 endif()
+set(PROJECT_LIBATAPP_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/_generated")
+file(MAKE_DIRECTORY "${PROJECT_LIBATAPP_GENERATED_DIR}/include/atframe")
+file(MAKE_DIRECTORY "${PROJECT_LIBATAPP_GENERATED_DIR}/src")
+file(MAKE_DIRECTORY "${PROJECT_LIBATAPP_GENERATED_DIR}/temp")
 configure_file("${CMAKE_CURRENT_LIST_DIR}/include/atframe/atapp_config.h.in"
-               "${CMAKE_CURRENT_LIST_DIR}/include/atframe/atapp_config.h" @ONLY)
+               "${PROJECT_LIBATAPP_GENERATED_DIR}/temp/atapp_config.h" @ONLY)
+execute_process(COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PROJECT_LIBATAPP_GENERATED_DIR}/temp/atapp_config.h"
+                        "${PROJECT_LIBATAPP_GENERATED_DIR}/include/atframe")
 
 add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/src")
 add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/binding/c")

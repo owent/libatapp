@@ -5,9 +5,9 @@ set(PROJECT_LIBATAPP_ROOT_SRC_DIR ${CMAKE_CURRENT_LIST_DIR})
 list(APPEND PROJECT_LIBATAPP_PUBLIC_INCLUDE_DIRS ${PROJECT_LIBATAPP_ROOT_INC_DIR})
 
 set(PROJECT_LIBATAPP_SRC_LIST
+    "${PROJECT_LIBATAPP_GENERATED_DIR}/include/atframe/atapp_config.h"
     "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp.h"
     "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_conf.h"
-    "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_config.h"
     "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_conf_rapidjson.h"
     "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_log_sink_maker.h"
     "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_module_impl.h"
@@ -39,24 +39,25 @@ set(PROJECT_LIBATAPP_SRC_LIST
     "${CMAKE_CURRENT_LIST_DIR}/atframe/modules/etcd_module.cpp")
 source_group_by_dir(PROJECT_LIBATAPP_SRC_LIST)
 
-set(PROJECT_LIBATAPP_PROTOCOL_SRC_LIST "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_conf.pb.h"
-                                       "${CMAKE_CURRENT_LIST_DIR}/atframe/atapp_conf.pb.cc")
+set(PROJECT_LIBATAPP_PROTOCOL_SRC_LIST "${PROJECT_LIBATAPP_GENERATED_DIR}/include/atframe/atapp_conf.pb.h"
+                                       "${PROJECT_LIBATAPP_GENERATED_DIR}/src/atapp_conf.pb.cc")
 
 # ============ libatapp - src ============
 add_custom_command(
   OUTPUT ${PROJECT_LIBATAPP_PROTOCOL_SRC_LIST}
   COMMAND
-    ${ATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_PROTOBUF_BIN_PROTOC} "-I" ${PROJECT_LIBATAPP_ROOT_INC_DIR} "-I"
+    "${ATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_PROTOBUF_BIN_PROTOC}" "-I" "${PROJECT_LIBATAPP_ROOT_INC_DIR}" "-I"
     "${PROJECT_THIRD_PARTY_INSTALL_DIR}/include" "-I" "${ATFRAMEWORK_LIBATBUS_REPO_DIR}/include"
-    "--cpp_out=${PROJECT_LIBATAPP_ROOT_INC_DIR}" "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_conf.proto"
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_conf.pb.cc"
-          "${PROJECT_LIBATAPP_ROOT_SRC_DIR}/atframe/atapp_conf.pb.cc"
-  COMMAND ${CMAKE_COMMAND} -E remove -f "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_conf.pb.cc"
+    "--cpp_out=${PROJECT_LIBATAPP_GENERATED_DIR}/temp" "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_conf.proto"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PROJECT_LIBATAPP_GENERATED_DIR}/temp/atframe/atapp_conf.pb.cc"
+          "${PROJECT_LIBATAPP_GENERATED_DIR}/src/atapp_conf.pb.cc"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PROJECT_LIBATAPP_GENERATED_DIR}/temp/atframe/atapp_conf.pb.h"
+          "${PROJECT_LIBATAPP_GENERATED_DIR}/include/atframe/atapp_conf.pb.h"
   DEPENDS "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_conf.proto"
           "${ATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_PROTOBUF_BIN_PROTOC}"
   WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
   COMMENT
-    "Generate ${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_conf.pb.h and ${PROJECT_LIBATAPP_ROOT_SRC_DIR}/atframe/atapp_conf.pb.cc"
+    "Generate ${PROJECT_LIBATAPP_GENERATED_DIR}/include/atframe/atapp_conf.pb.h and ${PROJECT_LIBATAPP_GENERATED_DIR}/src/atapp_conf.pb.cc"
 )
 
 if(NOT CMAKE_SYSTEM_NAME MATCHES "Windows|MinGW|WindowsStore" AND (BUILD_SHARED_LIBS OR ATFRAMEWORK_USE_DYNAMIC_LIBRARY
@@ -77,7 +78,8 @@ target_link_libraries("${PROJECT_LIBATAPP_LIB_LINK}-protocol"
 target_include_directories(
   "${PROJECT_LIBATAPP_LIB_LINK}-protocol"
   PRIVATE "$<BUILD_INTERFACE:${PROJECT_LIBATAPP_ROOT_INC_DIR}>"
-  PUBLIC "$<BUILD_INTERFACE:${ATFRAMEWORK_LIBATBUS_REPO_DIR}/include>")
+  PUBLIC "$<BUILD_INTERFACE:${ATFRAMEWORK_LIBATBUS_REPO_DIR}/include>"
+         "$<BUILD_INTERFACE:${PROJECT_LIBATAPP_GENERATED_DIR}/include>")
 
 set(PROJECT_LIBATAPP_PROTOCOL_SOURCE_COMPILE_OPTIONS ${PROJECT_COMMON_PRIVATE_COMPILE_OPTIONS}
                                                      ${PROJECT_BUILD_TOOLS_PATCH_PROTOBUF_SOURCES_OPTIONS})
@@ -135,7 +137,8 @@ target_link_libraries(${PROJECT_LIBATAPP_LIB_LINK} PUBLIC ${PROJECT_LIBATAPP_PUB
 
 target_include_directories(
   ${PROJECT_LIBATAPP_LIB_LINK}
-  PUBLIC "$<BUILD_INTERFACE:${PROJECT_LIBATAPP_PUBLIC_INCLUDE_DIRS}>" "$<INSTALL_INTERFACE:include>"
+  PUBLIC "$<BUILD_INTERFACE:${PROJECT_LIBATAPP_PUBLIC_INCLUDE_DIRS}>"
+         "$<BUILD_INTERFACE:${PROJECT_LIBATAPP_GENERATED_DIR}/include>" "$<INSTALL_INTERFACE:include>"
   PRIVATE "$<BUILD_INTERFACE:${PROJECT_LIBATAPP_ROOT_SRC_DIR}>")
 
 if(PROJECT_LIBATAPP_PRIVATE_COMPILE_OPTIONS)
@@ -143,8 +146,8 @@ if(PROJECT_LIBATAPP_PRIVATE_COMPILE_OPTIONS)
 endif()
 
 if(MSVC)
-  set_property(TARGET ${PROJECT_LIBATAPP_LIB_LINK} PROPERTY FOLDER "atframework")
-  set_property(TARGET "${PROJECT_LIBATAPP_LIB_LINK}-protocol" PROPERTY FOLDER "atframework")
+  set_property(TARGET ${PROJECT_LIBATAPP_LIB_LINK} PROPERTY FOLDER "atframework/atapp")
+  set_property(TARGET "${PROJECT_LIBATAPP_LIB_LINK}-protocol" PROPERTY FOLDER "atframework/atapp")
 endif()
 
 add_library("atframework::${PROJECT_LIBATAPP_LIB_LINK}-protocol" ALIAS "${PROJECT_LIBATAPP_LIB_LINK}-protocol")
@@ -164,3 +167,7 @@ install(
   REGEX ".+\\.h(pp)?$"
   PATTERN ".svn" EXCLUDE
   PATTERN ".git" EXCLUDE)
+
+install(FILES "${PROJECT_LIBATAPP_GENERATED_DIR}/include/atframe/atapp_conf.pb.h"
+              "${PROJECT_LIBATAPP_GENERATED_DIR}/include/atframe/atapp_config.h"
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/atframe/")

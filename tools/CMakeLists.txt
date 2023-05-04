@@ -22,6 +22,10 @@ foreach(TOOLS_SRC_FILE IN LISTS TOOLS_SRC_LIST)
 
   target_link_libraries(${TOOLS_SRC_BIN_NAME} atapp)
 
+  if(MSVC)
+    set_property(TARGET ${TOOLS_SRC_BIN_NAME} PROPERTY FOLDER "atframework/tools/atapp")
+  endif()
+
   install(
     TARGETS "${TOOLS_SRC_BIN_NAME}"
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
