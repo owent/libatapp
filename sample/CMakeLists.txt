@@ -23,4 +23,9 @@ foreach(SAMPLE_SRC_FILE IN LISTS SAMPLE_SRC_LIST)
     PROPERTIES INSTALL_RPATH_USE_LINK_PATH YES
                BUILD_WITH_INSTALL_RPATH NO
                BUILD_RPATH_USE_ORIGIN YES)
+
+  if(MSVC)
+    set_property(TARGET ${SAMPLE_SRC_BIN_NAME} PROPERTY FOLDER "atframework/sample/atapp")
+    add_target_properties(${SAMPLE_SRC_BIN_NAME} LINK_FLAGS /NODEFAULTLIB:library)
+  endif()
 endforeach()
