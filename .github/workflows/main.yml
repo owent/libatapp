@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: CI Job
         shell: bash
         run: |
@@ -35,7 +35,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Generate cache key
         shell: bash
         run: git submodule > '.github/.cache-key'
@@ -81,7 +81,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Generate cache key
         shell: bash
         run: |
@@ -111,7 +111,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Generate cache key
         shell: bash
         run: git submodule > '.github/.cache-key'
@@ -144,7 +144,7 @@ jobs:
       security-events: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Generate cache key
         shell: bash
         run: git submodule > '.github/.cache-key'
@@ -154,7 +154,7 @@ jobs:
           path: |
             third_party/install
           key: ${{ matrix.os }}-codeql-${{ matrix.cc }}-${{ hashFiles('.github/.cache-key') }}
-      - name: Build
+      - name: Configure
         shell: bash
         env:
           USE_CC: ${{ matrix.cc }}
