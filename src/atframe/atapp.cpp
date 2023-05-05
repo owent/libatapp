@@ -45,6 +45,13 @@
 namespace atapp {
 app *app::last_instance_ = nullptr;
 
+namespace {
+enum class atapp_pod_stateful_index : int32_t {
+  kUnset = -2,
+  kInvalid = -1,
+};
+}
+
 namespace details {
 static void _app_close_timer_handle(uv_handle_t *handle) {
   ::atapp::app::timer_ptr_t *ptr = reinterpret_cast<::atapp::app::timer_ptr_t *>(handle->data);
@@ -170,6 +177,7 @@ LIBATAPP_MACRO_API app::app() : setup_result_(0), ev_loop_(nullptr), mode_(mode_
   conf_.id = 0;
   conf_.execute_path = nullptr;
   conf_.upgrade_mode = false;
+  conf_.runtime_pod_stateful_index = static_cast<int32_t>(atapp_pod_stateful_index::kUnset);
 
   util::time::time_utility::update();
   tick_timer_.last_tick_timepoint = util::time::time_utility::sys_now();
@@ -1266,6 +1274,43 @@ LIBATAPP_MACRO_API atapp::protocol::atapp_metadata &app::mutable_metadata() {
   return conf_.metadata;
 }
 
+LIBATAPP_MACRO_API const atapp::protocol::atapp_runtime &app::get_runtime_configure() const noexcept {
+  return conf_.runtime;
+}
+
+LIBATAPP_MACRO_API atapp::protocol::atapp_runtime &app::mutable_runtime_configure() { return conf_.runtime; }
+
+LIBATAPP_MACRO_API int32_t app::get_runtime_stateful_pod_index() const noexcept {
+  if (static_cast<int32_t>(atapp_pod_stateful_index::kUnset) != conf_.runtime_pod_stateful_index) {
+    return conf_.runtime_pod_stateful_index;
+  }
+
+  if (conf_.runtime.spec().node_name().empty()) {
+    return static_cast<int32_t>(atapp_pod_stateful_index::kInvalid);
+  }
+
+  const std::string &node_name = conf_.runtime.spec().node_name();
+  std::string::size_type find_res = node_name.rfind('-');
+  if (find_res == std::string::npos || find_res + 1 >= node_name.size()) {
+    const_cast<app *>(this)->conf_.runtime_pod_stateful_index =
+        static_cast<int32_t>(atapp_pod_stateful_index::kInvalid);
+  } else {
+    ++find_res;
+    for (std::string::size_type i = 0; i < node_name.size(); ++i) {
+      if (node_name[i] < '0' || node_name[i] > '9') {
+        const_cast<app *>(this)->conf_.runtime_pod_stateful_index =
+            static_cast<int32_t>(atapp_pod_stateful_index::kInvalid);
+        return conf_.runtime_pod_stateful_index;
+      }
+    }
+
+    const_cast<app *>(this)->conf_.runtime_pod_stateful_index =
+        util::string::to_int<int32_t>(node_name.c_str() + find_res);
+  }
+
+  return conf_.runtime_pod_stateful_index;
+}
+
 LIBATAPP_MACRO_API const atapp::protocol::atapp_area &app::get_area() const noexcept { return conf_.origin.area(); }
 
 LIBATAPP_MACRO_API atapp::protocol::atapp_area &app::mutable_area() {
@@ -2174,6 +2219,11 @@ int app::apply_configure() {
   // reset metadata from configure
   if (conf_.origin.has_metadata()) {
     mutable_metadata() = conf_.origin.metadata();
+  }
+
+  if (conf_.origin.has_runtime()) {
+    mutable_runtime_configure() = conf_.origin.runtime();
+    conf_.runtime_pod_stateful_index = static_cast<int32_t>(atapp_pod_stateful_index::kUnset);
   }
 
   // atbus configure
