@@ -350,6 +350,17 @@ class app {
   LIBATAPP_MACRO_API const atapp::protocol::atapp_log &get_log_configure() const noexcept;
   LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata &get_metadata() const noexcept;
   LIBATAPP_MACRO_API atapp::protocol::atapp_metadata &mutable_metadata();
+  LIBATAPP_MACRO_API const atapp::protocol::atapp_runtime &get_runtime_configure() const noexcept;
+  LIBATAPP_MACRO_API atapp::protocol::atapp_runtime &mutable_runtime_configure();
+
+  /**
+   * @brief Get the runtime stateful pod index from configure atapp.runtime.spec.node_name
+   * @note It can also can be set by environment variable ATAPP_RUNTIME_SPEC_NODE_NAME
+   *
+   * @return stateful pod index, or -1 if it's not a stateful pod
+   */
+  LIBATAPP_MACRO_API int32_t get_runtime_stateful_pod_index() const noexcept;
+
   LIBATAPP_MACRO_API const atapp::protocol::atapp_area &get_area() const noexcept;
   LIBATAPP_MACRO_API atapp::protocol::atapp_area &mutable_area();
   LIBATAPP_MACRO_API util::time::time_utility::raw_duration_t get_configure_message_timeout() const noexcept;

@@ -257,10 +257,16 @@ message atapp_grpc {
 // Just like PodSandboxConfig in
 // https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/cri-api/pkg/apis/runtime/v1/api.proto
 message atapp_metadata {
-  string namespace_name = 1;
-  string api_version = 2;
-  string kind = 3;
-  string group = 4;
+  string api_version = 1;
+  string kind = 2;
+  string group = 3;
+
+  // kubernetes ENV: ATAPP_METADATA_NAME: valueFrom: fieldRef: fieldPath: metadata.name
+  string name = 11;
+  // kubernetes ENV: ATAPP_METADATA_NAMESPACE_NAME: valueFrom: fieldRef: fieldPath: metadata.namespace
+  string namespace_name = 12;
+  // kubernetes ENV: ATAPP_METADATA_UID: valueFrom: fieldRef: fieldPath: metadata.uid
+  string uid = 13;
 
   // string service_name    = 21; // Just use atapp_discovery.name
   // string service_version = 22; // Just use atapp_discovery.version
@@ -274,6 +280,27 @@ message atapp_metadata {
   map<string, string> annotations = 25;
 }
 
+message atapp_runtime_spec {
+  // kubernetes ENV: ATAPP_RUNTIME_SPEC_SERVICE_ACCOUNT_NAME: valueFrom: fieldRef: fieldPath: spec.serviceAccountName
+  string service_account_name = 1;
+
+  // kubernetes ENV: ATAPP_RUNTIME_SPEC_NODE_NAME: valueFrom: fieldRef: fieldPath: spec.nodeName
+  string node_name = 2;
+}
+
+message atapp_runtime_status {
+  // kubernetes ENV: ATAPP_RUNTIME_STATUS_HOST_IP: valueFrom: fieldRef: fieldPath: status.hostIP
+  string host_ip = 1;
+
+  // kubernetes ENV: ATAPP_RUNTIME_STATUS_POD_IP: valueFrom: fieldRef: fieldPath: status.podIP
+  string pod_ip = 2;
+}
+
+message atapp_runtime {
+  atapp_runtime_spec spec = 1;
+  atapp_runtime_status status = 2;
+}
+
 message atapp_configure {
   // bus configure
   string id = 101;       // maybe hex or a.b.c.d
@@ -281,8 +308,12 @@ message atapp_configure {
   string name = 103;
   uint64 type_id = 104;
   string type_name = 105;
-  atapp_area area = 106;          // Some service is splited by area
-  atapp_metadata metadata = 107;  // Just like in kubernetes
+  atapp_area area = 106;  // Some service is splited by area
+  // See these document below for details:
+  //   https://kubernetes.io/docs/concepts/workloads/pods/downward-api/#available-fields
+  //   https://kubernetes.io/zh-cn/docs/concepts/workloads/pods/downward-api/#available-fields
+  atapp_metadata metadata = 107;
+  atapp_runtime runtime = 108;
 
   string hostname = 121;
   // The same identity means the same instance of a app.
