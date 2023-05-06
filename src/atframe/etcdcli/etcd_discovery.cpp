@@ -159,9 +159,9 @@ static const std::vector<etcd_discovery_node::ptr_t> &get_empty_discovery_set() 
 }
 
 static bool is_empty(const etcd_discovery_set::metadata_type &metadata) noexcept {
-  return metadata.namespace_name().empty() && metadata.api_version().empty() && metadata.kind().empty() &&
-         metadata.group().empty() && metadata.service_subset().empty() && 0 == metadata.labels_size() &&
-         0 == metadata.annotations_size();
+  return metadata.api_version().empty() && metadata.kind().empty() && metadata.group().empty() &&
+         metadata.namespace_name().empty() && metadata.name().empty() && metadata.uid().empty() &&
+         metadata.service_subset().empty() && 0 == metadata.labels_size() && 0 == metadata.annotations_size();
 }
 
 }  // namespace
@@ -248,11 +248,6 @@ LIBATAPP_MACRO_API size_t
 etcd_discovery_set::metadata_hash_type::operator()(const metadata_type &metadata) const noexcept {
   std::pair<uint64_t, uint64_t> hash_value{LIBATAPP_MACRO_HASH_MAGIC_NUMBER, 0};
 
-  if (!metadata.namespace_name().empty()) {
-    consistent_hash_combine(reinterpret_cast<const void *>(metadata.namespace_name().c_str()),
-                            metadata.namespace_name().size(), hash_value);
-  }
-
   if (!metadata.api_version().empty()) {
     consistent_hash_combine(reinterpret_cast<const void *>(metadata.api_version().c_str()),
                             metadata.api_version().size(), hash_value);
@@ -266,6 +261,20 @@ etcd_discovery_set::metadata_hash_type::operator()(const metadata_type &metadata
   if (!metadata.group().empty()) {
     consistent_hash_combine(reinterpret_cast<const void *>(metadata.group().c_str()), metadata.group().size(),
                             hash_value);
+  }
+
+  if (!metadata.name().empty()) {
+    consistent_hash_combine(reinterpret_cast<const void *>(metadata.name().c_str()), metadata.name().size(),
+                            hash_value);
+  }
+
+  if (!metadata.namespace_name().empty()) {
+    consistent_hash_combine(reinterpret_cast<const void *>(metadata.namespace_name().c_str()),
+                            metadata.namespace_name().size(), hash_value);
+  }
+
+  if (!metadata.uid().empty()) {
+    consistent_hash_combine(reinterpret_cast<const void *>(metadata.uid().c_str()), metadata.uid().size(), hash_value);
   }
 
   if (!metadata.service_subset().empty()) {
@@ -298,10 +307,6 @@ LIBATAPP_MACRO_API bool etcd_discovery_set::metadata_equal_type::operator()(cons
     return true;
   }
 
-  if (l.namespace_name().size() != r.namespace_name().size()) {
-    return false;
-  }
-
   if (l.api_version().size() != r.api_version().size()) {
     return false;
   }
@@ -311,6 +316,18 @@ LIBATAPP_MACRO_API bool etcd_discovery_set::metadata_equal_type::operator()(cons
   }
 
   if (l.group().size() != r.group().size()) {
+    return false;
+  }
+
+  if (l.namespace_name().size() != r.namespace_name().size()) {
+    return false;
+  }
+
+  if (l.name().size() != r.name().size()) {
+    return false;
+  }
+
+  if (l.uid().size() != r.uid().size()) {
     return false;
   }
 
@@ -326,10 +343,6 @@ LIBATAPP_MACRO_API bool etcd_discovery_set::metadata_equal_type::operator()(cons
     return false;
   }
 
-  if (l.namespace_name() != r.namespace_name()) {
-    return false;
-  }
-
   if (l.api_version() != r.api_version()) {
     return false;
   }
@@ -339,6 +352,18 @@ LIBATAPP_MACRO_API bool etcd_discovery_set::metadata_equal_type::operator()(cons
   }
 
   if (l.group() != r.group()) {
+    return false;
+  }
+
+  if (l.namespace_name() != r.namespace_name()) {
+    return false;
+  }
+
+  if (l.name() != r.name()) {
+    return false;
+  }
+
+  if (l.uid() != r.uid()) {
     return false;
   }
 
@@ -377,10 +402,6 @@ LIBATAPP_MACRO_API bool etcd_discovery_set::metadata_equal_type::operator()(cons
 
 LIBATAPP_MACRO_API bool etcd_discovery_set::metadata_equal_type::filter(const metadata_type &rule,
                                                                         const metadata_type &metadata) noexcept {
-  if (!rule.namespace_name().empty() && rule.namespace_name() != metadata.namespace_name()) {
-    return false;
-  }
-
   if (!rule.api_version().empty() && rule.api_version() != metadata.api_version()) {
     return false;
   }
@@ -390,6 +411,18 @@ LIBATAPP_MACRO_API bool etcd_discovery_set::metadata_equal_type::filter(const me
   }
 
   if (!rule.group().empty() && rule.group() != metadata.group()) {
+    return false;
+  }
+
+  if (!rule.namespace_name().empty() && rule.namespace_name() != metadata.namespace_name()) {
+    return false;
+  }
+
+  if (!rule.name().empty() && rule.name() != metadata.name()) {
+    return false;
+  }
+
+  if (!rule.uid().empty() && rule.uid() != metadata.uid()) {
     return false;
   }
 

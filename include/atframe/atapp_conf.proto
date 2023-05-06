@@ -268,8 +268,6 @@ message atapp_metadata {
   // kubernetes ENV: ATAPP_METADATA_UID: valueFrom: fieldRef: fieldPath: metadata.uid
   string uid = 13;
 
-  // string service_name    = 21; // Just use atapp_discovery.name
-  // string service_version = 22; // Just use atapp_discovery.version
   // `service_subset` is similar to Destination in
   // https://istio.io/latest/docs/reference/config/networking/virtual-service/#Destination
   string service_subset = 23;
