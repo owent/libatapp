@@ -48,7 +48,8 @@ add_custom_command(
   COMMAND
     "${ATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_PROTOBUF_BIN_PROTOC}" "-I" "${PROJECT_LIBATAPP_ROOT_INC_DIR}" "-I"
     "${PROJECT_THIRD_PARTY_INSTALL_DIR}/include" "-I" "${ATFRAMEWORK_LIBATBUS_REPO_DIR}/include"
-    "--cpp_out=${PROJECT_LIBATAPP_GENERATED_DIR}/temp" "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_conf.proto"
+    "--cpp_out=dllexport_decl=LIBATAPP_MACRO_PROTOCOL_API:${PROJECT_LIBATAPP_GENERATED_DIR}/temp"
+    "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_conf.proto"
   COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PROJECT_LIBATAPP_GENERATED_DIR}/temp/atframe/atapp_conf.pb.cc"
           "${PROJECT_LIBATAPP_GENERATED_DIR}/src/atapp_conf.pb.cc"
   COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PROJECT_LIBATAPP_GENERATED_DIR}/temp/atframe/atapp_conf.pb.h"
@@ -60,11 +61,18 @@ add_custom_command(
     "Generate ${PROJECT_LIBATAPP_GENERATED_DIR}/include/atframe/atapp_conf.pb.h and ${PROJECT_LIBATAPP_GENERATED_DIR}/src/atapp_conf.pb.cc"
 )
 
-if(NOT CMAKE_SYSTEM_NAME MATCHES "Windows|MinGW|WindowsStore" AND (BUILD_SHARED_LIBS OR ATFRAMEWORK_USE_DYNAMIC_LIBRARY
-                                                                  ))
+if(BUILD_SHARED_LIBS OR ATFRAMEWORK_USE_DYNAMIC_LIBRARY)
   add_library("${PROJECT_LIBATAPP_LIB_LINK}-protocol" SHARED ${PROJECT_LIBATAPP_PROTOCOL_SRC_LIST})
+  project_build_tools_set_shared_library_declaration(LIBATAPP_MACRO_PROTOCOL_API
+                                                     "${PROJECT_LIBATAPP_LIB_LINK}-protocol")
 else()
   add_library("${PROJECT_LIBATAPP_LIB_LINK}-protocol" STATIC ${PROJECT_LIBATAPP_PROTOCOL_SRC_LIST})
+  if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang|Intel|XL|XLClang")
+    target_compile_definitions("${PROJECT_LIBATAPP_LIB_LINK}-protocol"
+                               PUBLIC "LIBATAPP_MACRO_PROTOCOL_API=__attribute__((visibility(\"default\")))")
+  else()
+    target_compile_definitions("${PROJECT_LIBATAPP_LIB_LINK}-protocol" PUBLIC "LIBATAPP_MACRO_PROTOCOL_API=")
+  endif()
 endif()
 set_target_properties(
   "${PROJECT_LIBATAPP_LIB_LINK}-protocol"
@@ -110,7 +118,7 @@ elseif(TARGET gsl::gsl-lite)
   list(APPEND PROJECT_LIBATAPP_PUBLIC_LINK_NAMES gsl::gsl-lite)
 endif()
 
-if(NOT MINGW AND (BUILD_SHARED_LIBS OR ATFRAMEWORK_USE_DYNAMIC_LIBRARY))
+if(BUILD_SHARED_LIBS OR ATFRAMEWORK_USE_DYNAMIC_LIBRARY)
   add_library(${PROJECT_LIBATAPP_LIB_LINK} SHARED ${PROJECT_LIBATAPP_SRC_LIST})
   target_compile_definitions(${PROJECT_LIBATAPP_LIB_LINK} PRIVATE LIBATAPP_MACRO_API_NATIVE=1 LIBATAPP_MACRO_API_DLL=1)
   set_target_properties(
