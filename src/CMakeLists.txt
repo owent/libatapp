@@ -89,8 +89,8 @@ else()
 endif()
 set_target_properties(
   "${PROJECT_LIBATAPP_LIB_LINK}-protocol"
-  PROPERTIES C_VISIBILITY_PRESET "default"
-             CXX_VISIBILITY_PRESET "default"
+  PROPERTIES C_VISIBILITY_PRESET "hidden"
+             CXX_VISIBILITY_PRESET "hidden"
              VERSION ${LIBATAPP_VERSION}
              WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
 target_link_libraries("${PROJECT_LIBATAPP_LIB_LINK}-protocol"
