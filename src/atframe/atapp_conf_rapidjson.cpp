@@ -151,6 +151,73 @@ static void load_map_field_item(rapidjson::Value &dst, const ATBUS_MACRO_PROTOBU
   }
 }
 
+static rapidjson::Value load_field_item_to_map_string(const ::google::protobuf::Message &src,
+                                                      const ::google::protobuf::FieldDescriptor *fds,
+                                                      rapidjson::Document &doc) {
+  rapidjson::Value ret;
+
+  if (nullptr == fds) {
+    ret.SetString("", 0, doc.GetAllocator());
+    return ret;
+  }
+
+  // map key can not be repeated in protobuf
+  if (fds->is_repeated()) {
+    ret.SetString("", 0, doc.GetAllocator());
+    return ret;
+  }
+
+  char integer_string[24] = {0};
+  switch (fds->cpp_type()) {
+    case google::protobuf::FieldDescriptor::CPPTYPE_INT32: {
+      size_t str_len =
+          util::string::int2str(integer_string, sizeof(integer_string) - 1, src.GetReflection()->GetInt32(src, fds));
+      ret.SetString(integer_string, static_cast<rapidjson::SizeType>(str_len), doc.GetAllocator());
+      break;
+    }
+    case google::protobuf::FieldDescriptor::CPPTYPE_UINT32: {
+      size_t str_len =
+          util::string::int2str(integer_string, sizeof(integer_string) - 1, src.GetReflection()->GetUInt32(src, fds));
+      ret.SetString(integer_string, static_cast<rapidjson::SizeType>(str_len), doc.GetAllocator());
+      break;
+    }
+    case google::protobuf::FieldDescriptor::CPPTYPE_INT64: {
+      size_t str_len =
+          util::string::int2str(integer_string, sizeof(integer_string) - 1, src.GetReflection()->GetInt64(src, fds));
+      ret.SetString(integer_string, static_cast<rapidjson::SizeType>(str_len), doc.GetAllocator());
+      break;
+    }
+    case google::protobuf::FieldDescriptor::CPPTYPE_UINT64: {
+      size_t str_len =
+          util::string::int2str(integer_string, sizeof(integer_string) - 1, src.GetReflection()->GetUInt64(src, fds));
+      ret.SetString(integer_string, static_cast<rapidjson::SizeType>(str_len), doc.GetAllocator());
+      break;
+    }
+    case google::protobuf::FieldDescriptor::CPPTYPE_FLOAT: {
+      std::string float_string = util::log::format("{}", src.GetReflection()->GetFloat(src, fds));
+      ret.SetString(float_string.c_str(), static_cast<rapidjson::SizeType>(float_string.size()), doc.GetAllocator());
+      break;
+    }
+    case google::protobuf::FieldDescriptor::CPPTYPE_DOUBLE: {
+      std::string double_string = util::log::format("{}", src.GetReflection()->GetDouble(src, fds));
+      ret.SetString(double_string.c_str(), static_cast<rapidjson::SizeType>(double_string.size()), doc.GetAllocator());
+      break;
+    }
+    case google::protobuf::FieldDescriptor::CPPTYPE_ENUM: {
+      size_t str_len = util::string::int2str(integer_string, sizeof(integer_string) - 1,
+                                             src.GetReflection()->GetEnumValue(src, fds));
+      ret.SetString(integer_string, static_cast<rapidjson::SizeType>(str_len), doc.GetAllocator());
+      break;
+    }
+    default: {
+      ret.SetString("", 0, doc.GetAllocator());
+      break;
+    }
+  }
+
+  return ret;
+}
+
 static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &src,
                             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds, rapidjson::Document &doc,
                             const rapidsjon_loader_load_options &options) {
@@ -320,11 +387,18 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
             load_map_field_item(obj_key, data.Get(i, nullptr), key_fds, doc, options);
             load_map_field_item(obj_value, data.Get(i, nullptr), value_fds, doc, options);
             if (!obj_key.IsNull() && !obj_value.IsNull()) {
-              rapidjson::Value::MemberIterator iter = obj.FindMember(obj_key);
+              rapidjson::Value map_key_jstring;
+              if (obj_key.IsString()) {
+                map_key_jstring = std::move(obj_key);
+              } else {
+                map_key_jstring = load_field_item_to_map_string(data.Get(i, nullptr), key_fds, doc);
+              }
+
+              rapidjson::Value::MemberIterator iter = obj.FindMember(map_key_jstring);
               if (iter != obj.MemberEnd()) {
                 iter->value.Swap(obj_value);
               } else {
-                obj.AddMember(obj_key, obj_value, doc.GetAllocator());
+                obj.AddMember(map_key_jstring, obj_value, doc.GetAllocator());
               }
             }
           }
