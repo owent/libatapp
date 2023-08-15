@@ -101,6 +101,7 @@ elif [[ "$1" == "clang.test" ]]; then
 elif [[ "$1" == "msys2.mingw.test" ]]; then
   pacman -S --needed --noconfirm mingw-w64-x86_64-cmake mingw-w64-x86_64-make \
     mingw-w64-x86_64-curl mingw-w64-x86_64-wget mingw-w64-x86_64-perl \
+    mingw-w64-nasm \
     mingw-w64-x86_64-git-lfs mingw-w64-x86_64-toolchain mingw-w64-x86_64-libtool \
     mingw-w64-x86_64-python mingw-w64-x86_64-python-pip mingw-w64-x86_64-python-setuptools || true
   export ATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_PROTOBUF_ALLOW_LOCAL=1
