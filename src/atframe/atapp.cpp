@@ -168,7 +168,9 @@ LIBATAPP_MACRO_API app::app() : setup_result_(0), ev_loop_(nullptr), mode_(mode_
     OPENSSL_init_ssl(0, nullptr);
 #  endif
 #endif
+#ifdef CRYPTO_CIPHER_ENABLED
     util::crypto::cipher::init_global_algorithm();
+#endif
   }
 
   last_instance_ = this;
@@ -281,6 +283,10 @@ LIBATAPP_MACRO_API app::~app() {
   if (this == last_instance_) {
     last_instance_ = nullptr;
   }
+
+#ifdef CRYPTO_CIPHER_ENABLED
+  util::crypto::cipher::cleanup_global_algorithm();
+#endif
 }
 
 LIBATAPP_MACRO_API int app::run(ev_loop_t *ev_loop, int argc, const char **argv, void *priv_data) {
