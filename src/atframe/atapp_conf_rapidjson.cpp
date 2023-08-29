@@ -78,7 +78,7 @@ static gsl::span<unsigned char> rapidjson_loader_get_shared_buffer() {
     ret = new unsigned char[2 * 1024 * 1024];  // in case of padding
     pthread_setspecific(gt_rapidjson_loader_get_shared_buffer_tls_key, ret);
   }
-  return {reinterpret_cast<void *>(ret), 2 * 1024 * 1024};
+  return {ret, 2 * 1024 * 1024};
 }
 #else
 static gsl::span<unsigned char> rapidjson_loader_get_shared_buffer() {
