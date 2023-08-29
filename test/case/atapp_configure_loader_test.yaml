@@ -4,6 +4,11 @@ atapp:
   name: "sample_echo_svr-1"
   type_id: 1
   type_name: "sample_echo_svr"
+  metadata:
+    api_version: v1
+    labels:
+      deployment.environment: test
+      deployment.region: cn
 
   bus:
     listen: "ipv6://:::21437"

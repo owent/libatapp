@@ -23,7 +23,7 @@ namespace atapp {
 
 etcd_keepalive::default_checker_t::default_checker_t(const std::string &checked) : data(checked) {
   ::atapp::protocol::atapp_discovery node;
-  if (::atapp::rapidsjon_loader_parse(node, checked)) {
+  if (::atapp::rapidjson_loader_parse(node, checked)) {
     identity = node.identity();
   }
 }
@@ -37,7 +37,7 @@ bool etcd_keepalive::default_checker_t::operator()(const std::string &checked) c
 
   if (!identity.empty()) {
     ::atapp::protocol::atapp_discovery node;
-    if (::atapp::rapidsjon_loader_parse(node, checked)) {
+    if (::atapp::rapidjson_loader_parse(node, checked)) {
       return node.identity().empty() || identity == node.identity();
     }
   }

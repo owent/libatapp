@@ -1,6 +1,7 @@
 // Copyright 2021 atframework
 // Created by owent
 
+#include <memory>
 #if defined(_WIN32)
 #  ifndef WIN32_LEAN_AND_MEAN
 #    define WIN32_LEAN_AND_MEAN
@@ -10,7 +11,19 @@
 #  endif
 #endif
 
+#include "atframe/atapp_conf_rapidjson.h"
+
+#ifdef GetMessage
+#  undef GetMessage
+#endif
+
+#if defined(max)
+#  undef max
+#endif
+
+// clang-format off
 #include <config/compiler/protobuf_prefix.h>
+// clang-format on
 
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
@@ -19,38 +32,70 @@
 #include <google/protobuf/reflection.h>
 #include <google/protobuf/repeated_field.h>
 
+// clang-format off
 #include <config/compiler/protobuf_suffix.h>
+// clang-format on
 
-// Must include protobuf first, or MinGW will redefine GetMessage -> GetMessageA
-#include "atframe/atapp_conf_rapidjson.h"
+#include <config/atframe_utils_build_feature.h>
 
 #include <common/string_oprs.h>
+#include <std/thread.h>
 #include <string/tquerystring.h>
 
 #include <assert.h>
 
+#if defined(THREAD_TLS_USE_PTHREAD) && THREAD_TLS_USE_PTHREAD
+#  include <pthread.h>
+#endif
+
 #include <numeric>
 #include <vector>
 
-#if defined(max)
-#  undef max
-#endif
-
-#if defined(GetMessage)
-#  undef GetMessage
-#endif
-
 namespace atapp {
 namespace detail {
+#if defined(THREAD_TLS_USE_PTHREAD) && THREAD_TLS_USE_PTHREAD
+static pthread_once_t gt_rapidjson_loader_get_shared_buffer_tls_once = PTHREAD_ONCE_INIT;
+static pthread_key_t gt_rapidjson_loader_get_shared_buffer_tls_key;
+
+static void dtor_pthread_rapidjson_loader_get_shared_buffer_tls(void *p) {
+  unsigned char *res = reinterpret_cast<unsigned char *>(p);
+  if (nullptr != res) {
+    delete[] res;
+  }
+}
+
+static void init_pthread_rapidjson_loader_get_shared_buffer_tls() {
+  (void)pthread_key_create(&gt_rapidjson_loader_get_shared_buffer_tls_key,
+                           dtor_pthread_rapidjson_loader_get_shared_buffer_tls);
+}
+
+static gsl::span<unsigned char> rapidjson_loader_get_shared_buffer() {
+  (void)pthread_once(&gt_rapidjson_loader_get_shared_buffer_tls_once,
+                     init_pthread_rapidjson_loader_get_shared_buffer_tls);
+  unsigned char *ret =
+      reinterpret_cast<unsigned char *>(pthread_getspecific(gt_rapidjson_loader_get_shared_buffer_tls_key));
+  if (nullptr == ret) {
+    ret = new unsigned char[2 * 1024 * 1024];  // in case of padding
+    pthread_setspecific(gt_rapidjson_loader_get_shared_buffer_tls_key, ret);
+  }
+  return {reinterpret_cast<void *>(ret), 2 * 1024 * 1024};
+}
+#else
+static gsl::span<unsigned char> rapidjson_loader_get_shared_buffer() {
+  static THREAD_TLS unsigned char ret[2 * 1024 * 1024];  // in case of padding
+  return {ret, 2 * 1024 * 1024};
+}
+#endif
+
 static void load_field_string_filter(const std::string &input, rapidjson::Value &output, rapidjson::Document &doc,
-                                     const rapidsjon_loader_load_options &options) {
+                                     const rapidjson_loader_load_options &options) {
   switch (options.string_mode) {
-    case rapidsjon_loader_string_mode::URI: {
+    case rapidjson_loader_string_mode::URI: {
       std::string strv = util::uri::encode_uri(input.c_str(), input.size());
       output.SetString(strv.c_str(), static_cast<rapidjson::SizeType>(strv.size()), doc.GetAllocator());
       break;
     }
-    case rapidsjon_loader_string_mode::URI_COMPONENT: {
+    case rapidjson_loader_string_mode::URI_COMPONENT: {
       std::string strv = util::uri::encode_uri_component(input.c_str(), input.size());
       output.SetString(strv.c_str(), static_cast<rapidjson::SizeType>(strv.size()), doc.GetAllocator());
       break;
@@ -64,7 +109,7 @@ static void load_field_string_filter(const std::string &input, rapidjson::Value 
 
 static void load_map_field_item(rapidjson::Value &dst, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &src,
                                 const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds, rapidjson::Document &doc,
-                                const rapidsjon_loader_load_options &options) {
+                                const rapidjson_loader_load_options &options) {
   if (nullptr == fds) {
     return;
   }
@@ -122,7 +167,7 @@ static void load_map_field_item(rapidjson::Value &dst, const ATBUS_MACRO_PROTOBU
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_MESSAGE: {
       dst.SetObject();
       if (dst.IsObject()) {
-        rapidsjon_loader_load_from(dst, doc, src.GetReflection()->GetMessage(src, fds), options);
+        rapidjson_loader_load_from(dst, doc, src.GetReflection()->GetMessage(src, fds), options);
       }
 
       break;
@@ -220,7 +265,7 @@ static rapidjson::Value load_field_item_to_map_string(const ::google::protobuf::
 
 static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &src,
                             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds, rapidjson::Document &doc,
-                            const rapidsjon_loader_load_options &options) {
+                            const rapidjson_loader_load_options &options) {
   if (nullptr == fds) {
     return;
   }
@@ -236,11 +281,11 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
         rapidjson::Value ls;
         ls.SetArray();
         for (int i = 0; i < len; ++i) {
-          rapidsjon_loader_append_to_list(ls, src.GetReflection()->GetRepeatedInt32(src, fds, i), doc);
+          rapidjson_loader_append_to_list(ls, src.GetReflection()->GetRepeatedInt32(src, fds, i), doc);
         }
-        rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
+        rapidjson_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
       } else {
-        rapidsjon_loader_mutable_set_member(parent, fds->name(), src.GetReflection()->GetInt32(src, fds), doc);
+        rapidjson_loader_mutable_set_member(parent, fds->name(), src.GetReflection()->GetInt32(src, fds), doc);
       }
       break;
     };
@@ -256,12 +301,12 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
             util::string::int2str(str_val, sizeof(str_val) - 1, int_val);
             rapidjson::Value v;
             v.SetString(str_val, static_cast<rapidjson::SizeType>(strlen(str_val)), doc.GetAllocator());
-            rapidsjon_loader_append_to_list(ls, std::move(v), doc);
+            rapidjson_loader_append_to_list(ls, std::move(v), doc);
           } else {
-            rapidsjon_loader_append_to_list(ls, int_val, doc);
+            rapidjson_loader_append_to_list(ls, int_val, doc);
           }
         }
-        rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
+        rapidjson_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
       } else {
         int64_t int_val = src.GetReflection()->GetInt64(src, fds);
         if (options.convert_large_number_to_string && int_val > std::numeric_limits<int32_t>::max()) {
@@ -269,9 +314,9 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
           util::string::int2str(str_val, sizeof(str_val) - 1, int_val);
           rapidjson::Value v;
           v.SetString(str_val, static_cast<rapidjson::SizeType>(strlen(str_val)), doc.GetAllocator());
-          rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(v), doc);
+          rapidjson_loader_mutable_set_member(parent, fds->name(), std::move(v), doc);
         } else {
-          rapidsjon_loader_mutable_set_member(parent, fds->name(), int_val, doc);
+          rapidjson_loader_mutable_set_member(parent, fds->name(), int_val, doc);
         }
       }
       break;
@@ -289,12 +334,12 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
             util::string::int2str(str_val, sizeof(str_val) - 1, int_val);
             rapidjson::Value v;
             v.SetString(str_val, static_cast<rapidjson::SizeType>(strlen(str_val)), doc.GetAllocator());
-            rapidsjon_loader_append_to_list(ls, std::move(v), doc);
+            rapidjson_loader_append_to_list(ls, std::move(v), doc);
           } else {
-            rapidsjon_loader_append_to_list(ls, int_val, doc);
+            rapidjson_loader_append_to_list(ls, int_val, doc);
           }
         }
-        rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
+        rapidjson_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
       } else {
         uint32_t int_val = src.GetReflection()->GetUInt32(src, fds);
         if (options.convert_large_number_to_string &&
@@ -303,9 +348,9 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
           util::string::int2str(str_val, sizeof(str_val) - 1, int_val);
           rapidjson::Value v;
           v.SetString(str_val, static_cast<rapidjson::SizeType>(strlen(str_val)), doc.GetAllocator());
-          rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(v), doc);
+          rapidjson_loader_mutable_set_member(parent, fds->name(), std::move(v), doc);
         } else {
-          rapidsjon_loader_mutable_set_member(parent, fds->name(), int_val, doc);
+          rapidjson_loader_mutable_set_member(parent, fds->name(), int_val, doc);
         }
       }
       break;
@@ -323,12 +368,12 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
             util::string::int2str(str_val, sizeof(str_val) - 1, int_val);
             rapidjson::Value v;
             v.SetString(str_val, static_cast<rapidjson::SizeType>(strlen(str_val)), doc.GetAllocator());
-            rapidsjon_loader_append_to_list(ls, std::move(v), doc);
+            rapidjson_loader_append_to_list(ls, std::move(v), doc);
           } else {
-            rapidsjon_loader_append_to_list(ls, int_val, doc);
+            rapidjson_loader_append_to_list(ls, int_val, doc);
           }
         }
-        rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
+        rapidjson_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
       } else {
         uint64_t int_val = src.GetReflection()->GetUInt64(src, fds);
         if (options.convert_large_number_to_string &&
@@ -337,9 +382,9 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
           util::string::int2str(str_val, sizeof(str_val) - 1, int_val);
           rapidjson::Value v;
           v.SetString(str_val, static_cast<rapidjson::SizeType>(strlen(str_val)), doc.GetAllocator());
-          rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(v), doc);
+          rapidjson_loader_mutable_set_member(parent, fds->name(), std::move(v), doc);
         } else {
-          rapidsjon_loader_mutable_set_member(parent, fds->name(), int_val, doc);
+          rapidjson_loader_mutable_set_member(parent, fds->name(), int_val, doc);
         }
       }
       break;
@@ -354,13 +399,13 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
           rapidjson::Value v;
           load_field_string_filter(src.GetReflection()->GetRepeatedStringReference(src, fds, i, &empty), v, doc,
                                    options);
-          rapidsjon_loader_append_to_list(ls, std::move(v), doc);
+          rapidjson_loader_append_to_list(ls, std::move(v), doc);
         }
-        rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
+        rapidjson_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
       } else {
         rapidjson::Value v;
         load_field_string_filter(src.GetReflection()->GetStringReference(src, fds, &empty), v, doc, options);
-        rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(v), doc);
+        rapidjson_loader_mutable_set_member(parent, fds->name(), std::move(v), doc);
       }
       break;
     };
@@ -403,7 +448,7 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
             }
           }
         }
-        rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(obj), doc);
+        rapidjson_loader_mutable_set_member(parent, fds->name(), std::move(obj), doc);
 
       } else if (fds->is_repeated()) {
         rapidjson::Value ls;
@@ -413,17 +458,17 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
         if (ls.IsArray()) {
           for (int i = 0; i < data.size(); ++i) {
             ls.PushBack(rapidjson::kObjectType, doc.GetAllocator());
-            rapidsjon_loader_load_from(ls[ls.Size() - 1], doc, data.Get(i, nullptr), options);
+            rapidjson_loader_load_from(ls[ls.Size() - 1], doc, data.Get(i, nullptr), options);
           }
         }
-        rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
+        rapidjson_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
       } else {
         rapidjson::Value obj;
         obj.SetObject();
         if (obj.IsObject()) {
-          rapidsjon_loader_load_from(obj, doc, src.GetReflection()->GetMessage(src, fds), options);
+          rapidjson_loader_load_from(obj, doc, src.GetReflection()->GetMessage(src, fds), options);
         }
-        rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(obj), doc);
+        rapidjson_loader_mutable_set_member(parent, fds->name(), std::move(obj), doc);
       }
 
       break;
@@ -434,11 +479,11 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
         rapidjson::Value ls;
         ls.SetArray();
         for (int i = 0; i < len; ++i) {
-          rapidsjon_loader_append_to_list(ls, src.GetReflection()->GetRepeatedDouble(src, fds, i), doc);
+          rapidjson_loader_append_to_list(ls, src.GetReflection()->GetRepeatedDouble(src, fds, i), doc);
         }
-        rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
+        rapidjson_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
       } else {
-        rapidsjon_loader_mutable_set_member(parent, fds->name(), src.GetReflection()->GetDouble(src, fds), doc);
+        rapidjson_loader_mutable_set_member(parent, fds->name(), src.GetReflection()->GetDouble(src, fds), doc);
       }
       break;
     };
@@ -448,11 +493,11 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
         rapidjson::Value ls;
         ls.SetArray();
         for (int i = 0; i < len; ++i) {
-          rapidsjon_loader_append_to_list(ls, src.GetReflection()->GetRepeatedFloat(src, fds, i), doc);
+          rapidjson_loader_append_to_list(ls, src.GetReflection()->GetRepeatedFloat(src, fds, i), doc);
         }
-        rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
+        rapidjson_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
       } else {
-        rapidsjon_loader_mutable_set_member(parent, fds->name(), src.GetReflection()->GetFloat(src, fds), doc);
+        rapidjson_loader_mutable_set_member(parent, fds->name(), src.GetReflection()->GetFloat(src, fds), doc);
       }
       break;
     };
@@ -462,11 +507,11 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
         rapidjson::Value ls;
         ls.SetArray();
         for (int i = 0; i < len; ++i) {
-          rapidsjon_loader_append_to_list(ls, src.GetReflection()->GetRepeatedBool(src, fds, i), doc);
+          rapidjson_loader_append_to_list(ls, src.GetReflection()->GetRepeatedBool(src, fds, i), doc);
         }
-        rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
+        rapidjson_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
       } else {
-        rapidsjon_loader_mutable_set_member(parent, fds->name(), src.GetReflection()->GetBool(src, fds), doc);
+        rapidjson_loader_mutable_set_member(parent, fds->name(), src.GetReflection()->GetBool(src, fds), doc);
       }
       break;
     };
@@ -476,11 +521,11 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
         rapidjson::Value ls;
         ls.SetArray();
         for (int i = 0; i < len; ++i) {
-          rapidsjon_loader_append_to_list(ls, src.GetReflection()->GetRepeatedEnumValue(src, fds, i), doc);
+          rapidjson_loader_append_to_list(ls, src.GetReflection()->GetRepeatedEnumValue(src, fds, i), doc);
         }
-        rapidsjon_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
+        rapidjson_loader_mutable_set_member(parent, fds->name(), std::move(ls), doc);
       } else {
-        rapidsjon_loader_mutable_set_member(parent, fds->name(), src.GetReflection()->GetEnumValue(src, fds), doc);
+        rapidjson_loader_mutable_set_member(parent, fds->name(), src.GetReflection()->GetEnumValue(src, fds), doc);
       }
       break;
     };
@@ -493,15 +538,15 @@ static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF
 }
 
 static std::string dump_pick_field_string_filter(const rapidjson::Value &val,
-                                                 const rapidsjon_loader_dump_options &options) {
+                                                 const rapidjson_loader_dump_options &options) {
   if (!val.IsString()) {
     return std::string();
   }
 
   switch (options.string_mode) {
-    case rapidsjon_loader_string_mode::URI:
+    case rapidjson_loader_string_mode::URI:
       return util::uri::decode_uri(val.GetString(), val.GetStringLength());
-    case rapidsjon_loader_string_mode::URI_COMPONENT:
+    case rapidjson_loader_string_mode::URI_COMPONENT:
       return util::uri::decode_uri_component(val.GetString(), val.GetStringLength());
     default:
       return std::string(val.GetString(), val.GetStringLength());
@@ -510,7 +555,7 @@ static std::string dump_pick_field_string_filter(const rapidjson::Value &val,
 
 static void dump_pick_field(const rapidjson::Value &val, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds,
-                            const rapidsjon_loader_dump_options &options) {
+                            const rapidjson_loader_dump_options &options) {
   if (nullptr == fds) {
     return;
   }
@@ -590,12 +635,12 @@ static void dump_pick_field(const rapidjson::Value &val, ATBUS_MACRO_PROTOBUF_NA
       if (fds->is_repeated()) {
         ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *submsg = dst.GetReflection()->AddMessage(&dst, fds);
         if (nullptr != submsg) {
-          rapidsjon_loader_dump_to(jval, *submsg, options);
+          rapidjson_loader_dump_to(jval, *submsg, options);
         }
       } else {
         ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *submsg = dst.GetReflection()->MutableMessage(&dst, fds);
         if (nullptr != submsg) {
-          rapidsjon_loader_dump_to(jval, *submsg, options);
+          rapidjson_loader_dump_to(jval, *submsg, options);
         }
       }
 
@@ -654,7 +699,7 @@ static void dump_pick_field(const rapidjson::Value &val, ATBUS_MACRO_PROTOBUF_NA
 
 static void dump_field_item_map(const rapidjson::Value &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                                 const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds,
-                                const rapidsjon_loader_dump_options &options) {
+                                const rapidjson_loader_dump_options &options) {
   if (nullptr == fds) {
     return;
   }
@@ -696,7 +741,7 @@ static void dump_field_item_map(const rapidjson::Value &src, ATBUS_MACRO_PROTOBU
 
 static void dump_field_item(const rapidjson::Value &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds,
-                            const rapidsjon_loader_dump_options &options) {
+                            const rapidjson_loader_dump_options &options) {
   if (nullptr == fds) {
     return;
   }
@@ -742,7 +787,7 @@ static void dump_field_item(const rapidjson::Value &src, ATBUS_MACRO_PROTOBUF_NA
 }
 }  // namespace detail
 
-LIBATAPP_MACRO_API std::string rapidsjon_loader_stringify(const rapidjson::Document &doc, size_t more_reserve_size) {
+LIBATAPP_MACRO_API std::string rapidjson_loader_stringify(const rapidjson::Document &doc, size_t more_reserve_size) {
 #if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
   try {
 #endif
@@ -762,7 +807,7 @@ LIBATAPP_MACRO_API std::string rapidsjon_loader_stringify(const rapidjson::Docum
 #endif
 }
 
-LIBATAPP_MACRO_API bool rapidsjon_loader_unstringify(rapidjson::Document &doc, const std::string &json) {
+LIBATAPP_MACRO_API bool rapidjson_loader_unstringify(rapidjson::Document &doc, const std::string &json) {
 #if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
   try {
 #endif
@@ -780,7 +825,7 @@ LIBATAPP_MACRO_API bool rapidsjon_loader_unstringify(rapidjson::Document &doc, c
   return true;
 }
 
-LIBATAPP_MACRO_API const char *rapidsjon_loader_get_type_name(rapidjson::Type t) {
+LIBATAPP_MACRO_API const char *rapidjson_loader_get_type_name(rapidjson::Type t) {
   switch (t) {
     case rapidjson::kNullType:
       return "null";
@@ -801,25 +846,41 @@ LIBATAPP_MACRO_API const char *rapidsjon_loader_get_type_name(rapidjson::Type t)
   }
 }
 
-LIBATAPP_MACRO_API std::string rapidsjon_loader_stringify(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &src,
-                                                          const rapidsjon_loader_load_options &options) {
-  rapidjson::Document doc;
-  rapidsjon_loader_load_from(doc, src, options);
-  return rapidsjon_loader_stringify(doc);
+LIBATAPP_MACRO_API gsl::span<unsigned char> rapidjson_loader_get_default_shared_buffer() {
+  return detail::rapidjson_loader_get_shared_buffer();
 }
 
-LIBATAPP_MACRO_API bool rapidsjon_loader_parse(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst, const std::string &src,
-                                               const rapidsjon_loader_dump_options &options) {
-  rapidjson::Document doc;
-  if (!rapidsjon_loader_unstringify(doc, src)) {
+LIBATAPP_MACRO_API std::string rapidjson_loader_stringify(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &src,
+                                                          const rapidjson_loader_load_options &options,
+                                                          gsl::span<unsigned char> use_buffer) {
+  if (use_buffer.data() == nullptr || use_buffer.size() < 8 * sizeof(size_t)) {
+    use_buffer = rapidjson_loader_get_default_shared_buffer();
+  }
+
+  rapidjson::MemoryPoolAllocator<> allocator{reinterpret_cast<void *>(use_buffer.data()), use_buffer.size()};
+  rapidjson::Document doc{&allocator};
+  rapidjson_loader_load_from(doc, src, options);
+  return rapidjson_loader_stringify(doc);
+}
+
+LIBATAPP_MACRO_API bool rapidjson_loader_parse(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst, const std::string &src,
+                                               const rapidjson_loader_dump_options &options,
+                                               gsl::span<unsigned char> use_buffer) {
+  if (use_buffer.data() == nullptr || use_buffer.size() < 8 * sizeof(size_t)) {
+    use_buffer = rapidjson_loader_get_default_shared_buffer();
+  }
+
+  rapidjson::MemoryPoolAllocator<> allocator{reinterpret_cast<void *>(use_buffer.data()), use_buffer.size()};
+  rapidjson::Document doc{&allocator};
+  if (!rapidjson_loader_unstringify(doc, src)) {
     return false;
   }
 
-  rapidsjon_loader_dump_to(doc, dst, options);
+  rapidjson_loader_dump_to(doc, dst, options);
   return true;
 }
 
-LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, gsl::string_view key,
+LIBATAPP_MACRO_API void rapidjson_loader_mutable_set_member(rapidjson::Value &parent, gsl::string_view key,
                                                             rapidjson::Value &&val, rapidjson::Document &doc) {
   if (!parent.IsObject()) {
     parent.SetObject();
@@ -840,7 +901,7 @@ LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &pa
   }
 }
 
-LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, gsl::string_view key,
+LIBATAPP_MACRO_API void rapidjson_loader_mutable_set_member(rapidjson::Value &parent, gsl::string_view key,
                                                             const rapidjson::Value &val, rapidjson::Document &doc) {
   if (!parent.IsObject()) {
     parent.SetObject();
@@ -861,42 +922,42 @@ LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &pa
   }
 }
 
-LIBATAPP_MACRO_API void rapidsjon_loader_mutable_set_member(rapidjson::Value &parent, gsl::string_view key,
+LIBATAPP_MACRO_API void rapidjson_loader_mutable_set_member(rapidjson::Value &parent, gsl::string_view key,
                                                             gsl::string_view val, rapidjson::Document &doc) {
   rapidjson::Value v;
   v.SetString(val.data(), static_cast<rapidjson::SizeType>(val.size()), doc.GetAllocator());
-  rapidsjon_loader_mutable_set_member(parent, key, std::move(v), doc);
+  rapidjson_loader_mutable_set_member(parent, key, std::move(v), doc);
 }
 
-LIBATAPP_MACRO_API void rapidsjon_loader_append_to_list(rapidjson::Value &list_parent, gsl::string_view val,
+LIBATAPP_MACRO_API void rapidjson_loader_append_to_list(rapidjson::Value &list_parent, gsl::string_view val,
                                                         rapidjson::Document &doc) {
   rapidjson::Value v;
   v.SetString(val.data(), static_cast<rapidjson::SizeType>(val.size()), doc.GetAllocator());
-  rapidsjon_loader_append_to_list(list_parent, std::move(v), doc);
+  rapidjson_loader_append_to_list(list_parent, std::move(v), doc);
 }
 
-LIBATAPP_MACRO_API void rapidsjon_loader_dump_to(const rapidjson::Document &src,
+LIBATAPP_MACRO_API void rapidjson_loader_dump_to(const rapidjson::Document &src,
                                                  ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
-                                                 const rapidsjon_loader_dump_options &options) {
+                                                 const rapidjson_loader_dump_options &options) {
   if (src.IsObject()) {
     rapidjson::Value &srcobj = const_cast<rapidjson::Document &>(src);
-    rapidsjon_loader_dump_to(srcobj, dst, options);
+    rapidjson_loader_dump_to(srcobj, dst, options);
   }
 }
 
-LIBATAPP_MACRO_API void rapidsjon_loader_load_from(rapidjson::Document &dst,
+LIBATAPP_MACRO_API void rapidjson_loader_load_from(rapidjson::Document &dst,
                                                    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &src,
-                                                   const rapidsjon_loader_load_options &options) {
+                                                   const rapidjson_loader_load_options &options) {
   if (!dst.IsObject()) {
     dst.SetObject();
   }
   rapidjson::Value &root = dst;
-  rapidsjon_loader_load_from(root, dst, src, options);
+  rapidjson_loader_load_from(root, dst, src, options);
 }
 
-LIBATAPP_MACRO_API void rapidsjon_loader_dump_to(const rapidjson::Value &src,
+LIBATAPP_MACRO_API void rapidjson_loader_dump_to(const rapidjson::Value &src,
                                                  ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
-                                                 const rapidsjon_loader_dump_options &options) {
+                                                 const rapidjson_loader_dump_options &options) {
   const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Descriptor *desc = dst.GetDescriptor();
   if (nullptr == desc) {
     return;
@@ -907,9 +968,9 @@ LIBATAPP_MACRO_API void rapidsjon_loader_dump_to(const rapidjson::Value &src,
   }
 }
 
-LIBATAPP_MACRO_API void rapidsjon_loader_load_from(rapidjson::Value &dst, rapidjson::Document &doc,
+LIBATAPP_MACRO_API void rapidjson_loader_load_from(rapidjson::Value &dst, rapidjson::Document &doc,
                                                    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &src,
-                                                   const rapidsjon_loader_load_options &options) {
+                                                   const rapidjson_loader_load_options &options) {
   if (options.reserve_empty) {
     const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Descriptor *desc = src.GetDescriptor();
     if (nullptr == desc) {

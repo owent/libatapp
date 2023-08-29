@@ -3967,7 +3967,7 @@ int app::command_handler_list_discovery(util::cli::callback_param params) {
           params, LOG_WRAPPER_FWAPI_FORMAT("node -> private data: {}, destroy event: {}, hash: {:016x}{:016x}, {}",
                                            reinterpret_cast<const void *>(nodes[i]->get_private_data_ptr()),
                                            (nodes[i]->get_on_destroy() ? "ON" : "OFF"), nodes[i]->get_name_hash().first,
-                                           nodes[i]->get_name_hash().second, rapidsjon_loader_stringify(node_info)));
+                                           nodes[i]->get_name_hash().second, rapidjson_loader_stringify(node_info)));
     }
   }
 

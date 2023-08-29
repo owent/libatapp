@@ -20,6 +20,7 @@
 #include <atframe/etcdcli/etcd_keepalive.h>
 #include <atframe/etcdcli/etcd_watcher.h>
 
+#include <memory>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -1104,12 +1105,15 @@ bool etcd_module::unpack(node_info_t &out, const std::string &path, const std::s
     return false;
   }
 
-  rapidjson::Document doc;
-  if (!::atapp::rapidsjon_loader_unstringify(doc, json)) {
+  gsl::span<unsigned char> shared_json_buffer = ::atapp::rapidjson_loader_get_default_shared_buffer();
+  rapidjson::MemoryPoolAllocator<> allocator{reinterpret_cast<void *>(shared_json_buffer.data()),
+                                             shared_json_buffer.size()};
+  rapidjson::Document doc{&allocator};
+  if (!::atapp::rapidjson_loader_unstringify(doc, json)) {
     return false;
   }
 
-  ::atapp::rapidsjon_loader_dump_to(doc, out.node_discovery);
+  ::atapp::rapidjson_loader_dump_to(doc, out.node_discovery);
   if (out.node_discovery.gateways_size() > 0 || !doc.IsObject()) {
     return true;
   }
@@ -1138,7 +1142,7 @@ bool etcd_module::unpack(node_info_t &out, const std::string &path, const std::s
 }
 
 void etcd_module::pack(const node_info_t &src, std::string &json) {
-  json = ::atapp::rapidsjon_loader_stringify(src.node_discovery);
+  json = ::atapp::rapidjson_loader_stringify(src.node_discovery);
 }
 
 int etcd_module::http_callback_on_etcd_closed(util::network::http_request &req) {

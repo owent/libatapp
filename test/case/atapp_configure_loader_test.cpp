@@ -25,7 +25,7 @@ inline int unsetenv(const char *name) { return setenv(name, "", 1); }
 #endif
 
 static void check_origin_configure(atapp::app &app, atapp::protocol::atapp_etcd sub_cfg,
-                                   const atapp::configure_key_set &existed_keys) {
+                                   const atapp::configure_key_set &existed_keys, bool check_map) {
   CASE_EXPECT_EQ(app.get_id(), 0x1234);
   CASE_EXPECT_EQ(app.get_origin_configure().id_mask(), "8.8.8.8");
   CASE_EXPECT_EQ(app.convert_app_id_by_string("1.2.3.4"), 0x01020304);
@@ -82,6 +82,19 @@ static void check_origin_configure(atapp::app &app, atapp::protocol::atapp_etcd 
   CASE_EXPECT_TRUE(sub_cfg.cluster().auto_update());
   CASE_EXPECT_FALSE(sub_cfg.watcher().by_id());
   CASE_EXPECT_TRUE(sub_cfg.watcher().by_name());
+
+  if (check_map) {
+    auto map_kv1 = app.get_origin_configure().metadata().labels().find("deployment.environment");
+    auto map_kv2 = app.get_origin_configure().metadata().labels().find("deployment.region");
+    CASE_EXPECT_TRUE(map_kv1 != app.get_origin_configure().metadata().labels().end());
+    CASE_EXPECT_TRUE(map_kv2 != app.get_origin_configure().metadata().labels().end());
+    if (map_kv1 != app.get_origin_configure().metadata().labels().end()) {
+      CASE_EXPECT_EQ("test", map_kv1->second);
+    }
+    if (map_kv2 != app.get_origin_configure().metadata().labels().end()) {
+      CASE_EXPECT_EQ("cn", map_kv2->second);
+    }
+  }
 
   // Check app keys
   std::string keys_path;
@@ -184,7 +197,7 @@ CASE_TEST(atapp_configure, load_yaml) {
   atapp::configure_key_set existed_log_keys;
   atapp::protocol::atapp_etcd sub_cfg;
   app.parse_configures_into(sub_cfg, "atapp.etcd", "", &existed_app_keys);
-  check_origin_configure(app, sub_cfg, existed_app_keys);
+  check_origin_configure(app, sub_cfg, existed_app_keys, true);
 
   atapp::protocol::atapp_log app_log;
   app.parse_log_configures_into(app_log, std::vector<gsl::string_view>{"atapp", "log"}, "", &existed_log_keys);
@@ -214,7 +227,7 @@ CASE_TEST(atapp_configure, load_conf) {
   atapp::configure_key_set existed_log_keys;
   atapp::protocol::atapp_etcd sub_cfg;
   app.parse_configures_into(sub_cfg, "atapp.etcd", "", &existed_app_keys);
-  check_origin_configure(app, sub_cfg, existed_app_keys);
+  check_origin_configure(app, sub_cfg, existed_app_keys, true);
 
   atapp::protocol::atapp_log app_log;
   app.parse_log_configures_into(app_log, std::vector<gsl::string_view>{"atapp", "log"}, "", &existed_log_keys);
@@ -264,7 +277,7 @@ CASE_TEST(atapp_configure, load_environment) {
   atapp::configure_key_set existed_log_keys;
   atapp::protocol::atapp_etcd sub_cfg;
   app.parse_configures_into(sub_cfg, "atapp.etcd", "ATAPP_ETCD", &existed_app_keys);
-  check_origin_configure(app, sub_cfg, existed_app_keys);
+  check_origin_configure(app, sub_cfg, existed_app_keys, false);
 
   atapp::protocol::atapp_log app_log;
   app.parse_log_configures_into(app_log, std::vector<gsl::string_view>{"atapp", "log"}, "ATAPP_LOG", &existed_log_keys);
