@@ -727,13 +727,13 @@ static void dump_field_item_map(const rapidjson::Value &src, ATBUS_MACRO_PROTOBU
     return;
   }
 
-  ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *submsg = dst.GetReflection()->AddMessage(&dst, fds);
-  if (nullptr == submsg) {
-    return;
-  }
-
   rapidjson::Value::ConstMemberIterator iter = src.MemberBegin();
   for (; iter != src.MemberEnd(); ++iter) {
+    ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *submsg = dst.GetReflection()->AddMessage(&dst, fds);
+    if (nullptr == submsg) {
+      continue;
+    }
+
     dump_pick_field(iter->name, *submsg, key_fds, options);
     dump_pick_field(iter->value, *submsg, value_fds, options);
   }
