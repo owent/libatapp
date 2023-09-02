@@ -37,6 +37,32 @@ class etcd_discovery_node {
   using on_destroy_fn_type = std::function<void(etcd_discovery_node &)>;
   using ptr_t = std::shared_ptr<etcd_discovery_node>;
 
+  struct LIBATAPP_MACRO_API_SYMBOL_VISIBLE node_version {
+    int64_t create_revision;
+    int64_t modify_revision;
+    int64_t version;
+
+    UTIL_FORCEINLINE node_version() : create_revision(0), modify_revision(0), version(0) {}
+    UTIL_FORCEINLINE node_version(const node_version &other)
+        : create_revision(other.create_revision), modify_revision(other.modify_revision), version(other.version) {}
+    UTIL_FORCEINLINE node_version(node_version &&other)
+        : create_revision(other.create_revision), modify_revision(other.modify_revision), version(other.version) {}
+
+    UTIL_FORCEINLINE node_version &operator=(const node_version &other) {
+      create_revision = other.create_revision;
+      modify_revision = other.modify_revision;
+      version = other.version;
+      return *this;
+    }
+
+    UTIL_FORCEINLINE node_version &operator=(node_version &&other) {
+      create_revision = other.create_revision;
+      modify_revision = other.modify_revision;
+      version = other.version;
+      return *this;
+    }
+  };
+
   UTIL_DESIGN_PATTERN_NOCOPYABLE(etcd_discovery_node)
   UTIL_DESIGN_PATTERN_NOMOVABLE(etcd_discovery_node)
 
@@ -45,7 +71,9 @@ class etcd_discovery_node {
   LIBATAPP_MACRO_API ~etcd_discovery_node();
 
   UTIL_FORCEINLINE const atapp::protocol::atapp_discovery &get_discovery_info() const { return node_info_; }
-  LIBATAPP_MACRO_API void copy_from(const atapp::protocol::atapp_discovery &input);
+  UTIL_FORCEINLINE const node_version &get_version() const noexcept { return node_version_; }
+
+  LIBATAPP_MACRO_API void copy_from(const atapp::protocol::atapp_discovery &input, const node_version &version);
   LIBATAPP_MACRO_API void copy_to(atapp::protocol::atapp_discovery &output) const;
   LIBATAPP_MACRO_API void copy_key_to(atapp::protocol::atapp_discovery &output) const;
 
@@ -71,6 +99,8 @@ class etcd_discovery_node {
 
  private:
   atapp::protocol::atapp_discovery node_info_;
+  node_version node_version_;
+
   std::pair<uint64_t, uint64_t> name_hash_;
   union {
     void *private_data_ptr_;
@@ -157,10 +187,12 @@ class etcd_discovery_set {
     std::vector<node_hash_type> hashing_cache;
     std::vector<etcd_discovery_node::ptr_t> round_robin_cache;
     size_t round_robin_index;
+
+    std::unordered_set<const etcd_discovery_node*> reference_cache;
   } index_cache_type;
 
   void rebuild_cache(index_cache_type &cache_set, const metadata_type *rule) const;
-  void clear_cache(const metadata_type &rule) const;
+  void clear_cache(const metadata_type *metadata, const etcd_discovery_node* node_ptr) const;
   static void clear_cache(index_cache_type &cache_set);
   index_cache_type *get_index_cache(const metadata_type *metadata) const;
   index_cache_type *mutable_index_cache(const metadata_type *metadata) const;

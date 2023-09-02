@@ -198,7 +198,7 @@ class etcd_module : public ::atapp::module_impl {
     void operator()(const ::atapp::etcd_response_header &header, const ::atapp::etcd_watcher::response_t &evt_data);
   };
 
-  bool update_inner_watcher_event(node_info_t &node);
+  bool update_inner_watcher_event(node_info_t &node, const etcd_discovery_node::node_version &version);
   void reset_inner_watchers_and_keepalives();
 
   struct watcher_internal_access_t {

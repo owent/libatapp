@@ -2513,7 +2513,7 @@ atapp_endpoint::ptr_t app::auto_mutable_self_endpoint() {
 
   atapp::protocol::atapp_discovery self_discovery_info;
   pack(self_discovery_info);
-  self_discovery->copy_from(self_discovery_info);
+  self_discovery->copy_from(self_discovery_info, atapp::etcd_discovery_node::node_version());
 
   return mutable_endpoint(self_discovery);
 }

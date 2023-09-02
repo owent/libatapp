@@ -1198,14 +1198,14 @@ void etcd_module::watcher_internal_access_t::cleanup_old_nodes(etcd_module &mod,
     etcd_module::node_info_t evt_node;
     evt_node.action = etcd_module::node_action_t::EN_NAT_DELETE;
     node.second->copy_key_to(evt_node.node_discovery);
-    mod.update_inner_watcher_event(evt_node);
+    mod.update_inner_watcher_event(evt_node, node.second->get_version());
   }
 
   for (auto &node : old_ids) {
     etcd_module::node_info_t evt_node;
     evt_node.action = etcd_module::node_action_t::EN_NAT_DELETE;
     node.second->copy_key_to(evt_node.node_discovery);
-    mod.update_inner_watcher_event(evt_node);
+    mod.update_inner_watcher_event(evt_node, node.second->get_version());
   }
 }
 
@@ -1257,10 +1257,18 @@ void etcd_module::watcher_callback_list_wrapper_t::operator()(const ::atapp::etc
   for (size_t i = 0; i < body.events.size(); ++i) {
     const ::atapp::etcd_watcher::event_t &evt_data = body.events[i];
     node_info_t node;
+    etcd_discovery_node::node_version current_node_version;
+
     if (evt_data.kv.value.empty()) {
       unpack(node, evt_data.kv.key, evt_data.prev_kv.value, true);
+      current_node_version.create_revision = evt_data.prev_kv.create_revision;
+      current_node_version.modify_revision = evt_data.prev_kv.mod_revision;
+      current_node_version.version = evt_data.prev_kv.version;
     } else {
       unpack(node, evt_data.kv.key, evt_data.kv.value, true);
+      current_node_version.create_revision = evt_data.kv.create_revision;
+      current_node_version.modify_revision = evt_data.kv.mod_revision;
+      current_node_version.version = evt_data.kv.version;
     }
     if (node.node_discovery.id() == 0 && node.node_discovery.name().empty()) {
       continue;
@@ -1276,7 +1284,7 @@ void etcd_module::watcher_callback_list_wrapper_t::operator()(const ::atapp::etc
       node.action = node_action_t::EN_NAT_PUT;
     }
 
-    mod->update_inner_watcher_event(node);
+    mod->update_inner_watcher_event(node, current_node_version);
 
     if (nullptr == callbacks) {
       continue;
@@ -1355,11 +1363,18 @@ void etcd_module::watcher_callback_one_wrapper_t::operator()(const ::atapp::etcd
   for (size_t i = 0; i < body.events.size(); ++i) {
     const ::atapp::etcd_watcher::event_t &evt_data = body.events[i];
     node_info_t node;
+    etcd_discovery_node::node_version current_node_version;
 
     if (evt_data.kv.value.empty()) {
       unpack(node, evt_data.kv.key, evt_data.prev_kv.value, true);
+      current_node_version.create_revision = evt_data.prev_kv.create_revision;
+      current_node_version.modify_revision = evt_data.prev_kv.mod_revision;
+      current_node_version.version = evt_data.prev_kv.version;
     } else {
       unpack(node, evt_data.kv.key, evt_data.kv.value, true);
+      current_node_version.create_revision = evt_data.kv.create_revision;
+      current_node_version.modify_revision = evt_data.kv.mod_revision;
+      current_node_version.version = evt_data.kv.version;
     }
     if (node.node_discovery.id() == 0 && node.node_discovery.name().empty()) {
       continue;
@@ -1375,7 +1390,7 @@ void etcd_module::watcher_callback_one_wrapper_t::operator()(const ::atapp::etcd
       node.action = node_action_t::EN_NAT_PUT;
     }
 
-    mod->update_inner_watcher_event(node);
+    mod->update_inner_watcher_event(node, current_node_version);
 
     if (!callback) {
       continue;
@@ -1398,7 +1413,7 @@ void etcd_module::watcher_callback_one_wrapper_t::operator()(const ::atapp::etcd
   }
 }
 
-bool etcd_module::update_inner_watcher_event(node_info_t &node) {
+bool etcd_module::update_inner_watcher_event(node_info_t &node, const etcd_discovery_node::node_version &version) {
   etcd_discovery_node::ptr_t local_cache_by_id = global_discovery_.get_node_by_id(node.node_discovery.id());
   etcd_discovery_node::ptr_t local_cache_by_name = global_discovery_.get_node_by_name(node.node_discovery.name());
   etcd_discovery_node::ptr_t new_inst;
@@ -1422,7 +1437,7 @@ bool etcd_module::update_inner_watcher_event(node_info_t &node) {
       }
 
       new_inst = std::make_shared<etcd_discovery_node>();
-      new_inst->copy_from(node.node_discovery);
+      new_inst->copy_from(node.node_discovery, version);
 
       global_discovery_.add_node(new_inst);
 
@@ -1453,7 +1468,7 @@ bool etcd_module::update_inner_watcher_event(node_info_t &node) {
 
       if (has_event) {
         new_inst = std::make_shared<etcd_discovery_node>();
-        new_inst->copy_from(node.node_discovery);
+        new_inst->copy_from(node.node_discovery, version);
 
         if (local_cache_by_id) {
           global_discovery_.remove_node(local_cache_by_id);

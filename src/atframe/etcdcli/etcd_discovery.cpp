@@ -178,10 +178,21 @@ LIBATAPP_MACRO_API etcd_discovery_node::~etcd_discovery_node() {
   }
 }
 
-LIBATAPP_MACRO_API void etcd_discovery_node::copy_from(const atapp::protocol::atapp_discovery &input) {
+LIBATAPP_MACRO_API void etcd_discovery_node::copy_from(const atapp::protocol::atapp_discovery &input,
+                                                       const node_version &version) {
   node_info_.CopyFrom(input);
 
   name_hash_ = consistent_hash_calc(input.name().c_str(), input.name().size(), LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
+
+  if (version.create_revision > node_version_.create_revision) {
+    node_version_.create_revision = version.create_revision;
+  }
+  if (version.modify_revision > node_version_.modify_revision) {
+    node_version_.modify_revision = version.modify_revision;
+  }
+  if (version.version > node_version_.version) {
+    node_version_.version = version.version;
+  }
 }
 
 LIBATAPP_MACRO_API void etcd_discovery_node::copy_to(atapp::protocol::atapp_discovery &output) const {
@@ -690,7 +701,9 @@ LIBATAPP_MACRO_API void etcd_discovery_set::add_node(const etcd_discovery_node::
     }
 
     if (node->get_discovery_info().has_metadata()) {
-      clear_cache(node->get_discovery_info().metadata());
+      clear_cache(&node->get_discovery_info().metadata(), node.get());
+    } else {
+      clear_cache(nullptr, node.get());
     }
   }
 }
@@ -719,7 +732,9 @@ LIBATAPP_MACRO_API void etcd_discovery_set::remove_node(const etcd_discovery_nod
 
   if (has_cleanup) {
     if (node->get_discovery_info().has_metadata()) {
-      clear_cache(node->get_discovery_info().metadata());
+      clear_cache(&node->get_discovery_info().metadata(), node.get());
+    } else {
+      clear_cache(nullptr, node.get());
     }
   }
 }
@@ -738,7 +753,9 @@ LIBATAPP_MACRO_API void etcd_discovery_set::remove_node(uint64_t id) {
   }
 
   if (iter_id->second->get_discovery_info().has_metadata()) {
-    clear_cache(iter_id->second->get_discovery_info().metadata());
+    clear_cache(&iter_id->second->get_discovery_info().metadata(), iter_id->second.get());
+  } else {
+    clear_cache(nullptr, iter_id->second.get());
   }
 
   node_by_id_.erase(iter_id);
@@ -758,7 +775,9 @@ LIBATAPP_MACRO_API void etcd_discovery_set::remove_node(const std::string &name)
   }
 
   if (iter_name->second->get_discovery_info().has_metadata()) {
-    clear_cache(iter_name->second->get_discovery_info().metadata());
+    clear_cache(&iter_name->second->get_discovery_info().metadata(), iter_name->second.get());
+  } else {
+    clear_cache(nullptr, iter_name->second.get());
   }
 
   node_by_name_.erase(iter_name);
@@ -797,6 +816,8 @@ void etcd_discovery_set::rebuild_cache(index_cache_type &cache_set, const metada
 
       cache_set.hashing_cache.push_back(hash_node);
     }
+
+    cache_set.reference_cache.insert(iter->second.get());
   }
 
   for (node_by_name_type::const_iterator iter = node_by_name_.begin(); iter != node_by_name_.end(); ++iter) {
@@ -807,6 +828,7 @@ void etcd_discovery_set::rebuild_cache(index_cache_type &cache_set, const metada
     // If already pushed by id, skip round robin cache
     if (0 == iter->second->get_discovery_info().id()) {
       cache_set.round_robin_cache.push_back(iter->second);
+      cache_set.reference_cache.insert(iter->second.get());
     }
 
     for (size_t i = 0; i < node_hash_type::HASH_POINT_PER_INS / 2; ++i) {
@@ -824,12 +846,17 @@ void etcd_discovery_set::rebuild_cache(index_cache_type &cache_set, const metada
   std::sort(cache_set.hashing_cache.begin(), cache_set.hashing_cache.end(), consistent_hash_compare_index);
 }
 
-void etcd_discovery_set::clear_cache(const metadata_type &metadata) const {
+void etcd_discovery_set::clear_cache(const metadata_type *metadata, const etcd_discovery_node *node_ptr) const {
+  if (nullptr == metadata && nullptr == node_ptr) {
+    return;
+  }
+
   clear_cache(default_index_);
 
   std::vector<const metadata_type *> pending_to_delete;
   for (auto &metadata_index : metadata_index_) {
-    if (metadata_equal_type::filter(metadata_index.first, metadata)) {
+    if (metadata_index.second.reference_cache.end() != metadata_index.second.reference_cache.find(node_ptr) ||
+        (nullptr != metadata && metadata_equal_type::filter(metadata_index.first, *metadata))) {
       pending_to_delete.push_back(&metadata_index.first);
     }
   }
@@ -842,6 +869,7 @@ void etcd_discovery_set::clear_cache(const metadata_type &metadata) const {
 void etcd_discovery_set::clear_cache(index_cache_type &cache_set) {
   cache_set.hashing_cache.clear();
   cache_set.round_robin_cache.clear();
+  cache_set.reference_cache.clear();
 }
 
 etcd_discovery_set::index_cache_type *etcd_discovery_set::get_index_cache(

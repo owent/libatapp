@@ -73,7 +73,7 @@ CASE_TEST(atapp_message, send_message_remote) {
   {
     atapp::protocol::atapp_discovery app2_discovery_info;
     app2.pack(app2_discovery_info);
-    app2_discovery->copy_from(app2_discovery_info);
+    app2_discovery->copy_from(app2_discovery_info, atapp::etcd_discovery_node::node_version());
     CASE_EXPECT_TRUE(app1.mutable_endpoint(app2_discovery));
   }
 
@@ -82,7 +82,7 @@ CASE_TEST(atapp_message, send_message_remote) {
     auto app1_discovery = std::make_shared<atapp::etcd_discovery_node>();
     atapp::protocol::atapp_discovery app1_discovery_info;
     app1.pack(app1_discovery_info);
-    app1_discovery->copy_from(app1_discovery_info);
+    app1_discovery->copy_from(app1_discovery_info, atapp::etcd_discovery_node::node_version());
     CASE_EXPECT_TRUE(app2.mutable_endpoint(app1_discovery));
   }
 
@@ -181,7 +181,7 @@ CASE_TEST(atapp_message, send_message_loopback) {
   auto self_discovery = std::make_shared<atapp::etcd_discovery_node>();
   atapp::protocol::atapp_discovery self_discovery_info;
   app1.pack(self_discovery_info);
-  self_discovery->copy_from(self_discovery_info);
+  self_discovery->copy_from(self_discovery_info, atapp::etcd_discovery_node::node_version());
   CASE_EXPECT_TRUE(app1.mutable_endpoint(self_discovery));
 
   now = util::time::time_utility::sys_now();

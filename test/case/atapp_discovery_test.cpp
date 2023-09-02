@@ -130,21 +130,29 @@ CASE_TEST(atapp_discovery, get_discovery_by_metadata) {
   discovery_data.set_id(1);
   discovery_data.set_name("node1");
   discovery_data.set_identity("node-dient-1");
-  node1->copy_from(discovery_data);
+
+  etcd_discovery_node::node_version test_node_version;
+  test_node_version.create_revision = 1;
+  test_node_version.modify_revision = 2;
+  test_node_version.version = 3;
+  node1->copy_from(discovery_data, test_node_version);
+  CASE_EXPECT_EQ(1, node1->get_version().create_revision);
+  CASE_EXPECT_EQ(2, node1->get_version().modify_revision);
+  CASE_EXPECT_EQ(3, node1->get_version().version);
 
   etcd_discovery_node::ptr_t node2 = std::make_shared<etcd_discovery_node>();
   discovery_data.set_id(2);
   discovery_data.set_name("node2");
   discovery_data.set_identity("node-dient-2");
   (*discovery_data.mutable_metadata()->mutable_labels())["selector"] = "s2";
-  node2->copy_from(discovery_data);
+  node2->copy_from(discovery_data, test_node_version);
 
   etcd_discovery_node::ptr_t node3 = std::make_shared<etcd_discovery_node>();
   discovery_data.set_id(3);
   discovery_data.set_name("node3");
   discovery_data.set_identity("node-dient-3");
   (*discovery_data.mutable_metadata()->mutable_labels())["selector"] = "s3";
-  node3->copy_from(discovery_data);
+  node3->copy_from(discovery_data, test_node_version);
 
   discovery_set->add_node(node1);
   discovery_set->add_node(node2);
