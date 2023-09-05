@@ -24,6 +24,8 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
 #define ETCD_MODULE_STARTUP_RETRY_TIMES 5
@@ -86,6 +88,245 @@ static void init_timer_closed_callback(uv_handle_t *handle) {
 
   handle->data = nullptr;
   uv_stop(handle->loop);
+}
+
+static bool atapp_discovery_equal_ignore_order(
+    const ::ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string> &l,
+    const ::ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string> &r) {
+  if (l.size() != r.size()) {
+    return false;
+  }
+
+  std::unordered_set<std::string> rvalues;
+  rvalues.reserve(static_cast<size_t>(r.size()));
+  for (auto &rv : r) {
+    rvalues.insert(rv);
+  }
+
+  for (auto &lv : l) {
+    if (rvalues.end() == rvalues.find(lv)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+static bool atapp_discovery_equal(
+    const ::ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::RepeatedPtrField<atapp::protocol::atbus_subnet_range> &l,
+    const ::ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::RepeatedPtrField<atapp::protocol::atbus_subnet_range> &r) {
+  if (l.size() != r.size()) {
+    return false;
+  }
+
+  std::vector<const atapp::protocol::atbus_subnet_range *> ls;
+  std::vector<const atapp::protocol::atbus_subnet_range *> rs;
+  ls.reserve(static_cast<size_t>(l.size()));
+  rs.reserve(static_cast<size_t>(r.size()));
+  for (int i = 0; i < l.size(); ++i) {
+    ls.push_back(&l.Get(i));
+    rs.push_back(&r.Get(i));
+  }
+  std::sort(ls.begin(), ls.end(),
+            [](const atapp::protocol::atbus_subnet_range *cl, const atapp::protocol::atbus_subnet_range *cr) {
+              if (cl->id_prefix() == cr->id_prefix()) {
+                return cl->mask_bits() < cr->mask_bits();
+              }
+              return cl->id_prefix() < cr->id_prefix();
+            });
+
+  for (size_t i = 0; i < ls.size(); ++i) {
+    if (ls[i]->id_prefix() != rs[i]->id_prefix() || ls[i]->mask_bits() != rs[i]->mask_bits()) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+static bool atapp_discovery_equal(const atapp::protocol::atapp_gateway &l, const atapp::protocol::atapp_gateway &r) {
+  if (l.address().size() != r.address().size()) {
+    return false;
+  }
+  if (l.match_hosts().size() != r.match_hosts().size()) {
+    return false;
+  }
+  if (l.match_namespaces().size() != r.match_namespaces().size()) {
+    return false;
+  }
+  if (l.match_labels().size() != r.match_labels().size()) {
+    return false;
+  }
+
+  if (l.address() != r.address()) {
+    return false;
+  }
+
+  if (!l.match_hosts().empty()) {
+    if (atapp_discovery_equal_ignore_order(l.match_hosts(), r.match_hosts())) {
+      return false;
+    }
+  }
+
+  if (!l.match_namespaces().empty()) {
+    if (atapp_discovery_equal_ignore_order(l.match_namespaces(), r.match_namespaces())) {
+      return false;
+    }
+  }
+
+  if (!l.match_labels().empty()) {
+    for (auto &rkv : r.match_labels()) {
+      auto iter = l.match_labels().find(rkv.first);
+      if (iter == l.match_labels().end()) {
+        return false;
+      }
+      if (iter->second != rkv.second) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+static bool atapp_discovery_equal(
+    const ::ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::RepeatedPtrField<atapp::protocol::atapp_gateway> &l,
+    const ::ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::RepeatedPtrField<atapp::protocol::atapp_gateway> &r) {
+  if (l.size() != r.size()) {
+    return false;
+  }
+
+  std::vector<const atapp::protocol::atapp_gateway *> ls;
+  std::vector<const atapp::protocol::atapp_gateway *> rs;
+  ls.reserve(static_cast<size_t>(l.size()));
+  rs.reserve(static_cast<size_t>(r.size()));
+  for (int i = 0; i < l.size(); ++i) {
+    ls.push_back(&l.Get(i));
+    rs.push_back(&r.Get(i));
+  }
+  std::sort(ls.begin(), ls.end(),
+            [](const atapp::protocol::atapp_gateway *cl, const atapp::protocol::atapp_gateway *cr) {
+              return cl->address() < cr->address();
+            });
+
+  for (size_t i = 0; i < ls.size(); ++i) {
+    if (!atapp_discovery_equal(*ls[i], *rs[i])) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+static bool atapp_discovery_equal(const atapp::protocol::atapp_discovery &l,
+                                  const atapp::protocol::atapp_discovery &r) {
+  if (l.id() != r.id()) {
+    return false;
+  }
+  if (l.pid() != r.pid()) {
+    return false;
+  }
+  if (l.type_id() != r.type_id()) {
+    return false;
+  }
+  if (l.atbus_protocol_version() != r.atbus_protocol_version()) {
+    return false;
+  }
+  if (l.atbus_protocol_min_version() != r.atbus_protocol_min_version()) {
+    return false;
+  }
+  if (l.name().size() != r.name().size()) {
+    return false;
+  }
+  if (l.hostname().size() != r.hostname().size()) {
+    return false;
+  }
+  if (l.hash_code().size() != r.hash_code().size()) {
+    return false;
+  }
+  if (l.type_name().size() != r.type_name().size()) {
+    return false;
+  }
+  if (l.version().size() != r.version().size()) {
+    return false;
+  }
+  if (l.custom_data().size() != r.custom_data().size()) {
+    return false;
+  }
+  if (l.identity().size() != r.identity().size()) {
+    return false;
+  }
+  if (l.listen_size() != r.listen_size()) {
+    return false;
+  }
+  if (l.gateways_size() != r.gateways_size()) {
+    return false;
+  }
+  if (l.atbus_subnets_size() != r.atbus_subnets_size()) {
+    return false;
+  }
+  if (l.has_area() || r.has_area()) {
+    if (l.area().zone_id() != r.area().zone_id()) {
+      return false;
+    }
+    if (l.area().region().size() != r.area().region().size()) {
+      return false;
+    }
+    if (l.area().district().size() != r.area().district().size()) {
+      return false;
+    }
+    if (l.area().region() != r.area().region()) {
+      return false;
+    }
+    if (l.area().district() != r.area().district()) {
+      return false;
+    }
+  }
+  if (l.name() != r.name()) {
+    return false;
+  }
+  if (l.hostname() != r.hostname()) {
+    return false;
+  }
+  if (l.hash_code() != r.hash_code()) {
+    return false;
+  }
+  if (l.type_name() != r.type_name()) {
+    return false;
+  }
+  if (l.version() != r.version()) {
+    return false;
+  }
+  if (l.custom_data() != r.custom_data()) {
+    return false;
+  }
+  if (l.identity() != r.identity()) {
+    return false;
+  }
+
+  if (!l.listen().empty()) {
+    if (atapp_discovery_equal_ignore_order(l.listen(), r.listen())) {
+      return false;
+    }
+  }
+
+  if (!l.gateways().empty()) {
+    if (atapp_discovery_equal(l.gateways(), r.gateways())) {
+      return false;
+    }
+  }
+
+  if (!l.atbus_subnets().empty()) {
+    if (atapp_discovery_equal(l.atbus_subnets(), r.atbus_subnets())) {
+      return false;
+    }
+  }
+
+  if (l.has_metadata() || r.has_metadata()) {
+    return etcd_discovery_set::metadata_equal_type()(l.metadata(), r.metadata());
+  }
+
+  return true;
 }
 
 }  // namespace detail
@@ -273,6 +514,11 @@ void etcd_module::update_keepalive_value() {
   std::string new_value;
   node_info_t ni;
   get_app()->pack(ni.node_discovery);
+  if (detail::atapp_discovery_equal(ni.node_discovery, last_submmited_discovery_data_)) {
+    return;
+  }
+  last_submmited_discovery_data_ = ni.node_discovery;
+
   pack(ni, new_value);
   if (new_value != inner_keepalive_value_) {
     inner_keepalive_value_.swap(new_value);

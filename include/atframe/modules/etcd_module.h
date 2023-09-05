@@ -213,6 +213,7 @@ class etcd_module : public ::atapp::module_impl {
   util::network::http_request::ptr_t cleanup_request_;
   bool etcd_ctx_enabled_;
   bool maybe_update_inner_keepalive_value_;
+  atapp::protocol::atapp_discovery last_submmited_discovery_data_;
   util::time::time_utility::raw_time_t tick_next_timepoint_;
   std::chrono::system_clock::duration tick_interval_;
   atapp::etcd_cluster etcd_ctx_;
