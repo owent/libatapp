@@ -1275,7 +1275,7 @@ LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata &app::get_metadata() co
 
 LIBATAPP_MACRO_API atapp::protocol::atapp_metadata &app::mutable_metadata() {
   if (internal_module_etcd_) {
-    internal_module_etcd_->set_maybe_update_keepalive_value();
+    internal_module_etcd_->set_maybe_update_keepalive_metadata();
   }
   return conf_.metadata;
 }
@@ -1321,7 +1321,7 @@ LIBATAPP_MACRO_API const atapp::protocol::atapp_area &app::get_area() const noex
 
 LIBATAPP_MACRO_API atapp::protocol::atapp_area &app::mutable_area() {
   if (internal_module_etcd_) {
-    internal_module_etcd_->set_maybe_update_keepalive_value();
+    internal_module_etcd_->set_maybe_update_keepalive_area();
   }
   return *conf_.origin.mutable_area();
 }

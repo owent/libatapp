@@ -123,6 +123,8 @@ class etcd_module : public ::atapp::module_impl {
   LIBATAPP_MACRO_API void enable_etcd();
   LIBATAPP_MACRO_API void disable_etcd();
   LIBATAPP_MACRO_API void set_maybe_update_keepalive_value();
+  LIBATAPP_MACRO_API void set_maybe_update_keepalive_area();
+  LIBATAPP_MACRO_API void set_maybe_update_keepalive_metadata();
 
   LIBATAPP_MACRO_API const util::network::http_request::curl_m_bind_ptr_t &get_shared_curl_multi_context() const;
 
@@ -212,8 +214,11 @@ class etcd_module : public ::atapp::module_impl {
   util::network::http_request::curl_m_bind_ptr_t curl_multi_;
   util::network::http_request::ptr_t cleanup_request_;
   bool etcd_ctx_enabled_;
-  bool maybe_update_inner_keepalive_value_;
-  atapp::protocol::atapp_discovery last_submmited_discovery_data_;
+  bool maybe_update_internal_keepalive_value_;
+  bool maybe_update_internal_keepalive_area_;
+  bool maybe_update_internal_keepalive_metadata_;
+  atapp::protocol::atapp_area last_submmited_discovery_data_area_;
+  atapp::protocol::atapp_metadata last_submmited_discovery_data_metadata_;
   util::time::time_utility::raw_time_t tick_next_timepoint_;
   std::chrono::system_clock::duration tick_interval_;
   atapp::etcd_cluster etcd_ctx_;

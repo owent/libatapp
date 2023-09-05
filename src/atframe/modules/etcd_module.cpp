@@ -3,19 +3,21 @@
 
 #include "atframe/modules/etcd_module.h"
 
+// clang-format off
 #include <config/compiler/protobuf_prefix.h>
+// clang-format on
 
-#include <rapidjson/stringbuffer.h>
-#include <rapidjson/writer.h>
+#include <google/protobuf/util/json_util.h>
 
+// clang-format off
 #include <config/compiler/protobuf_suffix.h>
+// clang-format on
 
 #include <common/string_oprs.h>
 #include <random/random_generator.h>
 
 #include <atframe/atapp.h>
 
-#include <atframe/atapp_conf_rapidjson.h>
 #include <atframe/etcdcli/etcd_cluster.h>
 #include <atframe/etcdcli/etcd_keepalive.h>
 #include <atframe/etcdcli/etcd_watcher.h>
@@ -89,7 +91,7 @@ static void init_timer_closed_callback(uv_handle_t *handle) {
   handle->data = nullptr;
   uv_stop(handle->loop);
 }
-
+/**
 static bool atapp_discovery_equal_ignore_order(
     const ::ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string> &l,
     const ::ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string> &r) {
@@ -217,122 +219,36 @@ static bool atapp_discovery_equal(
 
   return true;
 }
+**/
 
-static bool atapp_discovery_equal(const atapp::protocol::atapp_discovery &l,
-                                  const atapp::protocol::atapp_discovery &r) {
-  if (l.id() != r.id()) {
+static bool atapp_discovery_equal(const atapp::protocol::atapp_area &l, const atapp::protocol::atapp_area &r) {
+  if (l.zone_id() != r.zone_id()) {
     return false;
   }
-  if (l.pid() != r.pid()) {
+  if (l.region().size() != r.region().size()) {
     return false;
   }
-  if (l.type_id() != r.type_id()) {
+  if (l.district().size() != r.district().size()) {
     return false;
   }
-  if (l.atbus_protocol_version() != r.atbus_protocol_version()) {
+  if (l.region() != r.region()) {
     return false;
   }
-  if (l.atbus_protocol_min_version() != r.atbus_protocol_min_version()) {
-    return false;
-  }
-  if (l.name().size() != r.name().size()) {
-    return false;
-  }
-  if (l.hostname().size() != r.hostname().size()) {
-    return false;
-  }
-  if (l.hash_code().size() != r.hash_code().size()) {
-    return false;
-  }
-  if (l.type_name().size() != r.type_name().size()) {
-    return false;
-  }
-  if (l.version().size() != r.version().size()) {
-    return false;
-  }
-  if (l.custom_data().size() != r.custom_data().size()) {
-    return false;
-  }
-  if (l.identity().size() != r.identity().size()) {
-    return false;
-  }
-  if (l.listen_size() != r.listen_size()) {
-    return false;
-  }
-  if (l.gateways_size() != r.gateways_size()) {
-    return false;
-  }
-  if (l.atbus_subnets_size() != r.atbus_subnets_size()) {
-    return false;
-  }
-  if (l.has_area() || r.has_area()) {
-    if (l.area().zone_id() != r.area().zone_id()) {
-      return false;
-    }
-    if (l.area().region().size() != r.area().region().size()) {
-      return false;
-    }
-    if (l.area().district().size() != r.area().district().size()) {
-      return false;
-    }
-    if (l.area().region() != r.area().region()) {
-      return false;
-    }
-    if (l.area().district() != r.area().district()) {
-      return false;
-    }
-  }
-  if (l.name() != r.name()) {
-    return false;
-  }
-  if (l.hostname() != r.hostname()) {
-    return false;
-  }
-  if (l.hash_code() != r.hash_code()) {
-    return false;
-  }
-  if (l.type_name() != r.type_name()) {
-    return false;
-  }
-  if (l.version() != r.version()) {
-    return false;
-  }
-  if (l.custom_data() != r.custom_data()) {
-    return false;
-  }
-  if (l.identity() != r.identity()) {
+  if (l.district() != r.district()) {
     return false;
   }
 
-  if (!l.listen().empty()) {
-    if (atapp_discovery_equal_ignore_order(l.listen(), r.listen())) {
-      return false;
-    }
-  }
-
-  if (!l.gateways().empty()) {
-    if (atapp_discovery_equal(l.gateways(), r.gateways())) {
-      return false;
-    }
-  }
-
-  if (!l.atbus_subnets().empty()) {
-    if (atapp_discovery_equal(l.atbus_subnets(), r.atbus_subnets())) {
-      return false;
-    }
-  }
-
-  if (l.has_metadata() || r.has_metadata()) {
-    return etcd_discovery_set::metadata_equal_type()(l.metadata(), r.metadata());
-  }
-
-  return true;
+  return false;
 }
 
 }  // namespace detail
 
 LIBATAPP_MACRO_API etcd_module::etcd_module()
-    : etcd_ctx_enabled_(false), maybe_update_inner_keepalive_value_(true), watcher_snapshot_index_allocator_(0) {
+    : etcd_ctx_enabled_(false),
+      maybe_update_internal_keepalive_value_(true),
+      maybe_update_internal_keepalive_area_(false),
+      maybe_update_internal_keepalive_metadata_(false),
+      watcher_snapshot_index_allocator_(0) {
   tick_next_timepoint_ = util::time::time_utility::sys_now();
   tick_interval_ = std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::milliseconds(128));
 }
@@ -505,19 +421,37 @@ LIBATAPP_MACRO_API int etcd_module::init() {
 }
 
 void etcd_module::update_keepalive_value() {
-  if (!maybe_update_inner_keepalive_value_ || nullptr == get_app()) {
+  if (!(maybe_update_internal_keepalive_value_ || maybe_update_internal_keepalive_area_ ||
+        maybe_update_internal_keepalive_metadata_) ||
+      nullptr == get_app()) {
     return;
   }
-
-  maybe_update_inner_keepalive_value_ = false;
 
   std::string new_value;
   node_info_t ni;
   get_app()->pack(ni.node_discovery);
-  if (detail::atapp_discovery_equal(ni.node_discovery, last_submmited_discovery_data_)) {
+
+  bool has_changed = maybe_update_internal_keepalive_value_;
+  maybe_update_internal_keepalive_value_ = false;
+  if (maybe_update_internal_keepalive_area_) {
+    if (!detail::atapp_discovery_equal(ni.node_discovery.area(), last_submmited_discovery_data_area_)) {
+      has_changed = true;
+      last_submmited_discovery_data_area_ = ni.node_discovery.area();
+    }
+  }
+  maybe_update_internal_keepalive_area_ = false;
+  if (maybe_update_internal_keepalive_metadata_) {
+    if (!etcd_discovery_set::metadata_equal_type()(ni.node_discovery.metadata(),
+                                                   last_submmited_discovery_data_metadata_)) {
+      has_changed = true;
+      last_submmited_discovery_data_metadata_ = ni.node_discovery.metadata();
+    }
+  }
+  maybe_update_internal_keepalive_metadata_ = false;
+
+  if (!has_changed) {
     return;
   }
-  last_submmited_discovery_data_ = ni.node_discovery;
 
   pack(ni, new_value);
   if (new_value != inner_keepalive_value_) {
@@ -903,7 +837,9 @@ LIBATAPP_MACRO_API int etcd_module::tick() {
 
   int ret = etcd_ctx_.tick();
 
-  if (maybe_update_inner_keepalive_value_ && etcd_ctx_.check_flag(etcd_cluster::flag_t::RUNNING)) {
+  if ((maybe_update_internal_keepalive_value_ || maybe_update_internal_keepalive_area_ ||
+       maybe_update_internal_keepalive_metadata_) &&
+      etcd_ctx_.check_flag(etcd_cluster::flag_t::RUNNING)) {
     update_keepalive_value();
   }
 
@@ -919,7 +855,15 @@ LIBATAPP_MACRO_API bool etcd_module::is_etcd_enabled() const {
 LIBATAPP_MACRO_API void etcd_module::enable_etcd() { etcd_ctx_enabled_ = true; }
 LIBATAPP_MACRO_API void etcd_module::disable_etcd() { etcd_ctx_enabled_ = false; }
 
-LIBATAPP_MACRO_API void etcd_module::set_maybe_update_keepalive_value() { maybe_update_inner_keepalive_value_ = true; }
+LIBATAPP_MACRO_API void etcd_module::set_maybe_update_keepalive_value() {
+  maybe_update_internal_keepalive_value_ = true;
+}
+
+LIBATAPP_MACRO_API void etcd_module::set_maybe_update_keepalive_area() { maybe_update_internal_keepalive_area_ = true; }
+
+LIBATAPP_MACRO_API void etcd_module::set_maybe_update_keepalive_metadata() {
+  maybe_update_internal_keepalive_metadata_ = true;
+}
 
 LIBATAPP_MACRO_API const util::network::http_request::curl_m_bind_ptr_t &etcd_module::get_shared_curl_multi_context()
     const {
@@ -1351,44 +1295,22 @@ bool etcd_module::unpack(node_info_t &out, const std::string &path, const std::s
     return false;
   }
 
-  gsl::span<unsigned char> shared_json_buffer = ::atapp::rapidjson_loader_get_default_shared_buffer();
-  rapidjson::MemoryPoolAllocator<> allocator{reinterpret_cast<void *>(shared_json_buffer.data()),
-                                             shared_json_buffer.size()};
-  rapidjson::Document doc{&allocator};
-  if (!::atapp::rapidjson_loader_unstringify(doc, json)) {
+  ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::util::JsonParseOptions options;
+  options.ignore_unknown_fields = true;
+
+  if (!ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::util::JsonStringToMessage(json, &out.node_discovery, options).ok()) {
     return false;
-  }
-
-  ::atapp::rapidjson_loader_dump_to(doc, out.node_discovery);
-  if (out.node_discovery.gateways_size() > 0 || !doc.IsObject()) {
-    return true;
-  }
-
-  // FIXME(owent): remove deprecated gateway field
-  rapidjson::Value::ConstMemberIterator old_gateway_iter = doc.FindMember("gateway");
-  if (old_gateway_iter == doc.MemberEnd()) {
-    return true;
-  }
-  if (!old_gateway_iter->value.IsArray()) {
-    return true;
-  }
-
-  for (rapidjson::SizeType i = 0; i < old_gateway_iter->value.Size(); ++i) {
-    if (!old_gateway_iter->value[i].IsString()) {
-      continue;
-    }
-
-    atapp::protocol::atapp_gateway *gateway = out.node_discovery.add_gateways();
-    if (nullptr != gateway) {
-      gateway->set_address(old_gateway_iter->value[i].GetString(), old_gateway_iter->value[i].GetStringLength());
-    }
   }
 
   return true;
 }
 
 void etcd_module::pack(const node_info_t &src, std::string &json) {
-  json = ::atapp::rapidjson_loader_stringify(src.node_discovery);
+  ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::util::JsonPrintOptions options;
+  options.add_whitespace = false;
+  options.always_print_enums_as_ints = true;
+  options.preserve_proto_field_names = true;
+  ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::util::MessageToJsonString(src.node_discovery, &json, options);
 }
 
 int etcd_module::http_callback_on_etcd_closed(util::network::http_request &req) {
