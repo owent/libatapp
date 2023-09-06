@@ -196,8 +196,9 @@ int etcd_keepalive::libcurl_callback_on_get_data(util::network::http_request &re
   if (0 != req.get_error_code() || util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
                                        util::network::http_request::get_status_code_group(req.get_response_code())) {
     LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(
-        *self->owner_, "Etcd keepalive {} get request failed, error code: {}, http code: {}\n{}",
-        reinterpret_cast<const void *>(self), req.get_error_code(), req.get_response_code(), req.get_error_msg());
+        *self->owner_, "Etcd keepalive {} get request failed, error code: {}, http code: {}\n{}\n{}",
+        reinterpret_cast<const void *>(self), req.get_error_code(), req.get_response_code(), req.get_error_msg(),
+        req.get_response_stream().str());
 
     self->owner_->check_socket_error_code(req.get_error_code());
     self->owner_->add_retry_keepalive(self->shared_from_this());
@@ -280,8 +281,9 @@ int etcd_keepalive::libcurl_callback_on_set_data(util::network::http_request &re
   if (0 != req.get_error_code() || util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
                                        util::network::http_request::get_status_code_group(req.get_response_code())) {
     LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(
-        *self->owner_, "Etcd keepalive {} set request failed, error code: {}, http code: {}\n{}",
-        reinterpret_cast<const void *>(self), req.get_error_code(), req.get_response_code(), req.get_error_msg());
+        *self->owner_, "Etcd keepalive {} set request failed, error code: {}, http code: {}\n{}\n{}",
+        reinterpret_cast<const void *>(self), req.get_error_code(), req.get_response_code(), req.get_error_msg(),
+        req.get_response_stream().str());
 
     self->rpc_.is_value_changed = true;
     self->owner_->check_socket_error_code(req.get_error_code());

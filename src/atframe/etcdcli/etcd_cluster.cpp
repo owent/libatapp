@@ -836,12 +836,13 @@ int etcd_cluster::libcurl_callback_on_remove_keepalive_path(util::network::http_
          util::network::http_request::status_code_t::EN_SCT_NOT_FOUND != req.get_response_code())) {
       if (nullptr != self->owner) {
         LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(
-            *self->owner, "Etcd cluster delete keepalive {} path {} finished, res: {}, http code: {}\n{}",
-            self->keepalive_addr, self->path, req.get_error_code(), req.get_response_code(), req.get_error_msg());
+            *self->owner, "Etcd cluster delete keepalive {} path {} finished, res: {}, http code: {}\n{}\n{}",
+            self->keepalive_addr, self->path, req.get_error_code(), req.get_response_code(), req.get_error_msg(),
+            req.get_response_stream().str());
       } else {
-        FWLOGERROR("Etcd cluster delete keepalive {} path {} failed, error code: {}, http code: {}\n{}",
-                   self->keepalive_addr, self->path, req.get_error_code(), req.get_response_code(),
-                   req.get_error_msg());
+        FWLOGERROR("Etcd cluster delete keepalive {} path {} failed, error code: {}, http code: {}\n{}\n{}",
+                   self->keepalive_addr, self->path, req.get_error_code(), req.get_response_code(), req.get_error_msg(),
+                   req.get_response_stream().str());
       }
 
       if (nullptr != self->owner) {
@@ -864,11 +865,13 @@ int etcd_cluster::libcurl_callback_on_remove_keepalive_path(util::network::http_
 
     if (nullptr != self->owner) {
       LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(
-          *self->owner, "Etcd cluster delete keepalive {} path {} finished, res: {}, http code: {}\n{}",
-          self->keepalive_addr, self->path, req.get_error_code(), req.get_response_code(), req.get_error_msg());
+          *self->owner, "Etcd cluster delete keepalive {} path {} finished, res: {}, http code: {}\n{}\n{}",
+          self->keepalive_addr, self->path, req.get_error_code(), req.get_response_code(), req.get_error_msg(),
+          req.get_response_stream().str());
     } else {
-      FWLOGINFO("Etcd cluster delete keepalive {} path {} finished, res: {}, http code: {}\n{}", self->keepalive_addr,
-                self->path, req.get_error_code(), req.get_response_code(), req.get_error_msg());
+      FWLOGINFO("Etcd cluster delete keepalive {} path {} finished, res: {}, http code: {}\n{}\n{}",
+                self->keepalive_addr, self->path, req.get_error_code(), req.get_response_code(), req.get_error_msg(),
+                req.get_response_stream().str());
     }
   } while (false);
 
@@ -1031,9 +1034,11 @@ int etcd_cluster::libcurl_callback_on_auth_authenticate(util::network::http_requ
     }
     self->add_stats_error_request();
 
-    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self, "Etcd authenticate failed, error code: {}, http code: {}\n{}",
-                                          req.get_error_code(), req.get_response_code(), req.get_error_msg());
-    self->check_authorization_expired(req.get_response_code(), req.get_response_stream().str());
+    std::string response_content = req.get_response_stream().str();
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self, "Etcd authenticate failed, error code: {}, http code: {}\n{}\n{}",
+                                          req.get_error_code(), req.get_response_code(), req.get_error_msg(),
+                                          response_content);
+    self->check_authorization_expired(req.get_response_code(), response_content);
     return 0;
   }
 
@@ -1170,11 +1175,12 @@ int etcd_cluster::libcurl_callback_on_auth_user_get(util::network::http_request 
 
     if (ETCD_API_V3_ERROR_HTTP_CODE_AUTH == req.get_response_code()) {
       LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(
-          *self, "Etcd user get failed with authentication code expired, we will try to obtain a new one.{}",
-          req.get_error_msg());
+          *self, "Etcd user get failed with authentication code expired, we will try to obtain a new one.{}\n{}",
+          req.get_error_msg(), req.get_response_stream().str());
     } else {
-      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(*self, "Etcd user get failed, error code: {}, http code: {}\n{}",
-                                           req.get_error_code(), req.get_response_code(), req.get_error_msg());
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(*self, "Etcd user get failed, error code: {}, http code: {}\n{}\n{}",
+                                           req.get_error_code(), req.get_response_code(), req.get_error_msg(),
+                                           req.get_response_stream().str());
     }
 
     self->check_authorization_expired(req.get_response_code(), req.get_response_stream().str());
@@ -1368,8 +1374,9 @@ int etcd_cluster::libcurl_callback_on_member_update(util::network::http_request 
     if (0 != req.get_error_code()) {
       self->retry_request_member_update(req.get_url());
     }
-    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self, "Etcd member list failed, error code: {}, http code: {}\n{}",
-                                          req.get_error_code(), req.get_response_code(), req.get_error_msg());
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self, "Etcd member list failed, error code: {}, http code: {}\n{}\n{}",
+                                          req.get_error_code(), req.get_response_code(), req.get_error_msg(),
+                                          req.get_response_stream().str());
     self->add_stats_error_request();
 
     return 0;
@@ -1612,9 +1619,11 @@ int etcd_cluster::libcurl_callback_on_lease_keepalive(util::network::http_reques
     }
     self->add_stats_error_request();
 
-    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self, "Etcd lease grant/keepalive failed, error code: {}, http code: {}\n{}",
-                                          req.get_error_code(), req.get_response_code(), req.get_error_msg());
-    self->check_authorization_expired(req.get_response_code(), req.get_response_stream().str());
+    std::string response_content = req.get_response_stream().str();
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(
+        *self, "Etcd lease grant/keepalive failed, error code: {}, http code: {}\n{}\n{}", req.get_error_code(),
+        req.get_response_code(), req.get_error_msg(), response_content);
+    self->check_authorization_expired(req.get_response_code(), response_content);
     return 0;
   }
 

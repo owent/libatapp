@@ -197,14 +197,16 @@ int etcd_watcher::libcurl_callback_on_range_completed(util::network::http_reques
   // 服务器错误则过一段时间后重试
   if (0 != req.get_error_code() || util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
                                        util::network::http_request::get_status_code_group(req.get_response_code())) {
-    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(
-        *self->owner_, "Etcd watcher {} range request failed, error code: {}, http code: {}\n{}",
-        reinterpret_cast<const void *>(self), req.get_error_code(), req.get_response_code(), req.get_error_msg());
+    std::string response_content = req.get_response_stream().str();
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self->owner_,
+                                          "Etcd watcher {} range request failed, error code: {}, http code: {}\n{}\n{}",
+                                          reinterpret_cast<const void *>(self), req.get_error_code(),
+                                          req.get_response_code(), req.get_error_msg(), response_content);
 
     self->rpc_.watcher_next_request_time = util::time::time_utility::sys_now() + self->rpc_.retry_interval;
 
     self->owner_->check_socket_error_code(req.get_error_code());
-    self->owner_->check_authorization_expired(req.get_response_code(), req.get_response_stream().str());
+    self->owner_->check_authorization_expired(req.get_response_code(), response_content);
     return 0;
   }
 
@@ -330,14 +332,15 @@ int etcd_watcher::libcurl_callback_on_watch_completed(util::network::http_reques
         util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
             util::network::http_request::get_status_code_group(req.get_response_code())) {
       LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(
-          *self->owner_, "Etcd watcher {} watch request failed, error code: {}, http code: {}\n{}",
-          reinterpret_cast<const void *>(self), req.get_error_code(), req.get_response_code(), req.get_error_msg());
+          *self->owner_, "Etcd watcher {} watch request failed, error code: {}, http code: {}\n{}\n{}",
+          reinterpret_cast<const void *>(self), req.get_error_code(), req.get_response_code(), req.get_error_msg(),
+          req.get_response_stream().str());
 
       self->rpc_.watcher_next_request_time = util::time::time_utility::sys_now() + self->rpc_.retry_interval;
 
     } else {
-      FWLOGINFO("Etcd watcher {} watch request finished, start another request later, msg: {}.",
-                reinterpret_cast<const void *>(self), req.get_error_msg());
+      FWLOGINFO("Etcd watcher {} watch request finished, start another request later, msg: {}.\n{}",
+                reinterpret_cast<const void *>(self), req.get_error_msg(), req.get_response_stream().str());
       self->rpc_.watcher_next_request_time = util::time::time_utility::sys_now();
     }
 
