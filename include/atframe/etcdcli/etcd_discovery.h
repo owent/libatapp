@@ -188,11 +188,11 @@ class etcd_discovery_set {
     std::vector<etcd_discovery_node::ptr_t> round_robin_cache;
     size_t round_robin_index;
 
-    std::unordered_set<const etcd_discovery_node*> reference_cache;
+    std::unordered_set<const etcd_discovery_node *> reference_cache;
   } index_cache_type;
 
   void rebuild_cache(index_cache_type &cache_set, const metadata_type *rule) const;
-  void clear_cache(const metadata_type *metadata, const etcd_discovery_node* node_ptr) const;
+  void clear_cache(const metadata_type *metadata, gsl::span<const etcd_discovery_node *> node_ptrs) const;
   static void clear_cache(index_cache_type &cache_set);
   index_cache_type *get_index_cache(const metadata_type *metadata) const;
   index_cache_type *mutable_index_cache(const metadata_type *metadata) const;

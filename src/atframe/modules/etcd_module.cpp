@@ -1601,12 +1601,12 @@ bool etcd_module::update_inner_watcher_event(node_info_t &node, const etcd_disco
       }
 
       if (local_cache_by_id) {
-        global_discovery_.remove_node(local_cache_by_id);
+        new_inst = local_cache_by_id;
+      } else {
+        new_inst = std::make_shared<etcd_discovery_node>();
       }
 
-      new_inst = std::make_shared<etcd_discovery_node>();
       new_inst->copy_from(node.node_discovery, version);
-
       global_discovery_.add_node(new_inst);
 
       has_event = true;
@@ -1635,13 +1635,19 @@ bool etcd_module::update_inner_watcher_event(node_info_t &node, const etcd_disco
       }
 
       if (has_event) {
-        new_inst = std::make_shared<etcd_discovery_node>();
+        if (local_cache_by_id) {
+          new_inst = local_cache_by_id;
+        } else if (local_cache_by_name) {
+          new_inst = local_cache_by_name;
+        } else {
+          new_inst = std::make_shared<etcd_discovery_node>();
+        }
         new_inst->copy_from(node.node_discovery, version);
 
-        if (local_cache_by_id) {
+        if (local_cache_by_id && local_cache_by_id != new_inst) {
           global_discovery_.remove_node(local_cache_by_id);
         }
-        if (local_cache_by_name) {
+        if (local_cache_by_name && local_cache_by_name != new_inst) {
           global_discovery_.remove_node(local_cache_by_name);
         }
 
