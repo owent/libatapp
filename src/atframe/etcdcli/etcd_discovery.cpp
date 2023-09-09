@@ -189,8 +189,8 @@ LIBATAPP_MACRO_API void etcd_discovery_node::copy_from(const atapp::protocol::at
   }
   if (version.modify_revision > node_version_.modify_revision) {
     node_version_.modify_revision = version.modify_revision;
-  }
-  if (version.version > node_version_.version) {
+    node_version_.version = version.version;
+  } else if (version.version > node_version_.version) {
     node_version_.version = version.version;
   }
 }
@@ -201,8 +201,8 @@ LIBATAPP_MACRO_API void etcd_discovery_node::update_version(const node_version &
   }
   if (version.modify_revision > node_version_.modify_revision) {
     node_version_.modify_revision = version.modify_revision;
-  }
-  if (version.version > node_version_.version) {
+    node_version_.version = version.version;
+  } else if (version.version > node_version_.version) {
     node_version_.version = version.version;
   }
 }
