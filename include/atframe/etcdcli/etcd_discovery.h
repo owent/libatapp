@@ -74,6 +74,7 @@ class etcd_discovery_node {
   UTIL_FORCEINLINE const node_version &get_version() const noexcept { return node_version_; }
 
   LIBATAPP_MACRO_API void copy_from(const atapp::protocol::atapp_discovery &input, const node_version &version);
+  LIBATAPP_MACRO_API void update_version(const node_version &version);
   LIBATAPP_MACRO_API void copy_to(atapp::protocol::atapp_discovery &output) const;
   LIBATAPP_MACRO_API void copy_key_to(atapp::protocol::atapp_discovery &output) const;
 

@@ -1591,6 +1591,7 @@ bool etcd_module::update_inner_watcher_event(node_info_t &node, const etcd_disco
   UTIL_LIKELY_IF(local_cache_by_id == local_cache_by_name) {
     if (node_action_t::EN_NAT_DELETE == node.action) {
       if (local_cache_by_id) {
+        local_cache_by_id->update_version(version);
         global_discovery_.remove_node(local_cache_by_id);
 
         has_event = true;
@@ -1615,10 +1616,12 @@ bool etcd_module::update_inner_watcher_event(node_info_t &node, const etcd_disco
   else {
     if (node_action_t::EN_NAT_DELETE == node.action) {
       if (local_cache_by_id) {
+        local_cache_by_id->update_version(version);
         global_discovery_.remove_node(local_cache_by_id);
         has_event = true;
       }
       if (local_cache_by_name) {
+        local_cache_by_name->update_version(version);
         global_discovery_.remove_node(local_cache_by_name);
         has_event = true;
       }
@@ -1645,9 +1648,11 @@ bool etcd_module::update_inner_watcher_event(node_info_t &node, const etcd_disco
         new_inst->copy_from(node.node_discovery, version);
 
         if (local_cache_by_id && local_cache_by_id != new_inst) {
+          local_cache_by_id->update_version(version);
           global_discovery_.remove_node(local_cache_by_id);
         }
         if (local_cache_by_name && local_cache_by_name != new_inst) {
+          local_cache_by_name->update_version(version);
           global_discovery_.remove_node(local_cache_by_name);
         }
 
