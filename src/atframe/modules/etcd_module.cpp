@@ -1679,7 +1679,7 @@ bool etcd_module::update_inner_watcher_event(node_info_t &node, const etcd_disco
         owner->trigger_event_on_discovery_event(node.action, new_inst);
         for (node_event_callback_list_t::iterator iter = node_event_callbacks_.begin();
              iter != node_event_callbacks_.end(); ++iter) {
-          if (!(*iter)) {
+          if (*iter) {
             (*iter)(node.action, new_inst);
           }
         }
@@ -1687,7 +1687,7 @@ bool etcd_module::update_inner_watcher_event(node_info_t &node, const etcd_disco
         owner->trigger_event_on_discovery_event(node.action, local_cache_by_name);
         for (node_event_callback_list_t::iterator iter = node_event_callbacks_.begin();
              iter != node_event_callbacks_.end(); ++iter) {
-          if (!(*iter)) {
+          if (*iter) {
             (*iter)(node.action, local_cache_by_name);
           }
         }
@@ -1695,7 +1695,7 @@ bool etcd_module::update_inner_watcher_event(node_info_t &node, const etcd_disco
         owner->trigger_event_on_discovery_event(node.action, local_cache_by_id);
         for (node_event_callback_list_t::iterator iter = node_event_callbacks_.begin();
              iter != node_event_callbacks_.end(); ++iter) {
-          if (!(*iter)) {
+          if (*iter) {
             (*iter)(node.action, local_cache_by_id);
           }
         }
