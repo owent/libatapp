@@ -36,6 +36,7 @@
 #include <algorithm>
 #include <limits>
 #include <sstream>
+#include <unordered_map>
 
 #if defined(GetMessage)
 #  undef GetMessage
@@ -1884,11 +1885,237 @@ LIBATAPP_MACRO_API void default_loader_dump_to(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID
   }
 }
 
+namespace {
 static bool protobuf_equal_inner_message(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &l,
                                          const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &r);
 static bool protobuf_equal_inner_field(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &l,
                                        const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &r,
                                        const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds);
+
+static bool protobuf_equal_inner_map_bool(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &l,
+                                          const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &r,
+                                          const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *field_fds,
+                                          const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *key_fds,
+                                          const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *value_fds) {
+  auto lreflect = l.GetReflection();
+  auto rreflect = r.GetReflection();
+  int field_size = lreflect->FieldSize(l, field_fds);
+  std::unordered_map<bool, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *> lmap;
+  lmap.reserve(static_cast<size_t>(field_size));
+  for (int i = 0; i < field_size; ++i) {
+    auto lvalue = &lreflect->GetRepeatedMessage(l, field_fds, i);
+    auto lkey = lvalue->GetReflection()->GetRepeatedBool(*lvalue, key_fds, i);
+    lmap[lkey] = lvalue;
+  }
+
+  for (int i = 0; i < field_size; ++i) {
+    auto rvalue = &rreflect->GetRepeatedMessage(r, field_fds, i);
+    auto rkey = rvalue->GetReflection()->GetRepeatedBool(*rvalue, key_fds, i);
+    auto iter = lmap.find(rkey);
+    if (iter == lmap.end()) {
+      return false;
+    }
+
+    // Only compare value
+    if (false == protobuf_equal_inner_field(*iter->second, *rvalue, value_fds)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+static bool protobuf_equal_inner_map_int32(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &l,
+                                           const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &r,
+                                           const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *field_fds,
+                                           const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *key_fds,
+                                           const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *value_fds) {
+  auto lreflect = l.GetReflection();
+  auto rreflect = r.GetReflection();
+  int field_size = lreflect->FieldSize(l, field_fds);
+  std::unordered_map<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::int32, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *> lmap;
+  lmap.reserve(static_cast<size_t>(field_size));
+  for (int i = 0; i < field_size; ++i) {
+    auto lvalue = &lreflect->GetRepeatedMessage(l, field_fds, i);
+    auto lkey = lvalue->GetReflection()->GetRepeatedInt32(*lvalue, key_fds, i);
+    lmap[lkey] = lvalue;
+  }
+
+  for (int i = 0; i < field_size; ++i) {
+    auto rvalue = &rreflect->GetRepeatedMessage(r, field_fds, i);
+    auto rkey = rvalue->GetReflection()->GetRepeatedInt32(*rvalue, key_fds, i);
+    auto iter = lmap.find(rkey);
+    if (iter == lmap.end()) {
+      return false;
+    }
+
+    // Only compare value
+    if (false == protobuf_equal_inner_field(*iter->second, *rvalue, value_fds)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+static bool protobuf_equal_inner_map_uint32(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &l,
+                                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &r,
+                                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *field_fds,
+                                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *key_fds,
+                                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *value_fds) {
+  auto lreflect = l.GetReflection();
+  auto rreflect = r.GetReflection();
+  int field_size = lreflect->FieldSize(l, field_fds);
+  std::unordered_map<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::uint32, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *>
+      lmap;
+  lmap.reserve(static_cast<size_t>(field_size));
+  for (int i = 0; i < field_size; ++i) {
+    auto lvalue = &lreflect->GetRepeatedMessage(l, field_fds, i);
+    auto lkey = lvalue->GetReflection()->GetRepeatedUInt32(*lvalue, key_fds, i);
+    lmap[lkey] = lvalue;
+  }
+
+  for (int i = 0; i < field_size; ++i) {
+    auto rvalue = &rreflect->GetRepeatedMessage(r, field_fds, i);
+    auto rkey = rvalue->GetReflection()->GetRepeatedUInt32(*rvalue, key_fds, i);
+    auto iter = lmap.find(rkey);
+    if (iter == lmap.end()) {
+      return false;
+    }
+
+    // Only compare value
+    if (false == protobuf_equal_inner_field(*iter->second, *rvalue, value_fds)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+static bool protobuf_equal_inner_map_int64(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &l,
+                                           const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &r,
+                                           const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *field_fds,
+                                           const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *key_fds,
+                                           const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *value_fds) {
+  auto lreflect = l.GetReflection();
+  auto rreflect = r.GetReflection();
+  int field_size = lreflect->FieldSize(l, field_fds);
+  std::unordered_map<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::int64, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *> lmap;
+  lmap.reserve(static_cast<size_t>(field_size));
+  for (int i = 0; i < field_size; ++i) {
+    auto lvalue = &lreflect->GetRepeatedMessage(l, field_fds, i);
+    auto lkey = lvalue->GetReflection()->GetRepeatedInt64(*lvalue, key_fds, i);
+    lmap[lkey] = lvalue;
+  }
+
+  for (int i = 0; i < field_size; ++i) {
+    auto rvalue = &rreflect->GetRepeatedMessage(r, field_fds, i);
+    auto rkey = rvalue->GetReflection()->GetRepeatedInt64(*rvalue, key_fds, i);
+    auto iter = lmap.find(rkey);
+    if (iter == lmap.end()) {
+      return false;
+    }
+
+    // Only compare value
+    if (false == protobuf_equal_inner_field(*iter->second, *rvalue, value_fds)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+static bool protobuf_equal_inner_map_uint64(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &l,
+                                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &r,
+                                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *field_fds,
+                                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *key_fds,
+                                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *value_fds) {
+  auto lreflect = l.GetReflection();
+  auto rreflect = r.GetReflection();
+  int field_size = lreflect->FieldSize(l, field_fds);
+  std::unordered_map<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::uint64, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *>
+      lmap;
+  lmap.reserve(static_cast<size_t>(field_size));
+  for (int i = 0; i < field_size; ++i) {
+    auto lvalue = &lreflect->GetRepeatedMessage(l, field_fds, i);
+    auto lkey = lvalue->GetReflection()->GetRepeatedUInt64(*lvalue, key_fds, i);
+    lmap[lkey] = lvalue;
+  }
+
+  for (int i = 0; i < field_size; ++i) {
+    auto rvalue = &rreflect->GetRepeatedMessage(r, field_fds, i);
+    auto rkey = rvalue->GetReflection()->GetRepeatedUInt64(*rvalue, key_fds, i);
+    auto iter = lmap.find(rkey);
+    if (iter == lmap.end()) {
+      return false;
+    }
+
+    // Only compare value
+    if (false == protobuf_equal_inner_field(*iter->second, *rvalue, value_fds)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+static bool protobuf_equal_inner_map_string(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &l,
+                                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &r,
+                                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *field_fds,
+                                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *key_fds,
+                                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *value_fds) {
+  auto lreflect = l.GetReflection();
+  auto rreflect = r.GetReflection();
+  int field_size = lreflect->FieldSize(l, field_fds);
+  std::unordered_map<std::string, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *> lmap;
+  lmap.reserve(static_cast<size_t>(field_size));
+  for (int i = 0; i < field_size; ++i) {
+    auto lvalue = &lreflect->GetRepeatedMessage(l, field_fds, i);
+    auto lkey = lvalue->GetReflection()->GetRepeatedString(*lvalue, key_fds, i);
+    lmap[std::move(lkey)] = lvalue;
+  }
+
+  for (int i = 0; i < field_size; ++i) {
+    auto rvalue = &rreflect->GetRepeatedMessage(r, field_fds, i);
+    auto rkey = rvalue->GetReflection()->GetRepeatedString(*rvalue, key_fds, i);
+    auto iter = lmap.find(rkey);
+    if (iter == lmap.end()) {
+      return false;
+    }
+
+    // Only compare value
+    if (false == protobuf_equal_inner_field(*iter->second, *rvalue, value_fds)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+static std::pair<bool, bool> protobuf_equal_inner_map(
+    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &l, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &r,
+    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *field_fds,
+    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *key_fds,
+    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *value_fds) {
+  switch (field_fds->cpp_type()) {
+    case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_BOOL:
+      return {true, protobuf_equal_inner_map_bool(l, r, field_fds, key_fds, value_fds)};
+    case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_INT32:
+      return {true, protobuf_equal_inner_map_int32(l, r, field_fds, key_fds, value_fds)};
+    case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_INT64:
+      return {true, protobuf_equal_inner_map_int64(l, r, field_fds, key_fds, value_fds)};
+    case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_UINT32:
+      return {true, protobuf_equal_inner_map_uint32(l, r, field_fds, key_fds, value_fds)};
+    case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_UINT64:
+      return {true, protobuf_equal_inner_map_uint64(l, r, field_fds, key_fds, value_fds)};
+    case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_STRING:
+      return {true, protobuf_equal_inner_map_string(l, r, field_fds, key_fds, value_fds)};
+    default:
+      break;
+  }
+
+  return {false, false};
+}
 
 bool protobuf_equal_inner_message(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &l,
                                   const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &r) {
@@ -1988,6 +2215,23 @@ bool protobuf_equal_inner_field(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message
     };
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_MESSAGE: {
       if (fds->is_repeated()) {
+        do {
+          if (!fds->is_map()) {
+            break;
+          }
+          const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *key_fds = fds->message_type()->map_key();
+          const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *value_fds = fds->message_type()->map_value();
+          if (nullptr == key_fds || nullptr == value_fds) {
+            break;
+          }
+
+          auto res = protobuf_equal_inner_map(l, r, fds, key_fds, value_fds);
+          if (!res.first) {
+            break;
+          }
+          return res.second;
+        } while (false);
+
         for (int i = 0; i < field_size; ++i) {
           if (false == protobuf_equal_inner_message(l.GetReflection()->GetRepeatedMessage(l, fds, i),
                                                     r.GetReflection()->GetRepeatedMessage(r, fds, i))) {
@@ -2069,6 +2313,7 @@ bool protobuf_equal_inner_field(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message
 
   return true;
 }
+}  // namespace
 
 LIBATAPP_MACRO_API bool protobuf_equal(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &l,
                                        const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &r) {

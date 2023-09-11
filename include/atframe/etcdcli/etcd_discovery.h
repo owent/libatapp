@@ -39,6 +39,8 @@ class etcd_discovery_node {
 
   struct LIBATAPP_MACRO_API_SYMBOL_VISIBLE node_version {
     int64_t create_revision;
+    // Causion: modify_revision of multiple key may be same when they are modifiedx in one transaction of etcd
+    // @see https://etcd.io/docs/v3.5/learning/api_guarantees/#revision
     int64_t modify_revision;
     int64_t version;
 
