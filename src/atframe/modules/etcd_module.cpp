@@ -251,6 +251,11 @@ LIBATAPP_MACRO_API etcd_module::etcd_module()
       watcher_snapshot_index_allocator_(0) {
   tick_next_timepoint_ = util::time::time_utility::sys_now();
   tick_interval_ = std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::milliseconds(128));
+
+  last_etcd_event_header_.cluster_id = 0;
+  last_etcd_event_header_.member_id = 0;
+  last_etcd_event_header_.raft_term = 0;
+  last_etcd_event_header_.revision = 0;
 }
 
 LIBATAPP_MACRO_API etcd_module::~etcd_module() { reset(); }
@@ -1141,6 +1146,10 @@ LIBATAPP_MACRO_API atapp::etcd_watcher::ptr_t etcd_module::add_watcher_by_custom
 LIBATAPP_MACRO_API const ::atapp::etcd_cluster &etcd_module::get_raw_etcd_ctx() const { return etcd_ctx_; }
 LIBATAPP_MACRO_API ::atapp::etcd_cluster &etcd_module::get_raw_etcd_ctx() { return etcd_ctx_; }
 
+LIBATAPP_MACRO_API const ::atapp::etcd_response_header &etcd_module::get_last_etcd_event_header() const {
+  return last_etcd_event_header_;
+}
+
 LIBATAPP_MACRO_API const atapp::protocol::atapp_etcd &etcd_module::get_configure() const {
   return get_app()->get_origin_configure().etcd();
 }
@@ -1393,6 +1402,7 @@ void etcd_module::watcher_callback_list_wrapper_t::operator()(const ::atapp::etc
   if (nullptr == mod) {
     return;
   }
+  mod->last_etcd_event_header_ = header;
 
   bool enable_snapshot = body.snapshot && 0 != snapshot_index;
   if (enable_snapshot) {
@@ -1499,6 +1509,7 @@ void etcd_module::watcher_callback_one_wrapper_t::operator()(const ::atapp::etcd
   if (nullptr == mod) {
     return;
   }
+  mod->last_etcd_event_header_ = header;
 
   bool enable_snapshot = body.snapshot && 0 != snapshot_index;
   if (enable_snapshot) {
@@ -1591,7 +1602,7 @@ bool etcd_module::update_inner_watcher_event(node_info_t &node, const etcd_disco
   UTIL_LIKELY_IF(local_cache_by_id == local_cache_by_name) {
     if (node_action_t::EN_NAT_DELETE == node.action) {
       if (local_cache_by_id) {
-        local_cache_by_id->update_version(version);
+        local_cache_by_id->update_version(version, true);
         global_discovery_.remove_node(local_cache_by_id);
 
         has_event = true;
@@ -1616,12 +1627,12 @@ bool etcd_module::update_inner_watcher_event(node_info_t &node, const etcd_disco
   else {
     if (node_action_t::EN_NAT_DELETE == node.action) {
       if (local_cache_by_id) {
-        local_cache_by_id->update_version(version);
+        local_cache_by_id->update_version(version, true);
         global_discovery_.remove_node(local_cache_by_id);
         has_event = true;
       }
       if (local_cache_by_name) {
-        local_cache_by_name->update_version(version);
+        local_cache_by_name->update_version(version, true);
         global_discovery_.remove_node(local_cache_by_name);
         has_event = true;
       }
@@ -1648,11 +1659,11 @@ bool etcd_module::update_inner_watcher_event(node_info_t &node, const etcd_disco
         new_inst->copy_from(node.node_discovery, version);
 
         if (local_cache_by_id && local_cache_by_id != new_inst) {
-          local_cache_by_id->update_version(version);
+          local_cache_by_id->update_version(version, false);
           global_discovery_.remove_node(local_cache_by_id);
         }
         if (local_cache_by_name && local_cache_by_name != new_inst) {
-          local_cache_by_name->update_version(version);
+          local_cache_by_name->update_version(version, false);
           global_discovery_.remove_node(local_cache_by_name);
         }
 

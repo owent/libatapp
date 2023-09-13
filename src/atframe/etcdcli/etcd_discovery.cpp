@@ -184,34 +184,26 @@ LIBATAPP_MACRO_API void etcd_discovery_node::copy_from(const atapp::protocol::at
 
   name_hash_ = consistent_hash_calc(input.name().c_str(), input.name().size(), LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
 
-  if (version.create_revision > node_version_.create_revision) {
-    node_version_.create_revision = version.create_revision;
-    node_version_.version = version.version;
-  }
-
-  if (version.modify_revision > node_version_.modify_revision) {
-    node_version_.modify_revision = version.modify_revision;
-    node_version_.version = version.version;
-  }
-
-  if (version.version > node_version_.version) {
-    node_version_.version = version.version;
-  }
+  node_version_ = version;
 }
 
-LIBATAPP_MACRO_API void etcd_discovery_node::update_version(const node_version &version) {
-  if (version.create_revision > node_version_.create_revision) {
-    node_version_.create_revision = version.create_revision;
-    node_version_.version = version.version;
-  }
+LIBATAPP_MACRO_API void etcd_discovery_node::update_version(const node_version &version, bool upgrade) {
+  if (upgrade) {
+    if (version.create_revision > node_version_.create_revision) {
+      node_version_.create_revision = version.create_revision;
+      node_version_.version = version.version;
+    }
 
-  if (version.modify_revision > node_version_.modify_revision) {
-    node_version_.modify_revision = version.modify_revision;
-    node_version_.version = version.version;
-  }
+    if (version.modify_revision > node_version_.modify_revision) {
+      node_version_.modify_revision = version.modify_revision;
+      node_version_.version = version.version;
+    }
 
-  if (version.version > node_version_.version) {
-    node_version_.version = version.version;
+    if (version.version > node_version_.version) {
+      node_version_.version = version.version;
+    }
+  } else {
+    node_version_ = version;
   }
 }
 

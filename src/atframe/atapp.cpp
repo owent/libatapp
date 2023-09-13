@@ -1464,6 +1464,10 @@ LIBATAPP_MACRO_API int32_t app::send_message(uint64_t target_node_id, int32_t ty
     return EN_ATAPP_ERR_NOT_INITED;
   }
 
+  if (bus_node_ && target_node_id == bus_node_->get_id()) {
+    return bus_node_->send_data(target_node_id, type, data, data_size, msg_sequence);
+  }
+
   // Find from cache
   do {
     atapp_endpoint *cache = get_endpoint(target_node_id);
@@ -1517,6 +1521,10 @@ LIBATAPP_MACRO_API int32_t app::send_message(const std::string &target_node_name
     return EN_ATAPP_ERR_NOT_INITED;
   }
 
+  if (bus_node_ && target_node_name == get_app_name()) {
+    return bus_node_->send_data(bus_node_->get_id(), type, data, data_size, msg_sequence);
+  }
+
   do {
     atapp_endpoint *cache = get_endpoint(target_node_name);
     if (nullptr == cache && target_node_name == get_app_name()) {
@@ -1555,6 +1563,22 @@ LIBATAPP_MACRO_API int32_t app::send_message(const etcd_discovery_node::ptr_t &t
                                              const atapp::protocol::atapp_metadata *metadata) {
   if (!check_flag(flag_t::INITIALIZED)) {
     return EN_ATAPP_ERR_NOT_INITED;
+  }
+
+  if (!target_node_discovery) {
+    return EN_ATBUS_ERR_PARAMS;
+  }
+
+  if (bus_node_) {
+    if (target_node_discovery->get_discovery_info().id() != 0 &&
+        target_node_discovery->get_discovery_info().id() == bus_node_->get_id()) {
+      return bus_node_->send_data(bus_node_->get_id(), type, data, data_size, msg_sequence);
+    }
+
+    if (!target_node_discovery->get_discovery_info().name().empty() &&
+        target_node_discovery->get_discovery_info().name() == get_app_name()) {
+      return bus_node_->send_data(bus_node_->get_id(), type, data, data_size, msg_sequence);
+    }
   }
 
   if (!internal_module_etcd_) {

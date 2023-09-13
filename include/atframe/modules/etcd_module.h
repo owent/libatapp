@@ -152,6 +152,8 @@ class etcd_module : public ::atapp::module_impl {
   LIBATAPP_MACRO_API const ::atapp::etcd_cluster &get_raw_etcd_ctx() const;
   LIBATAPP_MACRO_API ::atapp::etcd_cluster &get_raw_etcd_ctx();
 
+  LIBATAPP_MACRO_API const ::atapp::etcd_response_header & get_last_etcd_event_header() const;
+
   LIBATAPP_MACRO_API const atapp::protocol::atapp_etcd &get_configure() const;
   LIBATAPP_MACRO_API const std::string &get_configure_path() const;
 
@@ -222,6 +224,7 @@ class etcd_module : public ::atapp::module_impl {
   util::time::time_utility::raw_time_t tick_next_timepoint_;
   std::chrono::system_clock::duration tick_interval_;
   atapp::etcd_cluster etcd_ctx_;
+  ::atapp::etcd_response_header last_etcd_event_header_;
 
   std::list<etcd_keepalive::ptr_t> inner_keepalive_actors_;
   std::string inner_keepalive_value_;
