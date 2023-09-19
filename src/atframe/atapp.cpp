@@ -4441,6 +4441,7 @@ int app::send_last_command(ev_loop_t *ev_loop) {
   }
 
   // step 2. connect failed return error code
+  FWLOGDEBUG("start to connect to {}", use_addr.address);
   atbus::endpoint *ep = nullptr;
   if (is_sync_channel) {
     // preallocate endpoint when using shared memory channel, because this channel can not be connected without endpoint
@@ -4494,6 +4495,7 @@ int app::send_last_command(ev_loop_t *ev_loop) {
     FWLOGERROR("connect to {} failed or timeout.", use_addr.address);
     return EN_ATAPP_ERR_CONNECT_ATAPP_FAILED;
   }
+  FWLOGDEBUG("connect to {} success", use_addr.address);
 
   flag_guard_t running_guard(*this, flag_t::RUNNING);
 
@@ -4511,6 +4513,7 @@ int app::send_last_command(ev_loop_t *ev_loop) {
                                                 std::placeholders::_1, std::placeholders::_2, std::placeholders::_3,
                                                 std::placeholders::_4, std::placeholders::_5, std::placeholders::_6));
 
+  FWLOGDEBUG("send command message to {:#x} with address = {}", ep->get_id(), use_addr.address);
   ret = bus_node_->send_custom_cmd(ep->get_id(), &arr_buff[0], &arr_size[0], last_command_.size());
   if (ret < 0) {
     FWLOGERROR("send command failed. ret: {}", ret);
@@ -4530,6 +4533,22 @@ int app::send_last_command(ev_loop_t *ev_loop) {
       if (check_flag(flag_t::TIMEOUT)) {
         FWLOGERROR("send command or receive response timeout");
         ret = -1;
+        break;
+      }
+
+      ep = bus_node_->get_endpoint(conf_.id);
+      if (nullptr == ep) {
+        FWLOGERROR("send command but endpoint is reset without any response");
+        break;
+      }
+
+      if (nullptr == bus_node_->get_self_endpoint()) {
+        FWLOGERROR("send command but closing without any response");
+        break;
+      }
+
+      if (nullptr == bus_node_->get_self_endpoint()->get_data_connection(ep)) {
+        FWLOGERROR("send command but connection is reset without any response");
         break;
       }
     } while (true);
