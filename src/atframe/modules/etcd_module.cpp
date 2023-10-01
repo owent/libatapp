@@ -1319,7 +1319,9 @@ void etcd_module::pack(const node_info_t &src, std::string &json) {
   options.add_whitespace = false;
   options.always_print_enums_as_ints = true;
   options.preserve_proto_field_names = true;
-  ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::util::MessageToJsonString(src.node_discovery, &json, options);
+  if(!ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::util::MessageToJsonString(src.node_discovery, &json, options).ok()) {
+    FWLOGERROR("etcd_module pack message to json failed");
+  }
 }
 
 int etcd_module::http_callback_on_etcd_closed(util::network::http_request &req) {
