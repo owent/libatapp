@@ -1464,10 +1464,6 @@ LIBATAPP_MACRO_API int32_t app::send_message(uint64_t target_node_id, int32_t ty
     return EN_ATAPP_ERR_NOT_INITED;
   }
 
-  if (bus_node_ && target_node_id == bus_node_->get_id()) {
-    return bus_node_->send_data(target_node_id, type, data, data_size, msg_sequence);
-  }
-
   // Find from cache
   do {
     atapp_endpoint *cache = get_endpoint(target_node_id);
@@ -1521,10 +1517,6 @@ LIBATAPP_MACRO_API int32_t app::send_message(const std::string &target_node_name
     return EN_ATAPP_ERR_NOT_INITED;
   }
 
-  if (bus_node_ && target_node_name == get_app_name()) {
-    return bus_node_->send_data(bus_node_->get_id(), type, data, data_size, msg_sequence);
-  }
-
   do {
     atapp_endpoint *cache = get_endpoint(target_node_name);
     if (nullptr == cache && target_node_name == get_app_name()) {
@@ -1566,22 +1558,6 @@ LIBATAPP_MACRO_API int32_t app::send_message(const etcd_discovery_node::ptr_t &t
   }
 
   if (!target_node_discovery) {
-    return EN_ATBUS_ERR_PARAMS;
-  }
-
-  if (bus_node_) {
-    if (target_node_discovery->get_discovery_info().id() != 0 &&
-        target_node_discovery->get_discovery_info().id() == bus_node_->get_id()) {
-      return bus_node_->send_data(bus_node_->get_id(), type, data, data_size, msg_sequence);
-    }
-
-    if (!target_node_discovery->get_discovery_info().name().empty() &&
-        target_node_discovery->get_discovery_info().name() == get_app_name()) {
-      return bus_node_->send_data(bus_node_->get_id(), type, data, data_size, msg_sequence);
-    }
-  }
-
-  if (!internal_module_etcd_) {
     return EN_ATBUS_ERR_PARAMS;
   }
 
@@ -1968,48 +1944,6 @@ LIBATAPP_MACRO_API atapp_endpoint::ptr_t app::mutable_endpoint(const etcd_discov
 
     bool is_loopback = (0 == id || id == get_app_id()) && (name.empty() || name == get_app_name());
 
-    int32_t gateway_size = discovery->get_ingress_size();
-    for (int32_t i = 0; handle && i < gateway_size; ++i) {
-      atbus::channel::channel_address_t addr;
-      const atapp::protocol::atapp_gateway &gateway = discovery->next_ingress_gateway();
-      if (!match_gateway(gateway)) {
-        FWLOGDEBUG("atapp endpoint {}({}) skip unmatched gateway {}", ret->get_id(), ret->get_name(),
-                   gateway.address());
-        continue;
-      }
-      atbus::channel::make_address(gateway.address().c_str(), addr);
-      std::transform(addr.scheme.begin(), addr.scheme.end(), addr.scheme.begin(), ::util::string::tolower<char>);
-
-      connector_protocol_map_t::const_iterator iter = connector_protocols_.find(addr.scheme);
-      if (iter == connector_protocols_.end()) {
-        FWLOGDEBUG("atapp endpoint {}({}) skip unsupported address {}", ret->get_id(), ret->get_name(), addr.address);
-        continue;
-      }
-
-      if (!iter->second) {
-        FWLOGDEBUG("atapp endpoint {}({}) skip unsupported address {}", ret->get_id(), ret->get_name(), addr.address);
-        continue;
-      }
-
-      // Skip loopback and use inner loopback connector
-      if (is_loopback && !iter->second->support_loopback()) {
-        continue;
-      }
-
-      int res = iter->second->on_start_connect(discovery.get(), addr, handle);
-      if (0 == res && handle.use_count() > 1) {
-        atapp_connector_bind_helper::bind(*handle, *iter->second);
-        atapp_endpoint_bind_helper::bind(*handle, *ret);
-
-        FWLOGINFO("connect address {} of atapp endpoint {}({}) success and use handle {}", ret->get_id(),
-                  ret->get_name(), addr.address, reinterpret_cast<const void *>(handle.get()));
-        break;
-      } else {
-        FWLOGINFO("skip address {} of atapp endpoint {}({}) with handle {}, connect result {}", ret->get_id(),
-                  ret->get_name(), addr.address, reinterpret_cast<const void *>(handle.get()), res);
-      }
-    }
-
     // Check loopback
     if (handle.use_count() == 1 && loopback_connector_ && is_loopback) {
       atbus::channel::channel_address_t addr;
@@ -2024,6 +1958,48 @@ LIBATAPP_MACRO_API atapp_endpoint::ptr_t app::mutable_endpoint(const etcd_discov
       } else {
         FWLOGINFO("atapp endpoint {}({}) skip loopback connector with handle {}, connect result {}", ret->get_id(),
                   ret->get_name(), addr.address, reinterpret_cast<const void *>(handle.get()), res);
+      }
+    } else {
+      int32_t gateway_size = discovery->get_ingress_size();
+      for (int32_t i = 0; handle && i < gateway_size; ++i) {
+        atbus::channel::channel_address_t addr;
+        const atapp::protocol::atapp_gateway &gateway = discovery->next_ingress_gateway();
+        if (!match_gateway(gateway)) {
+          FWLOGDEBUG("atapp endpoint {}({}) skip unmatched gateway {}", ret->get_id(), ret->get_name(),
+                     gateway.address());
+          continue;
+        }
+        atbus::channel::make_address(gateway.address().c_str(), addr);
+        std::transform(addr.scheme.begin(), addr.scheme.end(), addr.scheme.begin(), ::util::string::tolower<char>);
+
+        connector_protocol_map_t::const_iterator iter = connector_protocols_.find(addr.scheme);
+        if (iter == connector_protocols_.end()) {
+          FWLOGDEBUG("atapp endpoint {}({}) skip unsupported address {}", ret->get_id(), ret->get_name(), addr.address);
+          continue;
+        }
+
+        if (!iter->second) {
+          FWLOGDEBUG("atapp endpoint {}({}) skip unsupported address {}", ret->get_id(), ret->get_name(), addr.address);
+          continue;
+        }
+
+        // Skip loopback and use inner loopback connector
+        if (is_loopback && !iter->second->support_loopback()) {
+          continue;
+        }
+
+        int res = iter->second->on_start_connect(discovery.get(), addr, handle);
+        if (0 == res && handle.use_count() > 1) {
+          atapp_connector_bind_helper::bind(*handle, *iter->second);
+          atapp_endpoint_bind_helper::bind(*handle, *ret);
+
+          FWLOGINFO("connect address {} of atapp endpoint {}({}) success and use handle {}", ret->get_id(),
+                    ret->get_name(), addr.address, reinterpret_cast<const void *>(handle.get()));
+          break;
+        } else {
+          FWLOGINFO("skip address {} of atapp endpoint {}({}) with handle {}, connect result {}", ret->get_id(),
+                    ret->get_name(), addr.address, reinterpret_cast<const void *>(handle.get()), res);
+        }
       }
     }
   }
