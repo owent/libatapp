@@ -473,7 +473,8 @@ class app {
   LIBATAPP_MACRO_API const callback_fn_on_all_module_cleaned_t &get_evt_on_all_module_cleaned() const noexcept;
 
   LIBATAPP_MACRO_API bool add_endpoint_waker(util::time::time_utility::raw_time_t wakeup_time,
-                                             const atapp_endpoint::weak_ptr_t &ep_watcher);
+                                             const atapp_endpoint::weak_ptr_t &ep_watcher,
+                                             util::time::time_utility::raw_time_t previous_time);
   LIBATAPP_MACRO_API void remove_endpoint(uint64_t by_id);
   LIBATAPP_MACRO_API void remove_endpoint(const std::string &by_name);
   LIBATAPP_MACRO_API void remove_endpoint(const atapp_endpoint::ptr_t &enpoint);
@@ -596,6 +597,7 @@ class app {
                                                  const atbus::connection *, app_id_t,
                                                  const std::vector<std::pair<const void *, size_t>> &,
                                                  std::list<std::string> &);
+  int bus_evt_callback_on_new_connection(const atbus::node &, const atbus::connection *);
   int bus_evt_callback_on_add_endpoint(const atbus::node &, atbus::endpoint *, int);
   int bus_evt_callback_on_remove_endpoint(const atbus::node &, atbus::endpoint *, int);
   int bus_evt_callback_on_custom_command_response(const atbus::node &, const atbus::endpoint *,
@@ -698,7 +700,8 @@ class app {
   // inner endpoints
   endpoint_index_by_id_t endpoint_index_by_id_;
   endpoint_index_by_name_t endpoint_index_by_name_;
-  std::multimap<util::time::time_utility::raw_time_t, atapp_endpoint::weak_ptr_t> endpoint_waker_;
+  std::map<std::pair<util::time::time_utility::raw_time_t, atapp_endpoint *>, atapp_endpoint::weak_ptr_t>
+      endpoint_waker_;
 
   // inner connectors
   std::list<std::shared_ptr<atapp_connector_impl>> connectors_;

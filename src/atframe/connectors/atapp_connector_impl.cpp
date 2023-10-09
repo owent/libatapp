@@ -132,6 +132,10 @@ LIBATAPP_MACRO_API bool atapp_connection_handle::is_closing() const noexcept {
 }
 
 LIBATAPP_MACRO_API void atapp_connection_handle::set_ready() noexcept {
+  if (is_ready()) {
+    return;
+  }
+
   flags_ |= flags_t::EN_ACH_READY;
   flags_ &= ~static_cast<uint32_t>(flags_t::EN_ACH_CLOSING);
 

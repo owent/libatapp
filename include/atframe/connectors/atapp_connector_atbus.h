@@ -46,6 +46,7 @@ class atapp_connector_atbus : public atapp_connector_impl {
 
  private:
   friend class app;
+  int on_update_endpoint(const atbus::node &n, const atbus::endpoint *ep, int res);
   int on_add_endpoint(const atbus::node &n, atbus::endpoint *ep, int res);
   int on_remove_endpoint(const atbus::node &n, atbus::endpoint *ep, int res);
 

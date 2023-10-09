@@ -79,8 +79,11 @@ LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_start_connect(const etcd_di
   if (node->is_child_node(atbus_id)) {
     if (handle) {
       handles_[atbus_id] = handle;
-      handle->set_ready();
       handle->set_private_data_u64(atbus_id);
+
+      if (atbus_id == get_owner()->get_app_id() || node->is_endpoint_available(atbus_id)) {
+        handle->set_ready();
+      }
     }
     return EN_ATAPP_ERR_SUCCESS;
   }
@@ -95,7 +98,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_start_connect(const etcd_di
       break;
     }
 
-    // forward by parent node, skip connect
+    // forward by parent node, skip connect, always available
     if (handle) {
       handles_[atbus_id] = handle;
       handle->set_ready();
@@ -121,7 +124,8 @@ LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_start_connect(const etcd_di
 
   if (handle) {
     handles_[atbus_id] = handle;
-    if (get_owner()->get_bus_node() && get_owner()->get_bus_node()->get_endpoint(atbus_id) != nullptr) {
+    // Directly connected endpoint
+    if (atbus_id == get_owner()->get_app_id() || node->is_endpoint_available(atbus_id)) {
       handle->set_ready();
     }
     handle->set_private_data_u64(atbus_id);
@@ -191,7 +195,7 @@ LIBATAPP_MACRO_API void atapp_connector_atbus::on_receive_forward_response(
 LIBATAPP_MACRO_API void atapp_connector_atbus::on_discovery_event(etcd_discovery_action_t::type,
                                                                   const etcd_discovery_node::ptr_t &) {}
 
-int atapp_connector_atbus::on_add_endpoint(const atbus::node &n, atbus::endpoint *ep, int res) {
+int atapp_connector_atbus::on_update_endpoint(const atbus::node &n, const atbus::endpoint *ep, int res) {
   if (ep == nullptr) {
     return res;
   }
@@ -211,6 +215,10 @@ int atapp_connector_atbus::on_add_endpoint(const atbus::node &n, atbus::endpoint
     return on_close_connect(*iter->second);
   }
 
+  if (!ep->is_available()) {
+    return res;
+  }
+
   iter->second->set_ready();
   auto endpoint = iter->second->get_endpoint();
   if (nullptr != endpoint) {
@@ -222,6 +230,10 @@ int atapp_connector_atbus::on_add_endpoint(const atbus::node &n, atbus::endpoint
   }
 
   return res;
+}
+
+int atapp_connector_atbus::on_add_endpoint(const atbus::node &n, atbus::endpoint *ep, int res) {
+  return on_update_endpoint(n, ep, res);
 }
 
 int atapp_connector_atbus::on_remove_endpoint(const atbus::node &, atbus::endpoint *ep, int res) {

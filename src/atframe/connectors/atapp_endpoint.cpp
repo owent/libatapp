@@ -262,7 +262,7 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::retry_pending_messages(const util::ti
       res = connector->on_send_forward_request(handle, msg.type, &msg.message_sequence,
                                                reinterpret_cast<const void *>(msg.data.data()), msg.data.size(),
                                                msg.metadata.get());
-    } else if (msg.expired_timepoint > tick_time) {
+    } else if (msg.expired_timepoint > tick_time || max_count <= 0) {
       break;
     }
 
@@ -301,10 +301,10 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::retry_pending_messages(const util::ti
 LIBATAPP_MACRO_API void atapp_endpoint::add_waker(util::time::time_utility::raw_time_t wakeup_time) {
   if (wakeup_time < nearest_waker_ || std::chrono::system_clock::to_time_t(nearest_waker_) == 0) {
     if (nullptr != owner_) {
-      if (owner_->add_endpoint_waker(wakeup_time, watcher_)) {
+      if (owner_->add_endpoint_waker(wakeup_time, watcher_, nearest_waker_)) {
         nearest_waker_ = wakeup_time;
-        FWLOGDEBUG("atapp {:#x}({}) update waker for {:#x}({}) to {}us later", owner_->get_app_id(),
-                   owner_->get_app_name(), get_id(), get_name(),
+        FWLOGDEBUG("atapp {:#x}({}) update waker for {}({:#x}, {}) to {}us later", owner_->get_app_id(),
+                   owner_->get_app_name(), reinterpret_cast<const void *>(this), get_id(), get_name(),
                    std::max<int64_t>(std::chrono::duration_cast<std::chrono::microseconds>(
                                          nearest_waker_ - util::time::time_utility::sys_now())
                                          .count(),
@@ -334,6 +334,10 @@ void atapp_endpoint::cancel_pending_messages() {
   if (nullptr == connector) {
     return;
   }
+
+  FWLOGDEBUG("atapp {:#x}({}) cancel pending message to {}({:#x}, {}) with connector {} and handle {}",
+             owner_->get_app_id(), owner_->get_app_name(), reinterpret_cast<const void *>(this), get_id(), get_name(),
+             reinterpret_cast<const void *>(connector), reinterpret_cast<const void *>(handle));
 
   while (!pending_message_.empty()) {
     const pending_message_t &msg = pending_message_.front();

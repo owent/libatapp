@@ -1333,7 +1333,7 @@ LIBATAPP_MACRO_API util::time::time_utility::raw_time_t::duration app::get_confi
   }
 
   util::time::time_utility::raw_time_t::duration ret =
-      std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::nanoseconds(dur.seconds()));
+      std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::seconds(dur.seconds()));
   ret += std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::nanoseconds(dur.nanos()));
   return ret;
 }
@@ -1782,13 +1782,17 @@ LIBATAPP_MACRO_API const app::callback_fn_on_all_module_cleaned_t &app::get_evt_
 }
 
 LIBATAPP_MACRO_API bool app::add_endpoint_waker(util::time::time_utility::raw_time_t wakeup_time,
-                                                const atapp_endpoint::weak_ptr_t &ep_watcher) {
+                                                const atapp_endpoint::weak_ptr_t &ep_watcher,
+                                                util::time::time_utility::raw_time_t previous_time) {
   if (is_closing()) {
     return false;
   }
 
-  endpoint_waker_.insert(
-      std::pair<const util::time::time_utility::raw_time_t, atapp_endpoint::weak_ptr_t>(wakeup_time, ep_watcher));
+  atapp_endpoint *ep_ptr = ep_watcher.lock().get();
+  endpoint_waker_[std::pair<util::time::time_utility::raw_time_t, atapp_endpoint *>(wakeup_time, ep_ptr)] = ep_watcher;
+  if (previous_time > wakeup_time) {
+    endpoint_waker_.erase(std::pair<util::time::time_utility::raw_time_t, atapp_endpoint *>(previous_time, ep_ptr));
+  }
   return true;
 }
 
@@ -2470,14 +2474,14 @@ int64_t app::process_inner_events(const util::time::time_utility::raw_time_t &en
   while ((first_round || util::time::time_utility::sys_now() < end_tick) && more_messages) {
     first_round = false;
     int64_t round_res = 0;
-    if (!endpoint_waker_.empty() && endpoint_waker_.begin()->first <= tick_timer_.last_tick_timepoint) {
+    if (!endpoint_waker_.empty() && endpoint_waker_.begin()->first.first <= tick_timer_.last_tick_timepoint) {
       atapp_endpoint::ptr_t ep = endpoint_waker_.begin()->second.lock();
       endpoint_waker_.erase(endpoint_waker_.begin());
       ++stats_.endpoint_wake_count;
 
       if (ep) {
-        FWLOGDEBUG("atapp {:#x}({}) wakeup endpint {:#x}({})", get_app_id(), get_app_name(), ep->get_id(),
-                   ep->get_name());
+        FWLOGDEBUG("atapp {:#x}({}) wakeup endpint {}({:#x}, {})", get_app_id(), get_app_name(),
+                   reinterpret_cast<const void *>(ep.get()), ep->get_id(), ep->get_name());
         int32_t res = ep->retry_pending_messages(tick_timer_.last_tick_timepoint, conf_.origin.bus().loop_times());
         if (res > 0) {
           round_res += res;
@@ -3163,43 +3167,66 @@ int app::setup_atbus() {
   }
 
   // setup all callbacks
-  bus_node_->set_on_recv_handle(std::bind(&app::bus_evt_callback_on_recv_msg, this, std::placeholders::_1,
-                                          std::placeholders::_2, std::placeholders::_3, std::placeholders::_4,
-                                          std::placeholders::_5, std::placeholders::_6));
+  bus_node_->set_on_recv_handle([this](const atbus::node &n, const atbus::endpoint *ep, const atbus::connection *conn,
+                                       const ::atbus::protocol::msg &m, const void *data, size_t data_size) -> int {
+    return this->bus_evt_callback_on_recv_msg(n, ep, conn, m, data, data_size);
+  });
 
-  bus_node_->set_on_forward_response_handle(std::bind(&app::bus_evt_callback_on_forward_response, this,
-                                                      std::placeholders::_1, std::placeholders::_2,
-                                                      std::placeholders::_3, std::placeholders::_4));
+  bus_node_->set_on_forward_response_handle([this](const atbus::node &n, const atbus::endpoint *ep,
+                                                   const atbus::connection *conn,
+                                                   const ::atbus::protocol::msg *m) -> int {
+    return this->bus_evt_callback_on_forward_response(n, ep, conn, m);
+  });
 
-  bus_node_->set_on_error_handle(std::bind(&app::bus_evt_callback_on_error, this, std::placeholders::_1,
-                                           std::placeholders::_2, std::placeholders::_3, std::placeholders::_4,
-                                           std::placeholders::_5));
+  bus_node_->set_on_error_handle([this](const atbus::node &n, const atbus::endpoint *ep, const atbus::connection *conn,
+                                        int status, int errorcode) -> int {
+    // error log
+    return this->bus_evt_callback_on_error(n, ep, conn, status, errorcode);
+  });
 
-  bus_node_->set_on_info_log_handle(std::bind(&app::bus_evt_callback_on_info_log, this, std::placeholders::_1,
-                                              std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
+  bus_node_->set_on_info_log_handle([this](const atbus::node &n, const atbus::endpoint *ep,
+                                           const atbus::connection *conn, const char *content) -> int {
+    // normal log
+    return this->bus_evt_callback_on_info_log(n, ep, conn, content);
+  });
 
-  bus_node_->set_on_register_handle(std::bind(&app::bus_evt_callback_on_reg, this, std::placeholders::_1,
-                                              std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
+  bus_node_->set_on_register_handle(
+      [this](const atbus::node &n, const atbus::endpoint *ep, const atbus::connection *conn, int status) -> int {
+        return this->bus_evt_callback_on_reg(n, ep, conn, status);
+      });
 
-  bus_node_->set_on_shutdown_handle(
-      std::bind(&app::bus_evt_callback_on_shutdown, this, std::placeholders::_1, std::placeholders::_2));
+  bus_node_->set_on_shutdown_handle([this](const atbus::node &n, int reason) -> int {
+    // shutdown
+    return this->bus_evt_callback_on_shutdown(n, reason);
+  });
 
-  bus_node_->set_on_available_handle(
-      std::bind(&app::bus_evt_callback_on_available, this, std::placeholders::_1, std::placeholders::_2));
+  bus_node_->set_on_available_handle([this](const atbus::node &n, int result) -> int {
+    // available
+    return this->bus_evt_callback_on_available(n, result);
+  });
 
-  bus_node_->set_on_invalid_connection_handle(std::bind(&app::bus_evt_callback_on_invalid_connection, this,
-                                                        std::placeholders::_1, std::placeholders::_2,
-                                                        std::placeholders::_3));
+  bus_node_->set_on_invalid_connection_handle(
+      [this](const atbus::node &n, const atbus::connection *conn, int error_code) -> int {
+        return this->bus_evt_callback_on_invalid_connection(n, conn, error_code);
+      });
 
-  bus_node_->set_on_custom_cmd_handle(std::bind(&app::bus_evt_callback_on_custom_command_request, this,
-                                                std::placeholders::_1, std::placeholders::_2, std::placeholders::_3,
-                                                std::placeholders::_4, std::placeholders::_5, std::placeholders::_6));
-  bus_node_->set_on_add_endpoint_handle(std::bind(&app::bus_evt_callback_on_add_endpoint, this, std::placeholders::_1,
-                                                  std::placeholders::_2, std::placeholders::_3));
+  bus_node_->set_on_custom_cmd_handle([this](const atbus::node &n, const atbus::endpoint *ep,
+                                             const atbus::connection *conn, atbus::node::bus_id_t bus_id,
+                                             const std::vector<std::pair<const void *, size_t>> &request_body,
+                                             std::list<std::string> &response_body) -> int {
+    return this->bus_evt_callback_on_custom_command_request(n, ep, conn, bus_id, request_body, response_body);
+  });
 
-  bus_node_->set_on_remove_endpoint_handle(std::bind(&app::bus_evt_callback_on_remove_endpoint, this,
-                                                     std::placeholders::_1, std::placeholders::_2,
-                                                     std::placeholders::_3));
+  bus_node_->set_on_new_connection_handle([this](const atbus::node &n, const atbus::connection *conn) -> int {
+    return this->bus_evt_callback_on_new_connection(n, conn);
+  });
+  bus_node_->set_on_add_endpoint_handle([this](const atbus::node &n, atbus::endpoint *ep, int error_code) -> int {
+    return this->bus_evt_callback_on_add_endpoint(n, ep, error_code);
+  });
+
+  bus_node_->set_on_remove_endpoint_handle([this](const atbus::node &n, atbus::endpoint *ep, int error_code) -> int {
+    return this->bus_evt_callback_on_remove_endpoint(n, ep, error_code);
+  });
 
   // init listen
   for (int i = 0; i < conf_.origin.bus().listen_size(); ++i) {
@@ -4108,7 +4135,7 @@ int app::bus_evt_callback_on_info_log(const atbus::node &n, const atbus::endpoin
                                       const char *msg) {
   FWLOGINFO("bus node {:#x} endpoint {:#x}({}) connection {}({}) message: {}", n.get_id(),
             (nullptr == ep ? 0 : ep->get_id()), reinterpret_cast<const void *>(ep),
-            (nullptr == conn ? "" : conn->get_address().address.c_str()), reinterpret_cast<const void *>(conn),
+            reinterpret_cast<const void *>(conn), (nullptr == conn ? "" : conn->get_address().address.c_str()),
             (nullptr == msg ? "" : msg));
   return 0;
 }
@@ -4119,10 +4146,11 @@ int app::bus_evt_callback_on_reg(const atbus::node &n, const atbus::endpoint *ep
 
   if (nullptr != conn) {
     if (nullptr != ep) {
-      FWLOGINFO("bus node {:#x} endpoint {:#x} connection {} registered, res: {}", n.get_id(), ep->get_id(),
-                conn->get_address().address.c_str(), res);
+      FWLOGINFO("bus node {:#x} endpoint {:#x} connection {}({}) registered, res: {}", n.get_id(), ep->get_id(),
+                reinterpret_cast<const void *>(conn), conn->get_address().address, res);
     } else {
-      FWLOGINFO("bus node {:#x} connection {} registered, res: {}", n.get_id(), conn->get_address().address, res);
+      FWLOGINFO("bus node {:#x} connection {}({}) registered, res: {}", n.get_id(),
+                reinterpret_cast<const void *>(conn), conn->get_address().address, res);
     }
 
   } else {
@@ -4131,6 +4159,10 @@ int app::bus_evt_callback_on_reg(const atbus::node &n, const atbus::endpoint *ep
     } else {
       FWLOGINFO("bus node {:#x} registered, res: {}", n.get_id(), res);
     }
+  }
+
+  if (nullptr != ep && atbus_connector_) {
+    atbus_connector_->on_update_endpoint(n, ep, 0);
   }
 
   return 0;
@@ -4227,6 +4259,18 @@ int app::bus_evt_callback_on_custom_command_request(const atbus::node &n, const 
        << ", some data will be truncated.";
     rsp.push_back(ss.str());
   }
+  return 0;
+}
+
+int app::bus_evt_callback_on_new_connection(const atbus::node &n, const atbus::connection *conn) {
+  if (nullptr == conn) {
+    return 0;
+  }
+
+  if (conn->is_connected() && conn->get_binding() != nullptr && atbus_connector_) {
+    return atbus_connector_->on_update_endpoint(n, conn->get_binding(), 0);
+  }
+
   return 0;
 }
 
@@ -4485,9 +4529,12 @@ int app::send_last_command(ev_loop_t *ev_loop) {
     arr_size[i] = last_command_[i].size();
   }
 
-  bus_node_->set_on_custom_rsp_handle(std::bind(&app::bus_evt_callback_on_custom_command_response, this,
-                                                std::placeholders::_1, std::placeholders::_2, std::placeholders::_3,
-                                                std::placeholders::_4, std::placeholders::_5, std::placeholders::_6));
+  bus_node_->set_on_custom_rsp_handle([this](const atbus::node &n, const atbus::endpoint *response_ep,
+                                             const atbus::connection *conn, atbus::node::bus_id_t bus_id,
+                                             const std::vector<std::pair<const void *, size_t>> &response_body,
+                                             uint64_t sequence) -> int {
+    return this->bus_evt_callback_on_custom_command_response(n, response_ep, conn, bus_id, response_body, sequence);
+  });
 
   FWLOGDEBUG("send command message to {:#x} with address = {}", ep->get_id(), use_addr.address);
   ret = bus_node_->send_custom_cmd(ep->get_id(), &arr_buff[0], &arr_size[0], last_command_.size());
