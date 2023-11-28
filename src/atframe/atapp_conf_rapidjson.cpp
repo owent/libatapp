@@ -27,6 +27,10 @@
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 
+#ifdef GetMessage
+#  undef GetMessage
+#endif
+
 #include <google/protobuf/message.h>
 #include <google/protobuf/reflection.h>
 #include <google/protobuf/repeated_field.h>
