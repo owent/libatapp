@@ -604,7 +604,7 @@ dump_pick_enum_field_with_extensions(gsl::string_view val_str,
         auto &enum_value_options = fds->enum_type()->value(i)->options();
         if (enum_value_options.HasExtension(atapp::protocol::ENUMVALUE)) {
           auto &enumvalue_options = enum_value_options.GetExtension(atapp::protocol::ENUMVALUE);
-          if (!enumvalue_options.alias_name().empty() && enumvalue_options.alias_name() == val_str) {
+          if (!enumvalue_options.alias_name().empty() && gsl::string_view(enumvalue_options.alias_name()) == val_str) {
             ret = fds->enum_type()->value(i);
             break;
           }
