@@ -10,6 +10,21 @@
 #  endif
 #endif
 
+// clang-format off
+#include <config/compiler/protobuf_prefix.h>
+// clang-format on
+
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/writer.h>
+
+#include <google/protobuf/message.h>
+#include <google/protobuf/reflection.h>
+#include <google/protobuf/repeated_field.h>
+
+// clang-format off
+#include <config/compiler/protobuf_suffix.h>
+// clang-format on
+
 #include "atframe/atapp_conf_rapidjson.h"
 
 #ifdef GetMessage
@@ -19,25 +34,6 @@
 #if defined(max)
 #  undef max
 #endif
-
-// clang-format off
-#include <config/compiler/protobuf_prefix.h>
-// clang-format on
-
-#include <rapidjson/stringbuffer.h>
-#include <rapidjson/writer.h>
-
-#ifdef GetMessage
-#  undef GetMessage
-#endif
-
-#include <google/protobuf/message.h>
-#include <google/protobuf/reflection.h>
-#include <google/protobuf/repeated_field.h>
-
-// clang-format off
-#include <config/compiler/protobuf_suffix.h>
-// clang-format on
 
 #include <config/atframe_utils_build_feature.h>
 
