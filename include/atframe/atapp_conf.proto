@@ -22,6 +22,14 @@ extend google.protobuf.FieldOptions {
   atapp_configure_meta CONFIGURE = 3270;  // 自定义配置
 }
 
+message atapp_configure_enumvalue_options {
+  string alias_name = 1;
+}
+
+extend google.protobuf.EnumValueOptions {
+  atapp_configure_enumvalue_options ENUMVALUE = 3270;  // 自定义配置
+}
+
 message atapp_area {
   // region -> district -> zone
   string region = 1;
