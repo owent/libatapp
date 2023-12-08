@@ -24,6 +24,7 @@ extend google.protobuf.FieldOptions {
 
 message atapp_configure_enumvalue_options {
   string alias_name = 1;
+  bool case_sensitive = 2;
 }
 
 extend google.protobuf.EnumValueOptions {

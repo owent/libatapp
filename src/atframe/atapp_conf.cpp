@@ -604,9 +604,16 @@ dump_pick_enum_field_with_extensions(gsl::string_view val_str,
         auto &enum_value_options = fds->enum_type()->value(i)->options();
         if (enum_value_options.HasExtension(atapp::protocol::ENUMVALUE)) {
           auto &enumvalue_options = enum_value_options.GetExtension(atapp::protocol::ENUMVALUE);
-          if (!enumvalue_options.alias_name().empty() && gsl::string_view(enumvalue_options.alias_name()) == val_str) {
-            ret = fds->enum_type()->value(i);
-            break;
+          if (!enumvalue_options.alias_name().empty()) {
+            if (enumvalue_options.case_sensitive() && gsl::string_view(enumvalue_options.alias_name()) == val_str) {
+              ret = fds->enum_type()->value(i);
+              break;
+            } else if (!enumvalue_options.case_sensitive() &&
+                       0 == UTIL_STRFUNC_STRNCASE_CMP(val_str.data(), enumvalue_options.alias_name().c_str(),
+                                                      enumvalue_options.alias_name().size())) {
+              ret = fds->enum_type()->value(i);
+              break;
+            }
           }
         }
       }
