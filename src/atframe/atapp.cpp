@@ -1273,18 +1273,118 @@ LIBATAPP_MACRO_API const atapp::protocol::atapp_log &app::get_log_configure() co
 
 LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata &app::get_metadata() const noexcept { return conf_.metadata; }
 
-LIBATAPP_MACRO_API atapp::protocol::atapp_metadata &app::mutable_metadata() {
-  if (internal_module_etcd_) {
-    internal_module_etcd_->set_maybe_update_keepalive_metadata();
-  }
-  return conf_.metadata;
-}
-
 LIBATAPP_MACRO_API const atapp::protocol::atapp_runtime &app::get_runtime_configure() const noexcept {
   return conf_.runtime;
 }
 
 LIBATAPP_MACRO_API atapp::protocol::atapp_runtime &app::mutable_runtime_configure() { return conf_.runtime; }
+
+LIBATAPP_MACRO_API void app::set_api_version(gsl::string_view value) {
+  if (conf_.metadata.api_version() == value) {
+    return;
+  }
+
+  if (internal_module_etcd_) {
+    internal_module_etcd_->set_maybe_update_keepalive_metadata();
+  }
+
+  conf_.metadata.set_api_version(value.data(), value.size());
+}
+
+LIBATAPP_MACRO_API void app::set_kind(gsl::string_view value) {
+  if (conf_.metadata.kind() == value) {
+    return;
+  }
+
+  if (internal_module_etcd_) {
+    internal_module_etcd_->set_maybe_update_keepalive_metadata();
+  }
+
+  conf_.metadata.set_kind(value.data(), value.size());
+}
+
+LIBATAPP_MACRO_API void app::set_group(gsl::string_view value) {
+  if (conf_.metadata.group() == value) {
+    return;
+  }
+
+  if (internal_module_etcd_) {
+    internal_module_etcd_->set_maybe_update_keepalive_metadata();
+  }
+
+  conf_.metadata.set_group(value.data(), value.size());
+}
+
+LIBATAPP_MACRO_API void app::set_metadata_name(gsl::string_view value) {
+  if (conf_.metadata.name() == value) {
+    return;
+  }
+
+  if (internal_module_etcd_) {
+    internal_module_etcd_->set_maybe_update_keepalive_metadata();
+  }
+
+  conf_.metadata.set_name(value.data(), value.size());
+}
+
+LIBATAPP_MACRO_API void app::set_metadata_namespace_name(gsl::string_view value) {
+  if (conf_.metadata.namespace_name() == value) {
+    return;
+  }
+
+  if (internal_module_etcd_) {
+    internal_module_etcd_->set_maybe_update_keepalive_metadata();
+  }
+
+  conf_.metadata.set_namespace_name(value.data(), value.size());
+}
+
+LIBATAPP_MACRO_API void app::set_metadata_uid(gsl::string_view value) {
+  if (conf_.metadata.uid() == value) {
+    return;
+  }
+
+  if (internal_module_etcd_) {
+    internal_module_etcd_->set_maybe_update_keepalive_metadata();
+  }
+
+  conf_.metadata.set_uid(value.data(), value.size());
+}
+
+LIBATAPP_MACRO_API void app::set_metadata_service_subset(gsl::string_view value) {
+  if (conf_.metadata.service_subset() == value) {
+    return;
+  }
+
+  if (internal_module_etcd_) {
+    internal_module_etcd_->set_maybe_update_keepalive_metadata();
+  }
+
+  conf_.metadata.set_service_subset(value.data(), value.size());
+}
+
+LIBATAPP_MACRO_API void app::set_metadata_label(gsl::string_view key, gsl::string_view value) {
+  if (key.empty()) {
+    return;
+  }
+
+  auto labels = conf_.metadata.mutable_labels();
+  if (nullptr == labels) {
+    return;
+  }
+
+  std::string key_string = static_cast<std::string>(key);
+  auto iter = labels->find(key_string);
+  if (iter != labels->end() && iter->second == value) {
+    return;
+  }
+
+  if (internal_module_etcd_) {
+    internal_module_etcd_->set_maybe_update_keepalive_metadata();
+  }
+
+  (*labels)[key_string] = static_cast<std::string>(value);
+}
 
 LIBATAPP_MACRO_API int32_t app::get_runtime_stateful_pod_index() const noexcept {
   if (static_cast<int32_t>(atapp_pod_stateful_index::kUnset) != conf_.runtime_pod_stateful_index) {
@@ -2228,7 +2328,7 @@ int app::apply_configure() {
 
   // reset metadata from configure
   if (conf_.origin.has_metadata()) {
-    mutable_metadata() = conf_.origin.metadata();
+    conf_.metadata = conf_.origin.metadata();
   }
 
   if (conf_.origin.has_runtime()) {

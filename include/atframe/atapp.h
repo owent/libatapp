@@ -349,9 +349,20 @@ class app {
   LIBATAPP_MACRO_API const atapp::protocol::atapp_configure &get_origin_configure() const noexcept;
   LIBATAPP_MACRO_API const atapp::protocol::atapp_log &get_log_configure() const noexcept;
   LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata &get_metadata() const noexcept;
-  LIBATAPP_MACRO_API atapp::protocol::atapp_metadata &mutable_metadata();
   LIBATAPP_MACRO_API const atapp::protocol::atapp_runtime &get_runtime_configure() const noexcept;
   LIBATAPP_MACRO_API atapp::protocol::atapp_runtime &mutable_runtime_configure();
+
+  LIBATAPP_MACRO_API void set_api_version(gsl::string_view value);
+  LIBATAPP_MACRO_API void set_kind(gsl::string_view value);
+  LIBATAPP_MACRO_API void set_group(gsl::string_view value);
+
+  LIBATAPP_MACRO_API void set_metadata_name(gsl::string_view value);
+  LIBATAPP_MACRO_API void set_metadata_namespace_name(gsl::string_view value);
+  LIBATAPP_MACRO_API void set_metadata_uid(gsl::string_view value);
+
+  LIBATAPP_MACRO_API void set_metadata_service_subset(gsl::string_view value);
+
+  LIBATAPP_MACRO_API void set_metadata_label(gsl::string_view key, gsl::string_view value);
 
   /**
    * @brief Get the runtime stateful pod index from configure atapp.runtime.spec.node_name

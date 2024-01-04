@@ -284,7 +284,6 @@ message atapp_metadata {
   // https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#syntax-and-character-set
   // https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/cri-api/pkg/apis/runtime/v1/api.proto
   map<string, string> labels = 24;
-  map<string, string> annotations = 25;
 }
 
 message atapp_runtime_spec {

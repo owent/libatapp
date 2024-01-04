@@ -161,7 +161,7 @@ static const std::vector<etcd_discovery_node::ptr_t> &get_empty_discovery_set() 
 static bool is_empty(const etcd_discovery_set::metadata_type &metadata) noexcept {
   return metadata.api_version().empty() && metadata.kind().empty() && metadata.group().empty() &&
          metadata.namespace_name().empty() && metadata.name().empty() && metadata.uid().empty() &&
-         metadata.service_subset().empty() && 0 == metadata.labels_size() && 0 == metadata.annotations_size();
+         metadata.service_subset().empty() && 0 == metadata.labels_size();
 }
 
 }  // namespace
@@ -313,14 +313,6 @@ etcd_discovery_set::metadata_hash_type::operator()(const metadata_type &metadata
     }
   }
 
-  if (metadata.annotations_size() > 0) {
-    sort_string_map(metadata.annotations(), kvs);
-    for (auto &annotations : kvs) {
-      consistent_hash_combine(reinterpret_cast<const void *>(annotations.second.data()), annotations.second.size(),
-                              hash_value);
-    }
-  }
-
   return hash_value.first;
 }
 
@@ -362,10 +354,6 @@ LIBATAPP_MACRO_API bool etcd_discovery_set::metadata_equal_type::operator()(cons
     return false;
   }
 
-  if (l.annotations_size() != r.annotations_size()) {
-    return false;
-  }
-
   if (l.api_version() != r.api_version()) {
     return false;
   }
@@ -398,18 +386,6 @@ LIBATAPP_MACRO_API bool etcd_discovery_set::metadata_equal_type::operator()(cons
   std::vector<std::pair<gsl::string_view, gsl::string_view>> kvs_r;
   sort_string_map(l.labels(), kvs_l);
   sort_string_map(r.labels(), kvs_r);
-  for (size_t i = 0; i < kvs_l.size() && i < kvs_r.size(); ++i) {
-    if (kvs_l[i].first.size() != kvs_r[i].first.size() || kvs_l[i].second.size() != kvs_r[i].second.size()) {
-      return false;
-    }
-
-    if (kvs_l[i].first != kvs_r[i].first || kvs_l[i].second != kvs_r[i].second) {
-      return false;
-    }
-  }
-
-  sort_string_map(l.annotations(), kvs_l);
-  sort_string_map(r.annotations(), kvs_r);
   for (size_t i = 0; i < kvs_l.size() && i < kvs_r.size(); ++i) {
     if (kvs_l[i].first.size() != kvs_r[i].first.size() || kvs_l[i].second.size() != kvs_r[i].second.size()) {
       return false;
@@ -468,25 +444,6 @@ LIBATAPP_MACRO_API bool etcd_discovery_set::metadata_equal_type::filter(const me
     }
 
     if (iter->second != label.second) {
-      return false;
-    }
-  }
-
-  for (auto &annotation : rule.annotations()) {
-    if (annotation.second.empty()) {
-      continue;
-    }
-
-    auto iter = metadata.annotations().find(annotation.first);
-    if (iter == metadata.annotations().end()) {
-      return false;
-    }
-
-    if (iter->second.size() != annotation.second.size()) {
-      return false;
-    }
-
-    if (iter->second != annotation.second) {
       return false;
     }
   }

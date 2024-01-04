@@ -31,8 +31,6 @@ CASE_TEST(atapp_discovery, metadata_filter) {
 
   (*metadata.mutable_labels())["label1"] = "value1";
   (*metadata.mutable_labels())["label2"] = "value2";
-  (*metadata.mutable_annotations())["annotation1"] = "value3";
-  (*metadata.mutable_annotations())["annotation2"] = "value4";
 
   // empty rule
   CASE_EXPECT_TRUE(etcd_discovery_set::metadata_equal_type::filter(rule, metadata));
@@ -89,18 +87,6 @@ CASE_TEST(atapp_discovery, metadata_filter) {
     rule.mutable_labels()->clear();
     CASE_EXPECT_TRUE(etcd_discovery_set::metadata_equal_type::filter(rule, metadata));
   }
-
-  // annotations
-  {
-    rule.mutable_annotations()->erase("annotation1");
-    CASE_EXPECT_TRUE(etcd_discovery_set::metadata_equal_type::filter(rule, metadata));
-    (*rule.mutable_annotations())["annotation1"] = "";
-    CASE_EXPECT_TRUE(etcd_discovery_set::metadata_equal_type::filter(rule, metadata));
-    (*rule.mutable_annotations())["annotation1"] = "mismatch value";
-    CASE_EXPECT_FALSE(etcd_discovery_set::metadata_equal_type::filter(rule, metadata));
-    rule.mutable_annotations()->clear();
-    CASE_EXPECT_TRUE(etcd_discovery_set::metadata_equal_type::filter(rule, metadata));
-  }
 }
 
 CASE_TEST(atapp_discovery, get_discovery_by_metadata) {
@@ -123,8 +109,6 @@ CASE_TEST(atapp_discovery, get_discovery_by_metadata) {
   discovery_data.mutable_metadata()->set_service_subset("next");
   (*discovery_data.mutable_metadata()->mutable_labels())["label1"] = "value1";
   (*discovery_data.mutable_metadata()->mutable_labels())["label2"] = "value2";
-  (*discovery_data.mutable_metadata()->mutable_annotations())["annotation1"] = "value3";
-  (*discovery_data.mutable_metadata()->mutable_annotations())["annotation2"] = "value4";
 
   etcd_discovery_node::ptr_t node1 = std::make_shared<etcd_discovery_node>();
   discovery_data.set_id(1);
