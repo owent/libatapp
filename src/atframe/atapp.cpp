@@ -1280,7 +1280,7 @@ LIBATAPP_MACRO_API const atapp::protocol::atapp_runtime &app::get_runtime_config
 LIBATAPP_MACRO_API atapp::protocol::atapp_runtime &app::mutable_runtime_configure() { return conf_.runtime; }
 
 LIBATAPP_MACRO_API void app::set_api_version(gsl::string_view value) {
-  if (conf_.metadata.api_version() == value) {
+  if (gsl::string_view(conf_.metadata.api_version().c_str(), conf_.metadata.api_version().size()) == value) {
     return;
   }
 
@@ -1292,7 +1292,7 @@ LIBATAPP_MACRO_API void app::set_api_version(gsl::string_view value) {
 }
 
 LIBATAPP_MACRO_API void app::set_kind(gsl::string_view value) {
-  if (conf_.metadata.kind() == value) {
+  if (gsl::string_view(conf_.metadata.kind().c_str(), conf_.metadata.kind().size()) == value) {
     return;
   }
 
@@ -1304,7 +1304,7 @@ LIBATAPP_MACRO_API void app::set_kind(gsl::string_view value) {
 }
 
 LIBATAPP_MACRO_API void app::set_group(gsl::string_view value) {
-  if (conf_.metadata.group() == value) {
+  if (gsl::string_view(conf_.metadata.group().c_str(), conf_.metadata.group().size()) == value) {
     return;
   }
 
@@ -1316,7 +1316,7 @@ LIBATAPP_MACRO_API void app::set_group(gsl::string_view value) {
 }
 
 LIBATAPP_MACRO_API void app::set_metadata_name(gsl::string_view value) {
-  if (conf_.metadata.name() == value) {
+  if (gsl::string_view(conf_.metadata.name().c_str(), conf_.metadata.name().size()) == value) {
     return;
   }
 
@@ -1328,7 +1328,7 @@ LIBATAPP_MACRO_API void app::set_metadata_name(gsl::string_view value) {
 }
 
 LIBATAPP_MACRO_API void app::set_metadata_namespace_name(gsl::string_view value) {
-  if (conf_.metadata.namespace_name() == value) {
+  if (gsl::string_view(conf_.metadata.namespace_name().c_str(), conf_.metadata.namespace_name().size()) == value) {
     return;
   }
 
@@ -1340,7 +1340,7 @@ LIBATAPP_MACRO_API void app::set_metadata_namespace_name(gsl::string_view value)
 }
 
 LIBATAPP_MACRO_API void app::set_metadata_uid(gsl::string_view value) {
-  if (conf_.metadata.uid() == value) {
+  if (gsl::string_view(conf_.metadata.uid().c_str(), conf_.metadata.uid().size()) == value) {
     return;
   }
 
@@ -1352,7 +1352,7 @@ LIBATAPP_MACRO_API void app::set_metadata_uid(gsl::string_view value) {
 }
 
 LIBATAPP_MACRO_API void app::set_metadata_service_subset(gsl::string_view value) {
-  if (conf_.metadata.service_subset() == value) {
+  if (gsl::string_view(conf_.metadata.service_subset().c_str(), conf_.metadata.service_subset().size()) == value) {
     return;
   }
 
@@ -1375,7 +1375,7 @@ LIBATAPP_MACRO_API void app::set_metadata_label(gsl::string_view key, gsl::strin
 
   std::string key_string = static_cast<std::string>(key);
   auto iter = labels->find(key_string);
-  if (iter != labels->end() && iter->second == value) {
+  if (iter != labels->end() && gsl::string_view(iter->second.c_str(), iter->second.size()) == value) {
     return;
   }
 
