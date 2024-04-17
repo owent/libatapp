@@ -69,7 +69,7 @@ CASE_TEST(atapp_message, send_message_remote) {
 
   app2.set_evt_on_forward_request(message_callback_fn);
 
-  auto app2_discovery = std::make_shared<atapp::etcd_discovery_node>();
+  auto app2_discovery = util::memory::make_strong_rc<atapp::etcd_discovery_node>();
   {
     atapp::protocol::atapp_discovery app2_discovery_info;
     app2.pack(app2_discovery_info);
@@ -79,7 +79,7 @@ CASE_TEST(atapp_message, send_message_remote) {
 
   {
     // Mutable app1 in app2 to get name of remote node
-    auto app1_discovery = std::make_shared<atapp::etcd_discovery_node>();
+    auto app1_discovery = util::memory::make_strong_rc<atapp::etcd_discovery_node>();
     atapp::protocol::atapp_discovery app1_discovery_info;
     app1.pack(app1_discovery_info);
     app1_discovery->copy_from(app1_discovery_info, atapp::etcd_discovery_node::node_version());
@@ -178,7 +178,7 @@ CASE_TEST(atapp_message, send_message_loopback) {
   }
   CASE_EXPECT_EQ(received_messge_count, 2);
 
-  auto self_discovery = std::make_shared<atapp::etcd_discovery_node>();
+  auto self_discovery = util::memory::make_strong_rc<atapp::etcd_discovery_node>();
   atapp::protocol::atapp_discovery self_discovery_info;
   app1.pack(self_discovery_info);
   self_discovery->copy_from(self_discovery_info, atapp::etcd_discovery_node::node_version());

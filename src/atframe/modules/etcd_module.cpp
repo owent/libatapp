@@ -1319,7 +1319,7 @@ void etcd_module::pack(const node_info_t &src, std::string &json) {
   options.add_whitespace = false;
   options.always_print_enums_as_ints = true;
   options.preserve_proto_field_names = true;
-  if(!ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::util::MessageToJsonString(src.node_discovery, &json, options).ok()) {
+  if (!ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::util::MessageToJsonString(src.node_discovery, &json, options).ok()) {
     FWLOGERROR("etcd_module pack message to json failed");
   }
 }
@@ -1601,7 +1601,7 @@ bool etcd_module::update_inner_watcher_event(node_info_t &node, const etcd_disco
 
   bool has_event = false;
 
-  UTIL_LIKELY_IF(local_cache_by_id == local_cache_by_name) {
+  UTIL_LIKELY_IF (local_cache_by_id == local_cache_by_name) {
     if (node_action_t::EN_NAT_DELETE == node.action) {
       if (local_cache_by_id) {
         local_cache_by_id->update_version(version, true);
@@ -1617,7 +1617,7 @@ bool etcd_module::update_inner_watcher_event(node_info_t &node, const etcd_disco
       if (local_cache_by_id) {
         new_inst = local_cache_by_id;
       } else {
-        new_inst = std::make_shared<etcd_discovery_node>();
+        new_inst = util::memory::make_strong_rc<etcd_discovery_node>();
       }
 
       new_inst->copy_from(node.node_discovery, version);
@@ -1625,8 +1625,7 @@ bool etcd_module::update_inner_watcher_event(node_info_t &node, const etcd_disco
 
       has_event = true;
     }
-  }
-  else {
+  } else {
     if (node_action_t::EN_NAT_DELETE == node.action) {
       if (local_cache_by_id) {
         local_cache_by_id->update_version(version, true);
@@ -1656,7 +1655,7 @@ bool etcd_module::update_inner_watcher_event(node_info_t &node, const etcd_disco
         } else if (local_cache_by_name) {
           new_inst = local_cache_by_name;
         } else {
-          new_inst = std::make_shared<etcd_discovery_node>();
+          new_inst = util::memory::make_strong_rc<etcd_discovery_node>();
         }
         new_inst->copy_from(node.node_discovery, version);
 

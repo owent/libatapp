@@ -93,7 +93,7 @@ CASE_TEST(atapp_discovery, get_discovery_by_metadata) {
   using etcd_discovery_set = atapp::etcd_discovery_set;
   using etcd_discovery_node = atapp::etcd_discovery_node;
 
-  etcd_discovery_set::ptr_t discovery_set = std::make_shared<etcd_discovery_set>();
+  etcd_discovery_set::ptr_t discovery_set = util::memory::make_strong_rc<etcd_discovery_set>();
   CASE_EXPECT_TRUE(discovery_set->empty());
 
   atapp::protocol::atapp_discovery discovery_data;
@@ -110,7 +110,7 @@ CASE_TEST(atapp_discovery, get_discovery_by_metadata) {
   (*discovery_data.mutable_metadata()->mutable_labels())["label1"] = "value1";
   (*discovery_data.mutable_metadata()->mutable_labels())["label2"] = "value2";
 
-  etcd_discovery_node::ptr_t node1 = std::make_shared<etcd_discovery_node>();
+  etcd_discovery_node::ptr_t node1 = util::memory::make_strong_rc<etcd_discovery_node>();
   discovery_data.set_id(1);
   discovery_data.set_name("node1");
   discovery_data.set_identity("node-dient-1");
@@ -124,14 +124,14 @@ CASE_TEST(atapp_discovery, get_discovery_by_metadata) {
   CASE_EXPECT_EQ(2, node1->get_version().modify_revision);
   CASE_EXPECT_EQ(3, node1->get_version().version);
 
-  etcd_discovery_node::ptr_t node2 = std::make_shared<etcd_discovery_node>();
+  etcd_discovery_node::ptr_t node2 = util::memory::make_strong_rc<etcd_discovery_node>();
   discovery_data.set_id(2);
   discovery_data.set_name("node2");
   discovery_data.set_identity("node-dient-2");
   (*discovery_data.mutable_metadata()->mutable_labels())["selector"] = "s2";
   node2->copy_from(discovery_data, test_node_version);
 
-  etcd_discovery_node::ptr_t node3 = std::make_shared<etcd_discovery_node>();
+  etcd_discovery_node::ptr_t node3 = util::memory::make_strong_rc<etcd_discovery_node>();
   discovery_data.set_id(3);
   discovery_data.set_name("node3");
   discovery_data.set_identity("node-dient-3");

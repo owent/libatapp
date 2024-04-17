@@ -2610,7 +2610,7 @@ int64_t app::process_inner_events(const util::time::time_utility::raw_time_t &en
 }
 
 atapp_endpoint::ptr_t app::auto_mutable_self_endpoint() {
-  auto self_discovery = std::make_shared<atapp::etcd_discovery_node>();
+  auto self_discovery = util::memory::make_strong_rc<atapp::etcd_discovery_node>();
   if (!self_discovery) {
     return nullptr;
   }
@@ -4316,11 +4316,21 @@ int app::bus_evt_callback_on_custom_command_request(const atbus::node &n, const 
   }
 
   std::vector<std::string> args_str;
+  std::stringstream ss_log;
   args_str.resize(args.size());
 
   for (size_t i = 0; i < args_str.size(); ++i) {
     args_str[i].assign(reinterpret_cast<const char *>(args[i].first), args[i].second);
+    if (args_str[i].size() > 256) {
+      ss_log << " ";
+      ss_log.write(args_str[i].c_str(), 64);
+      ss_log << "...";
+      ss_log.write(args_str[i].c_str() + args_str[i].size() - 64, 64);
+    } else {
+      ss_log << " " << args_str[i];
+    }
   }
+  FWLOGINFO("app {}({:#x}) receive a command:{}", get_app_name(), get_app_id(), ss_log.str());
 
   util::cli::cmd_option_ci::ptr_type cmd_mgr = get_command_manager();
   custom_command_sender_t sender;

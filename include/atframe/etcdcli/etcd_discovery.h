@@ -11,6 +11,7 @@
 #include <design_pattern/nomovable.h>
 #include <design_pattern/noncopyable.h>
 
+#include <memory/rc_ptr.h>
 #include <random/random_generator.h>
 
 #include <memory>
@@ -35,7 +36,7 @@ struct LIBATAPP_MACRO_API_HEAD_ONLY etcd_discovery_action_t {
 class etcd_discovery_node {
  public:
   using on_destroy_fn_type = std::function<void(etcd_discovery_node &)>;
-  using ptr_t = std::shared_ptr<etcd_discovery_node>;
+  using ptr_t = util::memory::strong_rc_ptr<etcd_discovery_node>;
 
   struct LIBATAPP_MACRO_API_SYMBOL_VISIBLE node_version {
     int64_t create_revision;
@@ -122,7 +123,7 @@ class etcd_discovery_set {
   using node_by_name_type = std::unordered_map<std::string, etcd_discovery_node::ptr_t>;
   using node_by_id_type = std::unordered_map<uint64_t, etcd_discovery_node::ptr_t>;
   using metadata_type = atapp::protocol::atapp_metadata;
-  using ptr_t = std::shared_ptr<etcd_discovery_set>;
+  using ptr_t = util::memory::strong_rc_ptr<etcd_discovery_set>;
 
   struct node_hash_type {
     enum { HASH_POINT_PER_INS = 80 };

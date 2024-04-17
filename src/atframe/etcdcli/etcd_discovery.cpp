@@ -104,7 +104,10 @@ static void sort_string_map(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Map<std::st
 
   std::sort(output.begin(), output.end(),
             [](const std::pair<gsl::string_view, gsl::string_view> &l,
-               const std::pair<gsl::string_view, gsl::string_view> &r) { return l.first < r.first; });
+               const std::pair<gsl::string_view, gsl::string_view> &r) {
+              // only sort by key
+              return l.first < r.first;
+            });
 }
 
 struct lower_upper_bound_pred_t {
@@ -631,7 +634,7 @@ LIBATAPP_MACRO_API void etcd_discovery_set::add_node(const etcd_discovery_node::
         old_name = iter_id->second->get_discovery_info().name();
       }
 
-      // Remove old first, because directly change value of shared_ptr is not thread-safe
+      // Remove old first
       if (clear_cache_node_ptrs[clear_cache_node_ptrs_size - 1] != iter_id->second.get()) {
         clear_cache_node_ptrs[clear_cache_node_ptrs_size - 1] = iter_id->second.get();
         ++clear_cache_node_ptrs_size;
@@ -655,7 +658,7 @@ LIBATAPP_MACRO_API void etcd_discovery_set::add_node(const etcd_discovery_node::
         old_id = iter_name->second->get_discovery_info().id();
       }
 
-      // Remove old first, because directly change value of shared_ptr is not thread-safe
+      // Remove old first
       if (clear_cache_node_ptrs[clear_cache_node_ptrs_size - 1] != iter_name->second.get()) {
         clear_cache_node_ptrs[clear_cache_node_ptrs_size - 1] = iter_name->second.get();
         ++clear_cache_node_ptrs_size;

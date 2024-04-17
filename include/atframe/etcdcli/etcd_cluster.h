@@ -161,10 +161,10 @@ class etcd_cluster {
   LIBATAPP_MACRO_API bool is_available() const;
   LIBATAPP_MACRO_API void resolve_ready() noexcept;
 
-  UTIL_FORCEINLINE bool check_flag(uint32_t f) const { return 0 != (flags_ & f); };
+  UTIL_FORCEINLINE bool check_flag(uint32_t f) const { return 0 != (flags_ & f); }
   LIBATAPP_MACRO_API void set_flag(flag_t::type f, bool v);
 
-  UTIL_FORCEINLINE const stats_t &get_stats() const { return stats_; };
+  UTIL_FORCEINLINE const stats_t &get_stats() const { return stats_; }
 
   LIBATAPP_MACRO_API void set_logger(const util::log::log_wrapper::ptr_t &logger,
                                      util::log::log_formatter::level_t::type log_level) noexcept;
