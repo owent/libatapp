@@ -489,7 +489,9 @@ LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_na
 LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_consistent_hash(
     const void *buf, size_t bufsz, const metadata_type *metadata) const {
   index_cache_type *index_set = mutable_index_cache(metadata);
-  UTIL_UNLIKELY_IF(nullptr == index_set) { return nullptr; }
+  UTIL_UNLIKELY_IF (nullptr == index_set) {
+    return nullptr;
+  }
 
   if (index_set->hashing_cache.empty()) {
     rebuild_cache(*index_set, metadata);
@@ -527,7 +529,9 @@ LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_co
 LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_random(
     const metadata_type *metadata) const {
   index_cache_type *index_set = mutable_index_cache(metadata);
-  UTIL_UNLIKELY_IF(nullptr == index_set) { return nullptr; }
+  UTIL_UNLIKELY_IF (nullptr == index_set) {
+    return nullptr;
+  }
 
   if (index_set->round_robin_cache.empty()) {
     rebuild_cache(*index_set, metadata);
@@ -546,7 +550,9 @@ LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_ra
 LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_round_robin(
     const metadata_type *metadata) const {
   index_cache_type *index_set = mutable_index_cache(metadata);
-  UTIL_UNLIKELY_IF(nullptr == index_set) { return nullptr; }
+  UTIL_UNLIKELY_IF (nullptr == index_set) {
+    return nullptr;
+  }
 
   if (index_set->round_robin_cache.empty()) {
     rebuild_cache(*index_set, metadata);
@@ -569,7 +575,9 @@ LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_ro
 LIBATAPP_MACRO_API const std::vector<etcd_discovery_node::ptr_t> &etcd_discovery_set::get_sorted_nodes(
     const metadata_type *metadata) const {
   index_cache_type *index_set = mutable_index_cache(metadata);
-  UTIL_UNLIKELY_IF(nullptr == index_set) { return get_empty_discovery_set(); }
+  UTIL_UNLIKELY_IF (nullptr == index_set) {
+    return get_empty_discovery_set();
+  }
 
   if (index_set->round_robin_cache.empty()) {
     rebuild_cache(*index_set, metadata);

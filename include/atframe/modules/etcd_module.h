@@ -152,7 +152,7 @@ class etcd_module : public ::atapp::module_impl {
   LIBATAPP_MACRO_API const ::atapp::etcd_cluster &get_raw_etcd_ctx() const;
   LIBATAPP_MACRO_API ::atapp::etcd_cluster &get_raw_etcd_ctx();
 
-  LIBATAPP_MACRO_API const ::atapp::etcd_response_header & get_last_etcd_event_header() const;
+  LIBATAPP_MACRO_API const ::atapp::etcd_response_header &get_last_etcd_event_header() const;
 
   LIBATAPP_MACRO_API const atapp::protocol::atapp_etcd &get_configure() const;
   LIBATAPP_MACRO_API const std::string &get_configure_path() const;
