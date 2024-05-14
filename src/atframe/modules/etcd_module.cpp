@@ -410,7 +410,7 @@ LIBATAPP_MACRO_API int etcd_module::init() {
 
   // close timer for timeout
   uv_timer_stop(&tick_timer);
-  uv_close((uv_handle_t *)&tick_timer, detail::init_timer_closed_callback);
+  uv_close(reinterpret_cast<uv_handle_t *>(&tick_timer), detail::init_timer_closed_callback);
   while (tick_timer.data) {
     uv_run(get_app()->get_bus_node()->get_evloop(), UV_RUN_ONCE);
   }
@@ -953,6 +953,8 @@ LIBATAPP_MACRO_API int etcd_module::add_watcher_by_id(watcher_list_callback_t fn
     }
   }
 
+  std::lock_guard<std::recursive_mutex> lock_guard{watcher_callback_lock_};
+
   if (!inner_watcher_by_id_) {
     std::string watch_path = LOG_WRAPPER_FWAPI_FORMAT("{}{}", get_configure_path(), ETCD_MODULE_BY_ID_DIR);
 
@@ -1047,6 +1049,7 @@ LIBATAPP_MACRO_API int etcd_module::add_watcher_by_name(watcher_list_callback_t 
     }
   }
 
+  std::lock_guard<std::recursive_mutex> lock_guard{watcher_callback_lock_};
   if (!inner_watcher_by_name_) {
     // generate watch data
     std::string watch_path = LOG_WRAPPER_FWAPI_FORMAT("{}{}", get_configure_path(), ETCD_MODULE_BY_NAME_DIR);
@@ -1217,6 +1220,7 @@ LIBATAPP_MACRO_API bool etcd_module::remove_keepalive_actor(const atapp::etcd_ke
 
 LIBATAPP_MACRO_API etcd_module::node_event_callback_handle_t etcd_module::add_on_node_discovery_event(
     node_event_callback_t fn) {
+  std::lock_guard<std::recursive_mutex> lock_guard{node_event_lock_};
   if (!fn) {
     return node_event_callbacks_.end();
   }
@@ -1225,6 +1229,7 @@ LIBATAPP_MACRO_API etcd_module::node_event_callback_handle_t etcd_module::add_on
 }
 
 LIBATAPP_MACRO_API void etcd_module::remove_on_node_event(node_event_callback_handle_t &handle) {
+  std::lock_guard<std::recursive_mutex> lock_guard{node_event_lock_};
   if (handle == node_event_callbacks_.end()) {
     return;
   }
@@ -1601,7 +1606,7 @@ bool etcd_module::update_inner_watcher_event(node_info_t &node, const etcd_disco
 
   bool has_event = false;
 
-  UTIL_LIKELY_IF (local_cache_by_id == local_cache_by_name) {
+  if UTIL_LIKELY_CONDITION (local_cache_by_id == local_cache_by_name) {
     if (node_action_t::EN_NAT_DELETE == node.action) {
       if (local_cache_by_id) {
         local_cache_by_id->update_version(version, true);
@@ -1686,6 +1691,8 @@ bool etcd_module::update_inner_watcher_event(node_info_t &node, const etcd_disco
     }
 
     if (nullptr != owner) {
+      std::lock_guard<std::recursive_mutex> lock_guard{node_event_lock_};
+
       // notify all connector discovery event
       if (new_inst) {
         owner->trigger_event_on_discovery_event(node.action, new_inst);

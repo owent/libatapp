@@ -943,9 +943,13 @@ LIBATAPP_MACRO_API int app::tick() {
   // if is stoping, quit loop every tick
   if (nullptr != loop) {
     if (check_flag(flag_t::STOPING)) {
-      auto stop_interval = std::chrono::seconds{conf_.origin.timer().stop_interval().seconds()} +
-                           std::chrono::nanoseconds{conf_.origin.timer().stop_interval().nanos()};
-      auto stop_offset = tick_timer_.last_tick_timepoint - tick_timer_.last_stop_timepoint;
+      std::chrono::system_clock::duration stop_interval =
+          std::chrono::duration_cast<std::chrono::system_clock::duration>(
+              std::chrono::seconds{conf_.origin.timer().stop_interval().seconds()});
+      stop_interval += std::chrono::duration_cast<std::chrono::system_clock::duration>(
+          std::chrono::nanoseconds{conf_.origin.timer().stop_interval().nanos()});
+      std::chrono::system_clock::duration stop_offset =
+          tick_timer_.last_tick_timepoint - tick_timer_.last_stop_timepoint;
       if ((stop_offset.count() > 0 && stop_offset > stop_interval) ||
           (stop_offset.count() < 0 && -stop_offset > stop_interval)) {
         tick_timer_.last_stop_timepoint = tick_timer_.last_tick_timepoint;
@@ -1084,7 +1088,7 @@ LIBATAPP_MACRO_API util::cli::cmd_option::ptr_type app::get_option_manager() {
 LIBATAPP_MACRO_API bool app::is_current_upgrade_mode() const noexcept { return conf_.upgrade_mode; }
 
 LIBATAPP_MACRO_API util::network::http_request::curl_m_bind_ptr_t app::get_shared_curl_multi_context() const noexcept {
-  UTIL_LIKELY_IF (internal_module_etcd_) {
+  if UTIL_LIKELY_CONDITION (internal_module_etcd_) {
     return internal_module_etcd_->get_shared_curl_multi_context();
   }
 
@@ -1515,16 +1519,22 @@ LIBATAPP_MACRO_API uint32_t app::get_address_type(const std::string &address) co
   atbus::channel::make_address(address.c_str(), addr);
   std::transform(addr.scheme.begin(), addr.scheme.end(), addr.scheme.begin(), ::util::string::tolower<char>);
 
-  connector_protocol_map_t::const_iterator iter = connector_protocols_.find(addr.scheme);
-  if (iter == connector_protocols_.end()) {
-    return ret;
+  connector_protocol_map_t::mapped_type connector_protocol = nullptr;
+  {
+    std::lock_guard<std::recursive_mutex> lock_guard{connectors_lock_};
+    connector_protocol_map_t::const_iterator iter = connector_protocols_.find(addr.scheme);
+    if (iter == connector_protocols_.end()) {
+      return ret;
+    }
+
+    if (!iter->second) {
+      return ret;
+    }
+
+    connector_protocol = iter->second;
   }
 
-  if (!iter->second) {
-    return ret;
-  }
-
-  return iter->second->get_address_type(addr);
+  return connector_protocol->get_address_type(addr);
 }
 
 LIBATAPP_MACRO_API etcd_discovery_node::ptr_t app::get_discovery_node_by_id(uint64_t id) const noexcept {
@@ -1548,16 +1558,21 @@ LIBATAPP_MACRO_API int32_t app::listen(const std::string &address) {
   atbus::channel::make_address(address.c_str(), addr);
   std::transform(addr.scheme.begin(), addr.scheme.end(), addr.scheme.begin(), ::util::string::tolower<char>);
 
-  connector_protocol_map_t::const_iterator iter = connector_protocols_.find(addr.scheme);
-  if (iter == connector_protocols_.end()) {
-    return EN_ATBUS_ERR_CHANNEL_NOT_SUPPORT;
+  connector_protocol_map_t::mapped_type connector_protocol = nullptr;
+  {
+    std::lock_guard<std::recursive_mutex> lock(connectors_lock_);
+    connector_protocol_map_t::const_iterator iter = connector_protocols_.find(addr.scheme);
+    if (iter == connector_protocols_.end()) {
+      return EN_ATBUS_ERR_CHANNEL_NOT_SUPPORT;
+    }
+
+    if (!iter->second) {
+      return EN_ATBUS_ERR_CHANNEL_NOT_SUPPORT;
+    }
+    connector_protocol = iter->second;
   }
 
-  if (!iter->second) {
-    return EN_ATBUS_ERR_CHANNEL_NOT_SUPPORT;
-  }
-
-  return iter->second->on_start_listen(addr);
+  return connector_protocol->on_start_listen(addr);
 }
 
 LIBATAPP_MACRO_API int32_t app::send_message(uint64_t target_node_id, int32_t type, const void *data, size_t data_size,
@@ -2078,25 +2093,32 @@ LIBATAPP_MACRO_API atapp_endpoint::ptr_t app::mutable_endpoint(const etcd_discov
         atbus::channel::make_address(gateway.address().c_str(), addr);
         std::transform(addr.scheme.begin(), addr.scheme.end(), addr.scheme.begin(), ::util::string::tolower<char>);
 
-        connector_protocol_map_t::const_iterator iter = connector_protocols_.find(addr.scheme);
-        if (iter == connector_protocols_.end()) {
-          FWLOGDEBUG("atapp endpoint {}({}) skip unsupported address {}", ret->get_id(), ret->get_name(), addr.address);
-          continue;
-        }
+        connector_protocol_map_t::mapped_type connector_protocol = nullptr;
+        {
+          std::lock_guard<std::recursive_mutex> lock_guard{connectors_lock_};
+          connector_protocol_map_t::const_iterator iter = connector_protocols_.find(addr.scheme);
+          if (iter == connector_protocols_.end()) {
+            FWLOGDEBUG("atapp endpoint {}({}) skip unsupported address {}", ret->get_id(), ret->get_name(),
+                       addr.address);
+            continue;
+          }
 
-        if (!iter->second) {
-          FWLOGDEBUG("atapp endpoint {}({}) skip unsupported address {}", ret->get_id(), ret->get_name(), addr.address);
-          continue;
+          if (!iter->second) {
+            FWLOGDEBUG("atapp endpoint {}({}) skip unsupported address {}", ret->get_id(), ret->get_name(),
+                       addr.address);
+            continue;
+          }
+          connector_protocol = iter->second;
         }
 
         // Skip loopback and use inner loopback connector
-        if (is_loopback && !iter->second->support_loopback()) {
+        if (is_loopback && !connector_protocol->support_loopback()) {
           continue;
         }
 
-        int res = iter->second->on_start_connect(discovery.get(), addr, handle);
+        int res = connector_protocol->on_start_connect(discovery.get(), addr, handle);
         if (0 == res && handle.use_count() > 1) {
-          atapp_connector_bind_helper::bind(*handle, *iter->second);
+          atapp_connector_bind_helper::bind(*handle, *connector_protocol);
           atapp_endpoint_bind_helper::bind(*handle, *ret);
 
           FWLOGINFO("connect address {} of atapp endpoint {}({}) success and use handle {}", ret->get_id(),
@@ -3128,6 +3150,7 @@ LIBATAPP_MACRO_API void app::trigger_event_on_discovery_event(etcd_discovery_act
     }
   }
 
+  std::lock_guard<std::recursive_mutex> lock(connectors_lock_);
   for (std::list<std::shared_ptr<atapp_connector_impl>>::const_iterator iter = connectors_.begin();
        iter != connectors_.end(); ++iter) {
     if (*iter) {
@@ -3470,7 +3493,7 @@ bool app::setup_timeout_timer(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration 
 
   int res = uv_timer_start(&timer->timer, ev_stop_timeout,
                            details::chrono_to_libuv_duration(duration, ATAPP_DEFAULT_STOP_TIMEOUT), 0);
-  UTIL_LIKELY_IF (0 == res) {
+  if UTIL_LIKELY_CONDITION (0 == res) {
     tick_timer_.timeout_timer = timer;
 
     return true;
@@ -3642,7 +3665,9 @@ LIBATAPP_MACRO_API void app::split_ids_by_string(const char *in, std::vector<app
 
     out.push_back(::util::string::to_int<app_id_t>(in));
 
-    for (; nullptr != in && *in && '.' != *in; ++in);
+    for (; nullptr != in && *in && '.' != *in; ++in) {
+      continue;
+    }
     // skip dot and ready to next segment
     if (nullptr != in && *in && '.' == *in) {
       ++in;
@@ -4453,6 +4478,8 @@ LIBATAPP_MACRO_API void app::add_connector_inner(std::shared_ptr<atapp_connector
   if (!connector) {
     return;
   }
+
+  std::lock_guard<std::recursive_mutex> lock_guard{connectors_lock_};
 
   connectors_.push_back(connector);
 

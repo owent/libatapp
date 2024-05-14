@@ -27,6 +27,7 @@
 #include <ctime>
 #include <list>
 #include <memory>
+#include <mutex>
 #include <set>
 #include <string>
 #include <vector>
@@ -233,12 +234,16 @@ class etcd_module : public ::atapp::module_impl {
   snapshot_event_callback_list_t on_snapshot_loaded_callbacks_;
   std::set<int64_t> watcher_snapshot_index_;
   int64_t watcher_snapshot_index_allocator_;
+
+  mutable std::recursive_mutex watcher_callback_lock_;
   std::list<watcher_list_callback_t> watcher_by_id_callbacks_;
   std::list<watcher_list_callback_t> watcher_by_name_callbacks_;
 
   etcd_watcher::ptr_t inner_watcher_by_name_;
   etcd_watcher::ptr_t inner_watcher_by_id_;
   etcd_discovery_set global_discovery_;
+
+  mutable std::recursive_mutex node_event_lock_;
   node_event_callback_list_t node_event_callbacks_;
 };
 }  // namespace atapp

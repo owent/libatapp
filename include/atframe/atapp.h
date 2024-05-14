@@ -9,6 +9,7 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -715,6 +716,7 @@ class app {
       endpoint_waker_;
 
   // inner connectors
+  mutable std::recursive_mutex connectors_lock_;
   std::list<std::shared_ptr<atapp_connector_impl>> connectors_;
   connector_protocol_map_t connector_protocols_;
   std::shared_ptr<atapp_connector_atbus> atbus_connector_;
