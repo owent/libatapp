@@ -214,6 +214,7 @@ LIBATAPP_MACRO_API app::app() : setup_result_(0), ev_loop_(nullptr), mode_(mode_
 }
 
 LIBATAPP_MACRO_API app::~app() {
+  set_flag(flag_t::DESTROYING, true);
   if (is_inited() && !is_closed()) {
     if (!is_closing()) {
       stop();
@@ -260,6 +261,24 @@ LIBATAPP_MACRO_API app::~app() {
       mod->on_unbind();
       mod->owner_ = nullptr;
     }
+  }
+
+  {
+    std::lock_guard<std::recursive_mutex> lock_guard{connectors_lock_};
+
+    auto connectors = connectors_;
+
+    for (auto &connector : connectors_) {
+      if (!connector) {
+        continue;
+      }
+
+      connector->cleanup();
+    }
+
+    atbus_connector_.reset();
+    loopback_connector_.reset();
+    connectors_.clear();
   }
 
   // reset atbus first, make sure atbus ref count is greater than 0 when reset it
@@ -4475,7 +4494,7 @@ void app::app_evt_on_finally() {
 }
 
 LIBATAPP_MACRO_API void app::add_connector_inner(std::shared_ptr<atapp_connector_impl> connector) {
-  if (!connector) {
+  if (!connector || check_flag(flag_t::DESTROYING)) {
     return;
   }
 

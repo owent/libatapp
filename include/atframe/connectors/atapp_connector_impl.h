@@ -185,6 +185,7 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE atapp_connector_impl {
   mutable std::unique_ptr<util::scoped_demangled_name> auto_demangled_name_;
 
   friend struct atapp_connector_bind_helper;
+  friend class app;
 };
 
 }  // namespace atapp

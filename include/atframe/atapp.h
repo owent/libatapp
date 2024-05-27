@@ -71,6 +71,7 @@ class app {
       STOPPED,
       DISABLE_ATBUS_FALLBACK,
       IN_TICK,
+      DESTROYING,
       FLAG_MAX
     };
   };

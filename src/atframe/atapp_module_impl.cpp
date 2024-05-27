@@ -25,11 +25,7 @@ LIBATAPP_MACRO_API module_impl::module_impl() : enabled_(true), actived_(false),
       std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::seconds(5));
 }
 
-LIBATAPP_MACRO_API module_impl::~module_impl() {
-  if (nullptr != owner_) {
-    on_unbind();
-  }
-}
+LIBATAPP_MACRO_API module_impl::~module_impl() {}
 
 LIBATAPP_MACRO_API void module_impl::on_bind() {}
 

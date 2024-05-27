@@ -165,10 +165,7 @@ LIBATAPP_MACRO_API void atapp_connection_handle::reset_on_destroy() {
 
 LIBATAPP_MACRO_API atapp_connector_impl::atapp_connector_impl(app &owner) : owner_(&owner), is_destroying_(false) {}
 
-LIBATAPP_MACRO_API atapp_connector_impl::~atapp_connector_impl() {
-  is_destroying_ = true;
-  cleanup();
-}
+LIBATAPP_MACRO_API atapp_connector_impl::~atapp_connector_impl() { is_destroying_ = true; }
 
 LIBATAPP_MACRO_API const char *atapp_connector_impl::name() noexcept {
   if (auto_demangled_name_) {
