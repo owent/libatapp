@@ -2298,9 +2298,21 @@ bool app::set_flag(flag_t::type f, bool v) {
     return false;
   }
 
-  bool ret = flags_.test(f);
-  flags_.set(f, v);
-  return ret;
+  uint64_t mask_value = static_cast<uint64_t>(1) << static_cast<uint32_t>(f);
+
+  uint64_t current_value = flags_.load(std::memory_order_acquire);
+  while (true) {
+    uint64_t expect_value = v ? (current_value | mask_value) : (current_value & (~mask_value));
+    if (current_value == expect_value) {
+      return v;
+    }
+
+    if (flags_.compare_exchange_weak(current_value, expect_value, std::memory_order_acq_rel)) {
+      return !v;
+    }
+  }
+
+  return 0 != (current_value & mask_value);
 }
 
 LIBATAPP_MACRO_API bool app::check_flag(flag_t::type f) const noexcept {
@@ -2308,7 +2320,7 @@ LIBATAPP_MACRO_API bool app::check_flag(flag_t::type f) const noexcept {
     return false;
   }
 
-  return flags_.test(f);
+  return 0 != (flags_.load(std::memory_order_acquire) & (static_cast<uint64_t>(1) << static_cast<uint32_t>(f)));
 }
 
 int app::apply_configure() {
@@ -3458,6 +3470,9 @@ static void _app_tick_timer_handle(uv_timer_t *handle) {
   if (nullptr != handle && nullptr != handle->data) {
     app *self = reinterpret_cast<app *>(handle->data);
     self->tick();
+
+    // It may take a long time to process the tick, so update the time after the tick
+    uv_update_time(handle->loop);
   }
 }
 

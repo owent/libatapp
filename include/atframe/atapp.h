@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include <bitset>
+#include <atomic>
 #include <chrono>
 #include <functional>
 #include <list>
@@ -668,7 +668,7 @@ class app {
 
   ev_loop_t *ev_loop_;
   std::shared_ptr<atbus::node> bus_node_;
-  std::bitset<flag_t::FLAG_MAX> flags_;
+  std::atomic<uint64_t> flags_;
   mode_t::type mode_;
   tick_timer_t tick_timer_;
 
