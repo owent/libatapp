@@ -40,7 +40,6 @@
 #include "atframe/connectors/atapp_connector_loopback.h"
 
 #define ATAPP_DEFAULT_STOP_TIMEOUT 30000
-#define ATAPP_DEFAULT_TICK_INTERVAL 16
 
 namespace atapp {
 app *app::last_instance_ = nullptr;
@@ -93,6 +92,15 @@ static uint64_t chrono_to_libuv_duration(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID
   }
 
   return ret;
+}
+
+static uint64_t chrono_to_libuv_duration(std::chrono::system_clock::duration in) {
+  auto ret = std::chrono::duration_cast<std::chrono::milliseconds>(in).count();
+  if (ret < 0) {
+    ret = 0;
+  }
+
+  return static_cast<uint64_t>(ret);
 }
 
 #if defined(THREAD_TLS_USE_PTHREAD) && THREAD_TLS_USE_PTHREAD
@@ -180,6 +188,9 @@ LIBATAPP_MACRO_API app::app() : setup_result_(0), ev_loop_(nullptr), flags_(0), 
   conf_.execute_path = nullptr;
   conf_.upgrade_mode = false;
   conf_.runtime_pod_stateful_index = static_cast<int32_t>(atapp_pod_stateful_index::kUnset);
+  conf_.timer_tick_interval =
+      std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::milliseconds{8});
+  conf_.timer_reserve_permille = 10;
 
   util::time::time_utility::update();
   tick_timer_.last_tick_timepoint = util::time::time_utility::sys_now();
@@ -187,6 +198,7 @@ LIBATAPP_MACRO_API app::app() : setup_result_(0), ev_loop_(nullptr), flags_(0), 
   tick_timer_.sec = util::time::time_utility::get_sys_now();
   tick_timer_.usec = 0;
   tick_timer_.inner_break = nullptr;
+  tick_timer_.tick_offset = std::chrono::system_clock::duration::zero();
 
   stats_.last_checkpoint_min = 0;
   stats_.endpoint_wake_count = 0;
@@ -792,7 +804,6 @@ static bool reload_all_configure_files(app::yaml_conf_map_t &yaml_map, util::con
 
 LIBATAPP_MACRO_API int app::reload() {
   atbus::adapter::loop_t *old_loop = conf_.bus_conf.ev_loop;
-  ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration old_tick_interval = conf_.origin.timer().tick_interval();
 
   FWLOGWARNING("============ start to load configure ============");
   // step 1. reset configure
@@ -858,17 +869,6 @@ LIBATAPP_MACRO_API int app::reload() {
     }
   }
 
-  // step 8. if running and tick interval changed, reset timer
-  if (old_tick_interval.seconds() != conf_.origin.timer().tick_interval().seconds() ||
-      old_tick_interval.nanos() != conf_.origin.timer().tick_interval().nanos()) {
-    set_flag(flag_t::RESET_TIMER, true);
-
-    ev_loop_t *loop = get_evloop();
-    if (is_running() && nullptr != loop) {
-      uv_stop(loop);
-    }
-  }
-
   FWLOGWARNING("------------ load configure done ------------");
   return 0;
 }
@@ -908,12 +908,7 @@ LIBATAPP_MACRO_API int app::tick() {
   util::time::time_utility::raw_time_t start_tp = util::time::time_utility::sys_now();
   util::time::time_utility::raw_time_t end_tp = start_tp;
 
-  std::chrono::system_clock::duration conf_tick_interval =
-      std::chrono::duration_cast<std::chrono::system_clock::duration>(
-          std::chrono::seconds(conf_.origin.timer().tick_interval().seconds()));
-  conf_tick_interval += std::chrono::duration_cast<std::chrono::system_clock::duration>(
-      std::chrono::nanoseconds(conf_.origin.timer().tick_interval().nanos()));
-  end_tp += conf_tick_interval;
+  end_tp += conf_.timer_tick_interval;
 
   tick_timer_.last_tick_timepoint = util::time::time_utility::sys_now();
   do {
@@ -1227,6 +1222,14 @@ LIBATAPP_MACRO_API util::time::time_utility::raw_time_t app::get_last_tick_time(
 
 LIBATAPP_MACRO_API util::config::ini_loader &app::get_configure_loader() { return cfg_loader_; }
 LIBATAPP_MACRO_API const util::config::ini_loader &app::get_configure_loader() const noexcept { return cfg_loader_; }
+
+LIBATAPP_MACRO_API std::chrono::system_clock::duration app::get_configure_timer_interval() const noexcept {
+  return conf_.timer_tick_interval;
+}
+
+LIBATAPP_MACRO_API int64_t app::get_configure_timer_reserve_permille() const noexcept {
+  return conf_.timer_reserve_permille;
+}
 
 LIBATAPP_MACRO_API app::yaml_conf_map_t &app::get_yaml_loaders() { return yaml_loader_; }
 LIBATAPP_MACRO_API const app::yaml_conf_map_t &app::get_yaml_loaders() const noexcept { return yaml_loader_; }
@@ -1570,6 +1573,19 @@ LIBATAPP_MACRO_API etcd_discovery_node::ptr_t app::get_discovery_node_by_name(co
   }
 
   return internal_module_etcd_->get_global_discovery().get_node_by_name(name);
+}
+
+LIBATAPP_MACRO_API uint64_t app::calculate_next_tick_timer_ms(std::chrono::system_clock::duration offset) noexcept {
+  tick_timer_.tick_offset += offset;
+
+  if UTIL_UNLIKELY_CONDITION (tick_timer_.tick_offset < std::chrono::system_clock::duration::zero()) {
+    tick_timer_.tick_offset = std::chrono::system_clock::duration::zero();
+    return 0;
+  }
+
+  auto ret = std::chrono::duration_cast<std::chrono::milliseconds>(tick_timer_.tick_offset).count();
+  tick_timer_.tick_offset -= std::chrono::milliseconds(ret);
+  return static_cast<uint64_t>(ret);
 }
 
 LIBATAPP_MACRO_API int32_t app::listen(const std::string &address) {
@@ -2391,6 +2407,26 @@ int app::apply_configure() {
     conf_.runtime_pod_stateful_index = static_cast<int32_t>(atapp_pod_stateful_index::kUnset);
   }
 
+  // timer configure
+  {
+    conf_.timer_tick_interval = std::chrono::duration_cast<std::chrono::system_clock::duration>(
+        std::chrono::seconds(conf_.origin.timer().tick_interval().seconds()));
+    conf_.timer_tick_interval += std::chrono::duration_cast<std::chrono::system_clock::duration>(
+        std::chrono::nanoseconds(conf_.origin.timer().tick_interval().nanos()));
+
+    if (conf_.timer_tick_interval < std::chrono::milliseconds(1)) {
+      conf_.timer_tick_interval =
+          std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::milliseconds(8));
+    }
+
+    conf_.timer_reserve_permille = conf_.origin.timer().reserve_permille();
+    if (conf_.timer_reserve_permille <= 0) {
+      conf_.timer_reserve_permille = 10;
+    } else if (conf_.timer_reserve_permille >= 1000) {
+      conf_.timer_reserve_permille = 999;
+    }
+  }
+
   // atbus configure
   atbus::node::default_conf(&conf_.bus_conf);
 
@@ -2449,10 +2485,6 @@ void app::run_ev_loop(int run_mode) {
     if (nullptr != loop) {
       flag_guard_t in_callback_guard(*this, flag_t::IN_CALLBACK);
       uv_run(loop, static_cast<uv_run_mode>(run_mode));
-    }
-
-    if (check_flag(flag_t::RESET_TIMER)) {
-      setup_tick_timer();
     }
 
     if (0 != pending_signals_[0]) {
@@ -3468,25 +3500,45 @@ void app::close_timer(timer_ptr_t &t) {
 
 static void _app_tick_timer_handle(uv_timer_t *handle) {
   if (nullptr != handle && nullptr != handle->data) {
+    std::chrono::system_clock::time_point start_timer = std::chrono::system_clock::now();
+
     app *self = reinterpret_cast<app *>(handle->data);
     self->tick();
 
+    // insert timer again, just like uv_timer_again
+    int64_t reserve_permille = self->get_configure_timer_reserve_permille();
+    if (reserve_permille < 0) {
+      reserve_permille = 1;
+    } else if (reserve_permille >= 1000) {
+      reserve_permille = 999;
+    }
+
+    std::chrono::system_clock::duration timer_interval = self->get_configure_timer_interval();
+
+    std::chrono::system_clock::time_point end_timer = std::chrono::system_clock::now();
+    std::chrono::system_clock::duration round_cost = end_timer - start_timer;
+
+    std::chrono::system_clock::duration timer_interval_reserve =
+        std::chrono::system_clock::duration{(timer_interval.count() * reserve_permille / 1000)};
+    if (timer_interval - round_cost >= timer_interval_reserve) {
+      timer_interval_reserve = timer_interval - round_cost;
+    } else {
+      timer_interval_reserve =
+          std::chrono::system_clock::duration{round_cost.count() * reserve_permille / (1000 - reserve_permille)};
+    }
+
     // It may take a long time to process the tick, so update the time after the tick
     uv_update_time(handle->loop);
+    uv_timer_start(handle, _app_tick_timer_handle, self->calculate_next_tick_timer_ms(timer_interval_reserve), 0);
+  } else {
+    uv_timer_start(handle, _app_tick_timer_handle, 256, 0);
   }
 }
 
 int app::setup_tick_timer() {
-  set_flag(flag_t::RESET_TIMER, false);
-
   close_timer(tick_timer_.tick_timer);
 
-  if (details::chrono_to_libuv_duration(conf_.origin.timer().tick_interval(), 0) < 1) {
-    FWLOGWARNING("tick interval can not smaller than 1ms, we use default {}ms now.", ATAPP_DEFAULT_TICK_INTERVAL);
-  } else {
-    FWLOGINFO("setup tick interval to {}ms.",
-              details::chrono_to_libuv_duration(conf_.origin.timer().tick_interval(), ATAPP_DEFAULT_TICK_INTERVAL));
-  }
+  FWLOGINFO("setup tick interval to {}ms.", details::chrono_to_libuv_duration(conf_.timer_tick_interval));
 
   timer_ptr_t timer = std::make_shared<timer_info_t>();
   ev_loop_t *loop = get_evloop();
@@ -3494,10 +3546,8 @@ int app::setup_tick_timer() {
   uv_timer_init(loop, &timer->timer);
   timer->timer.data = this;
 
-  int res = uv_timer_start(
-      &timer->timer, _app_tick_timer_handle,
-      details::chrono_to_libuv_duration(conf_.origin.timer().tick_interval(), ATAPP_DEFAULT_TICK_INTERVAL),
-      details::chrono_to_libuv_duration(conf_.origin.timer().tick_interval(), ATAPP_DEFAULT_TICK_INTERVAL));
+  int res = uv_timer_start(&timer->timer, _app_tick_timer_handle,
+                           details::chrono_to_libuv_duration(conf_.timer_tick_interval), 0);
   if (0 == res) {
     tick_timer_.tick_timer = timer;
   } else {

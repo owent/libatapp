@@ -86,6 +86,7 @@ message atapp_timer {
   google.protobuf.Duration tick_interval = 3 [(atapp.protocol.CONFIGURE) = { default_value: "16ms" }];
   google.protobuf.Duration message_timeout = 4 [(atapp.protocol.CONFIGURE) = { default_value: "8s" }];
   google.protobuf.Duration initialize_timeout = 5 [(atapp.protocol.CONFIGURE) = { default_value: "10s" }];
+  int32 reserve_permille = 6 [(atapp.protocol.CONFIGURE) = { default_value: "10" min_value: "1" }];
 }
 
 message atapp_log_level_range {

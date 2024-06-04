@@ -18,6 +18,7 @@
 #include <libatbus.h>
 
 #include <stdint.h>
+#include <chrono>
 #include <cstddef>
 #include <cstring>
 #include <list>
@@ -47,6 +48,10 @@ struct app_conf {
   atbus::node::conf_t bus_conf;
   std::string app_version;
   std::string hash_code;
+
+  // timer configure
+  std::chrono::system_clock::duration timer_tick_interval;
+  int64_t timer_reserve_permille;
 
   std::list<std::string> startup_log;
 
