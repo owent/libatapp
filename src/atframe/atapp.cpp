@@ -159,7 +159,7 @@ LIBATAPP_MACRO_API app::flag_guard_t::~flag_guard_t() {
   owner_->set_flag(flag_, false);
 }
 
-LIBATAPP_MACRO_API app::app() : setup_result_(0), ev_loop_(nullptr), mode_(mode_t::CUSTOM) {
+LIBATAPP_MACRO_API app::app() : setup_result_(0), ev_loop_(nullptr), flags_(0), mode_(mode_t::CUSTOM) {
   if (nullptr == last_instance_) {
 #if defined(OPENSSL_VERSION_NUMBER)
 #  if OPENSSL_VERSION_NUMBER < 0x10100000L
