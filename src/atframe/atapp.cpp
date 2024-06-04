@@ -1591,10 +1591,10 @@ LIBATAPP_MACRO_API uint64_t app::calculate_next_tick_timer_ms(std::chrono::syste
   std::chrono::milliseconds::rep ret;
   if (tick_timer_.tick_offset < conf_.timer_reserve_interval_min) {
     tick_timer_.tick_offset = std::chrono::system_clock::duration::zero();
-    ret = conf_.timer_reserve_interval_min.count();
+    ret = std::chrono::duration_cast<std::chrono::milliseconds>(conf_.timer_reserve_interval_min).count();
   } else if (tick_timer_.tick_offset >= conf_.timer_reserve_interval_max) {
     tick_timer_.tick_offset = std::chrono::system_clock::duration::zero();
-    ret = conf_.timer_reserve_interval_max.count();
+    ret = std::chrono::duration_cast<std::chrono::milliseconds>(conf_.timer_reserve_interval_max).count();
   } else {
     ret = std::chrono::duration_cast<std::chrono::milliseconds>(tick_timer_.tick_offset).count();
     tick_timer_.tick_offset -= std::chrono::milliseconds(ret);
@@ -2457,6 +2457,9 @@ int app::apply_configure() {
     if (conf_.timer_reserve_interval_max < std::chrono::milliseconds(1)) {
       conf_.timer_tick_interval =
           std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::seconds(1));
+    }
+    if (conf_.timer_reserve_interval_max < conf_.timer_reserve_interval_min) {
+      conf_.timer_reserve_interval_max = conf_.timer_reserve_interval_min;
     }
 
     conf_.timer_reserve_interval_tick = std::chrono::system_clock::duration{
@@ -3566,6 +3569,7 @@ static void _app_tick_timer_handle(uv_timer_t *handle) {
     uv_update_time(handle->loop);
     uv_timer_start(handle, _app_tick_timer_handle, self->calculate_next_tick_timer_ms(timer_interval_reserve), 0);
   } else {
+    uv_update_time(handle->loop);
     uv_timer_start(handle, _app_tick_timer_handle, 256, 0);
   }
 }
