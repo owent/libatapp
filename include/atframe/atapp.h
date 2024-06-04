@@ -310,6 +310,8 @@ class app {
 
   LIBATAPP_MACRO_API int64_t get_configure_timer_reserve_permille() const noexcept;
 
+  LIBATAPP_MACRO_API std::chrono::system_clock::duration get_configure_timer_reserve_tick() const noexcept;
+
   /**
    * @brief get yaml configure loaders
    * @note Be careful yaml API may throw a exception

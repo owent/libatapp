@@ -52,6 +52,9 @@ struct app_conf {
   // timer configure
   std::chrono::system_clock::duration timer_tick_interval;
   int64_t timer_reserve_permille;
+  std::chrono::system_clock::duration timer_reserve_interval_tick;
+  std::chrono::system_clock::duration timer_reserve_interval_min;
+  std::chrono::system_clock::duration timer_reserve_interval_max;
 
   std::list<std::string> startup_log;
 
