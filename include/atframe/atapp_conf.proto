@@ -87,7 +87,7 @@ message atapp_timer {
   google.protobuf.Duration message_timeout = 4 [(atapp.protocol.CONFIGURE) = { default_value: "8s" }];
   google.protobuf.Duration initialize_timeout = 5 [(atapp.protocol.CONFIGURE) = { default_value: "10s" }];
   google.protobuf.Duration reserve_interval_min = 6
-      [(atapp.protocol.CONFIGURE) = { default_value: "100us" min_value: "1us" }];
+      [(atapp.protocol.CONFIGURE) = { default_value: "100us" min_value: "0" }];
   google.protobuf.Duration reserve_interval_max = 7
       [(atapp.protocol.CONFIGURE) = { default_value: "1s" min_value: "1ms" }];
   int32 reserve_permille = 8 [(atapp.protocol.CONFIGURE) = { default_value: "10" min_value: "1" }];

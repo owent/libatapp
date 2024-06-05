@@ -204,7 +204,7 @@ LIBATAPP_MACRO_API app::app() : setup_result_(0), ev_loop_(nullptr), flags_(0), 
   tick_timer_.sec = util::time::time_utility::get_sys_now();
   tick_timer_.usec = 0;
   tick_timer_.inner_break = nullptr;
-  tick_timer_.tick_offset = std::chrono::system_clock::duration::zero();
+  tick_timer_.tick_compensation = std::chrono::system_clock::duration::zero();
 
   stats_.last_checkpoint_min = 0;
   stats_.endpoint_wake_count = 0;
@@ -1585,22 +1585,36 @@ LIBATAPP_MACRO_API etcd_discovery_node::ptr_t app::get_discovery_node_by_name(co
   return internal_module_etcd_->get_global_discovery().get_node_by_name(name);
 }
 
-LIBATAPP_MACRO_API uint64_t app::calculate_next_tick_timer_ms(std::chrono::system_clock::duration offset) noexcept {
-  tick_timer_.tick_offset += offset;
-
-  std::chrono::milliseconds::rep ret;
-  if (tick_timer_.tick_offset < conf_.timer_reserve_interval_min) {
-    tick_timer_.tick_offset = std::chrono::system_clock::duration::zero();
-    ret = std::chrono::duration_cast<std::chrono::milliseconds>(conf_.timer_reserve_interval_min).count();
-  } else if (tick_timer_.tick_offset >= conf_.timer_reserve_interval_max) {
-    tick_timer_.tick_offset = std::chrono::system_clock::duration::zero();
-    ret = std::chrono::duration_cast<std::chrono::milliseconds>(conf_.timer_reserve_interval_max).count();
-  } else {
-    ret = std::chrono::duration_cast<std::chrono::milliseconds>(tick_timer_.tick_offset).count();
-    tick_timer_.tick_offset -= std::chrono::milliseconds(ret);
+LIBATAPP_MACRO_API void app::produce_tick_timer_compensation(std::chrono::system_clock::duration tick_cost) noexcept {
+  if (tick_cost <= conf_.timer_reserve_interval_tick) {
+    tick_timer_.tick_compensation += conf_.timer_reserve_interval_min;
+    return;
   }
 
-  return static_cast<uint64_t>(ret);
+  int64_t reserve_permille = conf_.timer_reserve_permille;
+  if (reserve_permille < 0) {
+    reserve_permille = 1;
+  } else if (reserve_permille >= 1000) {
+    reserve_permille = 999;
+  }
+
+  tick_timer_.tick_compensation += std::chrono::system_clock::duration{
+      (tick_cost - conf_.timer_reserve_interval_tick).count() * reserve_permille / (1000 - reserve_permille)};
+}
+
+LIBATAPP_MACRO_API uint64_t app::consume_tick_timer_compensation() noexcept {
+  if (tick_timer_.tick_compensation > std::chrono::milliseconds{1}) {
+    auto ret = std::chrono::duration_cast<std::chrono::milliseconds>(tick_timer_.tick_compensation).count();
+    if UTIL_UNLIKELY_CONDITION (tick_timer_.tick_compensation > conf_.timer_reserve_interval_max) {
+      tick_timer_.tick_compensation = std::chrono::system_clock::duration::zero();
+      ret = std::chrono::duration_cast<std::chrono::milliseconds>(conf_.timer_reserve_interval_max).count();
+    } else {
+      tick_timer_.tick_compensation -= std::chrono::milliseconds{ret};
+    }
+    return static_cast<uint64_t>(ret);
+  }
+
+  return 0;
 }
 
 LIBATAPP_MACRO_API int32_t app::listen(const std::string &address) {
@@ -2464,6 +2478,14 @@ int app::apply_configure() {
 
     conf_.timer_reserve_interval_tick = std::chrono::system_clock::duration{
         conf_.timer_tick_interval.count() * (1000 - conf_.timer_reserve_permille) / 1000};
+    {
+      std::chrono::system_clock::duration reserve_interval_tick_from_min =
+          std::chrono::system_clock::duration{conf_.timer_reserve_interval_min.count() *
+                                              (1000 - conf_.timer_reserve_permille) / conf_.timer_reserve_permille};
+      if (reserve_interval_tick_from_min > conf_.timer_reserve_interval_tick) {
+        conf_.timer_reserve_interval_tick = reserve_interval_tick_from_min;
+      }
+    }
   }
 
   // atbus configure
@@ -3542,34 +3564,21 @@ static void _app_tick_timer_handle(uv_timer_t *handle) {
     std::chrono::system_clock::time_point start_timer = std::chrono::system_clock::now();
 
     app *self = reinterpret_cast<app *>(handle->data);
-    self->tick();
 
     // insert timer again, just like uv_timer_again
     std::chrono::system_clock::duration timer_interval = self->get_configure_timer_interval();
 
+    uv_timer_start(handle, _app_tick_timer_handle,
+                   details::chrono_to_libuv_duration(timer_interval) + self->consume_tick_timer_compensation(), 0);
+
+    self->tick();
+
     std::chrono::system_clock::time_point end_timer = std::chrono::system_clock::now();
-    std::chrono::system_clock::duration round_cost = end_timer - start_timer;
-
-    std::chrono::system_clock::duration timer_interval_reserve = self->get_configure_timer_reserve_tick();
-    if (round_cost <= timer_interval_reserve) {
-      timer_interval_reserve = timer_interval - round_cost;
-    } else {
-      int64_t reserve_permille = self->get_configure_timer_reserve_permille();
-      if (reserve_permille < 0) {
-        reserve_permille = 1;
-      } else if (reserve_permille >= 1000) {
-        reserve_permille = 999;
-      }
-
-      timer_interval_reserve =
-          std::chrono::system_clock::duration{round_cost.count() * reserve_permille / (1000 - reserve_permille)};
-    }
+    self->produce_tick_timer_compensation(end_timer - start_timer);
 
     // It may take a long time to process the tick, so update the time after the tick
     uv_update_time(handle->loop);
-    uv_timer_start(handle, _app_tick_timer_handle, self->calculate_next_tick_timer_ms(timer_interval_reserve), 0);
   } else {
-    uv_update_time(handle->loop);
     uv_timer_start(handle, _app_tick_timer_handle, 256, 0);
   }
 }

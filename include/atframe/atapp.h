@@ -145,7 +145,7 @@ class app {
     time_t sec;
     time_t usec;
     util::time::time_utility::raw_time_t *inner_break;
-    std::chrono::system_clock::duration tick_offset;
+    std::chrono::system_clock::duration tick_compensation;
 
     timer_ptr_t tick_timer;
     timer_ptr_t timeout_timer;
@@ -395,7 +395,10 @@ class app {
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_discovery_node_by_id(uint64_t id) const noexcept;
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_discovery_node_by_name(const std::string &name) const noexcept;
 
-  LIBATAPP_MACRO_API uint64_t calculate_next_tick_timer_ms(std::chrono::system_clock::duration offset) noexcept;
+  LIBATAPP_MACRO_API void
+  produce_tick_timer_compensation(std::chrono::system_clock::duration tick_cost) noexcept;
+
+  LIBATAPP_MACRO_API uint64_t consume_tick_timer_compensation() noexcept;
 
   LIBATAPP_MACRO_API int32_t listen(const std::string &address);
   LIBATAPP_MACRO_API int32_t send_message(uint64_t target_node_id, int32_t type, const void *data, size_t data_size,
