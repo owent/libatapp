@@ -424,7 +424,7 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
   ret = setup_signal();
   if (ret < 0) {
     FWLOGERROR("setup signal failed");
-    write_pidfile(ret);
+    write_startup_error_file(ret);
     return setup_result_ = ret;
   }
 
@@ -434,7 +434,7 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
       ret = mod->setup(conf_);
       if (ret < 0) {
         FWLOGERROR("setup module {} failed", mod->name());
-        write_pidfile(ret);
+        write_startup_error_file(ret);
         return setup_result_ = ret;
       }
     }
@@ -452,7 +452,7 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
   ret = setup_log();
   if (ret < 0) {
     FWLOGERROR("setup log failed");
-    write_pidfile(ret);
+    write_startup_error_file(ret);
     return setup_result_ = ret;
   }
 
@@ -464,7 +464,7 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
   if (setup_tick_timer() < 0) {
     FWLOGERROR("setup timer failed");
     bus_node_.reset();
-    write_pidfile(EN_ATAPP_ERR_SETUP_TIMER);
+    write_startup_error_file(EN_ATAPP_ERR_SETUP_TIMER);
     return setup_result_ = EN_ATAPP_ERR_SETUP_TIMER;
   }
 
@@ -472,7 +472,7 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
   if (ret < 0) {
     FWLOGERROR("setup atbus failed");
     bus_node_.reset();
-    write_pidfile(ret);
+    write_startup_error_file(ret);
     return setup_result_ = ret;
   }
 
@@ -491,7 +491,7 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
       stats_.module_reload.emplace_back(std::move(reload_stats));
       if (ret < 0) {
         FWLOGERROR("load configure of {} failed", mod->name());
-        write_pidfile(ret);
+        write_startup_error_file(ret);
         return setup_result_ = ret;
       }
     }
@@ -552,14 +552,16 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
       evt_on_all_module_cleaned_(*this);
     }
 
-    write_pidfile(mod_init_res);
+    write_startup_error_file(mod_init_res);
     return setup_result_ = mod_init_res;
   }
 
   // write pid file
   if (false == write_pidfile(atbus::node::get_pid())) {
+    write_startup_error_file(EN_ATAPP_ERR_WRITE_PID_FILE);
     return EN_ATAPP_ERR_WRITE_PID_FILE;
   }
+  cleanup_startup_error_file();
 
   set_flag(flag_t::STOPPED, false);
   set_flag(flag_t::STOPING, false);
@@ -950,7 +952,8 @@ LIBATAPP_MACRO_API int app::tick() {
 
     // step 3. process inner events
     // This should be called at last, because it only concern time
-    active_count += process_inner_events(end_tp);
+    util::time::time_utility::update();
+    active_count += process_inner_events(util::time::time_utility::sys_now() + conf_.timer_tick_interval);
 
     // only tick time less than tick interval will run loop again
     if (active_count > 0) {
@@ -3697,6 +3700,40 @@ bool app::cleanup_pidfile() {
   return true;
 }
 
+bool app::write_startup_error_file(int error_code) {
+  const char *startup_error_file_path =
+      conf_.start_error_file.empty() ? conf_.pid_file.c_str() : conf_.start_error_file.c_str();
+  if (nullptr != startup_error_file_path && *startup_error_file_path) {
+    std::fstream startup_error_file;
+    startup_error_file.open(startup_error_file_path, std::ios::out | std::ios::trunc);
+    if (!startup_error_file.is_open()) {
+      util::cli::shell_stream ss(std::cerr);
+      ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "open and write startup error file "
+           << startup_error_file_path << " failed" << std::endl;
+      FWLOGERROR("open and write startup error file{} failed", startup_error_file_path);
+      // Failed and skip running
+      return false;
+    } else {
+      startup_error_file << error_code;
+      startup_error_file.close();
+    }
+  }
+
+  return true;
+}
+
+bool app::cleanup_startup_error_file() {
+  if (!conf_.start_error_file.empty()) {
+    if (!util::file_system::is_exist(conf_.pid_file.c_str())) {
+      return true;
+    }
+
+    return util::file_system::remove(conf_.pid_file.c_str());
+  }
+
+  return true;
+}
+
 void app::print_help() {
   util::cli::shell_stream shls(std::cout);
 
@@ -3955,6 +3992,18 @@ int app::prog_option_handler_set_startup_log(util::cli::callback_param params) {
   return 0;
 }
 
+int app::prog_option_handler_set_startup_error_file(util::cli::callback_param params) {
+  if (params.get_params_number() > 0) {
+    conf_.start_error_file = params[0]->to_cpp_string();
+  } else {
+    util::cli::shell_stream ss(std::cerr);
+    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "--startup-error-file require 1 parameter"
+         << std::endl;
+  }
+
+  return 0;
+}
+
 int app::prog_option_handler_start(util::cli::callback_param /*params*/) {
   mode_ = mode_t::START;
   return 0;
@@ -4031,6 +4080,10 @@ void app::setup_option(int argc, const char *argv[], void *priv_data) {
 
   opt_mgr->bind_cmd("--startup-log", &app::prog_option_handler_set_startup_log, this)
       ->set_help_msg("--startup-log                          where to write start up log(file name or stdout/stderr).");
+
+  // set startup error file
+  opt_mgr->bind_cmd("--startup-error-file", &app::prog_option_handler_set_startup_error_file, this)
+      ->set_help_msg("--startup-error-file <file path>       set where to store startup error code.");
 
   // start server
   opt_mgr->bind_cmd("start", &app::prog_option_handler_start, this)

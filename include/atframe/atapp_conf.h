@@ -42,6 +42,7 @@ struct app_conf {
   std::vector<atbus::node::bus_id_t> id_mask;  // convert a.b.c.d -> id
   std::string conf_file;
   std::string pid_file;
+  std::string start_error_file;
   const char *execute_path;
   bool upgrade_mode;
 

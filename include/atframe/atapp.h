@@ -395,8 +395,7 @@ class app {
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_discovery_node_by_id(uint64_t id) const noexcept;
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_discovery_node_by_name(const std::string &name) const noexcept;
 
-  LIBATAPP_MACRO_API void
-  produce_tick_timer_compensation(std::chrono::system_clock::duration tick_cost) noexcept;
+  LIBATAPP_MACRO_API void produce_tick_timer_compensation(std::chrono::system_clock::duration tick_cost) noexcept;
 
   LIBATAPP_MACRO_API uint64_t consume_tick_timer_compensation() noexcept;
 
@@ -556,6 +555,10 @@ class app {
 
   bool write_pidfile(int pid);
   bool cleanup_pidfile();
+
+  bool write_startup_error_file(int error_code);
+  bool cleanup_startup_error_file();
+
   void print_help();
 
   bool match_gateway_hosts(const atapp::protocol::atapp_gateway &checked) const noexcept;
@@ -592,6 +595,7 @@ class app {
   int prog_option_handler_set_pid(util::cli::callback_param params);
   int prog_option_handler_upgrade_mode(util::cli::callback_param params);
   int prog_option_handler_set_startup_log(util::cli::callback_param params);
+  int prog_option_handler_set_startup_error_file(util::cli::callback_param params);
   int prog_option_handler_start(util::cli::callback_param params);
   int prog_option_handler_stop(util::cli::callback_param params);
   int prog_option_handler_reload(util::cli::callback_param params);
