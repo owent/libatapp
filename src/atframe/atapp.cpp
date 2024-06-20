@@ -3573,16 +3573,22 @@ static void _app_tick_timer_handle(uv_timer_t *handle) {
     // insert timer again, just like uv_timer_again
     std::chrono::system_clock::duration timer_interval = self->get_configure_timer_interval();
 
-    uv_timer_start(handle, _app_tick_timer_handle,
-                   details::chrono_to_libuv_duration(timer_interval) + self->consume_tick_timer_compensation(), 0);
-
     self->tick();
 
     std::chrono::system_clock::time_point end_timer = std::chrono::system_clock::now();
+    std::chrono::system_clock::duration tick_cost = end_timer - start_timer;
     self->produce_tick_timer_compensation(end_timer - start_timer);
 
     // It may take a long time to process the tick, so update the time after the tick
     uv_update_time(handle->loop);
+
+    if (tick_cost > timer_interval) {
+      uv_timer_start(handle, _app_tick_timer_handle, self->consume_tick_timer_compensation(), 0);
+    } else {
+      uv_timer_start(
+          handle, _app_tick_timer_handle,
+          details::chrono_to_libuv_duration(timer_interval - tick_cost) + self->consume_tick_timer_compensation(), 0);
+    }
   } else {
     uv_timer_start(handle, _app_tick_timer_handle, 256, 0);
   }
