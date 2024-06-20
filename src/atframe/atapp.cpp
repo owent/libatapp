@@ -561,7 +561,9 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
     write_startup_error_file(EN_ATAPP_ERR_WRITE_PID_FILE);
     return EN_ATAPP_ERR_WRITE_PID_FILE;
   }
-  cleanup_startup_error_file();
+  if (mode_t::START == mode_) {
+    cleanup_startup_error_file();
+  }
 
   set_flag(flag_t::STOPPED, false);
   set_flag(flag_t::STOPING, false);
@@ -3723,15 +3725,26 @@ bool app::write_startup_error_file(int error_code) {
 }
 
 bool app::cleanup_startup_error_file() {
-  if (!conf_.start_error_file.empty()) {
-    if (!util::file_system::is_exist(conf_.pid_file.c_str())) {
+  if (conf_.start_error_file.empty()) {
+    std::string start_error_file;
+    auto last_dot = conf_.pid_file.find_last_of('.');
+    if (last_dot != std::string::npos) {
+      start_error_file = conf_.pid_file.substr(0, last_dot) + ".startup-error";
+    } else {
+      start_error_file = conf_.pid_file + ".startup-error";
+    }
+    if (!util::file_system::is_exist(start_error_file.c_str())) {
       return true;
     }
 
-    return util::file_system::remove(conf_.pid_file.c_str());
-  }
+    return util::file_system::remove(start_error_file.c_str());
+  } else {
+    if (!util::file_system::is_exist(conf_.start_error_file.c_str())) {
+      return true;
+    }
 
-  return true;
+    return util::file_system::remove(conf_.start_error_file.c_str());
+  }
 }
 
 void app::print_help() {

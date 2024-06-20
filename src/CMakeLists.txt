@@ -22,6 +22,8 @@ set(PROJECT_LIBATAPP_SRC_LIST
     "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/etcdcli/etcd_packer.h"
     "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/etcdcli/etcd_watcher.h"
     "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/modules/etcd_module.h"
+    "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/modules/worker_context.h"
+    "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/modules/worker_pool_module.h"
     "${CMAKE_CURRENT_LIST_DIR}/atframe/atapp.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/atframe/atapp_conf.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/atframe/atapp_conf_rapidjson.cpp"
@@ -36,7 +38,8 @@ set(PROJECT_LIBATAPP_SRC_LIST
     "${CMAKE_CURRENT_LIST_DIR}/atframe/etcdcli/etcd_keepalive.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/atframe/etcdcli/etcd_packer.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/atframe/etcdcli/etcd_watcher.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/atframe/modules/etcd_module.cpp")
+    "${CMAKE_CURRENT_LIST_DIR}/atframe/modules/etcd_module.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/atframe/modules/worker_pool_module.cpp")
 source_group_by_dir(PROJECT_LIBATAPP_SRC_LIST)
 
 set(PROJECT_LIBATAPP_PROTOCOL_SRC_LIST "${PROJECT_LIBATAPP_GENERATED_DIR}/include/atframe/atapp_conf.pb.h"
@@ -116,7 +119,7 @@ endif()
 
 list(PREPEND PROJECT_LIBATAPP_PUBLIC_LINK_NAMES "${PROJECT_LIBATAPP_LIB_LINK}-protocol")
 list(APPEND PROJECT_LIBATAPP_PUBLIC_LINK_NAMES ${ATFRAMEWORK_LIBATBUS_LINK_NAME}
-     ${ATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_YAML_CPP_LINK_NAME})
+     ${ATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_YAML_CPP_LINK_NAME} ${ATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_TBB_LINK_NAME})
 
 if(ATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_GSL_LINK_NAME)
   list(APPEND PROJECT_LIBATAPP_PUBLIC_LINK_NAMES ${ATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_GSL_LINK_NAME})
