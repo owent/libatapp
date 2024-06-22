@@ -23,9 +23,10 @@ struct UTIL_SYMBOL_LOCAL worker_configure_type {
 
 class UTIL_SYMBOL_LOCAL worker {
  public:
-  worker(int32_t worker_id) { context_.worker_id = worker_id; }
+  worker(worker_pool_module& owner, int32_t worker_id) : owner_(&owner) { context_.worker_id = worker_id; }
 
  private:
+  worker_pool_module* owner_;
   worker_context context_;
   ::tbb::concurrent_queue<worker_job_action_type> private_jobs;
 };
@@ -57,7 +58,7 @@ LIBATAPP_MACRO_API int worker_pool_module::reload() {
   return 0;
 }
 
-LIBATAPP_MACRO_API const char *worker_pool_module::name() const { return "atapp: worker pool module"; }
+LIBATAPP_MACRO_API const char* worker_pool_module::name() const { return "atapp: worker pool module"; }
 
 LIBATAPP_MACRO_API int worker_pool_module::tick() {
   // TODO: tick
