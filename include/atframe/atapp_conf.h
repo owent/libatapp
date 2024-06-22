@@ -64,6 +64,10 @@ struct app_conf {
   atapp::protocol::atapp_metadata metadata;
   atapp::protocol::atapp_runtime runtime;
   int32_t runtime_pod_stateful_index;
+
+  // backup data
+  atapp::protocol::atapp_configure previous_origin;
+  atapp::protocol::atapp_log previous_log;
 };
 
 enum ATAPP_ERROR_TYPE {

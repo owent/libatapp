@@ -30,9 +30,7 @@ target_include_directories(${PROJECT_BINDING_NAME} PRIVATE "$<BUILD_INTERFACE:${
 
 target_link_libraries(${PROJECT_BINDING_NAME} PUBLIC atapp)
 
-if(MSVC)
-  set_property(TARGET ${PROJECT_BINDING_NAME} PROPERTY FOLDER "atframework/atapp")
-endif()
+set_property(TARGET ${PROJECT_BINDING_NAME} PROPERTY FOLDER "atframework/atapp")
 
 install(
   TARGETS ${PROJECT_BINDING_NAME}

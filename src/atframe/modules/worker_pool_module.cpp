@@ -23,7 +23,8 @@ struct UTIL_SYMBOL_LOCAL worker_configure_type {
 
 class UTIL_SYMBOL_LOCAL worker {
  private:
-  // worker_context context_;
+  worker_context context_;
+  ::tbb::concurrent_queue<worker_job_action_type> private_jobs;
 };
 
 struct UTIL_SYMBOL_LOCAL worker_pool_module::worker_set {

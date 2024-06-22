@@ -166,10 +166,8 @@ if(PROJECT_LIBATAPP_PRIVATE_COMPILE_OPTIONS)
   target_compile_options(${PROJECT_LIBATAPP_LIB_LINK} PRIVATE ${PROJECT_LIBATAPP_PRIVATE_COMPILE_OPTIONS})
 endif()
 
-if(MSVC)
   set_property(TARGET ${PROJECT_LIBATAPP_LIB_LINK} PROPERTY FOLDER "atframework/atapp")
   set_property(TARGET "${PROJECT_LIBATAPP_LIB_LINK}-protocol" PROPERTY FOLDER "atframework/atapp")
-endif()
 
 add_library("atframework::${PROJECT_LIBATAPP_LIB_LINK}-protocol" ALIAS "${PROJECT_LIBATAPP_LIB_LINK}-protocol")
 add_library("atframework::${PROJECT_LIBATAPP_LIB_LINK}" ALIAS "${PROJECT_LIBATAPP_LIB_LINK}")
