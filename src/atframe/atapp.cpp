@@ -2377,6 +2377,10 @@ int app::apply_configure() {
   std::string old_name = conf_.origin.name();
   std::string old_hostname = conf_.origin.hostname();
   std::string old_identity = conf_.origin.identity();
+
+  conf_.previous_origin.Clear();
+  conf_.previous_origin.Swap(&conf_.origin);
+
   parse_configures_into(conf_.origin, "atapp", "ATAPP");
 
   // id and id mask
@@ -3382,6 +3386,8 @@ int app::setup_log() {
     }
   }
 
+  conf_.previous_log.Clear();
+  conf_.previous_log.Swap(&conf_.log);
   parse_log_configures_into(conf_.log, std::vector<gsl::string_view>{"atapp", "log"}, "ATAPP_LOG");
   for (int i = 0; i < conf_.log.category_size() && i < util::log::log_wrapper::categorize_t::MAX; ++i) {
     int32_t log_index = conf_.log.category(i).index();
