@@ -22,6 +22,9 @@ struct UTIL_SYMBOL_LOCAL worker_configure_type {
 }  // namespace
 
 class UTIL_SYMBOL_LOCAL worker {
+ public:
+  worker(int32_t worker_id) { context_.worker_id = worker_id; }
+
  private:
   worker_context context_;
   ::tbb::concurrent_queue<worker_job_action_type> private_jobs;
