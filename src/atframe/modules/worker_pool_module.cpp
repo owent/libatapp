@@ -25,6 +25,8 @@ class UTIL_SYMBOL_LOCAL worker {
  public:
   worker(worker_pool_module& owner, int32_t worker_id) : owner_(&owner) { context_.worker_id = worker_id; }
 
+  worker_pool_module& get_owner() noexcept { return *owner_; }
+
  private:
   worker_pool_module* owner_;
   worker_context context_;
