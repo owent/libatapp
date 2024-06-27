@@ -1444,17 +1444,15 @@ void etcd_module::watcher_callback_list_wrapper_t::operator()(const ::atapp::etc
     node_info_t node;
     etcd_discovery_node::node_version current_node_version;
 
-    if (evt_data.kv.value.empty()) {
+    if (evt_data.kv.key.empty()) {
       unpack(node, evt_data.kv.key, evt_data.prev_kv.value, true);
-      current_node_version.create_revision = evt_data.prev_kv.create_revision;
-      current_node_version.modify_revision = evt_data.prev_kv.mod_revision;
-      current_node_version.version = evt_data.prev_kv.version;
     } else {
       unpack(node, evt_data.kv.key, evt_data.kv.value, true);
-      current_node_version.create_revision = evt_data.kv.create_revision;
-      current_node_version.modify_revision = evt_data.kv.mod_revision;
-      current_node_version.version = evt_data.kv.version;
     }
+    current_node_version.create_revision = std::max(evt_data.prev_kv.create_revision, evt_data.kv.create_revision);
+    current_node_version.modify_revision = std::max(evt_data.prev_kv.mod_revision, evt_data.kv.mod_revision);
+    current_node_version.version = std::max(evt_data.prev_kv.version, evt_data.kv.version);
+
     if (node.node_discovery.id() == 0 && node.node_discovery.name().empty()) {
       continue;
     }
@@ -1551,17 +1549,15 @@ void etcd_module::watcher_callback_one_wrapper_t::operator()(const ::atapp::etcd
     node_info_t node;
     etcd_discovery_node::node_version current_node_version;
 
-    if (evt_data.kv.value.empty()) {
+    if (evt_data.kv.key.empty()) {
       unpack(node, evt_data.kv.key, evt_data.prev_kv.value, true);
-      current_node_version.create_revision = evt_data.prev_kv.create_revision;
-      current_node_version.modify_revision = evt_data.prev_kv.mod_revision;
-      current_node_version.version = evt_data.prev_kv.version;
     } else {
       unpack(node, evt_data.kv.key, evt_data.kv.value, true);
-      current_node_version.create_revision = evt_data.kv.create_revision;
-      current_node_version.modify_revision = evt_data.kv.mod_revision;
-      current_node_version.version = evt_data.kv.version;
     }
+    current_node_version.create_revision = std::max(evt_data.prev_kv.create_revision, evt_data.kv.create_revision);
+    current_node_version.modify_revision = std::max(evt_data.prev_kv.mod_revision, evt_data.kv.mod_revision);
+    current_node_version.version = std::max(evt_data.prev_kv.version, evt_data.kv.version);
+
     if (node.node_discovery.id() == 0 && node.node_discovery.name().empty()) {
       continue;
     }
