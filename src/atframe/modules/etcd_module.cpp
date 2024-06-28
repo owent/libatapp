@@ -22,6 +22,7 @@
 #include <atframe/etcdcli/etcd_keepalive.h>
 #include <atframe/etcdcli/etcd_watcher.h>
 
+#include <algorithm>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -1444,11 +1445,8 @@ void etcd_module::watcher_callback_list_wrapper_t::operator()(const ::atapp::etc
     node_info_t node;
     etcd_discovery_node::node_version current_node_version;
 
-    if (evt_data.kv.key.empty()) {
-      unpack(node, evt_data.kv.key, evt_data.prev_kv.value, true);
-    } else {
-      unpack(node, evt_data.kv.key, evt_data.kv.value, true);
-    }
+    unpack(node, evt_data.kv.key.empty() ? evt_data.prev_kv.key : evt_data.kv.key,
+           evt_data.kv.value.empty() ? evt_data.prev_kv.value : evt_data.kv.value, true);
     current_node_version.create_revision = std::max(evt_data.prev_kv.create_revision, evt_data.kv.create_revision);
     current_node_version.modify_revision = std::max(evt_data.prev_kv.mod_revision, evt_data.kv.mod_revision);
     current_node_version.version = std::max(evt_data.prev_kv.version, evt_data.kv.version);
@@ -1549,11 +1547,8 @@ void etcd_module::watcher_callback_one_wrapper_t::operator()(const ::atapp::etcd
     node_info_t node;
     etcd_discovery_node::node_version current_node_version;
 
-    if (evt_data.kv.key.empty()) {
-      unpack(node, evt_data.kv.key, evt_data.prev_kv.value, true);
-    } else {
-      unpack(node, evt_data.kv.key, evt_data.kv.value, true);
-    }
+    unpack(node, evt_data.kv.key.empty() ? evt_data.prev_kv.key : evt_data.kv.key,
+           evt_data.kv.value.empty() ? evt_data.prev_kv.value : evt_data.kv.value, true);
     current_node_version.create_revision = std::max(evt_data.prev_kv.create_revision, evt_data.kv.create_revision);
     current_node_version.modify_revision = std::max(evt_data.prev_kv.mod_revision, evt_data.kv.mod_revision);
     current_node_version.version = std::max(evt_data.prev_kv.version, evt_data.kv.version);
