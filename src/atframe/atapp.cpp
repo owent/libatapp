@@ -538,6 +538,47 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
 
   // cleanup all inited modules if failed
   if (mod_init_res < 0) {
+    // Trigger stop once and then force cleanup
+    stop();
+    for (size_t i = 0; i < inited_mod_idx && i < modules_.size(); ++i) {
+      if (!modules_[i]) {
+        continue;
+      }
+
+      if (!modules_[i]->is_enabled()) {
+        continue;
+      }
+
+      if (modules_[i]->check_suspend_stop() && !check_flag(flag_t::TIMEOUT)) {
+        continue;
+      }
+
+      if (modules_[i]->is_enabled()) {
+        if (modules_[i]->stop() <= 0) {
+          modules_[i]->disable();
+        }
+      }
+    }
+    while (!check_flag(flag_t::TIMEOUT)) {
+      bool more_event = false;
+      for (size_t i = 0; i < inited_mod_idx && i < modules_.size(); ++i) {
+        if (!modules_[i]) {
+          continue;
+        }
+
+        if (modules_[i]->is_enabled()) {
+          more_event = true;
+          break;
+        }
+      }
+
+      if (!more_event) {
+        break;
+      }
+
+      run_ev_loop(UV_RUN_ONCE);
+    }
+
     for (; inited_mod_idx < modules_.size(); --inited_mod_idx) {
       if (modules_[inited_mod_idx]) {
         modules_[inited_mod_idx]->cleanup();
@@ -3714,49 +3755,54 @@ bool app::cleanup_pidfile() {
   return true;
 }
 
-bool app::write_startup_error_file(int error_code) {
-  const char *startup_error_file_path =
-      conf_.start_error_file.empty() ? conf_.pid_file.c_str() : conf_.start_error_file.c_str();
-  if (nullptr != startup_error_file_path && *startup_error_file_path) {
-    std::fstream startup_error_file;
-    startup_error_file.open(startup_error_file_path, std::ios::out | std::ios::trunc);
-    if (!startup_error_file.is_open()) {
-      util::cli::shell_stream ss(std::cerr);
-      ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "open and write startup error file "
-           << startup_error_file_path << " failed" << std::endl;
-      FWLOGERROR("open and write startup error file{} failed", startup_error_file_path);
-      // Failed and skip running
-      return false;
+std::string app::get_startup_error_file_path() const {
+  if (conf_.start_error_file.empty()) {
+    std::string start_error_file;
+    auto last_dot = conf_.pid_file.find_last_of('.');
+    if (last_dot != std::string::npos) {
+      return conf_.pid_file.substr(0, last_dot) + ".startup-error";
     } else {
-      startup_error_file << error_code;
-      startup_error_file.close();
+      return conf_.pid_file + ".startup-error";
     }
+  } else {
+    return conf_.start_error_file;
+  }
+}
+
+bool app::write_startup_error_file(int error_code) {
+  std::string start_error_file = get_startup_error_file_path();
+  if (start_error_file.empty()) {
+    return false;
+  }
+
+  std::fstream startup_error_file;
+  startup_error_file.open(start_error_file.c_str(), std::ios::out | std::ios::trunc);
+  if (!startup_error_file.is_open()) {
+    util::cli::shell_stream ss(std::cerr);
+    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "open and write startup error file "
+         << start_error_file << " failed" << std::endl;
+    FWLOGERROR("open and write startup error file{} failed", start_error_file);
+    // Failed and skip running
+    return false;
+  } else {
+    startup_error_file << error_code;
+    startup_error_file.close();
   }
 
   return true;
 }
 
 bool app::cleanup_startup_error_file() {
-  if (conf_.start_error_file.empty()) {
-    std::string start_error_file;
-    auto last_dot = conf_.pid_file.find_last_of('.');
-    if (last_dot != std::string::npos) {
-      start_error_file = conf_.pid_file.substr(0, last_dot) + ".startup-error";
-    } else {
-      start_error_file = conf_.pid_file + ".startup-error";
-    }
-    if (!util::file_system::is_exist(start_error_file.c_str())) {
-      return true;
-    }
-
-    return util::file_system::remove(start_error_file.c_str());
-  } else {
-    if (!util::file_system::is_exist(conf_.start_error_file.c_str())) {
-      return true;
-    }
-
-    return util::file_system::remove(conf_.start_error_file.c_str());
+  std::string start_error_file = get_startup_error_file_path();
+  if (start_error_file.empty()) {
+    return true;
   }
+
+  if (!util::file_system::is_exist(start_error_file.c_str())) {
+    return true;
+  }
+
+  return util::file_system::remove(start_error_file.c_str());
 }
 
 void app::print_help() {

@@ -556,6 +556,8 @@ class app {
   bool write_pidfile(int pid);
   bool cleanup_pidfile();
 
+  std::string get_startup_error_file_path() const;
+
   bool write_startup_error_file(int error_code);
   bool cleanup_startup_error_file();
 
