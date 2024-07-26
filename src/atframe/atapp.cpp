@@ -22,6 +22,11 @@
 #include <cli/shell_font.h>
 #include <log/log_sink_file_backend.h>
 
+#if !defined(_WIN32)
+#  include <sys/resource.h>
+#  include <sys/time.h>
+#endif
+
 #include <assert.h>
 #include <signal.h>
 
@@ -51,7 +56,7 @@ enum class atapp_pod_stateful_index : int32_t {
 };
 }
 
-namespace details {
+namespace {
 static void _app_close_timer_handle(uv_handle_t *handle) {
   ::atapp::app::timer_ptr_t *ptr = reinterpret_cast<::atapp::app::timer_ptr_t *>(handle->data);
   if (nullptr == ptr) {
@@ -121,7 +126,20 @@ static void atapp_global_init_once() {
 }
 #endif
 
-}  // namespace details
+static std::chrono::milliseconds get_default_system_clock_granularity() {
+// This interval will be rounded up to the system clock granularity, which is 1 / (getconf CLK_TCK) on Linux.
+// + Most Linux systems have a CLK_TCK of 100, so the interval is rounded to 10ms.
+// + Windows usually use 15.6ms
+#ifdef _SC_CLK_TCK
+  auto clk_tck = sysconf(_SC_CLK_TCK);
+  if (clk_tck > 0 && clk_tck < 1000) {
+    return std::chrono::milliseconds{1000 / clk_tck};
+  }
+#endif
+  return std::chrono::milliseconds{10};
+}
+
+}  // namespace
 
 LIBATAPP_MACRO_API app::message_t::message_t()
     : type(0), message_sequence(0), data(nullptr), data_size(0), metadata(nullptr) {}
@@ -167,7 +185,12 @@ LIBATAPP_MACRO_API app::flag_guard_t::~flag_guard_t() {
   owner_->set_flag(flag_, false);
 }
 
-LIBATAPP_MACRO_API app::app() : setup_result_(0), ev_loop_(nullptr), flags_(0), mode_(mode_t::CUSTOM) {
+LIBATAPP_MACRO_API app::app()
+    : setup_result_(0),
+      ev_loop_(nullptr),
+      flags_(0),
+      mode_(mode_t::CUSTOM),
+      tick_clock_granularity_(std::chrono::milliseconds::zero()) {
   if (nullptr == last_instance_) {
 #if defined(OPENSSL_VERSION_NUMBER)
 #  if OPENSSL_VERSION_NUMBER < 0x10100000L
@@ -190,6 +213,8 @@ LIBATAPP_MACRO_API app::app() : setup_result_(0), ev_loop_(nullptr), flags_(0), 
   conf_.runtime_pod_stateful_index = static_cast<int32_t>(atapp_pod_stateful_index::kUnset);
   conf_.timer_tick_interval =
       std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::milliseconds{8});
+  conf_.timer_tick_round_timeout =
+      std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::milliseconds{128});
   conf_.timer_reserve_permille = 10;
   conf_.timer_reserve_interval_min =
       std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::microseconds{100});
@@ -225,9 +250,9 @@ LIBATAPP_MACRO_API app::app() : setup_result_(0), ev_loop_(nullptr), flags_(0), 
   add_module(internal_module_etcd_);
 
 #if defined(THREAD_TLS_USE_PTHREAD) && THREAD_TLS_USE_PTHREAD
-  (void)pthread_once(&details::gt_atapp_global_init_once, details::atapp_global_init_once);
+  (void)pthread_once(&gt_atapp_global_init_once, atapp_global_init_once);
 #elif __cplusplus >= 201103L
-  std::call_once(details::gt_atapp_global_init_once, details::atapp_global_init_once);
+  std::call_once(gt_atapp_global_init_once, atapp_global_init_once);
 #endif
 }
 
@@ -912,13 +937,13 @@ LIBATAPP_MACRO_API int app::tick() {
   }
   flag_guard_t in_tick_guard(*this, flag_t::IN_TICK);
 
-  int64_t active_count;
+  int32_t active_count;
   util::time::time_utility::update();
   // record start time point
   util::time::time_utility::raw_time_t start_tp = util::time::time_utility::sys_now();
   util::time::time_utility::raw_time_t end_tp = start_tp;
 
-  end_tp += conf_.timer_tick_interval;
+  end_tp += conf_.timer_tick_round_timeout;
 
   tick_timer_.last_tick_timepoint = util::time::time_utility::sys_now();
   do {
@@ -1010,7 +1035,7 @@ LIBATAPP_MACRO_API int app::tick() {
       offset_usr += stats_.last_checkpoint_usage.ru_utime.tv_usec - last_usage.ru_utime.tv_usec;
       offset_sys += stats_.last_checkpoint_usage.ru_stime.tv_usec - last_usage.ru_stime.tv_usec;
 
-      std::pair<uint64_t, const char *> max_rss = details::make_size_showup(last_usage.ru_maxrss);
+      std::pair<uint64_t, const char *> max_rss = make_size_showup(last_usage.ru_maxrss);
 #ifdef WIN32
       FWLOGINFO(
           "[STATISTICS]: {} CPU usage: user {:02.3}%, sys {:02.3}%, max rss: {}{}, page faults: {}", get_app_name(),
@@ -1018,9 +1043,9 @@ LIBATAPP_MACRO_API int app::tick() {
           offset_sys / (static_cast<float>(util::time::time_utility::MINITE_SECONDS) * 10000.0f),  // usec and add %
           max_rss.first, max_rss.second, last_usage.ru_majflt);
 #else
-      std::pair<uint64_t, const char *> ru_ixrss = details::make_size_showup(last_usage.ru_ixrss);
-      std::pair<uint64_t, const char *> ru_idrss = details::make_size_showup(last_usage.ru_idrss);
-      std::pair<uint64_t, const char *> ru_isrss = details::make_size_showup(last_usage.ru_isrss);
+      std::pair<uint64_t, const char *> ru_ixrss = make_size_showup(last_usage.ru_ixrss);
+      std::pair<uint64_t, const char *> ru_idrss = make_size_showup(last_usage.ru_idrss);
+      std::pair<uint64_t, const char *> ru_isrss = make_size_showup(last_usage.ru_isrss);
       FWLOGINFO(
           "[STATISTICS]: {} CPU usage: user {:02.3}%, sys {:02.3}%, max rss: {}{}, shared size: {}{}, unshared data "
           "size: "
@@ -1066,7 +1091,8 @@ LIBATAPP_MACRO_API int app::tick() {
       uv_stop(loop);
     }
   } while (false);
-  return 0;
+
+  return active_count;
 }
 
 LIBATAPP_MACRO_API app::app_id_t app::get_id() const noexcept { return conf_.id; }
@@ -1608,7 +1634,12 @@ LIBATAPP_MACRO_API void app::produce_tick_timer_compensation(std::chrono::system
 }
 
 LIBATAPP_MACRO_API uint64_t app::consume_tick_timer_compensation() noexcept {
-  if (tick_timer_.tick_compensation > std::chrono::milliseconds{1}) {
+  // This interval will be rounded up to the system clock granularity
+  if (tick_clock_granularity_ <= std::chrono::milliseconds::zero()) {
+    tick_clock_granularity_ = get_default_system_clock_granularity();
+  }
+
+  if (tick_timer_.tick_compensation > tick_clock_granularity_) {
     auto ret = std::chrono::duration_cast<std::chrono::milliseconds>(tick_timer_.tick_compensation).count();
     if UTIL_UNLIKELY_CONDITION (tick_timer_.tick_compensation > conf_.timer_reserve_interval_max) {
       tick_timer_.tick_compensation = std::chrono::system_clock::duration::zero();
@@ -2457,6 +2488,15 @@ int app::apply_configure() {
           std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::milliseconds(8));
     }
 
+    conf_.timer_tick_round_timeout = std::chrono::duration_cast<std::chrono::system_clock::duration>(
+        std::chrono::seconds(conf_.origin.timer().tick_round_timeout().seconds()));
+    conf_.timer_tick_round_timeout += std::chrono::duration_cast<std::chrono::system_clock::duration>(
+        std::chrono::nanoseconds(conf_.origin.timer().tick_round_timeout().nanos()));
+
+    if (conf_.timer_tick_round_timeout < conf_.timer_tick_interval) {
+      conf_.timer_tick_round_timeout = conf_.timer_tick_interval * 8;
+    }
+
     conf_.timer_reserve_permille = conf_.origin.timer().reserve_permille();
     if (conf_.timer_reserve_permille <= 0) {
       conf_.timer_reserve_permille = 10;
@@ -2469,7 +2509,7 @@ int app::apply_configure() {
     conf_.timer_reserve_interval_min += std::chrono::duration_cast<std::chrono::system_clock::duration>(
         std::chrono::nanoseconds(conf_.origin.timer().reserve_interval_min().nanos()));
     if (conf_.timer_reserve_interval_min < std::chrono::microseconds(1)) {
-      conf_.timer_tick_interval =
+      conf_.timer_reserve_interval_min =
           std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::microseconds(100));
     }
 
@@ -2478,7 +2518,7 @@ int app::apply_configure() {
     conf_.timer_reserve_interval_max += std::chrono::duration_cast<std::chrono::system_clock::duration>(
         std::chrono::nanoseconds(conf_.origin.timer().reserve_interval_max().nanos()));
     if (conf_.timer_reserve_interval_max < std::chrono::milliseconds(1)) {
-      conf_.timer_tick_interval =
+      conf_.timer_reserve_interval_max =
           std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::seconds(1));
     }
     if (conf_.timer_reserve_interval_max < conf_.timer_reserve_interval_min) {
@@ -2724,13 +2764,13 @@ void app::process_signal(int signo) {
   }
 }
 
-int64_t app::process_inner_events(const util::time::time_utility::raw_time_t &end_tick) {
-  int64_t ret = 0;
+int32_t app::process_inner_events(const util::time::time_utility::raw_time_t &end_tick) {
+  int32_t ret = 0;
   bool more_messages = true;
   bool first_round = true;
   while ((first_round || util::time::time_utility::sys_now() < end_tick) && more_messages) {
     first_round = false;
-    int64_t round_res = 0;
+    int32_t round_res = 0;
     if (!endpoint_waker_.empty() && endpoint_waker_.begin()->first.first <= tick_timer_.last_tick_timepoint) {
       atapp_endpoint::ptr_t ep = endpoint_waker_.begin()->second.lock();
       endpoint_waker_.erase(endpoint_waker_.begin());
@@ -3564,7 +3604,7 @@ void app::close_timer(timer_ptr_t &t) {
   if (t) {
     uv_timer_stop(&t->timer);
     t->timer.data = new timer_ptr_t(t);
-    uv_close(reinterpret_cast<uv_handle_t *>(&t->timer), details::_app_close_timer_handle);
+    uv_close(reinterpret_cast<uv_handle_t *>(&t->timer), _app_close_timer_handle);
 
     t.reset();
   }
@@ -3591,9 +3631,8 @@ static void _app_tick_timer_handle(uv_timer_t *handle) {
     if (tick_cost > timer_interval) {
       uv_timer_start(handle, _app_tick_timer_handle, self->consume_tick_timer_compensation(), 0);
     } else {
-      uv_timer_start(
-          handle, _app_tick_timer_handle,
-          details::chrono_to_libuv_duration(timer_interval - tick_cost) + self->consume_tick_timer_compensation(), 0);
+      uv_timer_start(handle, _app_tick_timer_handle,
+                     chrono_to_libuv_duration(timer_interval - tick_cost) + self->consume_tick_timer_compensation(), 0);
     }
   } else {
     uv_timer_start(handle, _app_tick_timer_handle, 256, 0);
@@ -3603,7 +3642,7 @@ static void _app_tick_timer_handle(uv_timer_t *handle) {
 int app::setup_tick_timer() {
   close_timer(tick_timer_.tick_timer);
 
-  FWLOGINFO("setup tick interval to {}ms.", details::chrono_to_libuv_duration(conf_.timer_tick_interval));
+  FWLOGINFO("setup tick interval to {}ms.", chrono_to_libuv_duration(conf_.timer_tick_interval));
 
   timer_ptr_t timer = std::make_shared<timer_info_t>();
   ev_loop_t *loop = get_evloop();
@@ -3611,15 +3650,15 @@ int app::setup_tick_timer() {
   uv_timer_init(loop, &timer->timer);
   timer->timer.data = this;
 
-  int res = uv_timer_start(&timer->timer, _app_tick_timer_handle,
-                           details::chrono_to_libuv_duration(conf_.timer_tick_interval), 0);
+  int res =
+      uv_timer_start(&timer->timer, _app_tick_timer_handle, chrono_to_libuv_duration(conf_.timer_tick_interval), 0);
   if (0 == res) {
     tick_timer_.tick_timer = timer;
   } else {
     FWLOGERROR("setup tick timer failed, res: {}", res);
 
     timer->timer.data = new timer_ptr_t(timer);
-    uv_close(reinterpret_cast<uv_handle_t *>(&timer->timer), details::_app_close_timer_handle);
+    uv_close(reinterpret_cast<uv_handle_t *>(&timer->timer), _app_close_timer_handle);
 
     return EN_ATAPP_ERR_SETUP_TIMER;
   }
@@ -3640,8 +3679,8 @@ bool app::setup_timeout_timer(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration 
   uv_timer_init(get_evloop(), &timer->timer);
   timer->timer.data = this;
 
-  int res = uv_timer_start(&timer->timer, ev_stop_timeout,
-                           details::chrono_to_libuv_duration(duration, ATAPP_DEFAULT_STOP_TIMEOUT), 0);
+  int res =
+      uv_timer_start(&timer->timer, ev_stop_timeout, chrono_to_libuv_duration(duration, ATAPP_DEFAULT_STOP_TIMEOUT), 0);
   if UTIL_LIKELY_CONDITION (0 == res) {
     tick_timer_.timeout_timer = timer;
 
@@ -3651,7 +3690,7 @@ bool app::setup_timeout_timer(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration 
     set_flag(flag_t::TIMEOUT, false);
 
     timer->timer.data = new timer_ptr_t(timer);
-    uv_close(reinterpret_cast<uv_handle_t *>(&timer->timer), details::_app_close_timer_handle);
+    uv_close(reinterpret_cast<uv_handle_t *>(&timer->timer), _app_close_timer_handle);
 
     return false;
   }

@@ -84,13 +84,14 @@ message atapp_timer {
   google.protobuf.Duration stop_timeout = 1 [(atapp.protocol.CONFIGURE) = { default_value: "10s" }];
   google.protobuf.Duration stop_interval = 2 [(atapp.protocol.CONFIGURE) = { default_value: "128ms" }];
   google.protobuf.Duration tick_interval = 3 [(atapp.protocol.CONFIGURE) = { default_value: "16ms" }];
-  google.protobuf.Duration message_timeout = 4 [(atapp.protocol.CONFIGURE) = { default_value: "8s" }];
-  google.protobuf.Duration initialize_timeout = 5 [(atapp.protocol.CONFIGURE) = { default_value: "10s" }];
-  google.protobuf.Duration reserve_interval_min = 6
+  google.protobuf.Duration tick_round_timeout = 4 [(atapp.protocol.CONFIGURE) = { default_value: "128ms" }];
+  google.protobuf.Duration message_timeout = 5 [(atapp.protocol.CONFIGURE) = { default_value: "8s" }];
+  google.protobuf.Duration initialize_timeout = 6 [(atapp.protocol.CONFIGURE) = { default_value: "10s" }];
+  google.protobuf.Duration reserve_interval_min = 7
       [(atapp.protocol.CONFIGURE) = { default_value: "100us" min_value: "0" }];
-  google.protobuf.Duration reserve_interval_max = 7
+  google.protobuf.Duration reserve_interval_max = 8
       [(atapp.protocol.CONFIGURE) = { default_value: "1s" min_value: "1ms" }];
-  int32 reserve_permille = 8 [(atapp.protocol.CONFIGURE) = { default_value: "10" min_value: "1" }];
+  int32 reserve_permille = 9 [(atapp.protocol.CONFIGURE) = { default_value: "10" min_value: "1" }];
 }
 
 message atapp_log_level_range {

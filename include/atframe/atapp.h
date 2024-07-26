@@ -641,7 +641,7 @@ class app {
   void process_signals();
   void process_signal(int signo);
 
-  int64_t process_inner_events(const util::time::time_utility::raw_time_t &end_tick);
+  int32_t process_inner_events(const util::time::time_utility::raw_time_t &end_tick);
 
   atapp_endpoint::ptr_t auto_mutable_self_endpoint();
 
@@ -686,6 +686,7 @@ class app {
   std::atomic<uint64_t> flags_;
   mode_t::type mode_;
   tick_timer_t tick_timer_;
+  std::chrono::milliseconds tick_clock_granularity_;
 
   std::vector<module_ptr_t> modules_;
   std::unordered_map<std::string, log_sink_maker::log_reg_t>
