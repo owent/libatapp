@@ -139,6 +139,21 @@ static std::chrono::milliseconds get_default_system_clock_granularity() {
   return std::chrono::milliseconds{10};
 }
 
+template <class TFn>
+static bool internal_setup_signal_action(int sig, TFn fn) {
+#ifdef WIN32
+  signal(sig, fn);
+#else
+  struct sigaction newact;
+  memset(&newact, 0, sizeof(newact));
+  newact.sa_handler = fn;
+  if (sigaction(sig, &newact, nullptr) == -1) {
+    return false;
+  }
+#endif
+  return true;
+}
+
 }  // namespace
 
 LIBATAPP_MACRO_API app::message_t::message_t()
@@ -416,6 +431,15 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
     return 0;
   }
 
+  if (mode_ != mode_t::CUSTOM && mode_ != mode_t::STOP && mode_ != mode_t::RELOAD) {
+    int ret = setup_signal();
+    if (ret < 0) {
+      FWLOGERROR("setup signal failed");
+      write_startup_error_file(ret);
+      return setup_result_ = ret;
+    }
+  }
+
   setup_startup_log();
 
   // step 4. load options from cmd line
@@ -444,13 +468,6 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
     default: {
       return setup_result_ = 0;
     }
-  }
-
-  ret = setup_signal();
-  if (ret < 0) {
-    FWLOGERROR("setup signal failed");
-    write_startup_error_file(ret);
-    return setup_result_ = ret;
   }
 
   // all modules setup
@@ -3376,17 +3393,50 @@ LIBATAPP_MACRO_API void app::trigger_event_on_discovery_event(etcd_discovery_act
 int app::setup_signal() {
   // block signals
   app::last_instance_ = this;
-  signal(SIGTERM, _app_setup_signal_handle);
-  signal(SIGINT, SIG_IGN);
+
+  if (!internal_setup_signal_action(SIGTERM, _app_setup_signal_handle)) {
+    FWLOGERROR("setup signal {} failed", "SIGTERM");
+    return EN_ATAPP_ERR_SETUP_SIGNAL;
+  }
+  if (!internal_setup_signal_action(SIGINT, SIG_IGN)) {
+    FWLOGERROR("setup signal {} failed", "SIGINT");
+    return EN_ATAPP_ERR_SETUP_SIGNAL;
+  }
 
 #ifndef WIN32
-  signal(SIGSTOP, _app_setup_signal_handle);
-  signal(SIGQUIT, SIG_IGN);
-  signal(SIGHUP, SIG_IGN);   // lost parent process
-  signal(SIGPIPE, SIG_IGN);  // close stdin, stdout or stderr
-  signal(SIGTSTP, SIG_IGN);  // close tty
-  signal(SIGTTIN, SIG_IGN);  // tty input
-  signal(SIGTTOU, SIG_IGN);  // tty output
+  if (!internal_setup_signal_action(SIGSTOP, _app_setup_signal_handle)) {
+    FWLOGERROR("setup signal {} failed", "SIGSTOP");
+    return EN_ATAPP_ERR_SETUP_SIGNAL;
+  }
+  if (!internal_setup_signal_action(SIGQUIT, SIG_IGN)) {
+    FWLOGERROR("setup signal {} failed", "SIGQUIT");
+    return EN_ATAPP_ERR_SETUP_SIGNAL;
+  }
+  // lost parent process
+  if (!internal_setup_signal_action(SIGHUP, SIG_IGN)) {
+    FWLOGERROR("setup signal {} failed", "SIGHUP");
+    return EN_ATAPP_ERR_SETUP_SIGNAL;
+  }
+  // close stdin, stdout or stderr
+  if (!internal_setup_signal_action(SIGPIPE, SIG_IGN)) {
+    FWLOGERROR("setup signal {} failed", "SIGPIPE");
+    return EN_ATAPP_ERR_SETUP_SIGNAL;
+  }
+  // close tty
+  if (!internal_setup_signal_action(SIGTSTP, SIG_IGN)) {
+    FWLOGERROR("setup signal {} failed", "SIGTSTP");
+    return EN_ATAPP_ERR_SETUP_SIGNAL;
+  }
+  // tty input
+  if (!internal_setup_signal_action(SIGTTIN, SIG_IGN)) {
+    FWLOGERROR("setup signal {} failed", "SIGTTIN");
+    return EN_ATAPP_ERR_SETUP_SIGNAL;
+  }
+  // tty output
+  if (!internal_setup_signal_action(SIGTTOU, SIG_IGN)) {
+    FWLOGERROR("setup signal {} failed", "SIGTTOU");
+    return EN_ATAPP_ERR_SETUP_SIGNAL;
+  }
 #endif
 
   return 0;
