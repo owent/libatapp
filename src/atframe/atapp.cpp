@@ -3417,11 +3417,6 @@ int app::setup_signal() {
   }
 
 #ifndef WIN32
-  if (!internal_setup_signal_action(SIGSTOP, _app_setup_signal_handle)) {
-    FWLOGERROR("setup signal {} failed, errno: {} -> {}", "SIGSTOP", util::platform::get_errno(),
-               util::platform::get_strerrno(util::platform::get_errno(), gsl::make_span(errmsg)));
-    ret = EN_ATAPP_ERR_SETUP_SIGNAL;
-  }
   if (!internal_setup_signal_action(SIGQUIT, SIG_IGN)) {
     FWLOGERROR("setup signal {} failed, errno: {} -> {}", "SIGQUIT", util::platform::get_errno(),
                util::platform::get_strerrno(util::platform::get_errno(), gsl::make_span(errmsg)));
