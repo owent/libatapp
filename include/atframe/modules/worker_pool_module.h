@@ -19,14 +19,15 @@ namespace atapp {
 
 class worker_pool_module : public ::atapp::module_impl {
  public:
+  struct worker_set;
+  struct scaling_statistics;
+
+ public:
   LIBATAPP_MACRO_API worker_pool_module();
   LIBATAPP_MACRO_API virtual ~worker_pool_module();
 
  private:
   class worker;
-
-  struct worker_set;
-  struct scaling_statistics;
 
  public:
   LIBATAPP_MACRO_API int reload() override;
@@ -40,6 +41,7 @@ class worker_pool_module : public ::atapp::module_impl {
   LIBATAPP_MACRO_API void cleanup() override;
 
  private:
+  void internal_cleanup();
   void apply_configure();
 
  private:

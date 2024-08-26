@@ -17,6 +17,7 @@
 
 #include <algorithm/sha.h>
 #include <common/file_system.h>
+#include <common/platform_compat.h>
 #include <common/string_oprs.h>
 
 #include <cli/shell_font.h>
@@ -431,6 +432,16 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
     return 0;
   }
 
+// Ignore SIGPIPE
+#ifndef WIN32
+  if (mode_ != mode_t::CUSTOM && mode_ != mode_t::STOP && mode_ != mode_t::RELOAD) {
+    // Ignore SIGPIPE because startup log may use closed stdin, stdout or stderr
+    internal_setup_signal_action(SIGPIPE, SIG_IGN);
+  }
+#endif
+
+  setup_startup_log();
+
   if (mode_ != mode_t::CUSTOM && mode_ != mode_t::STOP && mode_ != mode_t::RELOAD) {
     int ret = setup_signal();
     if (ret < 0) {
@@ -439,8 +450,6 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
       return setup_result_ = ret;
     }
   }
-
-  setup_startup_log();
 
   // step 4. load options from cmd line
   if (nullptr == ev_loop) {
@@ -3394,52 +3403,63 @@ int app::setup_signal() {
   // block signals
   app::last_instance_ = this;
 
+  int ret = 0;
+  char errmsg[4096] = {0};
   if (!internal_setup_signal_action(SIGTERM, _app_setup_signal_handle)) {
-    FWLOGERROR("setup signal {} failed", "SIGTERM");
-    return EN_ATAPP_ERR_SETUP_SIGNAL;
+    FWLOGERROR("setup signal {} failed, errno: {} -> {}", "SIGTERM", util::platform::get_errno(),
+               util::platform::get_strerrno(util::platform::get_errno(), gsl::make_span(errmsg)));
+    ret = EN_ATAPP_ERR_SETUP_SIGNAL;
   }
   if (!internal_setup_signal_action(SIGINT, SIG_IGN)) {
-    FWLOGERROR("setup signal {} failed", "SIGINT");
-    return EN_ATAPP_ERR_SETUP_SIGNAL;
+    FWLOGERROR("setup signal {} failed, errno: {} -> {}", "SIGINT", util::platform::get_errno(),
+               util::platform::get_strerrno(util::platform::get_errno(), gsl::make_span(errmsg)));
+    ret = EN_ATAPP_ERR_SETUP_SIGNAL;
   }
 
 #ifndef WIN32
   if (!internal_setup_signal_action(SIGSTOP, _app_setup_signal_handle)) {
-    FWLOGERROR("setup signal {} failed", "SIGSTOP");
-    return EN_ATAPP_ERR_SETUP_SIGNAL;
+    FWLOGERROR("setup signal {} failed, errno: {} -> {}", "SIGSTOP", util::platform::get_errno(),
+               util::platform::get_strerrno(util::platform::get_errno(), gsl::make_span(errmsg)));
+    ret = EN_ATAPP_ERR_SETUP_SIGNAL;
   }
   if (!internal_setup_signal_action(SIGQUIT, SIG_IGN)) {
-    FWLOGERROR("setup signal {} failed", "SIGQUIT");
-    return EN_ATAPP_ERR_SETUP_SIGNAL;
+    FWLOGERROR("setup signal {} failed, errno: {} -> {}", "SIGQUIT", util::platform::get_errno(),
+               util::platform::get_strerrno(util::platform::get_errno(), gsl::make_span(errmsg)));
+    ret = EN_ATAPP_ERR_SETUP_SIGNAL;
   }
   // lost parent process
   if (!internal_setup_signal_action(SIGHUP, SIG_IGN)) {
-    FWLOGERROR("setup signal {} failed", "SIGHUP");
-    return EN_ATAPP_ERR_SETUP_SIGNAL;
+    FWLOGERROR("setup signal {} failed, errno: {} -> {}", "SIGHUP", util::platform::get_errno(),
+               util::platform::get_strerrno(util::platform::get_errno(), gsl::make_span(errmsg)));
+    ret = EN_ATAPP_ERR_SETUP_SIGNAL;
   }
   // close stdin, stdout or stderr
   if (!internal_setup_signal_action(SIGPIPE, SIG_IGN)) {
-    FWLOGERROR("setup signal {} failed", "SIGPIPE");
-    return EN_ATAPP_ERR_SETUP_SIGNAL;
+    FWLOGERROR("setup signal {} failed, errno: {} -> {}", "SIGPIPE", util::platform::get_errno(),
+               util::platform::get_strerrno(util::platform::get_errno(), gsl::make_span(errmsg)));
+    ret = EN_ATAPP_ERR_SETUP_SIGNAL;
   }
   // close tty
   if (!internal_setup_signal_action(SIGTSTP, SIG_IGN)) {
-    FWLOGERROR("setup signal {} failed", "SIGTSTP");
-    return EN_ATAPP_ERR_SETUP_SIGNAL;
+    FWLOGERROR("setup signal {} failed, errno: {} -> {}", "SIGTSTP", util::platform::get_errno(),
+               util::platform::get_strerrno(util::platform::get_errno(), gsl::make_span(errmsg)));
+    ret = EN_ATAPP_ERR_SETUP_SIGNAL;
   }
   // tty input
   if (!internal_setup_signal_action(SIGTTIN, SIG_IGN)) {
-    FWLOGERROR("setup signal {} failed", "SIGTTIN");
-    return EN_ATAPP_ERR_SETUP_SIGNAL;
+    FWLOGERROR("setup signal {} failed, errno: {} -> {}", "SIGTTIN", util::platform::get_errno(),
+               util::platform::get_strerrno(util::platform::get_errno(), gsl::make_span(errmsg)));
+    ret = EN_ATAPP_ERR_SETUP_SIGNAL;
   }
   // tty output
   if (!internal_setup_signal_action(SIGTTOU, SIG_IGN)) {
-    FWLOGERROR("setup signal {} failed", "SIGTTOU");
-    return EN_ATAPP_ERR_SETUP_SIGNAL;
+    FWLOGERROR("setup signal {} failed, errno: {} -> {}", "SIGTTOU", util::platform::get_errno(),
+               util::platform::get_strerrno(util::platform::get_errno(), gsl::make_span(errmsg)));
+    ret = EN_ATAPP_ERR_SETUP_SIGNAL;
   }
 #endif
 
-  return 0;
+  return ret;
 }
 
 void app::setup_startup_log() {
