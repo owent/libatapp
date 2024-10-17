@@ -45,6 +45,7 @@ class connection;
 namespace atapp {
 
 class etcd_module;
+class worker_pool_module;
 class atapp_connector_atbus;
 class atapp_connector_loopback;
 
@@ -388,6 +389,8 @@ class app {
 
   LIBATAPP_MACRO_API std::shared_ptr<::atapp::etcd_module> get_etcd_module() const noexcept;
 
+  LIBATAPP_MACRO_API std::shared_ptr<::atapp::worker_pool_module> get_worker_pool_module() const noexcept;
+
   LIBATAPP_MACRO_API const etcd_discovery_set &get_global_discovery() const noexcept;
 
   LIBATAPP_MACRO_API uint32_t get_address_type(const std::string &addr) const noexcept;
@@ -725,6 +728,7 @@ class app {
   stats_data_t stats_;
 
   // inner modules
+  std::shared_ptr<::atapp::worker_pool_module> internal_module_worker_pool_;
   std::shared_ptr<::atapp::etcd_module> internal_module_etcd_;
   etcd_discovery_set internal_empty_discovery_set_;
 

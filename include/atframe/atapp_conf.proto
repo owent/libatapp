@@ -256,29 +256,28 @@ message atapp_etcd {
 }
 
 message atapp_worker_scaling {
-  google.protobuf.Duration check_interval = 1 [(atapp.protocol.CONFIGURE) = { default_value: "5s" min_value: "128ms" }];
-  google.protobuf.Duration stabilization_window = 2
-      [(atapp.protocol.CONFIGURE) = { default_value: "5s" min_value: "1s" }];
+  google.protobuf.Duration scaling_up_stabilization_window = 21
+      [(atapp.protocol.CONFIGURE) = { default_value: "10s" min_value: "1s" }];
+  int64 scaling_up_cpu_permillage = 22 [(atapp.protocol.CONFIGURE) = { default_value: "600" }];
+  uint32 scaling_up_queue_size = 23 [(atapp.protocol.CONFIGURE) = { default_value: "16" }];
 
-  int64 scaling_up_cpu_permillage = 21 [(atapp.protocol.CONFIGURE) = { default_value: "600" }];
-  uint32 scaling_up_queue_size = 22 [(atapp.protocol.CONFIGURE) = { default_value: "16" }];
+  google.protobuf.Duration scaling_down_stabilization_window = 31
+      [(atapp.protocol.CONFIGURE) = { default_value: "10s" min_value: "1s" }];
+  int64 scaling_down_cpu_permillage = 32 [(atapp.protocol.CONFIGURE) = { default_value: "500" }];
+  uint32 scaling_down_queue_size = 33 [(atapp.protocol.CONFIGURE) = { default_value: "12" }];
 
-  int64 scaling_down_cpu_permillage = 31 [(atapp.protocol.CONFIGURE) = { default_value: "500" }];
-  uint32 scaling_down_queue_size = 32 [(atapp.protocol.CONFIGURE) = { default_value: "12" }];
+  google.protobuf.Duration leak_scan_interval = 41
+      [(atapp.protocol.CONFIGURE) = { default_value: "300s" min_value: "1s" }];
 }
 
 message atapp_worker_pool {
   uint32 queue_size = 1 [(atapp.protocol.CONFIGURE) = { default_value: "20480" }];
   google.protobuf.Duration tick_interval = 2 [(atapp.protocol.CONFIGURE) = { default_value: "100ms" }];
 
-  uint32 worker_number_min = 11 [(atapp.protocol.CONFIGURE) = { default_value: "1" min_value: "0" }];
-  uint32 worker_number_max = 12 [(atapp.protocol.CONFIGURE) = { default_value: "8" min_value: "0" }];
+  uint32 worker_number_min = 11 [(atapp.protocol.CONFIGURE) = { default_value: "2" min_value: "1" }];
+  uint32 worker_number_max = 12 [(atapp.protocol.CONFIGURE) = { default_value: "4" min_value: "0" }];
 
-  repeated atapp_worker_scaling scaling_rules = 21;
-
-  uint32 loop_once_private_job_count = 31 [(atapp.protocol.CONFIGURE) = { default_value: "32" min_value: "1" }];
-  uint32 loop_once_shared_job_count = 32 [(atapp.protocol.CONFIGURE) = { default_value: "16" min_value: "1" }];
-  uint32 loop_once_timer_count = 33 [(atapp.protocol.CONFIGURE) = { default_value: "8" min_value: "1" }];
+  atapp_worker_scaling scaling_rules = 21;
 }
 
 message atapp_grpc_stub_options {}
