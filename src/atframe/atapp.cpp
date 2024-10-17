@@ -41,6 +41,7 @@
 
 #include "atframe/atapp_conf_rapidjson.h"
 #include "atframe/modules/etcd_module.h"
+#include "atframe/modules/worker_pool_module.h"
 
 #include "atframe/connectors/atapp_connector_atbus.h"
 #include "atframe/connectors/atapp_connector_loopback.h"
@@ -262,6 +263,8 @@ LIBATAPP_MACRO_API app::app()
   loopback_connector_ = add_connector<atapp_connector_loopback>();
 
   // inner modules
+  internal_module_worker_pool_ = std::make_shared<atapp::worker_pool_module>();
+  add_module(internal_module_worker_pool_);
   internal_module_etcd_ = std::make_shared<atapp::etcd_module>();
   add_module(internal_module_etcd_);
 
@@ -1632,6 +1635,10 @@ LIBATAPP_MACRO_API void app::pack(atapp::protocol::atapp_discovery &out) const {
 
 LIBATAPP_MACRO_API std::shared_ptr<::atapp::etcd_module> app::get_etcd_module() const noexcept {
   return internal_module_etcd_;
+}
+
+LIBATAPP_MACRO_API std::shared_ptr<::atapp::worker_pool_module> app::get_worker_pool_module() const noexcept {
+  return internal_module_worker_pool_;
 }
 
 LIBATAPP_MACRO_API const etcd_discovery_set &app::get_global_discovery() const noexcept {
