@@ -586,13 +586,13 @@ LIBATAPP_MACRO_API int worker_pool_module::tick(std::chrono::system_clock::time_
     size_t queue_size = 0;
     {
       std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
-      for (auto& worker : worker_set_->workers) {
-        if (!worker) {
+      for (auto& worker_ptr : worker_set_->workers) {
+        if (!worker_ptr) {
           continue;
         }
 
-        collect_cpu_time += worker->collect_scaling_up_cpu_time();
-        queue_size += worker->get_pending_job_size();
+        collect_cpu_time += worker_ptr->collect_scaling_up_cpu_time();
+        queue_size += worker_ptr->get_pending_job_size();
       }
     }
 
@@ -639,13 +639,13 @@ LIBATAPP_MACRO_API int worker_pool_module::tick(std::chrono::system_clock::time_
 
     {
       std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
-      for (auto& worker : worker_set_->workers) {
-        if (!worker) {
+      for (auto& worker_ptr : worker_set_->workers) {
+        if (!worker_ptr) {
           continue;
         }
 
-        collect_cpu_time += worker->collect_scaling_down_cpu_time();
-        queue_size += worker->get_pending_job_size();
+        collect_cpu_time += worker_ptr->collect_scaling_down_cpu_time();
+        queue_size += worker_ptr->get_pending_job_size();
       }
     }
 
@@ -695,9 +695,9 @@ LIBATAPP_MACRO_API int worker_pool_module::stop() {
     worker_set_->current_expect_workers.store(0, std::memory_order_release);
 
     std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
-    for (auto& worker : worker_set_->workers) {
-      if (worker) {
-        worker->wakeup();
+    for (auto& worker_ptr : worker_set_->workers) {
+      if (worker_ptr) {
+        worker_ptr->wakeup();
       }
     }
   }
@@ -726,8 +726,8 @@ LIBATAPP_MACRO_API int worker_pool_module::spawn(worker_job_action_pointer actio
     return EN_ATBUS_ERR_PARAMS;
   }
 
-  std::shared_ptr<worker> worker = select_worker();
-  if (!worker) {
+  std::shared_ptr<worker> worker_ptr = select_worker();
+  if (!worker_ptr) {
     if (!worker_set_ || worker_set_->closing.load(std::memory_order_acquire)) {
       return EN_ATAPP_ERR_WORKER_POOL_CLOSED;
     } else {
@@ -736,7 +736,7 @@ LIBATAPP_MACRO_API int worker_pool_module::spawn(worker_job_action_pointer actio
   }
 
   if (scaling_configure_) {
-    if (worker->get_pending_job_size() >= scaling_configure_->queue_size_limit) {
+    if (worker_ptr->get_pending_job_size() >= scaling_configure_->queue_size_limit) {
       return EN_ATAPP_ERR_WORKER_POOL_BUSY;
     }
   }
@@ -744,7 +744,7 @@ LIBATAPP_MACRO_API int worker_pool_module::spawn(worker_job_action_pointer actio
   worker_job_data new_job;
   new_job.event = worker_job_event_type::kWorkerJobEventAction;
   new_job.action = action;
-  worker->emplace(std::move(new_job));
+  worker_ptr->emplace(std::move(new_job));
 
   return EN_ATAPP_ERR_SUCCESS;
 }
@@ -801,12 +801,12 @@ LIBATAPP_MACRO_API std::chrono::microseconds worker_pool_module::get_configure_t
 LIBATAPP_MACRO_API std::chrono::microseconds worker_pool_module::get_statistics_last_second_busy_cpu_time() {
   std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
   std::chrono::microseconds::rep ret = 0;
-  for (auto& worker : worker_set_->workers) {
-    if (!worker) {
+  for (auto& worker_ptr : worker_set_->workers) {
+    if (!worker_ptr) {
       continue;
     }
 
-    ret += worker->cpu_time_last_second_busy_us_.load(std::memory_order_acquire);
+    ret += worker_ptr->cpu_time_last_second_busy_us_.load(std::memory_order_acquire);
   }
 
   return std::chrono::microseconds{ret};
@@ -815,12 +815,12 @@ LIBATAPP_MACRO_API std::chrono::microseconds worker_pool_module::get_statistics_
 LIBATAPP_MACRO_API std::chrono::microseconds worker_pool_module::get_statistics_last_minute_busy_cpu_time() {
   std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
   std::chrono::microseconds::rep ret = 0;
-  for (auto& worker : worker_set_->workers) {
-    if (!worker) {
+  for (auto& worker_ptr : worker_set_->workers) {
+    if (!worker_ptr) {
       continue;
     }
 
-    ret += worker->cpu_time_last_minute_busy_us_.load(std::memory_order_acquire);
+    ret += worker_ptr->cpu_time_last_minute_busy_us_.load(std::memory_order_acquire);
   }
 
   return std::chrono::microseconds{ret};
@@ -939,18 +939,18 @@ void worker_pool_module::internal_autofix_workers() {
 
   std::vector<std::shared_ptr<worker>> new_workers;
   new_workers.reserve(worker_set_->workers.size());
-  for (auto& worker : worker_set_->workers) {
-    if (!worker) {
+  for (auto& worker_ptr : worker_set_->workers) {
+    if (!worker_ptr) {
       continue;
     }
 
-    if (worker->is_exiting()) {
-      worker_set_->cpu_time_collect_scaling_up_us_for_removed_workers += worker->collect_scaling_up_cpu_time();
-      worker_set_->cpu_time_collect_scaling_down_us_for_removed_workers += worker->collect_scaling_down_cpu_time();
+    if (worker_ptr->is_exiting()) {
+      worker_set_->cpu_time_collect_scaling_up_us_for_removed_workers += worker_ptr->collect_scaling_up_cpu_time();
+      worker_set_->cpu_time_collect_scaling_down_us_for_removed_workers += worker_ptr->collect_scaling_down_cpu_time();
       continue;
     }
 
-    new_workers.push_back(worker);
+    new_workers.push_back(worker_ptr);
   }
 
   for (size_t i = 0; i < new_workers.size(); ++i) {
@@ -968,9 +968,9 @@ void worker_pool_module::internal_cleanup() {
   worker_set_->closing.store(true, std::memory_order_release);
   {
     std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
-    for (auto& worker : worker_set_->workers) {
-      if (worker) {
-        worker->wakeup();
+    for (auto& worker_ptr : worker_set_->workers) {
+      if (worker_ptr) {
+        worker_ptr->wakeup();
       }
     }
   }
@@ -999,23 +999,23 @@ std::shared_ptr<worker_pool_module::worker> worker_pool_module::select_worker() 
   std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
   std::shared_ptr<worker_pool_module::worker> ret;
   worker_compare_key min_key = worker_compare_key::max();
-  for (auto& worker : worker_set_->workers) {
-    if (!worker) {
+  for (auto& worker_ptr : worker_set_->workers) {
+    if (!worker_ptr) {
       continue;
     }
 
-    if (worker->is_exiting()) {
+    if (worker_ptr->is_exiting()) {
       continue;
     }
 
-    if (worker->get_context().worker_id > expect_workers) {
+    if (worker_ptr->get_context().worker_id > expect_workers) {
       break;
     }
 
-    worker_compare_key cur_key = worker->make_compare_key();
+    worker_compare_key cur_key = worker_ptr->make_compare_key();
     if (cur_key < min_key) {
       min_key = cur_key;
-      ret = worker;
+      ret = worker_ptr;
     }
   }
 
@@ -1038,20 +1038,20 @@ void worker_pool_module::rebalance_jobs() {
   std::map<worker_compare_key, std::shared_ptr<worker>> workers;
 
   std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
-  for (auto& worker : worker_set_->workers) {
-    if (!worker) {
+  for (auto& worker_ptr : worker_set_->workers) {
+    if (!worker_ptr) {
       continue;
     }
 
-    if (worker->is_exiting()) {
+    if (worker_ptr->is_exiting()) {
       continue;
     }
 
-    if (worker->get_context().worker_id > expect_workers) {
+    if (worker_ptr->get_context().worker_id > expect_workers) {
       break;
     }
 
-    workers[worker->make_compare_key()] = worker;
+    workers[worker_ptr->make_compare_key()] = worker_ptr;
   }
 
   if (workers.empty()) {
@@ -1060,12 +1060,12 @@ void worker_pool_module::rebalance_jobs() {
 
   worker_job_data job_data;
   while (worker_set_->shared_jobs.try_pop(job_data)) {
-    auto worker = workers.begin()->second;
-    worker->emplace(std::move(job_data));
+    auto worker_ptr = workers.begin()->second;
+    worker_ptr->emplace(std::move(job_data));
     workers.erase(workers.begin());
 
     // Reinsert and change the order
-    workers[worker->make_compare_key()] = worker;
+    workers[worker_ptr->make_compare_key()] = worker_ptr;
   }
 }
 
