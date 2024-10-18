@@ -85,17 +85,6 @@ struct UTIL_SYMBOL_LOCAL worker_compare_key {
 
     return l.worker_ptr < r.worker_ptr;
   }
-
-  friend inline bool operator==(const worker_compare_key& l, const worker_compare_key& r) noexcept {
-    return l.pending_job_size == r.pending_job_size &&
-           l.cpu_time_last_second_busy_us == r.cpu_time_last_second_busy_us &&
-           l.cpu_time_last_minute_busy_us == r.cpu_time_last_minute_busy_us && l.worker_id == r.worker_id &&
-           l.worker_ptr == r.worker_ptr;
-  }
-
-  /*
-  friend inline bool operator!=(const worker_compare_key& l, const worker_compare_key& r) noexcept { return !(l == r); }
-  */
 };
 
 }  // namespace
