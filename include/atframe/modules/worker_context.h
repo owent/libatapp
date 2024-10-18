@@ -28,6 +28,16 @@ enum class worker_tick_handle_type : uint32_t {
   kWorkerTickHandleSpecify = 1,
 };
 
+enum class worker_scaling_mode : uint8_t {
+  kStable = 0,  // Under minimal count
+  kDynamic = 1, // Between minimal and maximal count
+  kPendingToDestroy = 2, // Pending to destroy
+};
+
+struct UTIL_SYMBOL_VISIBLE worker_meta {
+  worker_scaling_mode scaling_mode;
+};
+
 using worker_job_action_type = std::function<void(const worker_context&)>;
 
 using worker_job_action_pointer = ::util::memory::strong_rc_ptr<worker_job_action_type>;

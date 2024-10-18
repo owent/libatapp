@@ -93,7 +93,9 @@ struct UTIL_SYMBOL_LOCAL worker_compare_key {
            l.worker_ptr == r.worker_ptr;
   }
 
+  /*
   friend inline bool operator!=(const worker_compare_key& l, const worker_compare_key& r) noexcept { return !(l == r); }
+  */
 };
 
 }  // namespace
@@ -749,6 +751,83 @@ LIBATAPP_MACRO_API int worker_pool_module::spawn(worker_job_action_pointer actio
   return EN_ATAPP_ERR_SUCCESS;
 }
 
+LIBATAPP_MACRO_API int worker_pool_module::spawn(worker_job_action_type action, const worker_context& context) {
+  return spawn(util::memory::make_strong_rc<worker_job_action_type>(std::move(action)), context);
+}
+
+LIBATAPP_MACRO_API int worker_pool_module::spawn(worker_job_action_pointer action, const worker_context& context) {
+  if (!action) {
+    return EN_ATBUS_ERR_PARAMS;
+  }
+
+  if (context.worker_id <= 0) {
+    return EN_ATBUS_ERR_PARAMS;
+  }
+
+  if (!worker_set_) {
+    return EN_ATAPP_ERR_WORKER_POOL_CLOSED;
+  }
+
+  uint32_t expect_workers = worker_set_->current_expect_workers.load(std::memory_order_acquire);
+  if (context.worker_id > expect_workers) {
+    if (worker_set_->closing.load(std::memory_order_acquire)) {
+      return EN_ATAPP_ERR_WORKER_POOL_CLOSED;
+    } else {
+      return EN_ATAPP_ERR_WORKER_POOL_NO_AVAILABLE_WORKER;
+    }
+  }
+
+  std::shared_ptr<worker> worker_ptr;
+
+  {
+    std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
+    // Find by index: O(1)
+    if (context.worker_id <= worker_set_->workers.size()) {
+      worker_ptr = worker_set_->workers[context.worker_id - 1];
+      if (worker_ptr && worker_ptr->get_context().worker_id != context.worker_id) {
+        worker_ptr.reset();
+      }
+    }
+    while (false);
+
+    // Find by worker id: O(n)
+    if (!worker_ptr) {
+      for (auto& check_worker_ptr : worker_set_->workers) {
+        if (!check_worker_ptr) {
+          continue;
+        }
+        if (check_worker_ptr->get_context().worker_id == context.worker_id) {
+          worker_ptr = check_worker_ptr;
+          break;
+        }
+      }
+    }
+    if (worker_ptr && worker_ptr->is_exiting()) {
+      worker_ptr.reset();
+    }
+  }
+
+  if (!worker_ptr) {
+    if (worker_set_->closing.load(std::memory_order_acquire)) {
+      return EN_ATAPP_ERR_WORKER_POOL_CLOSED;
+    } else {
+      return EN_ATAPP_ERR_WORKER_POOL_NO_AVAILABLE_WORKER;
+    }
+  }
+
+  if (scaling_configure_) {
+    if (worker_ptr->get_pending_job_size() >= scaling_configure_->queue_size_limit) {
+      return EN_ATAPP_ERR_WORKER_POOL_BUSY;
+    }
+  }
+
+  worker_job_data new_job;
+  new_job.event = worker_job_event_type::kWorkerJobEventAction;
+  new_job.action = action;
+  worker_ptr->emplace(std::move(new_job));
+  return EN_ATAPP_ERR_SUCCESS;
+}
+
 LIBATAPP_MACRO_API size_t worker_pool_module::get_current_worker_count() const noexcept {
   if (worker_set_) {
     std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
@@ -756,6 +835,79 @@ LIBATAPP_MACRO_API size_t worker_pool_module::get_current_worker_count() const n
   }
 
   return 0;
+}
+
+LIBATAPP_MACRO_API void worker_pool_module::foreach_worker_quickly(
+    ::util::nostd::function_ref<bool(const worker_context&, const worker_meta&)> fn) const {
+  if (!worker_set_) {
+    return;
+  }
+
+  size_t except_count = get_configure_worker_except_count();
+  size_t min_count = get_configure_worker_min_count();
+
+  std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
+  for (auto& worker_ptr : worker_set_->workers) {
+    if (!worker_ptr) {
+      continue;
+    }
+
+    if (worker_ptr->is_exiting()) {
+      continue;
+    }
+
+    worker_meta meta;
+    if (worker_ptr->get_context().worker_id <= min_count) {
+      meta.scaling_mode = worker_scaling_mode::kStable;
+    } else if (worker_ptr->get_context().worker_id <= except_count) {
+      meta.scaling_mode = worker_scaling_mode::kDynamic;
+    } else {
+      meta.scaling_mode = worker_scaling_mode::kPendingToDestroy;
+    }
+
+    if (!fn(worker_ptr->get_context(), meta)) {
+      break;
+    }
+  }
+}
+
+LIBATAPP_MACRO_API void worker_pool_module::foreach_worker(
+    ::util::nostd::function_ref<bool(const worker_context&, const worker_meta&)> fn) {
+  if (!worker_set_) {
+    return;
+  }
+
+  std::vector<std::shared_ptr<worker>> workers;
+  {
+    std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
+    workers = worker_set_->workers;
+  }
+
+  size_t except_count = get_configure_worker_except_count();
+  size_t min_count = get_configure_worker_min_count();
+
+  for (auto& worker_ptr : workers) {
+    if (!worker_ptr) {
+      continue;
+    }
+
+    if (worker_ptr->is_exiting()) {
+      continue;
+    }
+
+    worker_meta meta;
+    if (worker_ptr->get_context().worker_id <= min_count) {
+      meta.scaling_mode = worker_scaling_mode::kStable;
+    } else if (worker_ptr->get_context().worker_id <= except_count) {
+      meta.scaling_mode = worker_scaling_mode::kDynamic;
+    } else {
+      meta.scaling_mode = worker_scaling_mode::kPendingToDestroy;
+    }
+
+    if (!fn(worker_ptr->get_context(), meta)) {
+      break;
+    }
+  }
 }
 
 LIBATAPP_MACRO_API size_t worker_pool_module::get_configure_worker_except_count() const noexcept {

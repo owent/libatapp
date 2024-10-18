@@ -5,6 +5,8 @@
 
 #include <config/atframe_utils_build_feature.h>
 
+#include <nostd/function_ref.h>
+
 #include <atframe/atapp_conf.h>
 #include <atframe/atapp_module_impl.h>
 #include <atframe/modules/worker_context.h>
@@ -51,12 +53,30 @@ class worker_pool_module : public ::atapp::module_impl {
 
   LIBATAPP_MACRO_API void cleanup() override;
 
+  // thread-safe
   LIBATAPP_MACRO_API int spawn(worker_job_action_type action);
 
+  // thread-safe
   LIBATAPP_MACRO_API int spawn(worker_job_action_pointer action);
 
+  // thread-safe
+  LIBATAPP_MACRO_API int spawn(worker_job_action_type action, const worker_context& context);
+
+  // thread-safe
+  LIBATAPP_MACRO_API int spawn(worker_job_action_pointer action, const worker_context& context);
+
+  // thread-safe
   LIBATAPP_MACRO_API size_t get_current_worker_count() const noexcept;
 
+  // thread-safe
+  LIBATAPP_MACRO_API void foreach_worker_quickly(
+      ::util::nostd::function_ref<bool(const worker_context&, const worker_meta&)> fn) const;
+
+  // thread-safe
+  LIBATAPP_MACRO_API void foreach_worker(
+      ::util::nostd::function_ref<bool(const worker_context&, const worker_meta&)> fn);
+
+  // thread-safe, lockless
   LIBATAPP_MACRO_API size_t get_configure_worker_except_count() const noexcept;
 
   LIBATAPP_MACRO_API size_t get_configure_worker_min_count() const noexcept;
@@ -65,10 +85,13 @@ class worker_pool_module : public ::atapp::module_impl {
 
   LIBATAPP_MACRO_API size_t get_configure_worker_queue_size() const noexcept;
 
+  // thread-safe, lockless
   LIBATAPP_MACRO_API std::chrono::microseconds get_configure_tick_interval() const noexcept;
 
+  // thread-safe
   LIBATAPP_MACRO_API std::chrono::microseconds get_statistics_last_second_busy_cpu_time();
 
+  // thread-safe
   LIBATAPP_MACRO_API std::chrono::microseconds get_statistics_last_minute_busy_cpu_time();
 
  private:
