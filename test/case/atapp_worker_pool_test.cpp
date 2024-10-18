@@ -56,6 +56,32 @@ CASE_TEST(atapp_worker_pool, basic_spawn) {
     std::this_thread::sleep_for(std::chrono::milliseconds(4));
   }));
 
+  // Test foreach
+  worker_pool_module->foreach_worker(
+      [&worker_pool_module](const atapp::worker_context& context, const atapp::worker_meta& meta) -> bool {
+        if (context.worker_id > worker_pool_module->get_configure_worker_except_count()) {
+          CASE_EXPECT_TRUE(meta.scaling_mode == atapp::worker_scaling_mode::kPendingToDestroy);
+        } else if (context.worker_id > worker_pool_module->get_configure_worker_min_count()) {
+          CASE_EXPECT_TRUE(meta.scaling_mode == atapp::worker_scaling_mode::kDynamic);
+        } else {
+          CASE_EXPECT_TRUE(meta.scaling_mode == atapp::worker_scaling_mode::kStable);
+        }
+        return true;
+      });
+
+  // Test foreach
+  worker_pool_module->foreach_worker_quickly(
+      [&worker_pool_module](const atapp::worker_context& context, const atapp::worker_meta& meta) -> bool {
+        if (context.worker_id > worker_pool_module->get_configure_worker_except_count()) {
+          CASE_EXPECT_TRUE(meta.scaling_mode == atapp::worker_scaling_mode::kPendingToDestroy);
+        } else if (context.worker_id > worker_pool_module->get_configure_worker_min_count()) {
+          CASE_EXPECT_TRUE(meta.scaling_mode == atapp::worker_scaling_mode::kDynamic);
+        } else {
+          CASE_EXPECT_TRUE(meta.scaling_mode == atapp::worker_scaling_mode::kStable);
+        }
+        return true;
+      });
+
   int32_t sleep_ms = 10000;
   while (counter->load(std::memory_order_acquire) < 2 && sleep_ms > 0) {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -158,6 +184,7 @@ CASE_TEST(atapp_worker_pool, stop) {
   CASE_EXPECT_EQ(2, counter->load(std::memory_order_acquire));
 }
 
+// TODO: spawn with context and ignore the load balance
 // TODO: scaling up
 // TODO: scaling down
 // TODO: rebalance pending jobs
