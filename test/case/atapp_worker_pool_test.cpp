@@ -40,7 +40,7 @@ CASE_TEST(atapp_worker_pool, basic_spawn) {
   CASE_EXPECT_EQ(0, worker_pool_module->get_current_worker_count());
 
   std::shared_ptr<std::atomic<int32_t>> counter = std::make_shared<std::atomic<int32_t>>(0);
-  CASE_EXPECT_EQ(0, worker_pool_module->spawn([counter](const atapp::worker_context& ctx) {
+  CASE_EXPECT_EQ(0, worker_pool_module->spawn([counter](const atapp::worker_context&) {
     counter->fetch_add(1, std::memory_order_release);
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }));
@@ -51,7 +51,7 @@ CASE_TEST(atapp_worker_pool, basic_spawn) {
 
   worker_pool_module->tick(start_time + std::chrono::milliseconds(300));
 
-  CASE_EXPECT_EQ(0, worker_pool_module->spawn([counter](const atapp::worker_context& ctx) {
+  CASE_EXPECT_EQ(0, worker_pool_module->spawn([counter](const atapp::worker_context&) {
     counter->fetch_add(1, std::memory_order_release);
     std::this_thread::sleep_for(std::chrono::milliseconds(4));
   }));
@@ -144,11 +144,11 @@ CASE_TEST(atapp_worker_pool, stop) {
   worker_pool_module->tick(std::chrono::system_clock::now());
 
   std::shared_ptr<std::atomic<int32_t>> counter = std::make_shared<std::atomic<int32_t>>(0);
-  CASE_EXPECT_EQ(0, worker_pool_module->spawn([counter](const atapp::worker_context& ctx) {
+  CASE_EXPECT_EQ(0, worker_pool_module->spawn([counter](const atapp::worker_context&) {
     counter->fetch_add(1, std::memory_order_release);
     std::this_thread::sleep_for(std::chrono::seconds(1));
   }));
-  CASE_EXPECT_EQ(0, worker_pool_module->spawn([counter](const atapp::worker_context& ctx) {
+  CASE_EXPECT_EQ(0, worker_pool_module->spawn([counter](const atapp::worker_context&) {
     counter->fetch_add(1, std::memory_order_release);
     std::this_thread::sleep_for(std::chrono::seconds(1));
   }));
