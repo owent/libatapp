@@ -28,7 +28,8 @@ atapp:
     enable: false
   worker_pool:
     queue_size: 4
-    tick_interval: 10ms
+    tick_min_interval: 10ms
+    tick_max_interval: 1000ms
     worker_number_min: 1
     worker_number_max: 1
     scaling_rules:

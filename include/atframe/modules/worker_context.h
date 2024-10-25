@@ -29,9 +29,9 @@ enum class worker_tick_handle_type : uint32_t {
 };
 
 enum class worker_scaling_mode : uint8_t {
-  kStable = 0,  // Under minimal count
-  kDynamic = 1, // Between minimal and maximal count
-  kPendingToDestroy = 2, // Pending to destroy
+  kStable = 0,            // Under minimal count
+  kDynamic = 1,           // Between minimal and maximal count
+  kPendingToDestroy = 2,  // Pending to destroy
 };
 
 struct UTIL_SYMBOL_VISIBLE worker_meta {
@@ -56,9 +56,10 @@ struct UTIL_SYMBOL_VISIBLE worker_tick_handle_data {
   worker_tick_action_type action;
 };
 
-using worker_tick_action_container_type = std::list<::util::memory::strong_rc_ptr<worker_tick_handle_data>>;
+using worker_tick_action_pointer = ::util::memory::strong_rc_ptr<worker_tick_handle_data>;
 
-using worker_tick_action_handle_type = worker_tick_action_container_type::iterator;
+struct UTIL_SYMBOL_VISIBLE worker_tick_action_handle_data;
+using worker_tick_action_handle_type = std::shared_ptr<worker_tick_action_handle_data>;
 
 enum class worker_type : int32_t {
   kAnyWorker = -1,

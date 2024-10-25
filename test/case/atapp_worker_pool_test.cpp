@@ -40,10 +40,16 @@ CASE_TEST(atapp_worker_pool, basic_spawn) {
   CASE_EXPECT_EQ(0, worker_pool_module->get_current_worker_count());
 
   std::shared_ptr<std::atomic<int32_t>> counter = std::make_shared<std::atomic<int32_t>>(0);
-  CASE_EXPECT_EQ(0, worker_pool_module->spawn([counter](const atapp::worker_context&) {
-    counter->fetch_add(1, std::memory_order_release);
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  }));
+  atapp::worker_context selected_worker;
+  atapp::worker_context real_worker;
+
+  CASE_EXPECT_EQ(0, worker_pool_module->spawn(
+                        [counter, &real_worker](const atapp::worker_context& ctx) {
+                          counter->fetch_add(1, std::memory_order_release);
+                          real_worker = ctx;
+                          std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                        },
+                        &selected_worker));
 
   worker_pool_module->tick(start_time + std::chrono::milliseconds(100));
 
@@ -104,6 +110,7 @@ CASE_TEST(atapp_worker_pool, basic_spawn) {
   worker_pool_module->tick(start_time + std::chrono::milliseconds(600));
 
   CASE_EXPECT_EQ(2, counter->load(std::memory_order_acquire));
+  CASE_EXPECT_EQ(selected_worker.worker_id, real_worker.worker_id);
 }
 
 // stop and cleanup
@@ -134,7 +141,8 @@ CASE_TEST(atapp_worker_pool, stop) {
   CASE_EXPECT_EQ(1, worker_pool_module->get_configure_worker_max_count());
   CASE_EXPECT_EQ(1, worker_pool_module->get_configure_worker_min_count());
   CASE_EXPECT_EQ(4, worker_pool_module->get_configure_worker_queue_size());
-  CASE_EXPECT_EQ(10000, worker_pool_module->get_configure_tick_interval().count());
+  CASE_EXPECT_EQ(10000, worker_pool_module->get_configure_tick_min_interval().count());
+  CASE_EXPECT_EQ(1000000, worker_pool_module->get_configure_tick_max_interval().count());
 
   std::this_thread::sleep_for(std::chrono::milliseconds(32));
   worker_pool_module->tick(std::chrono::system_clock::now());
@@ -184,8 +192,65 @@ CASE_TEST(atapp_worker_pool, stop) {
   CASE_EXPECT_EQ(2, counter->load(std::memory_order_acquire));
 }
 
+CASE_TEST(atapp_worker_pool, foreach_stable_workers) {
+  std::string conf_path_base;
+  util::file_system::dirname(__FILE__, 0, conf_path_base);
+  std::string conf_path = conf_path_base + "/atapp_test_1.yaml";
+
+  if (!util::file_system::is_exist(conf_path.c_str())) {
+    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path << " not found, skip this test" << std::endl;
+    return;
+  }
+
+  atapp::app app;
+  const char* args[] = {"app", "-c", conf_path.c_str(), "start"};
+  CASE_EXPECT_EQ(0, app.init(nullptr, 4, args, nullptr));
+
+  std::chrono::system_clock::time_point start_time = std::chrono::system_clock::now();
+
+  auto worker_pool_module = app.get_worker_pool_module();
+  CASE_EXPECT_TRUE(!!worker_pool_module);
+
+  if (!worker_pool_module) {
+    return;
+  }
+
+  CASE_EXPECT_EQ(0, worker_pool_module->get_current_worker_count());
+
+  auto min_count = worker_pool_module->get_configure_worker_min_count();
+  size_t foreach_counter = 0;
+  // Test foreach
+  worker_pool_module->foreach_worker([&worker_pool_module, &foreach_counter, min_count](
+                                         const atapp::worker_context& context, const atapp::worker_meta& meta) -> bool {
+    CASE_EXPECT_TRUE(meta.scaling_mode == atapp::worker_scaling_mode::kStable);
+    CASE_EXPECT_LE(context.worker_id, min_count);
+
+    ++foreach_counter;
+    return true;
+  });
+  CASE_EXPECT_EQ(min_count, foreach_counter);
+
+  // Test foreach
+  worker_pool_module->foreach_worker_quickly(
+      [&worker_pool_module, &foreach_counter, min_count](const atapp::worker_context& context,
+                                                         const atapp::worker_meta& meta) -> bool {
+        CASE_EXPECT_TRUE(meta.scaling_mode == atapp::worker_scaling_mode::kStable);
+        CASE_EXPECT_LE(context.worker_id, min_count);
+
+        ++foreach_counter;
+        return true;
+      });
+
+  CASE_EXPECT_EQ(min_count + min_count, foreach_counter);
+}
+
 // TODO: spawn with context and ignore the load balance
 // TODO: scaling up
 // TODO: scaling down
 // TODO: rebalance pending jobs
 // TODO: closing and rebalance pending jobs
+
+// TODO: basic tick
+// TODO: busy tick and descrease tick interval
+// TODO: free tick and increase tick interval
+// TODO: stop tick

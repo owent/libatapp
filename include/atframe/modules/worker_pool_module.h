@@ -54,16 +54,23 @@ class worker_pool_module : public ::atapp::module_impl {
   LIBATAPP_MACRO_API void cleanup() override;
 
   // thread-safe
-  LIBATAPP_MACRO_API int spawn(worker_job_action_type action);
+  LIBATAPP_MACRO_API int spawn(worker_job_action_type action, worker_context* selected_context = nullptr);
 
   // thread-safe
-  LIBATAPP_MACRO_API int spawn(worker_job_action_pointer action);
+  LIBATAPP_MACRO_API int spawn(worker_job_action_pointer action, worker_context* selected_context = nullptr);
 
   // thread-safe
   LIBATAPP_MACRO_API int spawn(worker_job_action_type action, const worker_context& context);
 
   // thread-safe
   LIBATAPP_MACRO_API int spawn(worker_job_action_pointer action, const worker_context& context);
+
+  // thread-safe
+  LIBATAPP_MACRO_API worker_tick_action_handle_type add_tick_callback(worker_tick_action_type action,
+                                                                      const worker_context& context);
+
+  // thread-safe
+  LIBATAPP_MACRO_API bool remove_tick_callback(worker_tick_action_handle_type& handle);
 
   // thread-safe
   LIBATAPP_MACRO_API size_t get_current_worker_count() const noexcept;
@@ -86,7 +93,10 @@ class worker_pool_module : public ::atapp::module_impl {
   LIBATAPP_MACRO_API size_t get_configure_worker_queue_size() const noexcept;
 
   // thread-safe, lockless
-  LIBATAPP_MACRO_API std::chrono::microseconds get_configure_tick_interval() const noexcept;
+  LIBATAPP_MACRO_API std::chrono::microseconds get_configure_tick_min_interval() const noexcept;
+
+  // thread-safe, lockless
+  LIBATAPP_MACRO_API std::chrono::microseconds get_configure_tick_max_interval() const noexcept;
 
   // thread-safe
   LIBATAPP_MACRO_API std::chrono::microseconds get_statistics_last_second_busy_cpu_time();
@@ -102,6 +112,7 @@ class worker_pool_module : public ::atapp::module_impl {
   void internal_cleanup();
   void apply_configure();
 
+  int select_worker(const worker_context& context, std::shared_ptr<worker>& output);
   std::shared_ptr<worker> select_worker();
   void rebalance_jobs();
 
