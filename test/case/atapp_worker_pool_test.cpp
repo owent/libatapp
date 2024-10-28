@@ -206,8 +206,6 @@ CASE_TEST(atapp_worker_pool, foreach_stable_workers) {
   const char* args[] = {"app", "-c", conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app.init(nullptr, 4, args, nullptr));
 
-  std::chrono::system_clock::time_point start_time = std::chrono::system_clock::now();
-
   auto worker_pool_module = app.get_worker_pool_module();
   CASE_EXPECT_TRUE(!!worker_pool_module);
 
@@ -276,7 +274,7 @@ CASE_TEST(atapp_worker_pool, basic_tick) {
 
   atapp::worker_context select_context;
   worker_pool_module->foreach_worker(
-      [&select_context](const atapp::worker_context& context, const atapp::worker_meta& meta) -> bool {
+      [&select_context](const atapp::worker_context& context, const atapp::worker_meta&) -> bool {
         select_context = context;
         return false;
       });
@@ -353,7 +351,7 @@ CASE_TEST(atapp_worker_pool, stop_tick) {
 
   atapp::worker_context select_context;
   worker_pool_module->foreach_worker(
-      [&select_context](const atapp::worker_context& context, const atapp::worker_meta& meta) -> bool {
+      [&select_context](const atapp::worker_context& context, const atapp::worker_meta&) -> bool {
         select_context = context;
         return false;
       });
