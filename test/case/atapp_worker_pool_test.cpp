@@ -250,7 +250,146 @@ CASE_TEST(atapp_worker_pool, foreach_stable_workers) {
 // TODO: rebalance pending jobs
 // TODO: closing and rebalance pending jobs
 
-// TODO: basic tick
+// basic tick
+CASE_TEST(atapp_worker_pool, basic_tick) {
+  std::string conf_path_base;
+  util::file_system::dirname(__FILE__, 0, conf_path_base);
+  std::string conf_path = conf_path_base + "/atapp_test_1.yaml";
+
+  if (!util::file_system::is_exist(conf_path.c_str())) {
+    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path << " not found, skip this test" << std::endl;
+    return;
+  }
+
+  atapp::app app;
+  const char* args[] = {"app", "-c", conf_path.c_str(), "start"};
+  CASE_EXPECT_EQ(0, app.init(nullptr, 4, args, nullptr));
+
+  std::chrono::system_clock::time_point start_time = std::chrono::system_clock::now();
+
+  auto worker_pool_module = app.get_worker_pool_module();
+  CASE_EXPECT_TRUE(!!worker_pool_module);
+
+  if (!worker_pool_module) {
+    return;
+  }
+
+  atapp::worker_context select_context;
+  worker_pool_module->foreach_worker(
+      [&select_context](const atapp::worker_context& context, const atapp::worker_meta& meta) -> bool {
+        select_context = context;
+        return false;
+      });
+
+  std::atomic<size_t> tick_times{0};
+  auto old_tick_interval = worker_pool_module->get_tick_interval(select_context);
+  auto handle = worker_pool_module->add_tick_callback(
+      [&tick_times](const atapp::worker_context& /*context*/) {
+        ++tick_times;
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        return 0;
+      },
+      select_context);
+
+  CASE_EXPECT_TRUE(!!handle);
+  for (size_t i = 0; i < 5; ++i) {
+    worker_pool_module->tick(std::chrono::system_clock::now());
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    CASE_MSG_INFO() << "Tick interval: " << worker_pool_module->get_tick_interval(select_context).count() << "ms"
+                    << std::endl;
+  }
+  CASE_EXPECT_GT(tick_times.load(), 3);
+  CASE_EXPECT_LT(tick_times.load(), 8);
+  auto new_tick_interval = worker_pool_module->get_tick_interval(select_context);
+
+  // Change tick interval
+  CASE_EXPECT_NE(old_tick_interval.count(), new_tick_interval.count());
+  CASE_EXPECT_TRUE(worker_pool_module->reset_tick_interval(select_context, std::chrono::milliseconds(0)));
+  auto reset_tick_interval = worker_pool_module->get_tick_interval(select_context);
+  CASE_EXPECT_LT(reset_tick_interval.count(), new_tick_interval.count());
+  CASE_EXPECT_GE(reset_tick_interval.count(), worker_pool_module->get_configure_tick_min_interval().count());
+
+  // Remove
+  CASE_EXPECT_TRUE(worker_pool_module->remove_tick_callback(handle));
+  size_t tick_times_before = tick_times.load();
+  for (size_t i = 0; i < 6; ++i) {
+    worker_pool_module->tick(std::chrono::system_clock::now());
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    if (worker_pool_module->get_current_worker_count() == 0) {
+      break;
+    }
+  }
+
+  size_t tick_times_after = tick_times.load();
+  CASE_EXPECT_LE(tick_times_after, tick_times_before + 1);
+}
+
 // TODO: busy tick and descrease tick interval
 // TODO: free tick and increase tick interval
-// TODO: stop tick
+
+// stop tick
+CASE_TEST(atapp_worker_pool, stop_tick) {
+  std::string conf_path_base;
+  util::file_system::dirname(__FILE__, 0, conf_path_base);
+  std::string conf_path = conf_path_base + "/atapp_test_1.yaml";
+
+  if (!util::file_system::is_exist(conf_path.c_str())) {
+    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path << " not found, skip this test" << std::endl;
+    return;
+  }
+
+  atapp::app app;
+  const char* args[] = {"app", "-c", conf_path.c_str(), "start"};
+  CASE_EXPECT_EQ(0, app.init(nullptr, 4, args, nullptr));
+
+  std::chrono::system_clock::time_point start_time = std::chrono::system_clock::now();
+
+  auto worker_pool_module = app.get_worker_pool_module();
+  CASE_EXPECT_TRUE(!!worker_pool_module);
+
+  if (!worker_pool_module) {
+    return;
+  }
+
+  atapp::worker_context select_context;
+  worker_pool_module->foreach_worker(
+      [&select_context](const atapp::worker_context& context, const atapp::worker_meta& meta) -> bool {
+        select_context = context;
+        return false;
+      });
+
+  std::atomic<size_t> tick_times{0};
+  auto old_tick_interval = worker_pool_module->get_tick_interval(select_context);
+  auto handle = worker_pool_module->add_tick_callback(
+      [&tick_times](const atapp::worker_context& /*context*/) {
+        ++tick_times;
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        return 0;
+      },
+      select_context);
+
+  CASE_EXPECT_TRUE(!!handle);
+  for (size_t i = 0; i < 5; ++i) {
+    worker_pool_module->tick(std::chrono::system_clock::now());
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  }
+  auto new_tick_interval = worker_pool_module->get_tick_interval(select_context);
+  CASE_EXPECT_GT(tick_times.load(), 3);
+  CASE_EXPECT_LT(tick_times.load(), 8);
+
+  // Stop
+  CASE_EXPECT_NE(old_tick_interval.count(), new_tick_interval.count());
+  size_t tick_times_before = tick_times.load();
+  worker_pool_module->stop();
+
+  for (size_t i = 0; i < 5; ++i) {
+    worker_pool_module->tick(std::chrono::system_clock::now());
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    if (worker_pool_module->get_current_worker_count() == 0) {
+      break;
+    }
+  }
+
+  size_t tick_times_after = tick_times.load();
+  CASE_EXPECT_LT(tick_times_after, tick_times_before + 2);
+}

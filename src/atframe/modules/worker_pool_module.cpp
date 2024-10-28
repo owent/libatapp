@@ -106,7 +106,7 @@ struct UTIL_SYMBOL_LOCAL worker_compare_key {
 
 }  // namespace
 
-class UTIL_SYMBOL_LOCAL worker_pool_module::worker {
+class UTIL_SYMBOL_LOCAL worker_pool_module::worker : public std::enable_shared_from_this<worker_pool_module::worker> {
   UTIL_DESIGN_PATTERN_NOCOPYABLE(worker);
   UTIL_DESIGN_PATTERN_NOMOVABLE(worker);
 
@@ -199,8 +199,8 @@ class UTIL_SYMBOL_LOCAL worker_pool_module::worker {
     }
 
     std::lock_guard<std::recursive_mutex> lg{tick_handle_lock_};
-    ret->iter = tick_handles_.data.insert(tick_handles_.data.end(),
-                                          ::util::memory::make_strong_rc<worker_tick_action_type>(std::move(action)));
+    ret->iter = tick_handles_.data.insert(
+        tick_handles_.data.end(), ::util::memory::make_strong_rc<worker_tick_handle_data>(type, std::move(action)));
     return ret;
   }
 
@@ -226,9 +226,16 @@ class UTIL_SYMBOL_LOCAL worker_pool_module::worker {
     tick_handles_.data.erase(handle->iter);
     handle->iter = tick_handles_.data.end();
     handle->version = 0;
-    handle->owner = nullptr;
 
     return true;
+  }
+
+  void reset_tick_interval(std::chrono::microseconds new_tick_interval) noexcept {
+    current_tick_interval_us_.store(new_tick_interval.count(), std::memory_order_release);
+  }
+
+  std::chrono::microseconds get_current_tick_interval() const noexcept {
+    return std::chrono::microseconds{current_tick_interval_us_.load(std::memory_order_acquire)};
   }
 
  private:
@@ -252,7 +259,7 @@ class UTIL_SYMBOL_LOCAL worker_pool_module::worker {
   ::tbb::concurrent_queue<worker_job_data> private_jobs;
   worker_tick_action_container_type tick_handles_;
   std::recursive_mutex tick_handle_lock_;
-  std::chrono::microseconds::rep current_tick_interval_us_;
+  std::atomic<std::chrono::microseconds::rep> current_tick_interval_us_;
 
   std::atomic<std::chrono::microseconds::rep> cpu_time_busy_us_;
   std::atomic<std::chrono::microseconds::rep> cpu_time_sleep_us_;
@@ -321,9 +328,10 @@ worker_pool_module::worker::worker(worker_pool_module::worker_set& owner, uint32
   created_time_.store(std::chrono::system_clock::now().time_since_epoch().count(), std::memory_order_release);
 
   tick_handles_.version = 1;
-  current_tick_interval_us_ = owner.configure_tick_min_interval_microseconds.load(std::memory_order_acquire);
-  if (current_tick_interval_us_ < 1000) {
-    current_tick_interval_us_ = 4000;
+  current_tick_interval_us_.store(owner.configure_tick_min_interval_microseconds.load(std::memory_order_acquire),
+                                  std::memory_order_release);
+  if (current_tick_interval_us_.load(std::memory_order_acquire) < 1000) {
+    current_tick_interval_us_.store(4000, std::memory_order_release);
   }
 
   cpu_time_busy_us_.store(0, std::memory_order_release);
@@ -348,6 +356,10 @@ worker_pool_module::worker::~worker() {
 
   if (background_job_thread) {
     background_job_thread->join();
+  }
+
+  if (status_.load(std::memory_order_acquire) != static_cast<uint8_t>(worker_status::kExited)) {
+    status_.store(static_cast<uint8_t>(worker_status::kExited), std::memory_order_release);
   }
 }
 
@@ -375,7 +387,7 @@ void worker_pool_module::worker::start(std::shared_ptr<worker> self, std::shared
         }
       }
 
-      std::chrono::microseconds tick_interval{self->current_tick_interval_us_};
+      std::chrono::microseconds tick_interval{self->current_tick_interval_us_.load(std::memory_order_acquire)};
       std::chrono::microseconds tick_min_interval{
           owner->configure_tick_min_interval_microseconds.load(std::memory_order_acquire)};
       std::chrono::microseconds tick_max_interval{
@@ -512,7 +524,7 @@ void worker_pool_module::worker::background_job_tick(std::chrono::microseconds t
     std::chrono::microseconds tick_cost =
         std::chrono::duration_cast<std::chrono::microseconds>(tick_end_time - start_time);
     // Reduce tick interval
-    if (tick_cost <= tick_current_interval + tick_current_interval) {
+    if (tick_cost + tick_cost <= tick_current_interval) {
       tick_current_interval /= 2;
     } else if (tick_cost >= tick_current_interval) {
       tick_current_interval *= 2;
@@ -531,7 +543,7 @@ void worker_pool_module::worker::background_job_tick(std::chrono::microseconds t
     if (tick_current_interval > tick_max_interval) {
       tick_current_interval = tick_max_interval;
     }
-    current_tick_interval_us_ = tick_current_interval.count();
+    current_tick_interval_us_.store(tick_current_interval.count(), std::memory_order_release);
   }
 }
 
@@ -910,6 +922,45 @@ LIBATAPP_MACRO_API bool worker_pool_module::remove_tick_callback(worker_tick_act
   }
 
   return worker_ptr->remove_tick_callback(handle);
+}
+
+LIBATAPP_MACRO_API bool worker_pool_module::reset_tick_interval(const worker_context& context,
+                                                                std::chrono::microseconds new_tick_interval) {
+  std::shared_ptr<worker> worker_ptr;
+  if (select_worker(context, worker_ptr) < 0) {
+    return false;
+  }
+  if (!worker_ptr || !worker_set_) {
+    return false;
+  }
+
+  if (new_tick_interval < std::chrono::microseconds{
+                              worker_set_->configure_tick_min_interval_microseconds.load(std::memory_order_acquire)}) {
+    new_tick_interval = std::chrono::microseconds{
+        worker_set_->configure_tick_min_interval_microseconds.load(std::memory_order_acquire)};
+  }
+
+  if (new_tick_interval > std::chrono::microseconds{
+                              worker_set_->configure_tick_max_interval_microseconds.load(std::memory_order_acquire)}) {
+    new_tick_interval = std::chrono::microseconds{
+        worker_set_->configure_tick_max_interval_microseconds.load(std::memory_order_acquire)};
+  }
+
+  worker_ptr->reset_tick_interval(new_tick_interval);
+  return true;
+}
+
+LIBATAPP_MACRO_API std::chrono::microseconds worker_pool_module::get_tick_interval(
+    const worker_context& context) const {
+  std::shared_ptr<worker> worker_ptr;
+  if (const_cast<worker_pool_module*>(this)->select_worker(context, worker_ptr) < 0) {
+    return std::chrono::microseconds::zero();
+  }
+  if (!worker_ptr || !worker_set_) {
+    return std::chrono::microseconds::zero();
+  }
+
+  return worker_ptr->get_current_tick_interval();
 }
 
 LIBATAPP_MACRO_API size_t worker_pool_module::get_current_worker_count() const noexcept {

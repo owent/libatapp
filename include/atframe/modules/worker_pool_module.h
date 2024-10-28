@@ -73,6 +73,13 @@ class worker_pool_module : public ::atapp::module_impl {
   LIBATAPP_MACRO_API bool remove_tick_callback(worker_tick_action_handle_type& handle);
 
   // thread-safe
+  LIBATAPP_MACRO_API bool reset_tick_interval(const worker_context& context,
+                                              std::chrono::microseconds new_tick_interval);
+
+  // thread-safe
+  LIBATAPP_MACRO_API std::chrono::microseconds get_tick_interval(const worker_context& context) const;
+
+  // thread-safe
   LIBATAPP_MACRO_API size_t get_current_worker_count() const noexcept;
 
   // thread-safe
