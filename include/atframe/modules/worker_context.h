@@ -57,6 +57,9 @@ using worker_tick_action_type = std::function<void(const worker_context&)>;
 struct UTIL_SYMBOL_VISIBLE worker_tick_handle_data {
   worker_tick_handle_type type;
   worker_tick_action_type action;
+
+  inline worker_tick_handle_data(worker_tick_handle_type input_type, worker_tick_action_type&& input_action) noexcept
+      : type(input_type), action(std::move(input_action)) {}
 };
 
 using worker_tick_action_pointer = ::util::memory::strong_rc_ptr<worker_tick_handle_data>;

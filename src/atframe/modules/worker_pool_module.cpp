@@ -39,8 +39,6 @@ struct UTIL_SYMBOL_VISIBLE worker_tick_action_handle_data {
 
 namespace {
 
-const size_t kWorkerPoolModuleDefaultWorkerQueueSize = 1024;
-
 struct UTIL_SYMBOL_LOCAL worker_tick_action_container_type {
   size_t version;
   std::list<worker_tick_action_pointer> data;
