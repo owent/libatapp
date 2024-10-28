@@ -218,20 +218,19 @@ CASE_TEST(atapp_worker_pool, foreach_stable_workers) {
   auto min_count = worker_pool_module->get_configure_worker_min_count();
   size_t foreach_counter = 0;
   // Test foreach
-  worker_pool_module->foreach_worker([&worker_pool_module, &foreach_counter, min_count](
-                                         const atapp::worker_context& context, const atapp::worker_meta& meta) -> bool {
-    CASE_EXPECT_TRUE(meta.scaling_mode == atapp::worker_scaling_mode::kStable);
-    CASE_EXPECT_LE(context.worker_id, min_count);
+  worker_pool_module->foreach_worker(
+      [&foreach_counter, min_count](const atapp::worker_context& context, const atapp::worker_meta& meta) -> bool {
+        CASE_EXPECT_TRUE(meta.scaling_mode == atapp::worker_scaling_mode::kStable);
+        CASE_EXPECT_LE(context.worker_id, min_count);
 
-    ++foreach_counter;
-    return true;
-  });
+        ++foreach_counter;
+        return true;
+      });
   CASE_EXPECT_EQ(min_count, foreach_counter);
 
   // Test foreach
   worker_pool_module->foreach_worker_quickly(
-      [&worker_pool_module, &foreach_counter, min_count](const atapp::worker_context& context,
-                                                         const atapp::worker_meta& meta) -> bool {
+      [&foreach_counter, min_count](const atapp::worker_context& context, const atapp::worker_meta& meta) -> bool {
         CASE_EXPECT_TRUE(meta.scaling_mode == atapp::worker_scaling_mode::kStable);
         CASE_EXPECT_LE(context.worker_id, min_count);
 
@@ -262,8 +261,6 @@ CASE_TEST(atapp_worker_pool, basic_tick) {
   atapp::app app;
   const char* args[] = {"app", "-c", conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app.init(nullptr, 4, args, nullptr));
-
-  std::chrono::system_clock::time_point start_time = std::chrono::system_clock::now();
 
   auto worker_pool_module = app.get_worker_pool_module();
   CASE_EXPECT_TRUE(!!worker_pool_module);
@@ -339,8 +336,6 @@ CASE_TEST(atapp_worker_pool, stop_tick) {
   atapp::app app;
   const char* args[] = {"app", "-c", conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app.init(nullptr, 4, args, nullptr));
-
-  std::chrono::system_clock::time_point start_time = std::chrono::system_clock::now();
 
   auto worker_pool_module = app.get_worker_pool_module();
   CASE_EXPECT_TRUE(!!worker_pool_module);
