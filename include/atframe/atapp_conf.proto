@@ -272,7 +272,9 @@ message atapp_worker_scaling {
 
 message atapp_worker_pool {
   uint32 queue_size = 1 [(atapp.protocol.CONFIGURE) = { default_value: "20480" }];
-  google.protobuf.Duration tick_interval = 2 [(atapp.protocol.CONFIGURE) = { default_value: "100ms" }];
+  google.protobuf.Duration tick_min_interval = 2
+      [(atapp.protocol.CONFIGURE) = { default_value: "4ms" min_value: "1ms" }];
+  google.protobuf.Duration tick_max_interval = 3 [(atapp.protocol.CONFIGURE) = { default_value: "100ms" }];
 
   uint32 worker_number_min = 11 [(atapp.protocol.CONFIGURE) = { default_value: "2" min_value: "1" }];
   uint32 worker_number_max = 12 [(atapp.protocol.CONFIGURE) = { default_value: "4" min_value: "0" }];

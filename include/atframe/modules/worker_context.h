@@ -16,7 +16,10 @@
 namespace atapp {
 
 struct UTIL_SYMBOL_VISIBLE worker_context {
-  uint32_t worker_id;
+  uint32_t worker_id = 0;
+
+  inline worker_context() noexcept : worker_id(0) {}
+  explicit inline worker_context(uint32_t id) noexcept : worker_id(id) {}
 };
 
 enum class worker_job_event_type : uint32_t {
@@ -29,9 +32,9 @@ enum class worker_tick_handle_type : uint32_t {
 };
 
 enum class worker_scaling_mode : uint8_t {
-  kStable = 0,  // Under minimal count
-  kDynamic = 1, // Between minimal and maximal count
-  kPendingToDestroy = 2, // Pending to destroy
+  kStable = 0,            // Under minimal count
+  kDynamic = 1,           // Between minimal and maximal count
+  kPendingToDestroy = 2,  // Pending to destroy
 };
 
 struct UTIL_SYMBOL_VISIBLE worker_meta {
@@ -54,11 +57,15 @@ using worker_tick_action_type = std::function<void(const worker_context&)>;
 struct UTIL_SYMBOL_VISIBLE worker_tick_handle_data {
   worker_tick_handle_type type;
   worker_tick_action_type action;
+
+  inline worker_tick_handle_data(worker_tick_handle_type input_type, worker_tick_action_type&& input_action) noexcept
+      : type(input_type), action(std::move(input_action)) {}
 };
 
-using worker_tick_action_container_type = std::list<::util::memory::strong_rc_ptr<worker_tick_handle_data>>;
+using worker_tick_action_pointer = ::util::memory::strong_rc_ptr<worker_tick_handle_data>;
 
-using worker_tick_action_handle_type = worker_tick_action_container_type::iterator;
+struct UTIL_SYMBOL_VISIBLE worker_tick_action_handle_data;
+using worker_tick_action_handle_type = std::shared_ptr<worker_tick_action_handle_data>;
 
 enum class worker_type : int32_t {
   kAnyWorker = -1,
