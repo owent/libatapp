@@ -330,14 +330,28 @@ message atapp_runtime_spec {
 message atapp_runtime_status {
   // kubernetes ENV: ATAPP_RUNTIME_STATUS_HOST_IP: valueFrom: fieldRef: fieldPath: status.hostIP
   string host_ip = 1;
+  // kubernetes ENV: ATAPP_RUNTIME_STATUS_HOST_IPS: valueFrom: fieldRef: fieldPath: status.hostIPs
+  string host_ips = 2;
 
   // kubernetes ENV: ATAPP_RUNTIME_STATUS_POD_IP: valueFrom: fieldRef: fieldPath: status.podIP
-  string pod_ip = 2;
+  string pod_ip = 3;
+  // kubernetes ENV: ATAPP_RUNTIME_STATUS_POD_IPS: valueFrom: fieldRef: fieldPath: status.podIPs
+  string pod_ips = 4;
 }
 
 message atapp_runtime {
   atapp_runtime_spec spec = 1;
   atapp_runtime_status status = 2;
+}
+
+message atapp_resource_group {
+  string cpu = 1;
+  uint64 memory = 2 [(atapp.protocol.CONFIGURE) = { size_mode: true }];
+}
+
+message atapp_resource {
+  atapp_resource_group limits = 1;
+  atapp_resource_group requests = 2;
 }
 
 message atapp_configure {

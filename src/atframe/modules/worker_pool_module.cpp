@@ -1151,6 +1151,10 @@ LIBATAPP_MACRO_API std::chrono::microseconds worker_pool_module::get_statistics_
   return std::chrono::microseconds{ret};
 }
 
+LIBATAPP_MACRO_API bool worker_pool_module::is_valid(const worker_context& context) noexcept {
+  return context.worker_id > 0;
+}
+
 void worker_pool_module::do_shared_job_on_main_thread() {
   if (!worker_set_) {
     return;

@@ -111,6 +111,8 @@ class worker_pool_module : public ::atapp::module_impl {
   // thread-safe
   LIBATAPP_MACRO_API std::chrono::microseconds get_statistics_last_minute_busy_cpu_time();
 
+  LIBATAPP_MACRO_API static bool is_valid(const worker_context& context) noexcept;
+
  private:
   void do_shared_job_on_main_thread();
   void do_scaling_up();

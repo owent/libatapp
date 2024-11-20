@@ -116,6 +116,7 @@ static void atapp_global_init_once() {
   uv_loop_t loop;
   // Call uv_loop_init() to initialize the global data.
   uv_loop_init(&loop);
+  uv_loop_configure(&loop, UV_METRICS_IDLE_TIME);
   uv_loop_close(&loop);
 }
 #elif __cplusplus >= 201103L
@@ -124,6 +125,7 @@ static void atapp_global_init_once() {
   uv_loop_t loop;
   // Call uv_loop_init() to initialize the global data.
   uv_loop_init(&loop);
+  uv_loop_configure(&loop, UV_METRICS_IDLE_TIME);
   uv_loop_close(&loop);
 }
 #endif
@@ -461,6 +463,7 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
 
   ev_loop_ = ev_loop;
   conf_.bus_conf.ev_loop = ev_loop;
+  uv_loop_configure(ev_loop, UV_METRICS_IDLE_TIME);
   int ret = reload();
   if (ret < 0) {
     FWLOGERROR("load configure failed");
@@ -1530,11 +1533,11 @@ LIBATAPP_MACRO_API int32_t app::get_runtime_stateful_pod_index() const noexcept 
     return conf_.runtime_pod_stateful_index;
   }
 
-  if (conf_.runtime.spec().node_name().empty()) {
+  if (conf_.metadata.name().empty()) {
     return static_cast<int32_t>(atapp_pod_stateful_index::kInvalid);
   }
 
-  const std::string &node_name = conf_.runtime.spec().node_name();
+  const std::string &node_name = conf_.metadata.name();
   std::string::size_type find_res = node_name.rfind('-');
   if (find_res == std::string::npos || find_res + 1 >= node_name.size()) {
     const_cast<app *>(this)->conf_.runtime_pod_stateful_index =
@@ -2505,7 +2508,11 @@ int app::apply_configure() {
   if (!old_name.empty()) {
     conf_.origin.set_name(old_name);
   } else if (conf_.origin.name().empty()) {
-    conf_.origin.set_name(LOG_WRAPPER_FWAPI_FORMAT("{}-0x{:x}", conf_.origin.type_name(), conf_.id));
+    if (!conf_.origin.metadata().name().empty()) {
+      conf_.origin.set_name(conf_.origin.metadata().name());
+    } else {
+      conf_.origin.set_name(LOG_WRAPPER_FWAPI_FORMAT("{}-0x{:x}", conf_.origin.type_name(), conf_.id));
+    }
   }
 
   {
@@ -2518,6 +2525,12 @@ int app::apply_configure() {
   // Changing hostname is not allowed
   if (!old_hostname.empty()) {
     conf_.origin.set_hostname(old_hostname);
+  } else if (conf_.origin.hostname().empty()) {
+    if (!conf_.origin.metadata().name().empty()) {
+      conf_.origin.set_hostname(conf_.origin.metadata().name());
+    } else if (!conf_.origin.runtime().status().pod_ip().empty()) {
+      conf_.origin.set_hostname(conf_.origin.runtime().status().pod_ip());
+    }
   }
 
   if (!conf_.origin.hostname().empty()) {
@@ -4937,6 +4950,7 @@ int app::send_last_command(ev_loop_t *ev_loop) {
     ev_loop_ = uv_default_loop();
   }
   conf_.bus_conf.ev_loop = ev_loop_;
+  uv_loop_configure(ev_loop_, UV_METRICS_IDLE_TIME);
 
   if (!bus_node_) {
     bus_node_ = atbus::node::create();
