@@ -345,7 +345,7 @@ message atapp_runtime {
 }
 
 message atapp_resource_group {
-  string cpu = 1;
+  uint64 cpu = 1;
   uint64 memory = 2 [(atapp.protocol.CONFIGURE) = { size_mode: true }];
 }
 
