@@ -1467,6 +1467,7 @@ LIBATAPP_MACRO_API void app::set_metadata_name(gsl::string_view value) {
   }
 
   conf_.metadata.set_name(value.data(), value.size());
+  conf_.runtime_pod_stateful_index = static_cast<int32_t>(atapp_pod_stateful_index::kUnset);
 }
 
 LIBATAPP_MACRO_API void app::set_metadata_namespace_name(gsl::string_view value) {
@@ -1544,7 +1545,7 @@ LIBATAPP_MACRO_API int32_t app::get_runtime_stateful_pod_index() const noexcept 
         static_cast<int32_t>(atapp_pod_stateful_index::kInvalid);
   } else {
     ++find_res;
-    for (std::string::size_type i = 0; i < node_name.size(); ++i) {
+    for (std::string::size_type i = find_res; i < node_name.size(); ++i) {
       if (node_name[i] < '0' || node_name[i] > '9') {
         const_cast<app *>(this)->conf_.runtime_pod_stateful_index =
             static_cast<int32_t>(atapp_pod_stateful_index::kInvalid);
@@ -2556,11 +2557,11 @@ int app::apply_configure() {
   // reset metadata from configure
   if (conf_.origin.has_metadata()) {
     conf_.metadata = conf_.origin.metadata();
+    conf_.runtime_pod_stateful_index = static_cast<int32_t>(atapp_pod_stateful_index::kUnset);
   }
 
   if (conf_.origin.has_runtime()) {
     mutable_runtime_configure() = conf_.origin.runtime();
-    conf_.runtime_pod_stateful_index = static_cast<int32_t>(atapp_pod_stateful_index::kUnset);
   }
 
   // timer configure
