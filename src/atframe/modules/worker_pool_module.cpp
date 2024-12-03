@@ -48,7 +48,8 @@ enum class worker_status : uint8_t {
   kCreated = 0,
   kRunning = 1,
   kSleeping = 2,
-  kExited = 3,
+  kExiting = 4,
+  kExited = 5,
 };
 
 struct UTIL_SYMBOL_LOCAL worker_compare_key {
@@ -165,6 +166,24 @@ class UTIL_SYMBOL_LOCAL worker_pool_module::worker : public std::enable_shared_f
 
   inline bool is_exiting() const noexcept {
     auto status = get_status();
+    if (worker_status::kExited == status || worker_status::kExiting == status) {
+      return true;
+    }
+
+    if (worker_status::kCreated == status) {
+      // create for a while, but not start, leak
+      auto offset = std::chrono::system_clock::now().time_since_epoch() -
+                    std::chrono::system_clock::duration{created_time_.load(std::memory_order_acquire)};
+      if (offset < std::chrono::seconds(-30) || offset > std::chrono::seconds(30)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  inline bool is_exited() const noexcept {
+    auto status = get_status();
     if (worker_status::kExited == status) {
       return true;
     }
@@ -273,6 +292,7 @@ class UTIL_SYMBOL_LOCAL worker_pool_module::worker : public std::enable_shared_f
 struct UTIL_SYMBOL_LOCAL worker_pool_module::worker_set {
   bool need_scaling_up;
   std::atomic<bool> closing;
+  std::atomic<bool> cleaning;
   std::atomic<uint32_t> current_expect_workers;
 
   std::atomic<int64_t> configure_tick_min_interval_microseconds;
@@ -376,11 +396,19 @@ void worker_pool_module::worker::start(std::shared_ptr<worker> self, std::shared
     self->status_.store(static_cast<uint8_t>(worker_status::kRunning), std::memory_order_release);
 
     // loop util end
-    while (!owner->closing.load(std::memory_order_acquire)) {
+    while (!owner->cleaning.load(std::memory_order_acquire)) {
       if (self->get_context().worker_id > owner->current_expect_workers.load(std::memory_order_acquire)) {
         // If there are tick handle, can not exit.
         std::lock_guard<std::recursive_mutex> child_lg{self->tick_handle_lock_};
         if (self->tick_handles_.data.empty()) {
+          break;
+        }
+      }
+
+      if (owner->closing.load(std::memory_order_acquire)) {
+        // If there are tick handle, can not exit.
+        std::lock_guard<std::recursive_mutex> child_lg{self->tick_handle_lock_};
+        if (self->tick_handles_.data.empty() && self->private_jobs.empty()) {
           break;
         }
       }
@@ -446,6 +474,8 @@ void worker_pool_module::worker::start(std::shared_ptr<worker> self, std::shared
         }
       }
     }
+
+    self->status_.store(static_cast<uint8_t>(worker_status::kExiting), std::memory_order_release);
 
     // Move unfinished jobs into shared jobs
     {
@@ -552,6 +582,7 @@ worker_pool_module::worker_set::worker_set() {
   cpu_time_collect_scaling_down_us_for_removed_workers = std::chrono::system_clock::duration::zero();
 
   closing.store(false, std::memory_order_release);
+  cleaning.store(false, std::memory_order_release);
   current_expect_workers.store(2, std::memory_order_release);
   configure_tick_min_interval_microseconds.store(4, std::memory_order_release);
   configure_tick_max_interval_microseconds.store(128, std::memory_order_release);
@@ -835,27 +866,33 @@ LIBATAPP_MACRO_API int worker_pool_module::spawn(worker_job_action_pointer actio
 
   std::shared_ptr<worker> worker_ptr = select_worker();
   if (!worker_ptr) {
-    if (!worker_set_ || worker_set_->closing.load(std::memory_order_acquire)) {
+    if (!worker_set_ || worker_set_->cleaning.load(std::memory_order_acquire)) {
       return EN_ATAPP_ERR_WORKER_POOL_CLOSED;
-    } else {
-      return EN_ATAPP_ERR_WORKER_POOL_NO_AVAILABLE_WORKER;
     }
   }
 
-  if (scaling_configure_) {
+  if (worker_ptr && scaling_configure_) {
     if (worker_ptr->get_pending_job_size() >= scaling_configure_->queue_size_limit) {
       return EN_ATAPP_ERR_WORKER_POOL_BUSY;
     }
   }
 
   if (nullptr != selected_context) {
-    *selected_context = worker_ptr->get_context();
+    if (worker_ptr) {
+      *selected_context = worker_ptr->get_context();
+    } else {
+      selected_context->worker_id = static_cast<uint32_t>(worker_type::kMain);
+    }
   }
 
   worker_job_data new_job;
   new_job.event = worker_job_event_type::kWorkerJobEventAction;
   new_job.action = action;
-  worker_ptr->emplace(std::move(new_job));
+  if (worker_ptr) {
+    worker_ptr->emplace(std::move(new_job));
+  } else {
+    worker_set_->shared_jobs.emplace(std::move(new_job));
+  }
 
   return EN_ATAPP_ERR_SUCCESS;
 }
@@ -1223,7 +1260,7 @@ bool worker_pool_module::internal_reduce_workers() {
   while (worker_set_->workers.size() > expect_workers) {
     auto& last_worker = *worker_set_->workers.rbegin();
     if (last_worker) {
-      if (!last_worker->is_exiting()) {
+      if (!last_worker->is_exited()) {
         last_worker->wakeup();
         break;
       }
@@ -1255,7 +1292,7 @@ void worker_pool_module::internal_autofix_workers() {
       continue;
     }
 
-    if (!worker_set_->workers[i]->is_exiting()) {
+    if (!worker_set_->workers[i]->is_exited()) {
       continue;
     }
 
@@ -1273,7 +1310,7 @@ void worker_pool_module::internal_autofix_workers() {
       continue;
     }
 
-    if (worker_ptr->is_exiting()) {
+    if (worker_ptr->is_exited()) {
       worker_set_->cpu_time_collect_scaling_up_us_for_removed_workers += worker_ptr->collect_scaling_up_cpu_time();
       worker_set_->cpu_time_collect_scaling_down_us_for_removed_workers += worker_ptr->collect_scaling_down_cpu_time();
       continue;
@@ -1295,6 +1332,7 @@ void worker_pool_module::internal_cleanup() {
   }
 
   worker_set_->closing.store(true, std::memory_order_release);
+  worker_set_->cleaning.store(true, std::memory_order_release);
   {
     std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
     for (auto& worker_ptr : worker_set_->workers) {
