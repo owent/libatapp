@@ -397,18 +397,11 @@ void worker_pool_module::worker::start(std::shared_ptr<worker> self, std::shared
 
     // loop util end
     while (!owner->cleaning.load(std::memory_order_acquire)) {
-      if (self->get_context().worker_id > owner->current_expect_workers.load(std::memory_order_acquire)) {
+      if (self->get_context().worker_id > owner->current_expect_workers.load(std::memory_order_acquire) ||
+          owner->closing.load(std::memory_order_acquire)) {
         // If there are tick handle, can not exit.
         std::lock_guard<std::recursive_mutex> child_lg{self->tick_handle_lock_};
         if (self->tick_handles_.data.empty()) {
-          break;
-        }
-      }
-
-      if (owner->closing.load(std::memory_order_acquire)) {
-        // If there are tick handle, can not exit.
-        std::lock_guard<std::recursive_mutex> child_lg{self->tick_handle_lock_};
-        if (self->tick_handles_.data.empty() && self->private_jobs.empty()) {
           break;
         }
       }
@@ -840,9 +833,23 @@ LIBATAPP_MACRO_API int worker_pool_module::stop() {
     }
   }
 
-  // Can not finish when there is still any worker
-  if (internal_reduce_workers()) {
-    return 1;
+  internal_reduce_workers();
+  // Can not finish when there is still any job action in any worker
+  {
+    std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
+    for (auto& worker_ptr : worker_set_->workers) {
+      if (!worker_ptr) {
+        continue;
+      }
+
+      if (worker_ptr->is_exiting()) {
+        continue;
+      }
+
+      if (worker_ptr->get_pending_job_size() > 0) {
+        return 1;
+      }
+    }
   }
 
   // Wait for pending jobs to finish
