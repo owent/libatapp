@@ -125,11 +125,26 @@ class etcd_discovery_set {
   using metadata_type = atapp::protocol::atapp_metadata;
   using ptr_t = util::memory::strong_rc_ptr<etcd_discovery_set>;
 
-  struct node_hash_type {
+  struct UTIL_SYMBOL_VISIBLE node_hash_type {
     enum { HASH_POINT_PER_INS = 80 };
+    enum class search_mode : uint8_t {
+      kInclude = 0,          // 搜索时包含自己
+      kExcludeHashCode = 1,  // 搜索时排除相同的HashCode
+      kExcludeNode = 2,      // 搜索时排除相同的Node
+    };
 
     etcd_discovery_node::ptr_t node;
     std::pair<uint64_t, uint64_t> hash_code;
+
+    inline node_hash_type() noexcept : node(), hash_code(0, 0) {}
+
+    template <class NodeType, class CodeType>
+    inline node_hash_type(NodeType &&n, CodeType &&hc) noexcept
+        : node(std::forward<NodeType>(n)), hash_code(std::forward<CodeType>(hc)) {}
+
+    template <class CodeType>
+    inline node_hash_type(std::nullptr_t, CodeType &&hc) noexcept
+        : node(nullptr), hash_code(std::forward<CodeType>(hc)) {}
   };
 
   struct metadata_hash_type {
@@ -154,6 +169,19 @@ class etcd_discovery_set {
 
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_id(uint64_t id) const;
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_name(const std::string &name) const;
+
+  LIBATAPP_MACRO_API node_hash_type lower_bound_node_hash_by_consistent_hash(
+      const node_hash_type &key, const metadata_type *metadata = nullptr,
+      node_hash_type::search_mode searchmode = node_hash_type::search_mode::kInclude) const;
+
+  LIBATAPP_MACRO_API node_hash_type get_node_hash_by_consistent_hash(const void *buf, size_t bufsz,
+                                                                     const metadata_type *metadata = nullptr) const;
+  LIBATAPP_MACRO_API node_hash_type get_node_hash_by_consistent_hash(uint64_t key,
+                                                                     const metadata_type *metadata = nullptr) const;
+  LIBATAPP_MACRO_API node_hash_type get_node_hash_by_consistent_hash(int64_t key,
+                                                                     const metadata_type *metadata = nullptr) const;
+  LIBATAPP_MACRO_API node_hash_type get_node_hash_by_consistent_hash(gsl::string_view key,
+                                                                     const metadata_type *metadata = nullptr) const;
 
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_consistent_hash(
       const void *buf, size_t bufsz, const metadata_type *metadata = nullptr) const;
