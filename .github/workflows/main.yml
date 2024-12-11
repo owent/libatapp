@@ -159,7 +159,6 @@ jobs:
         shell: bash
         env:
           USE_CC: ${{ matrix.cc }}
-          USE_SSL: ${{ matrix.ssl }}
           GCOV_FLAGS: "${{ matrix.gcov_flags }}"
         run: |
           SETUP_INSTALL_LCOV=0

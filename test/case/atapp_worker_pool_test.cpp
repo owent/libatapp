@@ -384,5 +384,20 @@ CASE_TEST(atapp_worker_pool, stop_tick) {
   }
 
   size_t tick_times_after = tick_times.load();
+  CASE_EXPECT_GT(tick_times_after, tick_times_before);
+
+  // Cleanup
+  tick_times_before = tick_times.load();
+  worker_pool_module->cleanup();
+
+  for (size_t i = 0; i < 5; ++i) {
+    worker_pool_module->tick(std::chrono::system_clock::now());
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    if (worker_pool_module->get_current_worker_count() == 0) {
+      break;
+    }
+  }
+
+  tick_times_after = tick_times.load();
   CASE_EXPECT_LT(tick_times_after, tick_times_before + 2);
 }
