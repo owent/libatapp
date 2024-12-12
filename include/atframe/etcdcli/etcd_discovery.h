@@ -8,6 +8,8 @@
 #include <config/atframe_utils_build_feature.h>
 #include <config/compiler_features.h>
 
+#include <gsl/select-gsl.h>
+
 #include <design_pattern/nomovable.h>
 #include <design_pattern/noncopyable.h>
 
@@ -170,8 +172,16 @@ class etcd_discovery_set {
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_id(uint64_t id) const;
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_name(const std::string &name) const;
 
-  LIBATAPP_MACRO_API node_hash_type lower_bound_node_hash_by_consistent_hash(
-      const node_hash_type &key, const metadata_type *metadata = nullptr,
+  /**
+   * @brief 按一致性Hash算法（二分）查找后续节点
+   * @param output 输出结果(传入的size就是最大查找个数)
+   * @param key 搜索起始点
+   * @param metadata 策略路由
+   * @param searchmode 搜索模式（是否排除搜索起始点，按什么策略排除）
+   * @return 返回查找到的个数
+   */
+  LIBATAPP_MACRO_API size_t lower_bound_node_hash_by_consistent_hash(
+      gsl::span<node_hash_type> output, const node_hash_type &key, const metadata_type *metadata = nullptr,
       node_hash_type::search_mode searchmode = node_hash_type::search_mode::kInclude) const;
 
   LIBATAPP_MACRO_API node_hash_type get_node_hash_by_consistent_hash(const void *buf, size_t bufsz,

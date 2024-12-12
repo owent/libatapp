@@ -486,38 +486,43 @@ LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_na
   return iter->second;
 }
 
-LIBATAPP_MACRO_API etcd_discovery_set::node_hash_type etcd_discovery_set::lower_bound_node_hash_by_consistent_hash(
-    const node_hash_type &key, const metadata_type *metadata, node_hash_type::search_mode searchmode) const {
+LIBATAPP_MACRO_API size_t etcd_discovery_set::lower_bound_node_hash_by_consistent_hash(
+    gsl::span<node_hash_type> output, const node_hash_type &key, const metadata_type *metadata,
+    node_hash_type::search_mode searchmode) const {
+  UTIL_UNLIKELY_IF (output.empty()) {
+    return 0;
+  }
+
   index_cache_type *index_set = mutable_index_cache(metadata);
   UTIL_UNLIKELY_IF (nullptr == index_set) {
-    return node_hash_type{nullptr, key.hash_code};
+    return 0;
   }
 
   if (index_set->hashing_cache.empty()) {
     rebuild_cache(*index_set, metadata);
 
     if (index_set->hashing_cache.empty()) {
-      return node_hash_type{nullptr, key.hash_code};
+      return 0;
     }
   }
 
   std::vector<node_hash_type>::const_iterator hash_iter = std::lower_bound(
       index_set->hashing_cache.begin(), index_set->hashing_cache.end(), key.hash_code, consistent_hash_compare_find);
 
-  if (hash_iter == index_set->hashing_cache.end()) {
-    hash_iter = index_set->hashing_cache.begin();
-  }
-
+  size_t ret = 0;
   switch (searchmode) {
     case node_hash_type::search_mode::kExcludeHashCode: {
-      size_t check_count = index_set->hashing_cache.size() - 1;
-      while (check_count > 0 && hash_iter->hash_code == key.hash_code) {
-        ++hash_iter;
-        --check_count;
-
+      size_t check_count = index_set->hashing_cache.size();
+      for (; ret < output.size() && check_count > 0; ++hash_iter, --check_count) {
         if (hash_iter == index_set->hashing_cache.end()) {
           hash_iter = index_set->hashing_cache.begin();
         }
+
+        if (hash_iter->hash_code == key.hash_code) {
+          continue;
+        }
+
+        output[ret++] = *hash_iter;
       }
       if (0 == check_count) {
         hash_iter = index_set->hashing_cache.end();
@@ -525,35 +530,45 @@ LIBATAPP_MACRO_API etcd_discovery_set::node_hash_type etcd_discovery_set::lower_
       break;
     }
     case node_hash_type::search_mode::kExcludeNode: {
-      size_t check_count = index_set->hashing_cache.size() - 1;
-      while (check_count > 0 && ((key.node && hash_iter->node == key.node) || hash_iter->hash_code == key.hash_code)) {
-        ++hash_iter;
-        --check_count;
-
+      size_t check_count = index_set->hashing_cache.size();
+      for (; ret < output.size() && check_count > 0; ++hash_iter, --check_count) {
         if (hash_iter == index_set->hashing_cache.end()) {
           hash_iter = index_set->hashing_cache.begin();
         }
-      }
-      if (0 == check_count) {
-        hash_iter = index_set->hashing_cache.end();
+
+        if ((key.node && hash_iter->node == key.node) || hash_iter->hash_code == key.hash_code) {
+          continue;
+        }
+
+        output[ret++] = *hash_iter;
       }
       break;
     }
-    default:
+    default: {
+      size_t check_count = index_set->hashing_cache.size();
+      for (; ret < output.size() && check_count > 0; ++hash_iter, --check_count) {
+        if (hash_iter == index_set->hashing_cache.end()) {
+          hash_iter = index_set->hashing_cache.begin();
+        }
+
+        output[ret++] = *hash_iter;
+      }
       break;
+    }
   }
 
-  if (hash_iter == index_set->hashing_cache.end()) {
-    return node_hash_type{nullptr, key.hash_code};
-  }
-
-  return *hash_iter;
+  return ret;
 }
 
 LIBATAPP_MACRO_API etcd_discovery_set::node_hash_type etcd_discovery_set::get_node_hash_by_consistent_hash(
     const void *buf, size_t bufsz, const metadata_type *metadata) const {
   std::pair<uint64_t, uint64_t> hash_key = consistent_hash_calc(buf, bufsz, LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
-  return lower_bound_node_hash_by_consistent_hash(node_hash_type{nullptr, hash_key}, metadata);
+  node_hash_type ret[1];
+  if (lower_bound_node_hash_by_consistent_hash(gsl::make_span(ret), node_hash_type{nullptr, hash_key}, metadata) <= 0) {
+    return node_hash_type{nullptr, hash_key};
+  }
+
+  return ret[0];
 }
 
 LIBATAPP_MACRO_API etcd_discovery_set::node_hash_type etcd_discovery_set::get_node_hash_by_consistent_hash(
