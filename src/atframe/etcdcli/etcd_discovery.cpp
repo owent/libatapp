@@ -57,6 +57,28 @@ static bool consistent_hash_compare_find(const etcd_discovery_set::node_hash_typ
   return l.hash_code < r;
 }
 
+static bool round_robin_compare_index(const etcd_discovery_node::ptr_t &l, const etcd_discovery_node::ptr_t &r) {
+  if (!l || !r) {
+    return reinterpret_cast<uintptr_t>(l.get()) < reinterpret_cast<uintptr_t>(r.get());
+  }
+
+  auto &ldi = l->get_discovery_info();
+  auto &rdi = r->get_discovery_info();
+  if (ldi.runtime().stateful_pod_index() != rdi.runtime().stateful_pod_index()) {
+    return ldi.runtime().stateful_pod_index() < rdi.runtime().stateful_pod_index();
+  }
+
+  if (ldi.id() != rdi.id()) {
+    return ldi.id() < rdi.id();
+  }
+
+  if (l->get_name_hash() != r->get_name_hash()) {
+    return l->get_name_hash() < r->get_name_hash();
+  }
+
+  return ldi.name() < rdi.name();
+}
+
 static bool consistent_hash_compare_index(const etcd_discovery_set::node_hash_type &l,
                                           const etcd_discovery_set::node_hash_type &r) {
   if (l.hash_code != r.hash_code) {
@@ -67,43 +89,7 @@ static bool consistent_hash_compare_index(const etcd_discovery_set::node_hash_ty
     return reinterpret_cast<uintptr_t>(l.node.get()) < reinterpret_cast<uintptr_t>(r.node.get());
   }
 
-  if (l.node->get_discovery_info().runtime().stateful_pod_index() !=
-      l.node->get_discovery_info().runtime().stateful_pod_index()) {
-    return l.node->get_discovery_info().runtime().stateful_pod_index() <
-           r.node->get_discovery_info().runtime().stateful_pod_index();
-  }
-
-  if (l.node->get_discovery_info().id() != r.node->get_discovery_info().id()) {
-    return l.node->get_discovery_info().id() < r.node->get_discovery_info().id();
-  }
-
-  if (l.node->get_name_hash() != r.node->get_name_hash()) {
-    return l.node->get_name_hash() < r.node->get_name_hash();
-  }
-
-  return l.node->get_discovery_info().name() < r.node->get_discovery_info().name();
-}
-
-static bool round_robin_compare_index(const etcd_discovery_node::ptr_t &l, const etcd_discovery_node::ptr_t &r) {
-  if (!l || !r) {
-    return reinterpret_cast<uintptr_t>(l.get()) < reinterpret_cast<uintptr_t>(r.get());
-  }
-
-  if (l->get_discovery_info().runtime().stateful_pod_index() !=
-      l->get_discovery_info().runtime().stateful_pod_index()) {
-    return l->get_discovery_info().runtime().stateful_pod_index() <
-           r->get_discovery_info().runtime().stateful_pod_index();
-  }
-
-  if (l->get_discovery_info().id() != r->get_discovery_info().id()) {
-    return l->get_discovery_info().id() < r->get_discovery_info().id();
-  }
-
-  if (l->get_name_hash() != r->get_name_hash()) {
-    return l->get_name_hash() < r->get_name_hash();
-  }
-
-  return l->get_discovery_info().name() < r->get_discovery_info().name();
+  return round_robin_compare_index(l.node, r.node);
 }
 
 static void sort_string_map(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Map<std::string, std::string> &input,
