@@ -383,6 +383,10 @@ message atapp_configure {
   atapp_worker_pool worker_pool = 501;
 }
 
+message atapp_discovery_runtime {
+  sint32 stateful_pod_index = 1;
+}
+
 message atapp_discovery {
   uint64 id = 1;
   string name = 2;
@@ -398,6 +402,7 @@ message atapp_discovery {
   // repeated string gateway                       = 12 [ deprecated = true ];
   string identity = 13;
   repeated atapp_gateway gateways = 14;
+  atapp_discovery_runtime runtime = 15;
 
   uint64 atbus_protocol_version = 21;
   uint64 atbus_protocol_min_version = 22;

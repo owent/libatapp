@@ -1603,6 +1603,7 @@ LIBATAPP_MACRO_API void app::pack(atapp::protocol::atapp_discovery &out) const {
       gateway->CopyFrom(conf_.origin.bus().gateways(i));
     }
   }
+  out.mutable_runtime()->set_stateful_pod_index(get_runtime_stateful_pod_index());
 
   out.mutable_metadata()->CopyFrom(get_metadata());
 

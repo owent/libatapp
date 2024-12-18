@@ -67,6 +67,12 @@ static bool consistent_hash_compare_index(const etcd_discovery_set::node_hash_ty
     return reinterpret_cast<uintptr_t>(l.node.get()) < reinterpret_cast<uintptr_t>(r.node.get());
   }
 
+  if (l.node->get_discovery_info().runtime().stateful_pod_index() !=
+      l.node->get_discovery_info().runtime().stateful_pod_index()) {
+    return l.node->get_discovery_info().runtime().stateful_pod_index() <
+           r.node->get_discovery_info().runtime().stateful_pod_index();
+  }
+
   if (l.node->get_discovery_info().id() != r.node->get_discovery_info().id()) {
     return l.node->get_discovery_info().id() < r.node->get_discovery_info().id();
   }
@@ -81,6 +87,12 @@ static bool consistent_hash_compare_index(const etcd_discovery_set::node_hash_ty
 static bool round_robin_compare_index(const etcd_discovery_node::ptr_t &l, const etcd_discovery_node::ptr_t &r) {
   if (!l || !r) {
     return reinterpret_cast<uintptr_t>(l.get()) < reinterpret_cast<uintptr_t>(r.get());
+  }
+
+  if (l->get_discovery_info().runtime().stateful_pod_index() !=
+      l->get_discovery_info().runtime().stateful_pod_index()) {
+    return l->get_discovery_info().runtime().stateful_pod_index() <
+           r->get_discovery_info().runtime().stateful_pod_index();
   }
 
   if (l->get_discovery_info().id() != r->get_discovery_info().id()) {
