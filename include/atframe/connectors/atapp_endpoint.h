@@ -44,7 +44,7 @@ class atapp_endpoint {
   using weak_ptr_t = std::weak_ptr<atapp_endpoint>;
 
   struct pending_message_t {
-    util::time::time_utility::raw_time_t expired_timepoint;
+    atfw::util::time::time_utility::raw_time_t expired_timepoint;
     int32_t type;
     uint64_t message_sequence;
     std::vector<unsigned char> data;
@@ -82,9 +82,9 @@ class atapp_endpoint {
   LIBATAPP_MACRO_API int32_t push_forward_message(int32_t type, uint64_t &msg_sequence, const void *data,
                                                   size_t data_size, const atapp::protocol::atapp_metadata *metadata);
 
-  LIBATAPP_MACRO_API int32_t retry_pending_messages(const util::time::time_utility::raw_time_t &tick_time,
+  LIBATAPP_MACRO_API int32_t retry_pending_messages(const atfw::util::time::time_utility::raw_time_t &tick_time,
                                                     int32_t max_count = 0);
-  LIBATAPP_MACRO_API void add_waker(util::time::time_utility::raw_time_t wakeup_time);
+  LIBATAPP_MACRO_API void add_waker(atfw::util::time::time_utility::raw_time_t wakeup_time);
 
   UTIL_FORCEINLINE app *get_owner() const noexcept { return owner_; }
 
@@ -102,7 +102,7 @@ class atapp_endpoint {
  private:
   bool closing_;
   app *owner_;
-  util::time::time_utility::raw_time_t nearest_waker_;
+  atfw::util::time::time_utility::raw_time_t nearest_waker_;
   weak_ptr_t watcher_;
   handle_set_t refer_connections_;
   etcd_discovery_node::ptr_t discovery_;

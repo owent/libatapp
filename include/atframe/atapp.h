@@ -141,11 +141,11 @@ class app {
   using timer_ptr_t = std::shared_ptr<timer_info_t>;
 
   struct tick_timer_t {
-    util::time::time_utility::raw_time_t last_tick_timepoint;
-    util::time::time_utility::raw_time_t last_stop_timepoint;
+    atfw::util::time::time_utility::raw_time_t last_tick_timepoint;
+    atfw::util::time::time_utility::raw_time_t last_stop_timepoint;
     time_t sec;
     time_t usec;
-    util::time::time_utility::raw_time_t *inner_break;
+    atfw::util::time::time_utility::raw_time_t *inner_break;
     std::chrono::system_clock::duration tick_compensation;
 
     timer_ptr_t tick_timer;
@@ -253,13 +253,13 @@ class app {
    * @brief api: add custom command callback
    * @return the command manager
    */
-  LIBATAPP_MACRO_API util::cli::cmd_option_ci::ptr_type get_command_manager();
+  LIBATAPP_MACRO_API atfw::util::cli::cmd_option_ci::ptr_type get_command_manager();
 
   /**
    * @brief api: add custem program options
    * @return the program options manager
    */
-  LIBATAPP_MACRO_API util::cli::cmd_option::ptr_type get_option_manager();
+  LIBATAPP_MACRO_API atfw::util::cli::cmd_option::ptr_type get_option_manager();
 
   /**
    * @brief api: if last command or action run with upgrade mode
@@ -268,12 +268,13 @@ class app {
   LIBATAPP_MACRO_API bool is_current_upgrade_mode() const noexcept;
 
   /**
-   * @brief api: get shared httr_request context, this context can be reused to create util::network::http_request
+   * @brief api: get shared httr_request context, this context can be reused to create atfw::util::network::http_request
    * @note All the http_requests created from this context should be cleaned before atapp is destroyed.
    * @note this function only return a valid context after initialized.
    * @return the shared http_request context
    */
-  LIBATAPP_MACRO_API util::network::http_request::curl_m_bind_ptr_t get_shared_curl_multi_context() const noexcept;
+  LIBATAPP_MACRO_API atfw::util::network::http_request::curl_m_bind_ptr_t get_shared_curl_multi_context()
+      const noexcept;
 
   LIBATAPP_MACRO_API void set_app_version(const std::string &ver);
 
@@ -302,10 +303,10 @@ class app {
   LIBATAPP_MACRO_API void disable_fallback_to_atbus_connector();
   LIBATAPP_MACRO_API bool is_fallback_to_atbus_connector_enabled() const noexcept;
 
-  LIBATAPP_MACRO_API util::time::time_utility::raw_time_t get_last_tick_time() const noexcept;
+  LIBATAPP_MACRO_API atfw::util::time::time_utility::raw_time_t get_last_tick_time() const noexcept;
 
-  LIBATAPP_MACRO_API util::config::ini_loader &get_configure_loader();
-  LIBATAPP_MACRO_API const util::config::ini_loader &get_configure_loader() const noexcept;
+  LIBATAPP_MACRO_API atfw::util::config::ini_loader &get_configure_loader();
+  LIBATAPP_MACRO_API const atfw::util::config::ini_loader &get_configure_loader() const noexcept;
 
   LIBATAPP_MACRO_API std::chrono::system_clock::duration get_configure_timer_interval() const noexcept;
 
@@ -383,7 +384,7 @@ class app {
 
   LIBATAPP_MACRO_API const atapp::protocol::atapp_area &get_area() const noexcept;
   LIBATAPP_MACRO_API atapp::protocol::atapp_area &mutable_area();
-  LIBATAPP_MACRO_API util::time::time_utility::raw_duration_t get_configure_message_timeout() const noexcept;
+  LIBATAPP_MACRO_API atfw::util::time::time_utility::raw_duration_t get_configure_message_timeout() const noexcept;
 
   LIBATAPP_MACRO_API void pack(atapp::protocol::atapp_discovery &out) const;
 
@@ -498,9 +499,9 @@ class app {
   LIBATAPP_MACRO_API const callback_fn_on_all_module_inited_t &get_evt_on_all_module_inited() const noexcept;
   LIBATAPP_MACRO_API const callback_fn_on_all_module_cleaned_t &get_evt_on_all_module_cleaned() const noexcept;
 
-  LIBATAPP_MACRO_API bool add_endpoint_waker(util::time::time_utility::raw_time_t wakeup_time,
+  LIBATAPP_MACRO_API bool add_endpoint_waker(atfw::util::time::time_utility::raw_time_t wakeup_time,
                                              const atapp_endpoint::weak_ptr_t &ep_watcher,
-                                             util::time::time_utility::raw_time_t previous_time);
+                                             atfw::util::time::time_utility::raw_time_t previous_time);
   LIBATAPP_MACRO_API void remove_endpoint(uint64_t by_id);
   LIBATAPP_MACRO_API void remove_endpoint(const std::string &by_name);
   LIBATAPP_MACRO_API void remove_endpoint(const atapp_endpoint::ptr_t &enpoint);
@@ -522,7 +523,7 @@ class app {
 
   LIBATAPP_MACRO_API bool match_gateway(const atapp::protocol::atapp_gateway &checked) const noexcept;
 
-  LIBATAPP_MACRO_API void setup_logger(util::log::log_wrapper &logger, const std::string &min_level,
+  LIBATAPP_MACRO_API void setup_logger(atfw::util::log::log_wrapper &logger, const std::string &min_level,
                                        const atapp::protocol::atapp_log_category &log_conf) const noexcept;
 
  private:
@@ -573,8 +574,8 @@ class app {
   // ============ inner functional handlers ============
 
  public:
-  static LIBATAPP_MACRO_API custom_command_sender_t get_custom_command_sender(util::cli::callback_param);
-  static LIBATAPP_MACRO_API bool add_custom_command_rsp(util::cli::callback_param, const std::string &rsp_text);
+  static LIBATAPP_MACRO_API custom_command_sender_t get_custom_command_sender(atfw::util::cli::callback_param);
+  static LIBATAPP_MACRO_API bool add_custom_command_rsp(atfw::util::cli::callback_param, const std::string &rsp_text);
   static LIBATAPP_MACRO_API void split_ids_by_string(const char *in, std::vector<app_id_t> &out);
   static LIBATAPP_MACRO_API app_id_t convert_app_id_by_string(const char *id_in, const std::vector<app_id_t> &mask_in);
   static LIBATAPP_MACRO_API app_id_t convert_app_id_by_string(const char *id_in, const char *mask_in);
@@ -591,28 +592,28 @@ class app {
   static LIBATAPP_MACRO_API app *get_last_instance();
 
  private:
-  int prog_option_handler_help(util::cli::callback_param params, util::cli::cmd_option *opt_mgr,
-                               util::cli::cmd_option_ci *cmd_mgr);
-  int prog_option_handler_version(util::cli::callback_param params);
-  int prog_option_handler_set_id(util::cli::callback_param params);
-  int prog_option_handler_set_id_mask(util::cli::callback_param params);
-  int prog_option_handler_set_conf_file(util::cli::callback_param params);
-  int prog_option_handler_set_pid(util::cli::callback_param params);
-  int prog_option_handler_upgrade_mode(util::cli::callback_param params);
-  int prog_option_handler_set_startup_log(util::cli::callback_param params);
-  int prog_option_handler_set_startup_error_file(util::cli::callback_param params);
-  int prog_option_handler_start(util::cli::callback_param params);
-  int prog_option_handler_stop(util::cli::callback_param params);
-  int prog_option_handler_reload(util::cli::callback_param params);
-  int prog_option_handler_run(util::cli::callback_param params);
+  int prog_option_handler_help(atfw::util::cli::callback_param params, atfw::util::cli::cmd_option *opt_mgr,
+                               atfw::util::cli::cmd_option_ci *cmd_mgr);
+  int prog_option_handler_version(atfw::util::cli::callback_param params);
+  int prog_option_handler_set_id(atfw::util::cli::callback_param params);
+  int prog_option_handler_set_id_mask(atfw::util::cli::callback_param params);
+  int prog_option_handler_set_conf_file(atfw::util::cli::callback_param params);
+  int prog_option_handler_set_pid(atfw::util::cli::callback_param params);
+  int prog_option_handler_upgrade_mode(atfw::util::cli::callback_param params);
+  int prog_option_handler_set_startup_log(atfw::util::cli::callback_param params);
+  int prog_option_handler_set_startup_error_file(atfw::util::cli::callback_param params);
+  int prog_option_handler_start(atfw::util::cli::callback_param params);
+  int prog_option_handler_stop(atfw::util::cli::callback_param params);
+  int prog_option_handler_reload(atfw::util::cli::callback_param params);
+  int prog_option_handler_run(atfw::util::cli::callback_param params);
 
-  int command_handler_start(util::cli::callback_param params);
-  int command_handler_stop(util::cli::callback_param params);
-  int command_handler_reload(util::cli::callback_param params);
-  int command_handler_invalid(util::cli::callback_param params);
-  int command_handler_disable_etcd(util::cli::callback_param params);
-  int command_handler_enable_etcd(util::cli::callback_param params);
-  int command_handler_list_discovery(util::cli::callback_param params);
+  int command_handler_start(atfw::util::cli::callback_param params);
+  int command_handler_stop(atfw::util::cli::callback_param params);
+  int command_handler_reload(atfw::util::cli::callback_param params);
+  int command_handler_invalid(atfw::util::cli::callback_param params);
+  int command_handler_disable_etcd(atfw::util::cli::callback_param params);
+  int command_handler_enable_etcd(atfw::util::cli::callback_param params);
+  int command_handler_list_discovery(atfw::util::cli::callback_param params);
 
  private:
   int bus_evt_callback_on_recv_msg(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
@@ -646,7 +647,7 @@ class app {
   void process_signals();
   void process_signal(int signo);
 
-  int32_t process_inner_events(const util::time::time_utility::raw_time_t &end_tick);
+  int32_t process_inner_events(const atfw::util::time::time_utility::raw_time_t &end_tick);
 
   atapp_endpoint::ptr_t auto_mutable_self_endpoint();
 
@@ -668,10 +669,10 @@ class app {
 
  private:
   static app *last_instance_;
-  util::config::ini_loader cfg_loader_;
+  atfw::util::config::ini_loader cfg_loader_;
   yaml_conf_map_t yaml_loader_;
-  util::cli::cmd_option::ptr_type app_option_;
-  util::cli::cmd_option_ci::ptr_type cmd_handler_;
+  atfw::util::cli::cmd_option::ptr_type app_option_;
+  atfw::util::cli::cmd_option_ci::ptr_type cmd_handler_;
   std::vector<std::string> last_command_;
   int setup_result_;
 
@@ -735,7 +736,7 @@ class app {
   // inner endpoints
   endpoint_index_by_id_t endpoint_index_by_id_;
   endpoint_index_by_name_t endpoint_index_by_name_;
-  std::map<std::pair<util::time::time_utility::raw_time_t, atapp_endpoint *>, atapp_endpoint::weak_ptr_t>
+  std::map<std::pair<atfw::util::time::time_utility::raw_time_t, atapp_endpoint *>, atapp_endpoint::weak_ptr_t>
       endpoint_waker_;
 
   // inner connectors

@@ -17,7 +17,7 @@
 
 static int exit_code = 0;
 
-static void _log_sink_stdout_handle(const util::log::log_wrapper::caller_info_t &, const char *content,
+static void _log_sink_stdout_handle(const atfw::util::log::log_wrapper::caller_info_t &, const char *content,
                                     size_t content_size) {
   std::cout.write(content, content_size);
   std::cout << std::endl;
@@ -26,10 +26,10 @@ static void _log_sink_stdout_handle(const util::log::log_wrapper::caller_info_t 
 class atappctl_module : public atapp::module_impl {
  public:
   int init() override {
-    WLOG_GETCAT(util::log::log_wrapper::categorize_t::DEFAULT)->add_sink(_log_sink_stdout_handle);
-    WLOG_GETCAT(util::log::log_wrapper::categorize_t::DEFAULT)
-        ->set_stacktrace_level(util::log::log_formatter::level_t::LOG_LW_DISABLED,
-                               util::log::log_formatter::level_t::LOG_LW_DISABLED);
+    WLOG_GETCAT(atfw::util::log::log_wrapper::categorize_t::DEFAULT)->add_sink(_log_sink_stdout_handle);
+    WLOG_GETCAT(atfw::util::log::log_wrapper::categorize_t::DEFAULT)
+        ->set_stacktrace_level(atfw::util::log::log_formatter::level_t::LOG_LW_DISABLED,
+                               atfw::util::log::log_formatter::level_t::LOG_LW_DISABLED);
     return 0;
   };
 
@@ -79,8 +79,8 @@ int main(int argc, char *argv[]) {
   // project directory
   {
     std::string proj_dir;
-    util::file_system::dirname(__FILE__, 0, proj_dir, 2);
-    util::log::log_formatter::set_project_directory(proj_dir.c_str(), proj_dir.size());
+    atfw::util::file_system::dirname(__FILE__, 0, proj_dir, 2);
+    atfw::util::log::log_formatter::set_project_directory(proj_dir.c_str(), proj_dir.size());
   }
 
   // setup module

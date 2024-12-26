@@ -68,8 +68,8 @@ int main(int argc, char *argv[]) {
     // 设置工程目录，不设置的话日志打印出来都是绝对路劲，比较长
     {
         std::string proj_dir;
-        util::file_system::dirname(__FILE__, 0, proj_dir, 2); // 设置当前源文件的2级父目录为工程目录
-        util::log::log_formatter::set_project_directory(proj_dir.c_str(), proj_dir.size());
+        atfw::util::file_system::dirname(__FILE__, 0, proj_dir, 2); // 设置当前源文件的2级父目录为工程目录
+        atfw::util::log::log_formatter::set_project_directory(proj_dir.c_str(), proj_dir.size());
     }
 
     // setup handle
@@ -88,7 +88,7 @@ int main(int argc, char *argv[]) {
 
 #include <sstream>
 
-static int app_option_handler_echo(util::cli::callback_param params) {
+static int app_option_handler_echo(atfw::util::cli::callback_param params) {
     // 获取参数并输出到stdout
     std::stringstream ss;
     for (size_t i = 0; i < params.get_params_number(); ++i) {
@@ -103,7 +103,7 @@ int main(int argc, char *argv[]) {
     atapp::app app;
     // ...
     // setup options, 自定义命令行参数是区分大小写的
-    util::cli::cmd_option::ptr_type opt_mgr = app.get_option_manager();
+    atfw::util::cli::cmd_option::ptr_type opt_mgr = app.get_option_manager();
     // show help and exit
     opt_mgr->bind_cmd("-echo", app_option_handler_echo)   // 当启动参数里带-echo时跳转进 app_option_handler_echo 函数
         ->set_help_msg("-echo [text]                           echo a message."); // 帮助文本，--help时显示，不执行这个就没有帮助信息
@@ -120,7 +120,7 @@ int main(int argc, char *argv[]) {
 // ...
 #include <sstream>
 
-static int app_command_handler_echo(util::cli::callback_param params) {
+static int app_command_handler_echo(atfw::util::cli::callback_param params) {
     std::stringstream ss;
     for (size_t i = 0; i < params.get_params_number(); ++i) {
         ss << " " << params[i]->to_cpp_string();
@@ -134,7 +134,7 @@ int main(int argc, char *argv[]) {
     atapp::app app;
     // ... 
     // setup cmd, 自定义远程命令是不区分大小写的
-    util::cli::cmd_option_ci::ptr_type cmgr = app.get_command_manager();
+    atfw::util::cli::cmd_option_ci::ptr_type cmgr = app.get_command_manager();
     cmgr->bind_cmd("echo", app_command_handler_echo)
         ->set_help_msg("echo       [messages...]                                    echo messages to log");
 
@@ -186,7 +186,7 @@ public:
 
     virtual int tick() {
         // 每次tick的时候调用，tick间隔由配置文件指定，返回成功执行的任务数
-        time_t cur_print = util::time::time_utility::get_sys_now() / 20;
+        time_t cur_print = atfw::util::time::time_utility::get_sys_now() / 20;
         static time_t print_per_sec = cur_print;
         if (print_per_sec != cur_print) {
             WLOGINFO("echo module tick");

@@ -39,7 +39,7 @@ class echo_module : public atapp::module_impl {
   virtual const char *name() const { return "echo_module"; }
 
   virtual int tick() {
-    time_t cur_print = util::time::time_utility::get_sys_now() / 20;
+    time_t cur_print = atfw::util::time::time_utility::get_sys_now() / 20;
     static time_t print_per_sec = cur_print;
     if (print_per_sec != cur_print) {
       WLOGINFO("echo module tick");
@@ -50,7 +50,7 @@ class echo_module : public atapp::module_impl {
   }
 };
 
-static int app_command_handler_echo(util::cli::callback_param params) {
+static int app_command_handler_echo(atfw::util::cli::callback_param params) {
   std::stringstream ss;
   for (size_t i = 0; i < params.get_params_number(); ++i) {
     ss << " " << params[i]->to_cpp_string();
@@ -66,7 +66,7 @@ struct app_command_handler_transfer {
   atapp::app *app_;
   app_command_handler_transfer(atapp::app &a) : app_(&a) {}
 
-  int operator()(util::cli::callback_param params) {
+  int operator()(atfw::util::cli::callback_param params) {
     if (params.get_params_number() < 2) {
       WLOGERROR("transfer command require at least 2 parameters");
       return 0;
@@ -86,7 +86,7 @@ struct app_command_handler_listen {
   atapp::app *app_;
   explicit app_command_handler_listen(atapp::app &a) : app_(&a) {}
 
-  int operator()(util::cli::callback_param params) {
+  int operator()(atfw::util::cli::callback_param params) {
     if (params.get_params_number() < 1) {
       WLOGERROR("listen command require at least 1 parameters");
       return 0;
@@ -100,7 +100,7 @@ struct app_command_handler_connect {
   atapp::app *app_;
   explicit app_command_handler_connect(atapp::app &a) : app_(&a) {}
 
-  int operator()(util::cli::callback_param params) {
+  int operator()(atfw::util::cli::callback_param params) {
     if (params.get_params_number() < 1) {
       WLOGERROR("connect command require at least 1 parameters");
       return 0;
@@ -110,7 +110,7 @@ struct app_command_handler_connect {
   }
 };
 
-static int app_option_handler_echo(util::cli::callback_param params) {
+static int app_option_handler_echo(atfw::util::cli::callback_param params) {
   std::stringstream ss;
   for (size_t i = 0; i < params.get_params_number(); ++i) {
     ss << " " << params[i]->to_cpp_string();
@@ -157,14 +157,14 @@ int main(int argc, char *argv[]) {
   // project directory
   {
     std::string proj_dir;
-    util::file_system::dirname(__FILE__, 0, proj_dir, 2);
-    util::log::log_formatter::set_project_directory(proj_dir.c_str(), proj_dir.size());
+    atfw::util::file_system::dirname(__FILE__, 0, proj_dir, 2);
+    atfw::util::log::log_formatter::set_project_directory(proj_dir.c_str(), proj_dir.size());
   }
 
   // setup module
   app.add_module(std::make_shared<echo_module>());
   // setup cmd
-  util::cli::cmd_option_ci::ptr_type cmgr = app.get_command_manager();
+  atfw::util::cli::cmd_option_ci::ptr_type cmgr = app.get_command_manager();
   cmgr->bind_cmd("echo", app_command_handler_echo);
   cmgr->bind_cmd("transfer", app_command_handler_transfer(app))
       ->set_help_msg("transfer    <target bus id> <message> [type=0]              send a message to another atapp");
@@ -176,7 +176,7 @@ int main(int argc, char *argv[]) {
           "connect     <connect address>                               address(for example: ipv4://127.0.0.1:23456)");
 
   // setup options
-  util::cli::cmd_option::ptr_type opt_mgr = app.get_option_manager();
+  atfw::util::cli::cmd_option::ptr_type opt_mgr = app.get_option_manager();
   // show help and exit
   opt_mgr->bind_cmd("-echo", app_option_handler_echo)
       ->set_help_msg("-echo [text]                           echo a message.");

@@ -10,6 +10,7 @@
 #include <atframe/etcdcli/etcd_discovery.h>
 
 #include <algorithm>
+#include <unordered_set>
 #include <vector>
 
 #ifdef max
@@ -19,10 +20,64 @@
 namespace atapp {
 
 namespace {
+enum class search_mode_internal_flag : uint8_t {
+  kCompact = 0x01,  // 紧凑模式 flag
+  kUnique = 0x02,   // 排除重复节点 flag
+  kNext = 0x04,     // 排除自己 flag
+};
+
+static_assert(0 != (static_cast<uint8_t>(search_mode_internal_flag::kNext) &
+                    static_cast<uint8_t>(etcd_discovery_set::node_hash_type::search_mode::kNextCompact)),
+              "search_mode_internal_flag next checking");
+
+static_assert(0 != (static_cast<uint8_t>(search_mode_internal_flag::kNext) &
+                    static_cast<uint8_t>(etcd_discovery_set::node_hash_type::search_mode::kNextCompact)),
+              "search_mode_internal_flag next checking");
+
+static_assert(0 != (static_cast<uint8_t>(search_mode_internal_flag::kNext) &
+                    static_cast<uint8_t>(etcd_discovery_set::node_hash_type::search_mode::kNextCompact)),
+              "search_mode_internal_flag next checking");
+
+static_assert(0 != (static_cast<uint8_t>(search_mode_internal_flag::kNext) &
+                    static_cast<uint8_t>(etcd_discovery_set::node_hash_type::search_mode::kNextCompact)),
+              "search_mode_internal_flag next checking");
+
+static_assert(0 != (static_cast<uint8_t>(search_mode_internal_flag::kCompact) &
+                    static_cast<uint8_t>(etcd_discovery_set::node_hash_type::search_mode::kCompact)),
+              "search_mode_internal_flag compact checking");
+
+static_assert(0 != (static_cast<uint8_t>(search_mode_internal_flag::kCompact) &
+                    static_cast<uint8_t>(etcd_discovery_set::node_hash_type::search_mode::kCompactUniqueNode)),
+              "search_mode_internal_flag compact checking");
+
+static_assert(0 != (static_cast<uint8_t>(search_mode_internal_flag::kCompact) &
+                    static_cast<uint8_t>(etcd_discovery_set::node_hash_type::search_mode::kNextCompact)),
+              "search_mode_internal_flag compact checking");
+
+static_assert(0 != (static_cast<uint8_t>(search_mode_internal_flag::kCompact) &
+                    static_cast<uint8_t>(etcd_discovery_set::node_hash_type::search_mode::kNextCompactUniqueNode)),
+              "search_mode_internal_flag compact checking");
+
+static_assert(0 != (static_cast<uint8_t>(search_mode_internal_flag::kUnique) &
+                    static_cast<uint8_t>(etcd_discovery_set::node_hash_type::search_mode::kCompactUniqueNode)),
+              "search_mode_internal_flag unique checking");
+
+static_assert(0 != (static_cast<uint8_t>(search_mode_internal_flag::kUnique) &
+                    static_cast<uint8_t>(etcd_discovery_set::node_hash_type::search_mode::kNextCompactUniqueNode)),
+              "search_mode_internal_flag unique checking");
+
+static_assert(0 != (static_cast<uint8_t>(search_mode_internal_flag::kUnique) &
+                    static_cast<uint8_t>(etcd_discovery_set::node_hash_type::search_mode::kNextUniqueNode)),
+              "search_mode_internal_flag unique checking");
+
+static_assert(0 != (static_cast<uint8_t>(search_mode_internal_flag::kUnique) &
+                    static_cast<uint8_t>(etcd_discovery_set::node_hash_type::search_mode::kUniqueNode)),
+              "search_mode_internal_flag unique checking");
+
 static std::pair<uint64_t, uint64_t> consistent_hash_calc(const void *buf, size_t bufsz, uint32_t seed) {
   std::pair<uint64_t, uint64_t> ret;
   uint64_t out[2] = {0};
-  ::util::hash::murmur_hash3_x64_128(buf, static_cast<int>(bufsz), seed, out);
+  ::atfw::util::hash::murmur_hash3_x64_128(buf, static_cast<int>(bufsz), seed, out);
   ret.first = out[0];
   ret.second = out[1];
 
@@ -163,6 +218,21 @@ static bool is_empty(const etcd_discovery_set::metadata_type &metadata) noexcept
   return metadata.api_version().empty() && metadata.kind().empty() && metadata.group().empty() &&
          metadata.namespace_name().empty() && metadata.name().empty() && metadata.uid().empty() &&
          metadata.service_subset().empty() && 0 == metadata.labels_size();
+}
+
+static bool node_equal(const etcd_discovery_node::ptr_t &l, const etcd_discovery_node::ptr_t &r) noexcept {
+  if (l == r) {
+    return true;
+  }
+  if (!l || !r) {
+    return false;
+  }
+
+  if (l->get_discovery_info().id() != 0 && r->get_discovery_info().id() != 0) {
+    return l->get_discovery_info().id() == r->get_discovery_info().id();
+  }
+
+  return l->get_discovery_info().name() == r->get_discovery_info().name();
 }
 
 }  // namespace
@@ -454,7 +524,7 @@ LIBATAPP_MACRO_API bool etcd_discovery_set::metadata_equal_type::filter(const me
 
 LIBATAPP_MACRO_API etcd_discovery_set::etcd_discovery_set() {
   random_generator_.init_seed(
-      static_cast<util::random::xoshiro256_starstar::result_type>(util::time::time_utility::get_now()));
+      static_cast<atfw::util::random::xoshiro256_starstar::result_type>(atfw::util::time::time_utility::get_now()));
   default_index_.round_robin_index = 0;
 }
 
@@ -487,72 +557,74 @@ LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_na
 LIBATAPP_MACRO_API size_t etcd_discovery_set::lower_bound_node_hash_by_consistent_hash(
     gsl::span<node_hash_type> output, const node_hash_type &key, const metadata_type *metadata,
     node_hash_type::search_mode searchmode) const {
-  UTIL_UNLIKELY_IF (output.empty()) {
+  if UTIL_UNLIKELY_CONDITION (output.empty()) {
     return 0;
   }
 
   index_cache_type *index_set = mutable_index_cache(metadata);
-  UTIL_UNLIKELY_IF (nullptr == index_set) {
+  if UTIL_UNLIKELY_CONDITION (nullptr == index_set) {
     return 0;
   }
 
-  if (index_set->hashing_cache.empty()) {
-    rebuild_cache(*index_set, metadata);
+  bool exclude_self = 0 != (static_cast<uint8_t>(search_mode_internal_flag::kNext) & static_cast<uint8_t>(searchmode));
+  bool compact_mode =
+      0 != (static_cast<uint8_t>(search_mode_internal_flag::kCompact) & static_cast<uint8_t>(searchmode));
+  bool unique_node = 0 != (static_cast<uint8_t>(search_mode_internal_flag::kUnique) & static_cast<uint8_t>(searchmode));
 
-    if (index_set->hashing_cache.empty()) {
-      return 0;
+  const std::vector<node_hash_type> *select_hash_ring;
+  size_t max_output_size;
+  std::unordered_set<etcd_discovery_node *> unique_cache;
+
+  // 紧凑模式使用紧凑集合，可以减少对比开销
+  if (compact_mode) {
+    if (index_set->compact_hashing_ring.empty()) {
+      rebuild_compact_cache(*index_set, metadata);
     }
+
+    select_hash_ring = &index_set->compact_hashing_ring;
+  } else {
+    if (index_set->normal_hashing_ring.empty()) {
+      rebuild_cache(*index_set, metadata);
+    }
+
+    select_hash_ring = &index_set->normal_hashing_ring;
   }
 
-  std::vector<node_hash_type>::const_iterator hash_iter = std::lower_bound(
-      index_set->hashing_cache.begin(), index_set->hashing_cache.end(), key.hash_code, consistent_hash_compare_find);
+  // 去重模式需要初始化去重判定集合
+  if (unique_node) {
+    max_output_size = index_set->round_robin_cache.size();
+    unique_cache.reserve(max_output_size);
+  } else {
+    max_output_size = select_hash_ring->size();
+  }
 
+  if (select_hash_ring->empty()) {
+    return 0;
+  }
+
+  std::vector<node_hash_type>::const_iterator hash_iter =
+      std::lower_bound(select_hash_ring->begin(), select_hash_ring->end(), key.hash_code, consistent_hash_compare_find);
   size_t ret = 0;
-  switch (searchmode) {
-    case node_hash_type::search_mode::kExcludeHashCode: {
-      size_t check_count = index_set->hashing_cache.size();
-      for (; ret < output.size() && check_count > 0; ++hash_iter, --check_count) {
-        if (hash_iter == index_set->hashing_cache.end()) {
-          hash_iter = index_set->hashing_cache.begin();
-        }
-
-        if (hash_iter->hash_code == key.hash_code) {
-          continue;
-        }
-
-        output[ret++] = *hash_iter;
-      }
-      if (0 == check_count) {
-        hash_iter = index_set->hashing_cache.end();
-      }
-      break;
+  size_t check_count = select_hash_ring->size();
+  for (; ret < output.size() && ret < max_output_size && check_count > 0; ++hash_iter, --check_count) {
+    if (hash_iter == select_hash_ring->end()) {
+      hash_iter = select_hash_ring->begin();
     }
-    case node_hash_type::search_mode::kExcludeNode: {
-      size_t check_count = index_set->hashing_cache.size();
-      for (; ret < output.size() && check_count > 0; ++hash_iter, --check_count) {
-        if (hash_iter == index_set->hashing_cache.end()) {
-          hash_iter = index_set->hashing_cache.begin();
-        }
 
-        if ((key.node && hash_iter->node == key.node) || hash_iter->hash_code == key.hash_code) {
-          continue;
-        }
-
-        output[ret++] = *hash_iter;
+    if (exclude_self) {
+      if ((unique_node || key.hash_code == hash_iter->hash_code) && node_equal(hash_iter->node, key.node)) {
+        continue;
       }
-      break;
     }
-    default: {
-      size_t check_count = index_set->hashing_cache.size();
-      for (; ret < output.size() && check_count > 0; ++hash_iter, --check_count) {
-        if (hash_iter == index_set->hashing_cache.end()) {
-          hash_iter = index_set->hashing_cache.begin();
-        }
 
-        output[ret++] = *hash_iter;
+    if (unique_node) {
+      if (unique_cache.end() != unique_cache.find(hash_iter->node.get())) {
+        continue;
       }
-      break;
+      unique_cache.insert(hash_iter->node.get());
     }
+
+    output[ret++] = *hash_iter;
   }
 
   return ret;
@@ -607,7 +679,7 @@ LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_co
 LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_random(
     const metadata_type *metadata) const {
   index_cache_type *index_set = mutable_index_cache(metadata);
-  UTIL_UNLIKELY_IF (nullptr == index_set) {
+  if UTIL_UNLIKELY_CONDITION (nullptr == index_set) {
     return nullptr;
   }
 
@@ -628,7 +700,7 @@ LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_ra
 LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_round_robin(
     const metadata_type *metadata) const {
   index_cache_type *index_set = mutable_index_cache(metadata);
-  UTIL_UNLIKELY_IF (nullptr == index_set) {
+  if UTIL_UNLIKELY_CONDITION (nullptr == index_set) {
     return nullptr;
   }
 
@@ -653,7 +725,7 @@ LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_ro
 LIBATAPP_MACRO_API const std::vector<etcd_discovery_node::ptr_t> &etcd_discovery_set::get_sorted_nodes(
     const metadata_type *metadata) const {
   index_cache_type *index_set = mutable_index_cache(metadata);
-  UTIL_UNLIKELY_IF (nullptr == index_set) {
+  if UTIL_UNLIKELY_CONDITION (nullptr == index_set) {
     return get_empty_discovery_set();
   }
 
@@ -863,7 +935,7 @@ LIBATAPP_MACRO_API void etcd_discovery_set::remove_node(const std::string &name)
 void etcd_discovery_set::rebuild_cache(index_cache_type &cache_set, const metadata_type *rule) const {
   using std::max;
 
-  if (!cache_set.hashing_cache.empty()) {
+  if (!cache_set.normal_hashing_ring.empty()) {
     return;
   }
 
@@ -875,26 +947,9 @@ void etcd_discovery_set::rebuild_cache(index_cache_type &cache_set, const metada
 
   if (&default_index_ == &cache_set) {
     cache_set.round_robin_cache.reserve(max(node_by_id_.size(), node_by_name_.size()));
-    cache_set.hashing_cache.reserve(max(node_by_id_.size(), node_by_name_.size()) * node_hash_type::HASH_POINT_PER_INS);
-  }
-
-  for (node_by_id_type::const_iterator iter = node_by_id_.begin(); iter != node_by_id_.end(); ++iter) {
-    if (nullptr != rule && !metadata_equal_type::filter(*rule, iter->second->get_discovery_info().metadata())) {
-      continue;
-    }
-
-    cache_set.round_robin_cache.push_back(iter->second);
-
-    for (size_t i = 0; i < node_hash_type::HASH_POINT_PER_INS / 2; ++i) {
-      node_hash_type hash_node;
-      hash_node.node = iter->second;
-      uint64_t key = iter->second->get_discovery_info().id();
-      hash_node.hash_code = consistent_hash_calc(&key, sizeof(key), static_cast<uint32_t>(i));
-
-      cache_set.hashing_cache.push_back(hash_node);
-    }
-
-    cache_set.reference_cache.insert(iter->second.get());
+    cache_set.normal_hashing_ring.reserve(max(node_by_id_.size(), node_by_name_.size()) *
+                                          node_hash_type::HASH_POINT_PER_INS);
+    cache_set.compact_hashing_ring.reserve(cache_set.normal_hashing_ring.capacity());
   }
 
   for (node_by_name_type::const_iterator iter = node_by_name_.begin(); iter != node_by_name_.end(); ++iter) {
@@ -902,25 +957,84 @@ void etcd_discovery_set::rebuild_cache(index_cache_type &cache_set, const metada
       continue;
     }
 
-    // If already pushed by id, skip round robin cache
-    if (0 == iter->second->get_discovery_info().id()) {
-      cache_set.round_robin_cache.push_back(iter->second);
-      cache_set.reference_cache.insert(iter->second.get());
+    if (iter->second->get_discovery_info().name().empty()) {
+      continue;
     }
 
-    for (size_t i = 0; i < node_hash_type::HASH_POINT_PER_INS / 2; ++i) {
+    cache_set.round_robin_cache.push_back(iter->second);
+    cache_set.reference_cache.insert(iter->second.get());
+
+    for (size_t i = 0; i < node_hash_type::HASH_POINT_PER_INS; ++i) {
       node_hash_type hash_node;
       hash_node.node = iter->second;
       const std::string &name = iter->second->get_discovery_info().name();
       hash_node.hash_code = consistent_hash_calc(name.c_str(), name.size(), static_cast<uint32_t>(i));
 
-      cache_set.hashing_cache.push_back(hash_node);
+      cache_set.normal_hashing_ring.push_back(hash_node);
+    }
+  }
+
+  for (node_by_id_type::const_iterator iter = node_by_id_.begin(); iter != node_by_id_.end(); ++iter) {
+    if (nullptr != rule && !metadata_equal_type::filter(*rule, iter->second->get_discovery_info().metadata())) {
+      continue;
+    }
+
+    // If already pushed by id, skip round robin cache
+    if (!iter->second->get_discovery_info().name().empty()) {
+      continue;
+    }
+
+    cache_set.round_robin_cache.push_back(iter->second);
+    cache_set.reference_cache.insert(iter->second.get());
+
+    for (size_t i = 0; i < node_hash_type::HASH_POINT_PER_INS; ++i) {
+      node_hash_type hash_node;
+      hash_node.node = iter->second;
+      uint64_t key = iter->second->get_discovery_info().id();
+      hash_node.hash_code = consistent_hash_calc(&key, sizeof(key), static_cast<uint32_t>(i));
+
+      cache_set.normal_hashing_ring.push_back(hash_node);
     }
   }
 
   std::sort(cache_set.round_robin_cache.begin(), cache_set.round_robin_cache.end(), round_robin_compare_index);
   cache_set.round_robin_index = 0;
-  std::sort(cache_set.hashing_cache.begin(), cache_set.hashing_cache.end(), consistent_hash_compare_index);
+  std::sort(cache_set.normal_hashing_ring.begin(), cache_set.normal_hashing_ring.end(), consistent_hash_compare_index);
+}
+
+void etcd_discovery_set::rebuild_compact_cache(index_cache_type &cache_set, const metadata_type *rule) const {
+  if (!cache_set.compact_hashing_ring.empty()) {
+    return;
+  }
+
+  if (node_by_id_.empty() && node_by_name_.empty()) {
+    return;
+  }
+
+  rebuild_cache(cache_set, rule);
+
+  if UTIL_UNLIKELY_CONDITION (cache_set.normal_hashing_ring.empty()) {
+    return;
+  }
+  cache_set.compact_hashing_ring.reserve(cache_set.normal_hashing_ring.capacity());
+
+  auto iter = cache_set.normal_hashing_ring.begin();
+  node_hash_type *previous = &(*iter);
+  for (++iter; iter != cache_set.normal_hashing_ring.end(); ++iter) {
+    // 不连续，结算前一个节点
+    if (!node_equal(iter->node, previous->node)) {
+      cache_set.compact_hashing_ring.push_back(*previous);
+    }
+
+    previous = &(*iter);
+  }
+
+  // 结算最后一个节点，可能和第一个做合并
+  if (cache_set.compact_hashing_ring.empty()) {
+    cache_set.compact_hashing_ring.push_back(*previous);
+  } else if (!node_equal(previous->node, cache_set.compact_hashing_ring.begin()->node)) {
+    cache_set.compact_hashing_ring.push_back(*previous);
+  }
 }
 
 void etcd_discovery_set::clear_cache(const metadata_type *metadata,
@@ -966,7 +1080,8 @@ void etcd_discovery_set::clear_cache(const metadata_type *metadata,
 }
 
 void etcd_discovery_set::clear_cache(index_cache_type &cache_set) {
-  cache_set.hashing_cache.clear();
+  cache_set.normal_hashing_ring.clear();
+  cache_set.compact_hashing_ring.clear();
   cache_set.round_robin_cache.clear();
   cache_set.reference_cache.clear();
 }

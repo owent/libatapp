@@ -98,10 +98,10 @@ static void check_origin_configure(atapp::app &app, atapp::protocol::atapp_etcd 
 
   // Check app keys
   std::string keys_path;
-  util::file_system::dirname(__FILE__, 0, keys_path);
+  atfw::util::file_system::dirname(__FILE__, 0, keys_path);
   keys_path += "/atapp_configure_loader_test_app_keys.txt";
 
-  if (!util::file_system::is_exist(keys_path.c_str())) {
+  if (!atfw::util::file_system::is_exist(keys_path.c_str())) {
     CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << keys_path << " not found, skip checking etcd keys" << std::endl;
     return;
   }
@@ -110,7 +110,7 @@ static void check_origin_configure(atapp::app &app, atapp::protocol::atapp_etcd 
   std::string key_line;
   size_t keys_size = 0;
   while (std::getline(keys_ss, key_line)) {
-    auto trimed_line = util::string::trim(key_line.c_str(), key_line.size());
+    auto trimed_line = atfw::util::string::trim(key_line.c_str(), key_line.size());
     if (trimed_line.second == 0) {
       continue;
     }
@@ -149,10 +149,10 @@ static void check_log_configure(const atapp::protocol::atapp_log &app_log,
 
   // Check app keys
   std::string keys_path;
-  util::file_system::dirname(__FILE__, 0, keys_path);
+  atfw::util::file_system::dirname(__FILE__, 0, keys_path);
   keys_path += "/atapp_configure_loader_test_log_keys.txt";
 
-  if (!util::file_system::is_exist(keys_path.c_str())) {
+  if (!atfw::util::file_system::is_exist(keys_path.c_str())) {
     CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << keys_path << " not found, skip checking etcd keys" << std::endl;
     return;
   }
@@ -161,7 +161,7 @@ static void check_log_configure(const atapp::protocol::atapp_log &app_log,
   std::string key_line;
   size_t keys_size = 0;
   while (std::getline(keys_ss, key_line)) {
-    auto trimed_line = util::string::trim(key_line.c_str(), key_line.size());
+    auto trimed_line = atfw::util::string::trim(key_line.c_str(), key_line.size());
     if (trimed_line.second == 0) {
       continue;
     }
@@ -180,10 +180,10 @@ static void check_log_configure(const atapp::protocol::atapp_log &app_log,
 CASE_TEST(atapp_configure, load_yaml) {
   atapp::app app;
   std::string conf_path;
-  util::file_system::dirname(__FILE__, 0, conf_path);
+  atfw::util::file_system::dirname(__FILE__, 0, conf_path);
   conf_path += "/atapp_configure_loader_test.yaml";
 
-  if (!util::file_system::is_exist(conf_path.c_str())) {
+  if (!atfw::util::file_system::is_exist(conf_path.c_str())) {
     CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path << " not found, skip atapp_configure.load_yaml"
                     << std::endl;
     return;
@@ -210,10 +210,10 @@ CASE_TEST(atapp_configure, load_yaml) {
 CASE_TEST(atapp_configure, load_conf) {
   atapp::app app;
   std::string conf_path;
-  util::file_system::dirname(__FILE__, 0, conf_path);
+  atfw::util::file_system::dirname(__FILE__, 0, conf_path);
   conf_path += "/atapp_configure_loader_test.conf";
 
-  if (!util::file_system::is_exist(conf_path.c_str())) {
+  if (!atfw::util::file_system::is_exist(conf_path.c_str())) {
     CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path << " not found, skip atapp_configure.load_conf"
                     << std::endl;
     return;
@@ -240,10 +240,10 @@ CASE_TEST(atapp_configure, load_conf) {
 CASE_TEST(atapp_configure, load_environment) {
   atapp::app app;
   std::string conf_path;
-  util::file_system::dirname(__FILE__, 0, conf_path);
+  atfw::util::file_system::dirname(__FILE__, 0, conf_path);
   conf_path += "/atapp_configure_loader_test.env.txt";
 
-  if (!util::file_system::is_exist(conf_path.c_str())) {
+  if (!atfw::util::file_system::is_exist(conf_path.c_str())) {
     CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path << " not found, skip atapp_configure.load_environment"
                     << std::endl;
     return;
@@ -253,7 +253,7 @@ CASE_TEST(atapp_configure, load_environment) {
   std::string line;
   std::unordered_set<std::string> env_vars;
   while (std::getline(fs, line)) {
-    auto trimed_line = util::string::trim(line.c_str(), line.size());
+    auto trimed_line = atfw::util::string::trim(line.c_str(), line.size());
     if (trimed_line.second == 0) {
       continue;
     }

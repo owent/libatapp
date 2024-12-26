@@ -38,7 +38,7 @@ struct LIBATAPP_MACRO_API_HEAD_ONLY etcd_discovery_action_t {
 class etcd_discovery_node {
  public:
   using on_destroy_fn_type = std::function<void(etcd_discovery_node &)>;
-  using ptr_t = util::memory::strong_rc_ptr<etcd_discovery_node>;
+  using ptr_t = atfw::util::memory::strong_rc_ptr<etcd_discovery_node>;
 
   struct LIBATAPP_MACRO_API_SYMBOL_VISIBLE node_version {
     int64_t create_revision;
@@ -125,14 +125,19 @@ class etcd_discovery_set {
   using node_by_name_type = std::unordered_map<std::string, etcd_discovery_node::ptr_t>;
   using node_by_id_type = std::unordered_map<uint64_t, etcd_discovery_node::ptr_t>;
   using metadata_type = atapp::protocol::atapp_metadata;
-  using ptr_t = util::memory::strong_rc_ptr<etcd_discovery_set>;
+  using ptr_t = atfw::util::memory::strong_rc_ptr<etcd_discovery_set>;
 
   struct UTIL_SYMBOL_VISIBLE node_hash_type {
     enum { HASH_POINT_PER_INS = 80 };
     enum class search_mode : uint8_t {
-      kInclude = 0,          // 搜索时包含自己
-      kExcludeHashCode = 1,  // 搜索时排除相同的HashCode
-      kExcludeNode = 2,      // 搜索时排除相同的Node
+      kAll = 0,                       // 不作任何排除，搜索时包含自己
+      kCompact = 0x01,                // 紧凑模式，排除连续节点，如果多个HashCode指向通一个节点，只选中最后一个
+      kUniqueNode = 0x02,             // 排除重复节点，每个节点仅取第一个
+      kCompactUniqueNode = 0x03,      // 紧凑模式，排除重复节点，每个节点仅取第一个
+      kNextNode = 0x04,               // 从下一个Node开始，搜索时不包含自己
+      kNextCompact = 0x05,            // 从下一个Node开始，如果多个HashCode指向通一个节点，只选中最后一个
+      kNextUniqueNode = 0x06,         // 从下一个Node开始，紧凑模式，搜索时不包含自己
+      kNextCompactUniqueNode = 0x07,  // 从下一个Node开始，紧凑模式，排除重复节点，搜索时不包含自己
     };
 
     etcd_discovery_node::ptr_t node;
@@ -182,7 +187,7 @@ class etcd_discovery_set {
    */
   LIBATAPP_MACRO_API size_t lower_bound_node_hash_by_consistent_hash(
       gsl::span<node_hash_type> output, const node_hash_type &key, const metadata_type *metadata = nullptr,
-      node_hash_type::search_mode searchmode = node_hash_type::search_mode::kInclude) const;
+      node_hash_type::search_mode searchmode = node_hash_type::search_mode::kAll) const;
 
   LIBATAPP_MACRO_API node_hash_type get_node_hash_by_consistent_hash(const void *buf, size_t bufsz,
                                                                      const metadata_type *metadata = nullptr) const;
@@ -226,7 +231,8 @@ class etcd_discovery_set {
 
  private:
   typedef struct {
-    std::vector<node_hash_type> hashing_cache;
+    std::vector<node_hash_type> normal_hashing_ring;
+    std::vector<node_hash_type> compact_hashing_ring;
     std::vector<etcd_discovery_node::ptr_t> round_robin_cache;
     size_t round_robin_index;
 
@@ -234,6 +240,7 @@ class etcd_discovery_set {
   } index_cache_type;
 
   void rebuild_cache(index_cache_type &cache_set, const metadata_type *rule) const;
+  void rebuild_compact_cache(index_cache_type &cache_set, const metadata_type *rule) const;
   void clear_cache(const metadata_type *metadata, gsl::span<const etcd_discovery_node *> node_ptrs) const;
   static void clear_cache(index_cache_type &cache_set);
   index_cache_type *get_index_cache(const metadata_type *metadata) const;
@@ -243,7 +250,7 @@ class etcd_discovery_set {
   node_by_name_type node_by_name_;
   node_by_id_type node_by_id_;
 
-  mutable util::random::xoshiro256_starstar random_generator_;
+  mutable atfw::util::random::xoshiro256_starstar random_generator_;
   mutable index_cache_type default_index_;
   mutable std::unordered_map<metadata_type, index_cache_type, metadata_hash_type, metadata_equal_type> metadata_index_;
 };

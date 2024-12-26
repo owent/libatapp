@@ -162,7 +162,7 @@ void etcd_keepalive::process() {
   } while (false);
 
   if (rpc_.rpc_opr_) {
-    int res = rpc_.rpc_opr_->start(util::network::http_request::method_t::EN_MT_POST, false);
+    int res = rpc_.rpc_opr_->start(atfw::util::network::http_request::method_t::EN_MT_POST, false);
     if (res != 0) {
       need_retry = true;
       rpc_.rpc_opr_->set_priv_data(nullptr);
@@ -181,20 +181,21 @@ void etcd_keepalive::process() {
   }
 }
 
-int etcd_keepalive::libcurl_callback_on_get_data(util::network::http_request &req) {
+int etcd_keepalive::libcurl_callback_on_get_data(atfw::util::network::http_request &req) {
   etcd_keepalive *self = reinterpret_cast<etcd_keepalive *>(req.get_priv_data());
   if (nullptr == self) {
     FWLOGERROR("Etcd keepalive get request shouldn't has request without private data");
     return 0;
   }
-  util::network::http_request::ptr_t keep_rpc = self->rpc_.rpc_opr_;
+  atfw::util::network::http_request::ptr_t keep_rpc = self->rpc_.rpc_opr_;
 
   self->rpc_.rpc_opr_.reset();
   ++self->checker_.retry_times;
 
   // 服务器错误则重试，预检查请求的404是正常的
-  if (0 != req.get_error_code() || util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
-                                       util::network::http_request::get_status_code_group(req.get_response_code())) {
+  if (0 != req.get_error_code() ||
+      atfw::util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
+          atfw::util::network::http_request::get_status_code_group(req.get_response_code())) {
     LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(
         *self->owner_, "Etcd keepalive {} get request failed, error code: {}, http code: {}\n{}\n{}",
         reinterpret_cast<const void *>(self), req.get_error_code(), req.get_response_code(), req.get_error_msg(),
@@ -267,19 +268,20 @@ int etcd_keepalive::libcurl_callback_on_get_data(util::network::http_request &re
   return 0;
 }
 
-int etcd_keepalive::libcurl_callback_on_set_data(util::network::http_request &req) {
+int etcd_keepalive::libcurl_callback_on_set_data(atfw::util::network::http_request &req) {
   etcd_keepalive *self = reinterpret_cast<etcd_keepalive *>(req.get_priv_data());
   if (nullptr == self) {
     FWLOGERROR("Etcd keepalive set request shouldn't has request without private data");
     return 0;
   }
 
-  util::network::http_request::ptr_t keep_rpc = self->rpc_.rpc_opr_;
+  atfw::util::network::http_request::ptr_t keep_rpc = self->rpc_.rpc_opr_;
   self->rpc_.rpc_opr_.reset();
 
   // 服务器错误则忽略
-  if (0 != req.get_error_code() || util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
-                                       util::network::http_request::get_status_code_group(req.get_response_code())) {
+  if (0 != req.get_error_code() ||
+      atfw::util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
+          atfw::util::network::http_request::get_status_code_group(req.get_response_code())) {
     LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(
         *self->owner_, "Etcd keepalive {} set request failed, error code: {}, http code: {}\n{}\n{}",
         reinterpret_cast<const void *>(self), req.get_error_code(), req.get_response_code(), req.get_error_msg(),

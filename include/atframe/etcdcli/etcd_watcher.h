@@ -122,10 +122,10 @@ class etcd_watcher {
   void process();
 
  private:
-  static int libcurl_callback_on_range_completed(util::network::http_request &req);
+  static int libcurl_callback_on_range_completed(atfw::util::network::http_request &req);
 
-  static int libcurl_callback_on_watch_completed(util::network::http_request &req);
-  static int libcurl_callback_on_watch_write(util::network::http_request &req, const char *inbuf, size_t inbufsz,
+  static int libcurl_callback_on_watch_completed(atfw::util::network::http_request &req);
+  static int libcurl_callback_on_watch_write(atfw::util::network::http_request &req, const char *inbuf, size_t inbufsz,
                                              const char *&outbuf, size_t &outbufsz);
 
  private:
@@ -135,7 +135,7 @@ class etcd_watcher {
   std::stringstream rpc_data_stream_;
   int64_t rpc_data_brackets_;
   struct rpc_data_t {
-    util::network::http_request::ptr_t rpc_opr_;
+    atfw::util::network::http_request::ptr_t rpc_opr_;
     bool is_actived;
     bool is_retry_mode;
     bool enable_progress_notify;

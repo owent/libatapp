@@ -18,10 +18,9 @@
 
 namespace atapp {
 namespace detail {
-static util::log::log_wrapper::log_handler_t _log_sink_file(util::log::log_wrapper& /*logger*/, int32_t /*index*/,
-                                                            const ::atapp::protocol::atapp_log& /*log_cfg*/,
-                                                            const ::atapp::protocol::atapp_log_category& /*cat_cfg*/,
-                                                            const ::atapp::protocol::atapp_log_sink& sink_cfg) {
+static atfw::util::log::log_wrapper::log_handler_t _log_sink_file(
+    atfw::util::log::log_wrapper& /*logger*/, int32_t /*index*/, const ::atapp::protocol::atapp_log& /*log_cfg*/,
+    const ::atapp::protocol::atapp_log_category& /*cat_cfg*/, const ::atapp::protocol::atapp_log_sink& sink_cfg) {
   std::string file_pattern = sink_cfg.log_backend_file().file();
   if (file_pattern.empty()) {
     file_pattern = "server.%N.log";
@@ -29,7 +28,7 @@ static util::log::log_wrapper::log_handler_t _log_sink_file(util::log::log_wrapp
   size_t max_file_size = static_cast<size_t>(sink_cfg.log_backend_file().rotate().size());
   uint32_t rotate_size = static_cast<uint32_t>(sink_cfg.log_backend_file().rotate().number());
 
-  util::log::log_sink_file_backend file_sink;
+  atfw::util::log::log_sink_file_backend file_sink;
   if (0 == max_file_size) {
     max_file_size = 262144;  // 256KB
   }
@@ -43,65 +42,62 @@ static util::log::log_wrapper::log_handler_t _log_sink_file(util::log::log_wrapp
   file_sink.set_rotate_size(rotate_size);
 
   file_sink.set_auto_flush(
-      util::log::log_formatter::get_level_by_name(sink_cfg.log_backend_file().auto_flush().c_str()));
+      atfw::util::log::log_formatter::get_level_by_name(sink_cfg.log_backend_file().auto_flush().c_str()));
   file_sink.set_flush_interval(static_cast<time_t>(sink_cfg.log_backend_file().flush_interval().seconds()));
   file_sink.set_writing_alias_pattern(sink_cfg.log_backend_file().writing_alias());
 
   return file_sink;
 }
 
-static void _log_sink_stdout_handle(const util::log::log_wrapper::caller_info_t& caller, const char* content,
+static void _log_sink_stdout_handle(const atfw::util::log::log_wrapper::caller_info_t& caller, const char* content,
                                     size_t content_size) {
-  if (caller.level_id <= util::log::log_formatter::level_t::LOG_LW_ERROR) {
-    util::cli::shell_stream ss(std::cout);
-    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << content << std::endl;
-  } else if (caller.level_id == util::log::log_formatter::level_t::LOG_LW_WARNING) {
-    util::cli::shell_stream ss(std::cout);
-    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW << content << std::endl;
-  } else if (caller.level_id == util::log::log_formatter::level_t::LOG_LW_INFO) {
-    util::cli::shell_stream ss(std::cout);
-    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_GREEN << content << std::endl;
+  if (caller.level_id <= atfw::util::log::log_formatter::level_t::LOG_LW_ERROR) {
+    atfw::util::cli::shell_stream ss(std::cout);
+    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << content << std::endl;
+  } else if (caller.level_id == atfw::util::log::log_formatter::level_t::LOG_LW_WARNING) {
+    atfw::util::cli::shell_stream ss(std::cout);
+    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW << content << std::endl;
+  } else if (caller.level_id == atfw::util::log::log_formatter::level_t::LOG_LW_INFO) {
+    atfw::util::cli::shell_stream ss(std::cout);
+    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_GREEN << content << std::endl;
   } else {
     std::cout.write(content, content_size);
     std::cout << std::endl;
   }
 }
 
-static util::log::log_wrapper::log_handler_t _log_sink_stdout(util::log::log_wrapper& /*logger*/, int32_t /*index*/,
-                                                              const ::atapp::protocol::atapp_log& /*log_cfg*/,
-                                                              const ::atapp::protocol::atapp_log_category& /*cat_cfg*/,
-                                                              const ::atapp::protocol::atapp_log_sink& /*sink_cfg*/) {
+static atfw::util::log::log_wrapper::log_handler_t _log_sink_stdout(
+    atfw::util::log::log_wrapper& /*logger*/, int32_t /*index*/, const ::atapp::protocol::atapp_log& /*log_cfg*/,
+    const ::atapp::protocol::atapp_log_category& /*cat_cfg*/, const ::atapp::protocol::atapp_log_sink& /*sink_cfg*/) {
   return _log_sink_stdout_handle;
 }
 
-static void _log_sink_stderr_handle(const util::log::log_wrapper::caller_info_t& caller, const char* content,
+static void _log_sink_stderr_handle(const atfw::util::log::log_wrapper::caller_info_t& caller, const char* content,
                                     size_t content_size) {
-  if (caller.level_id <= util::log::log_formatter::level_t::LOG_LW_ERROR) {
-    util::cli::shell_stream ss(std::cerr);
-    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_RED << content << std::endl;
-  } else if (caller.level_id == util::log::log_formatter::level_t::LOG_LW_WARNING) {
-    util::cli::shell_stream ss(std::cerr);
-    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW << content << std::endl;
-  } else if (caller.level_id == util::log::log_formatter::level_t::LOG_LW_INFO) {
-    util::cli::shell_stream ss(std::cerr);
-    ss() << util::cli::shell_font_style::SHELL_FONT_COLOR_GREEN << content << std::endl;
+  if (caller.level_id <= atfw::util::log::log_formatter::level_t::LOG_LW_ERROR) {
+    atfw::util::cli::shell_stream ss(std::cerr);
+    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << content << std::endl;
+  } else if (caller.level_id == atfw::util::log::log_formatter::level_t::LOG_LW_WARNING) {
+    atfw::util::cli::shell_stream ss(std::cerr);
+    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW << content << std::endl;
+  } else if (caller.level_id == atfw::util::log::log_formatter::level_t::LOG_LW_INFO) {
+    atfw::util::cli::shell_stream ss(std::cerr);
+    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_GREEN << content << std::endl;
   } else {
     std::cerr.write(content, content_size);
     std::cerr << std::endl;
   }
 }
 
-static util::log::log_wrapper::log_handler_t _log_sink_stderr(util::log::log_wrapper& /*logger*/, int32_t /*index*/,
-                                                              const ::atapp::protocol::atapp_log& /*log_cfg*/,
-                                                              const ::atapp::protocol::atapp_log_category& /*cat_cfg*/,
-                                                              const ::atapp::protocol::atapp_log_sink& /*sink_cfg*/) {
+static atfw::util::log::log_wrapper::log_handler_t _log_sink_stderr(
+    atfw::util::log::log_wrapper& /*logger*/, int32_t /*index*/, const ::atapp::protocol::atapp_log& /*log_cfg*/,
+    const ::atapp::protocol::atapp_log_category& /*cat_cfg*/, const ::atapp::protocol::atapp_log_sink& /*sink_cfg*/) {
   return _log_sink_stderr_handle;
 }
 
-static util::log::log_wrapper::log_handler_t _log_sink_syslog(util::log::log_wrapper& /*logger*/, int32_t /*index*/,
-                                                              const ::atapp::protocol::atapp_log& /*log_cfg*/,
-                                                              const ::atapp::protocol::atapp_log_category& /*cat_cfg*/,
-                                                              const ::atapp::protocol::atapp_log_sink& sink_cfg) {
+static atfw::util::log::log_wrapper::log_handler_t _log_sink_syslog(
+    atfw::util::log::log_wrapper& /*logger*/, int32_t /*index*/, const ::atapp::protocol::atapp_log& /*log_cfg*/,
+    const ::atapp::protocol::atapp_log_category& /*cat_cfg*/, const ::atapp::protocol::atapp_log_sink& sink_cfg) {
   const ::atapp::protocol::atapp_log_sink_syslog& syslog_conf = sink_cfg.log_backend_syslog();
 #if defined(LOG_SINK_ENABLE_SYSLOG_SUPPORT) && LOG_SINK_ENABLE_SYSLOG_SUPPORT
   int options = 0;
@@ -147,14 +143,14 @@ static util::log::log_wrapper::log_handler_t _log_sink_syslog(util::log::log_wra
   } else if (0 == UTIL_STRFUNC_STRCASE_CMP("uucp", syslog_conf.facility().c_str())) {
     facility = LOG_UUCP;
   } else {
-    facility = util::string::to_int<int>(syslog_conf.facility().c_str());
+    facility = atfw::util::string::to_int<int>(syslog_conf.facility().c_str());
     if (0 == facility) {
       facility = LOG_USER;
     }
   }
 
-  return util::log::log_sink_syslog_backend(syslog_conf.ident().empty() ? nullptr : syslog_conf.ident().c_str(),
-                                            options, facility);
+  return atfw::util::log::log_sink_syslog_backend(syslog_conf.ident().empty() ? nullptr : syslog_conf.ident().c_str(),
+                                                  options, facility);
 
 #else
   for (const std::string& option : syslog_conf.options()) {

@@ -65,7 +65,7 @@ LIBATAPP_MACRO_API void etcd_packer::unpack(etcd_key_value &etcd_val, const rapi
         etcd_val.create_revision = iter->value.GetInt64();
       } else if (iter->value.IsString()) {
         const char *val = iter->value.GetString();
-        ::util::string::str2int(etcd_val.create_revision, val);
+        ::atfw::util::string::str2int(etcd_val.create_revision, val);
       } else {
         etcd_val.create_revision = 0;
       }
@@ -81,7 +81,7 @@ LIBATAPP_MACRO_API void etcd_packer::unpack(etcd_key_value &etcd_val, const rapi
         etcd_val.mod_revision = iter->value.GetInt64();
       } else if (iter->value.IsString()) {
         const char *val = iter->value.GetString();
-        ::util::string::str2int(etcd_val.mod_revision, val);
+        ::atfw::util::string::str2int(etcd_val.mod_revision, val);
       } else {
         etcd_val.mod_revision = 0;
       }
@@ -97,7 +97,7 @@ LIBATAPP_MACRO_API void etcd_packer::unpack(etcd_key_value &etcd_val, const rapi
         etcd_val.version = iter->value.GetInt64();
       } else if (iter->value.IsString()) {
         const char *val = iter->value.GetString();
-        ::util::string::str2int(etcd_val.version, val);
+        ::atfw::util::string::str2int(etcd_val.version, val);
       } else {
         etcd_val.version = 0;
       }
@@ -113,7 +113,7 @@ LIBATAPP_MACRO_API void etcd_packer::unpack(etcd_key_value &etcd_val, const rapi
         etcd_val.lease = iter->value.GetInt64();
       } else if (iter->value.IsString()) {
         const char *val = iter->value.GetString();
-        ::util::string::str2int(etcd_val.lease, val);
+        ::atfw::util::string::str2int(etcd_val.lease, val);
       } else {
         etcd_val.lease = 0;
       }
@@ -153,7 +153,7 @@ LIBATAPP_MACRO_API void etcd_packer::unpack(etcd_response_header &etcd_val, cons
         etcd_val.cluster_id = iter->value.GetUint64();
       } else if (iter->value.IsString()) {
         const char *val = iter->value.GetString();
-        ::util::string::str2int(etcd_val.cluster_id, val);
+        ::atfw::util::string::str2int(etcd_val.cluster_id, val);
       } else {
         etcd_val.cluster_id = 0;
       }
@@ -169,7 +169,7 @@ LIBATAPP_MACRO_API void etcd_packer::unpack(etcd_response_header &etcd_val, cons
         etcd_val.member_id = iter->value.GetUint64();
       } else if (iter->value.IsString()) {
         const char *val = iter->value.GetString();
-        ::util::string::str2int(etcd_val.member_id, val);
+        ::atfw::util::string::str2int(etcd_val.member_id, val);
       } else {
         etcd_val.member_id = 0;
       }
@@ -185,7 +185,7 @@ LIBATAPP_MACRO_API void etcd_packer::unpack(etcd_response_header &etcd_val, cons
         etcd_val.revision = iter->value.GetInt64();
       } else if (iter->value.IsString()) {
         const char *val = iter->value.GetString();
-        ::util::string::str2int(etcd_val.revision, val);
+        ::atfw::util::string::str2int(etcd_val.revision, val);
       } else {
         etcd_val.revision = 0;
       }
@@ -201,7 +201,7 @@ LIBATAPP_MACRO_API void etcd_packer::unpack(etcd_response_header &etcd_val, cons
         etcd_val.raft_term = iter->value.GetUint64();
       } else if (iter->value.IsString()) {
         const char *val = iter->value.GetString();
-        ::util::string::str2int(etcd_val.raft_term, val);
+        ::atfw::util::string::str2int(etcd_val.raft_term, val);
       } else {
         etcd_val.raft_term = 0;
       }
@@ -303,7 +303,7 @@ LIBATAPP_MACRO_API std::string etcd_packer::unpack_to_string(const rapidjson::Va
 LIBATAPP_MACRO_API void etcd_packer::pack_base64(rapidjson::Value &json_val, const char *key, const std::string &val,
                                                  rapidjson::Document &doc) {
   std::string base64_val;
-  util::base64_encode(base64_val, val);
+  atfw::util::base64_encode(base64_val, val);
 
   rapidjson::Value k;
   rapidjson::Value v;
@@ -326,7 +326,7 @@ LIBATAPP_MACRO_API bool etcd_packer::unpack_base64(const rapidjson::Value &json_
   const char *base64_val = iter->value.GetString();
   size_t base64_val_sz = strlen(base64_val);
 
-  return 0 == util::base64_decode(val, reinterpret_cast<const unsigned char *>(base64_val), base64_val_sz);
+  return 0 == atfw::util::base64_decode(val, reinterpret_cast<const unsigned char *>(base64_val), base64_val_sz);
 }
 
 LIBATAPP_MACRO_API void etcd_packer::unpack_int(const rapidjson::Value &json_val, const char *key, int64_t &out) {
@@ -338,7 +338,7 @@ LIBATAPP_MACRO_API void etcd_packer::unpack_int(const rapidjson::Value &json_val
       out = iter->value.GetInt64();
     } else if (iter->value.IsString()) {
       const char *val = iter->value.GetString();
-      ::util::string::str2int(out, val);
+      ::atfw::util::string::str2int(out, val);
     }
   }
 }
@@ -352,7 +352,7 @@ LIBATAPP_MACRO_API void etcd_packer::unpack_int(const rapidjson::Value &json_val
       out = iter->value.GetUint64();
     } else if (iter->value.IsString()) {
       const char *val = iter->value.GetString();
-      ::util::string::str2int(out, val);
+      ::atfw::util::string::str2int(out, val);
     }
   }
 }
@@ -371,7 +371,7 @@ LIBATAPP_MACRO_API void etcd_packer::unpack_bool(const rapidjson::Value &json_va
     } else if (iter->value.IsString()) {
       const char *val = iter->value.GetString();
       int outint = 1;
-      ::util::string::str2int(outint, val);
+      ::atfw::util::string::str2int(outint, val);
       out = 0 != outint;
     }
   }

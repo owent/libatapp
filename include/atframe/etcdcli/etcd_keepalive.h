@@ -66,15 +66,15 @@ class etcd_keepalive : public std::enable_shared_from_this<etcd_keepalive> {
   void process();
 
  private:
-  static int libcurl_callback_on_get_data(util::network::http_request &req);
-  static int libcurl_callback_on_set_data(util::network::http_request &req);
+  static int libcurl_callback_on_get_data(atfw::util::network::http_request &req);
+  static int libcurl_callback_on_set_data(atfw::util::network::http_request &req);
 
  private:
   gsl::not_null<etcd_cluster *> owner_;
   std::string path_;
   std::string value_;
   struct rpc_data_t {
-    util::network::http_request::ptr_t rpc_opr_;
+    atfw::util::network::http_request::ptr_t rpc_opr_;
     bool is_actived;
     bool is_value_changed;
     bool has_data;

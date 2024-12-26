@@ -41,10 +41,10 @@ class atapp_setup_test_timeout_module : public ::atapp::module_impl {
 
 CASE_TEST(atapp_setup, timeout) {
   std::string conf_path_base;
-  util::file_system::dirname(__FILE__, 0, conf_path_base);
+  atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
   std::string conf_path_1 = conf_path_base + "/atapp_test_0.yaml";
 
-  if (!util::file_system::is_exist(conf_path_1.c_str())) {
+  if (!atfw::util::file_system::is_exist(conf_path_1.c_str())) {
     CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path_1 << " not found, skip this test" << std::endl;
     return;
   }
@@ -54,10 +54,10 @@ CASE_TEST(atapp_setup, timeout) {
 
   app1.add_module(std::make_shared<atapp_setup_test_timeout_module>());
 
-  util::time::time_utility::update();
-  auto before = util::time::time_utility::sys_now();
+  atfw::util::time::time_utility::update();
+  auto before = atfw::util::time::time_utility::sys_now();
   CASE_EXPECT_EQ(atapp::EN_ATAPP_ERR_OPERATION_TIMEOUT, app1.init(nullptr, 4, args1, nullptr));
-  util::time::time_utility::update();
-  auto after = util::time::time_utility::sys_now();
+  atfw::util::time::time_utility::update();
+  auto after = atfw::util::time::time_utility::sys_now();
   CASE_EXPECT_LE(std::chrono::duration_cast<std::chrono::seconds>(after - before).count(), 3);
 }

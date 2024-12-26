@@ -16,10 +16,10 @@
 
 CASE_TEST(atapp_worker_pool, basic_spawn) {
   std::string conf_path_base;
-  util::file_system::dirname(__FILE__, 0, conf_path_base);
+  atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
   std::string conf_path = conf_path_base + "/atapp_test_1.yaml";
 
-  if (!util::file_system::is_exist(conf_path.c_str())) {
+  if (!atfw::util::file_system::is_exist(conf_path.c_str())) {
     CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path << " not found, skip this test" << std::endl;
     return;
   }
@@ -116,10 +116,10 @@ CASE_TEST(atapp_worker_pool, basic_spawn) {
 // stop and cleanup
 CASE_TEST(atapp_worker_pool, stop) {
   std::string conf_path_base;
-  util::file_system::dirname(__FILE__, 0, conf_path_base);
+  atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
   std::string conf_path = conf_path_base + "/atapp_test_one_worker.yaml";
 
-  if (!util::file_system::is_exist(conf_path.c_str())) {
+  if (!atfw::util::file_system::is_exist(conf_path.c_str())) {
     CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path << " not found, skip this test" << std::endl;
     return;
   }
@@ -194,10 +194,10 @@ CASE_TEST(atapp_worker_pool, stop) {
 
 CASE_TEST(atapp_worker_pool, foreach_stable_workers) {
   std::string conf_path_base;
-  util::file_system::dirname(__FILE__, 0, conf_path_base);
+  atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
   std::string conf_path = conf_path_base + "/atapp_test_1.yaml";
 
-  if (!util::file_system::is_exist(conf_path.c_str())) {
+  if (!atfw::util::file_system::is_exist(conf_path.c_str())) {
     CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path << " not found, skip this test" << std::endl;
     return;
   }
@@ -250,10 +250,10 @@ CASE_TEST(atapp_worker_pool, foreach_stable_workers) {
 // basic tick
 CASE_TEST(atapp_worker_pool, basic_tick) {
   std::string conf_path_base;
-  util::file_system::dirname(__FILE__, 0, conf_path_base);
+  atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
   std::string conf_path = conf_path_base + "/atapp_test_1.yaml";
 
-  if (!util::file_system::is_exist(conf_path.c_str())) {
+  if (!atfw::util::file_system::is_exist(conf_path.c_str())) {
     CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path << " not found, skip this test" << std::endl;
     return;
   }
@@ -325,10 +325,10 @@ CASE_TEST(atapp_worker_pool, basic_tick) {
 // stop tick
 CASE_TEST(atapp_worker_pool, stop_tick) {
   std::string conf_path_base;
-  util::file_system::dirname(__FILE__, 0, conf_path_base);
+  atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
   std::string conf_path = conf_path_base + "/atapp_test_1.yaml";
 
-  if (!util::file_system::is_exist(conf_path.c_str())) {
+  if (!atfw::util::file_system::is_exist(conf_path.c_str())) {
     CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path << " not found, skip this test" << std::endl;
     return;
   }

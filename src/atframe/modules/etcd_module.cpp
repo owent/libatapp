@@ -72,7 +72,7 @@ static void init_timer_tick_callback(uv_timer_t *handle) {
   assert(handle);
   assert(handle->loop);
 
-  util::time::time_utility::update();
+  atfw::util::time::time_utility::update();
   init_timer_data_type *data = reinterpret_cast<init_timer_data_type *>(handle->data);
   data->cluster->tick();
 
@@ -250,7 +250,7 @@ LIBATAPP_MACRO_API etcd_module::etcd_module()
       maybe_update_internal_keepalive_area_(false),
       maybe_update_internal_keepalive_metadata_(false),
       watcher_snapshot_index_allocator_(0) {
-  tick_next_timepoint_ = util::time::time_utility::sys_now();
+  tick_next_timepoint_ = atfw::util::time::time_utility::sys_now();
   tick_interval_ = std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::milliseconds(128));
 
   last_etcd_event_header_.cluster_id = 0;
@@ -274,7 +274,7 @@ LIBATAPP_MACRO_API void etcd_module::reset() {
   etcd_ctx_.reset();
 
   if (curl_multi_) {
-    util::network::http_request::destroy_curl_multi(curl_multi_);
+    atfw::util::network::http_request::destroy_curl_multi(curl_multi_);
   }
 }
 
@@ -286,12 +286,12 @@ LIBATAPP_MACRO_API int etcd_module::init() {
     return -1;
   }
 
-  util::network::http_request::curl_share_options share_options;
-  util::network::http_request::curl_multi_options multi_options;
+  atfw::util::network::http_request::curl_share_options share_options;
+  atfw::util::network::http_request::curl_multi_options multi_options;
   multi_options.ev_loop = get_app()->get_bus_node()->get_evloop();
   // Share DNS cache, connection, TLS sessions and etc.
-  util::network::http_request::create_curl_share(share_options, multi_options.share_context);
-  util::network::http_request::create_curl_multi(get_app()->get_bus_node()->get_evloop(), curl_multi_);
+  atfw::util::network::http_request::create_curl_share(share_options, multi_options.share_context);
+  atfw::util::network::http_request::create_curl_multi(get_app()->get_bus_node()->get_evloop(), curl_multi_);
   if (!curl_multi_) {
     LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(etcd_ctx_, "create curl multi instance failed.");
     return -1;
@@ -339,7 +339,7 @@ LIBATAPP_MACRO_API int etcd_module::init() {
 
   int ticks = 0;
   while (false == is_failed && std::chrono::system_clock::now() <= tick_timer_data.timeout && nullptr != get_app()) {
-    util::time::time_utility::update();
+    atfw::util::time::time_utility::update();
     etcd_ctx_.tick();
     ++ticks;
 
@@ -588,8 +588,9 @@ LIBATAPP_MACRO_API int etcd_module::reload() {
   const atapp::protocol::atapp_etcd &conf = get_configure();
 
   // load logger
-  util::log::log_wrapper::ptr_t logger;
-  util::log::log_formatter::level_t::type startup_level = util::log::log_formatter::level_t::LOG_LW_DISABLED;
+  atfw::util::log::log_wrapper::ptr_t logger;
+  atfw::util::log::log_formatter::level_t::type startup_level =
+      atfw::util::log::log_formatter::level_t::LOG_LW_DISABLED;
   do {
     atapp::protocol::atapp_log etcd_log_conf;
     get_app()->parse_log_configures_into(etcd_log_conf, std::vector<gsl::string_view>{"atapp", "etcd", "log"},
@@ -598,18 +599,18 @@ LIBATAPP_MACRO_API int etcd_module::reload() {
       break;
     }
 
-    startup_level = util::log::log_formatter::get_level_by_name(conf.log().startup_level().c_str());
-    if (startup_level <= util::log::log_formatter::level_t::LOG_LW_DISABLED &&
-        util::log::log_formatter::get_level_by_name(etcd_log_conf.level().c_str()) <=
-            util::log::log_formatter::level_t::LOG_LW_DISABLED) {
+    startup_level = atfw::util::log::log_formatter::get_level_by_name(conf.log().startup_level().c_str());
+    if (startup_level <= atfw::util::log::log_formatter::level_t::LOG_LW_DISABLED &&
+        atfw::util::log::log_formatter::get_level_by_name(etcd_log_conf.level().c_str()) <=
+            atfw::util::log::log_formatter::level_t::LOG_LW_DISABLED) {
       break;
     }
 
-    logger = util::log::log_wrapper::create_user_logger();
+    logger = atfw::util::log::log_wrapper::create_user_logger();
     if (!logger) {
       break;
     }
-    logger->init(util::log::log_formatter::get_level_by_name(etcd_log_conf.level().c_str()));
+    logger->init(atfw::util::log::log_formatter::get_level_by_name(etcd_log_conf.level().c_str()));
     get_app()->setup_logger(*logger, etcd_log_conf.level(), etcd_log_conf.category(0));
   } while (false);
   etcd_ctx_.set_logger(logger, startup_level);
@@ -871,8 +872,8 @@ LIBATAPP_MACRO_API void etcd_module::set_maybe_update_keepalive_metadata() {
   maybe_update_internal_keepalive_metadata_ = true;
 }
 
-LIBATAPP_MACRO_API const util::network::http_request::curl_m_bind_ptr_t &etcd_module::get_shared_curl_multi_context()
-    const {
+LIBATAPP_MACRO_API const atfw::util::network::http_request::curl_m_bind_ptr_t &
+etcd_module::get_shared_curl_multi_context() const {
   return curl_multi_;
 }
 
@@ -1300,11 +1301,11 @@ bool etcd_module::unpack(node_info_t &out, const std::string &path, const std::s
     // parse id from key if key is a number
     if (start_idx < path.size()) {
       if (last_minus + 1 < path.size() && last_minus >= start_idx) {
-        out.node_discovery.set_id(util::string::to_int<uint64_t>(path.c_str() + last_minus + 1));
+        out.node_discovery.set_id(atfw::util::string::to_int<uint64_t>(path.c_str() + last_minus + 1));
         out.node_discovery.set_name(path.substr(start_idx, last_minus - start_idx));
       } else {
         // old mode, only id on last segment
-        out.node_discovery.set_id(util::string::to_int<uint64_t>(&path[start_idx]));
+        out.node_discovery.set_id(atfw::util::string::to_int<uint64_t>(&path[start_idx]));
       }
     }
     return false;
@@ -1330,7 +1331,7 @@ void etcd_module::pack(const node_info_t &src, std::string &json) {
   }
 }
 
-int etcd_module::http_callback_on_etcd_closed(util::network::http_request &req) {
+int etcd_module::http_callback_on_etcd_closed(atfw::util::network::http_request &req) {
   etcd_module *self = reinterpret_cast<etcd_module *>(req.get_priv_data());
   if (nullptr == self) {
     FWLOGERROR("etcd_module get request shouldn't has request without private data");
@@ -1613,7 +1614,7 @@ bool etcd_module::update_inner_watcher_event(node_info_t &node, const etcd_disco
       if (local_cache_by_id) {
         new_inst = local_cache_by_id;
       } else {
-        new_inst = util::memory::make_strong_rc<etcd_discovery_node>();
+        new_inst = atfw::util::memory::make_strong_rc<etcd_discovery_node>();
       }
 
       new_inst->copy_from(node.node_discovery, version);
@@ -1651,7 +1652,7 @@ bool etcd_module::update_inner_watcher_event(node_info_t &node, const etcd_disco
         } else if (local_cache_by_name) {
           new_inst = local_cache_by_name;
         } else {
-          new_inst = util::memory::make_strong_rc<etcd_discovery_node>();
+          new_inst = atfw::util::memory::make_strong_rc<etcd_discovery_node>();
         }
         new_inst->copy_from(node.node_discovery, version);
 

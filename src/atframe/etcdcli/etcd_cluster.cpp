@@ -136,12 +136,12 @@ static const std::string &get_default_user_agent() {
   return ret;
 }
 
-EXPLICIT_UNUSED_ATTR static int etcd_cluster_verbose_callback(util::network::http_request &req, curl_infotype type,
-                                                              char *data, size_t size,
-                                                              const util::log::log_wrapper::ptr_t &logger) {
-  if (util::log::log_wrapper::check_level(WDTLOGGETCAT(util::log::log_wrapper::categorize_t::DEFAULT),
-                                          util::log::log_wrapper::level_t::LOG_LW_TRACE) ||
-      (logger && logger->check_level(util::log::log_wrapper::level_t::LOG_LW_TRACE))) {
+EXPLICIT_UNUSED_ATTR static int etcd_cluster_verbose_callback(atfw::util::network::http_request &req,
+                                                              curl_infotype type, char *data, size_t size,
+                                                              const atfw::util::log::log_wrapper::ptr_t &logger) {
+  if (atfw::util::log::log_wrapper::check_level(WDTLOGGETCAT(atfw::util::log::log_wrapper::categorize_t::DEFAULT),
+                                                atfw::util::log::log_wrapper::level_t::LOG_LW_TRACE) ||
+      (logger && logger->check_level(atfw::util::log::log_wrapper::level_t::LOG_LW_TRACE))) {
     const char *verbose_type = "Unknown Action";
     switch (type) {
       case CURLINFO_TEXT:
@@ -169,12 +169,13 @@ EXPLICIT_UNUSED_ATTR static int etcd_cluster_verbose_callback(util::network::htt
         break;
     }
 
-    util::log::log_wrapper::caller_info_t caller = WDTLOGFILENF(util::log::log_wrapper::level_t::LOG_LW_TRACE, "Trace");
-    WDTLOGGETCAT(util::log::log_wrapper::categorize_t::DEFAULT)
+    atfw::util::log::log_wrapper::caller_info_t caller =
+        WDTLOGFILENF(atfw::util::log::log_wrapper::level_t::LOG_LW_TRACE, "Trace");
+    WDTLOGGETCAT(atfw::util::log::log_wrapper::categorize_t::DEFAULT)
         ->log(caller, "Etcd cluster %p http request %p to %s => Verbose: %s", req.get_priv_data(), &req,
               req.get_url().c_str(), verbose_type);
-    WDTLOGGETCAT(util::log::log_wrapper::categorize_t::DEFAULT)->write_log(caller, data, size);
-    if (logger && logger->check_level(util::log::log_wrapper::level_t::LOG_LW_TRACE)) {
+    WDTLOGGETCAT(atfw::util::log::log_wrapper::categorize_t::DEFAULT)->write_log(caller, data, size);
+    if (logger && logger->check_level(atfw::util::log::log_wrapper::level_t::LOG_LW_TRACE)) {
       logger->log(caller, "Etcd cluster %p http request %p to %s => Verbose: %s", req.get_priv_data(), &req,
                   req.get_url().c_str(), verbose_type);
       logger->write_log(caller, data, size);
@@ -187,8 +188,8 @@ EXPLICIT_UNUSED_ATTR static int etcd_cluster_verbose_callback(util::network::htt
 
 LIBATAPP_MACRO_API etcd_cluster::etcd_cluster()
     : flags_(0),
-      startup_log_level_(util::log::log_formatter::level_t::LOG_LW_DISABLED),
-      runtime_log_level_(util::log::log_formatter::level_t::LOG_LW_DISABLED) {
+      startup_log_level_(atfw::util::log::log_formatter::level_t::LOG_LW_DISABLED),
+      runtime_log_level_(atfw::util::log::log_formatter::level_t::LOG_LW_DISABLED) {
   conf_.authorization_next_update_time = std::chrono::system_clock::from_time_t(0);
   conf_.authorization_retry_interval = std::chrono::seconds(5);
   conf_.auth_user_get_next_update_time = std::chrono::system_clock::from_time_t(0);
@@ -247,14 +248,15 @@ LIBATAPP_MACRO_API etcd_cluster::~etcd_cluster() {
   cleanup_keepalive_deletors();
 }
 
-LIBATAPP_MACRO_API void etcd_cluster::init(const util::network::http_request::curl_m_bind_ptr_t &curl_mgr) {
+LIBATAPP_MACRO_API void etcd_cluster::init(const atfw::util::network::http_request::curl_m_bind_ptr_t &curl_mgr) {
   curl_multi_ = curl_mgr;
-  random_generator_.init_seed(static_cast<util::random::mt19937::result_type>(util::time::time_utility::get_now()));
+  random_generator_.init_seed(
+      static_cast<atfw::util::random::mt19937::result_type>(atfw::util::time::time_utility::get_now()));
 
   set_flag(flag_t::CLOSING, false);
 }
 
-LIBATAPP_MACRO_API util::network::http_request::ptr_t etcd_cluster::close(bool wait, bool revoke_lease) {
+LIBATAPP_MACRO_API atfw::util::network::http_request::ptr_t etcd_cluster::close(bool wait, bool revoke_lease) {
   set_flag(flag_t::CLOSING, true);
   set_flag(flag_t::RUNNING, false);
 
@@ -293,7 +295,7 @@ LIBATAPP_MACRO_API util::network::http_request::ptr_t etcd_cluster::close(bool w
   }
   watcher_actors_.clear();
 
-  util::network::http_request::ptr_t ret;
+  atfw::util::network::http_request::ptr_t ret;
   if (curl_multi_) {
     if (0 != conf_.lease) {
       if (revoke_lease) {
@@ -302,7 +304,7 @@ LIBATAPP_MACRO_API util::network::http_request::ptr_t etcd_cluster::close(bool w
         // wait to delete content
         if (ret) {
           LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(*this, "Etcd start to revoke lease {}", get_lease());
-          ret->start(util::network::http_request::method_t::EN_MT_POST, wait);
+          ret->start(atfw::util::network::http_request::method_t::EN_MT_POST, wait);
         }
       }
 
@@ -390,7 +392,7 @@ LIBATAPP_MACRO_API int etcd_cluster::tick() {
   }
 
   // update members
-  if (util::time::time_utility::sys_now() > conf_.etcd_members_next_update_time) {
+  if (atfw::util::time::time_utility::sys_now() > conf_.etcd_members_next_update_time) {
     ret += create_request_member_update() ? 1 : 0;
   }
 
@@ -420,7 +422,7 @@ LIBATAPP_MACRO_API int etcd_cluster::tick() {
 
       // run actions after lease granted
       return ret;
-    } else if (util::time::time_utility::sys_now() > conf_.keepalive_next_update_time) {
+    } else if (atfw::util::time::time_utility::sys_now() > conf_.keepalive_next_update_time) {
       ret += create_request_lease_keepalive() ? 1 : 0;
     }
   } else if (!check_flag(flag_t::RUNNING)) {
@@ -530,8 +532,8 @@ LIBATAPP_MACRO_API void etcd_cluster::set_flag(flag_t::type f, bool v) {
   }
 }
 
-LIBATAPP_MACRO_API void etcd_cluster::set_logger(const util::log::log_wrapper::ptr_t &logger,
-                                                 util::log::log_formatter::level_t::type log_level) noexcept {
+LIBATAPP_MACRO_API void etcd_cluster::set_logger(const atfw::util::log::log_wrapper::ptr_t &logger,
+                                                 atfw::util::log::log_formatter::level_t::type log_level) noexcept {
   logger_ = logger;
   startup_log_level_ = log_level;
   if (logger) {
@@ -773,7 +775,7 @@ void etcd_cluster::remove_keepalive_path(etcd_keepalive_deletor *keepalive_delet
       break;
     }
 
-    util::network::http_request::ptr_t rpc = create_request_kv_del(keepalive_deletor->path, "+1");
+    atfw::util::network::http_request::ptr_t rpc = create_request_kv_del(keepalive_deletor->path, "+1");
     if (!rpc) {
       LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*this, "Etcd cluster create delete keepalive {} path request to {} failed",
                                             keepalive_deletor->keepalive_addr, keepalive_deletor->path);
@@ -787,7 +789,7 @@ void etcd_cluster::remove_keepalive_path(etcd_keepalive_deletor *keepalive_delet
     rpc->set_on_complete(etcd_cluster::libcurl_callback_on_remove_keepalive_path);
     rpc->set_priv_data(keepalive_deletor);
 
-    int res = rpc->start(util::network::http_request::method_t::EN_MT_POST, false);
+    int res = rpc->start(atfw::util::network::http_request::method_t::EN_MT_POST, false);
     if (res != 0) {
       LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*this,
                                             "Etcd cluster start delete keepalive {} request to {} failed, res: {}",
@@ -810,7 +812,7 @@ void etcd_cluster::remove_keepalive_path(etcd_keepalive_deletor *keepalive_delet
   }
 }  // namespace atapp
 
-int etcd_cluster::libcurl_callback_on_remove_keepalive_path(util::network::http_request &req) {
+int etcd_cluster::libcurl_callback_on_remove_keepalive_path(atfw::util::network::http_request &req) {
   etcd_keepalive_deletor *self = reinterpret_cast<etcd_keepalive_deletor *>(req.get_priv_data());
   if (nullptr == self) {
     // Maybe deleted before or in callback, just skip
@@ -831,9 +833,9 @@ int etcd_cluster::libcurl_callback_on_remove_keepalive_path(util::network::http_
     // 服务器错误则忽略，正常流程path不存在也会返回200，然后没有 deleted=1 。如果删除成功会有 deleted=1
     // 判定 404 只是是个防御性判定
     if (0 != req.get_error_code() ||
-        (util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
-             util::network::http_request::get_status_code_group(req.get_response_code()) &&
-         util::network::http_request::status_code_t::EN_SCT_NOT_FOUND != req.get_response_code())) {
+        (atfw::util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
+             atfw::util::network::http_request::get_status_code_group(req.get_response_code()) &&
+         atfw::util::network::http_request::status_code_t::EN_SCT_NOT_FOUND != req.get_response_code())) {
       if (nullptr != self->owner) {
         LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(
             *self->owner, "Etcd cluster delete keepalive {} path {} finished, res: {}, http code: {}\n{}\n{}",
@@ -951,7 +953,7 @@ bool etcd_cluster::create_request_auth_authenticate() {
     return false;
   }
 
-  if (util::time::time_utility::sys_now() <= conf_.authorization_next_update_time) {
+  if (atfw::util::time::time_utility::sys_now() <= conf_.authorization_next_update_time) {
     return false;
   }
 
@@ -961,12 +963,13 @@ bool etcd_cluster::create_request_auth_authenticate() {
   }
 
   if (std::chrono::system_clock::duration::zero() >= conf_.authorization_retry_interval) {
-    conf_.authorization_next_update_time = util::time::time_utility::sys_now() + std::chrono::seconds(3);
+    conf_.authorization_next_update_time = atfw::util::time::time_utility::sys_now() + std::chrono::seconds(3);
   } else {
-    conf_.authorization_next_update_time = util::time::time_utility::sys_now() + conf_.authorization_retry_interval;
+    conf_.authorization_next_update_time =
+        atfw::util::time::time_utility::sys_now() + conf_.authorization_retry_interval;
   }
 
-  util::network::http_request::ptr_t req = util::network::http_request::create(
+  atfw::util::network::http_request::ptr_t req = atfw::util::network::http_request::create(
       curl_multi_.get(), LOG_WRAPPER_FWAPI_FORMAT("{}{}", conf_.path_node, ETCD_API_V3_AUTH_AUTHENTICATE));
 
   std::string username, password;
@@ -985,12 +988,13 @@ bool etcd_cluster::create_request_auth_authenticate() {
     req->set_on_complete(libcurl_callback_on_auth_authenticate);
 
     if (get_conf_http_debug_mode()) {
-      util::log::log_wrapper::ptr_t logger = logger_;
-      req->set_on_verbose([logger](util::network::http_request &self_req, curl_infotype type, char *data, size_t size) {
-        return details::etcd_cluster_verbose_callback(self_req, type, data, size, logger);
-      });
+      atfw::util::log::log_wrapper::ptr_t logger = logger_;
+      req->set_on_verbose(
+          [logger](atfw::util::network::http_request &self_req, curl_infotype type, char *data, size_t size) {
+            return details::etcd_cluster_verbose_callback(self_req, type, data, size, logger);
+          });
     }
-    int res = req->start(util::network::http_request::method_t::EN_MT_POST, false);
+    int res = req->start(atfw::util::network::http_request::method_t::EN_MT_POST, false);
     if (res != 0) {
       req->set_on_complete(nullptr);
       LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*this, "Etcd start authenticate request for user {} to {} failed, res: {}",
@@ -1003,9 +1007,10 @@ bool etcd_cluster::create_request_auth_authenticate() {
                                          req->get_url());
     rpc_authenticate_ = req;
     if (std::chrono::system_clock::duration::zero() >= conf_.auth_user_get_retry_interval) {
-      conf_.auth_user_get_next_update_time = util::time::time_utility::sys_now() + std::chrono::seconds(3);
+      conf_.auth_user_get_next_update_time = atfw::util::time::time_utility::sys_now() + std::chrono::seconds(3);
     } else {
-      conf_.auth_user_get_next_update_time = util::time::time_utility::sys_now() + conf_.auth_user_get_retry_interval;
+      conf_.auth_user_get_next_update_time =
+          atfw::util::time::time_utility::sys_now() + conf_.auth_user_get_retry_interval;
     }
   } else {
     add_stats_error_request();
@@ -1014,19 +1019,20 @@ bool etcd_cluster::create_request_auth_authenticate() {
   return !!rpc_authenticate_;
 }
 
-int etcd_cluster::libcurl_callback_on_auth_authenticate(util::network::http_request &req) {
+int etcd_cluster::libcurl_callback_on_auth_authenticate(atfw::util::network::http_request &req) {
   etcd_cluster *self = reinterpret_cast<etcd_cluster *>(req.get_priv_data());
   if (nullptr == self) {
     FWLOGERROR("Etcd authenticate shouldn't has request without private data");
     return 0;
   }
 
-  util::network::http_request::ptr_t keep_rpc = self->rpc_authenticate_;
+  atfw::util::network::http_request::ptr_t keep_rpc = self->rpc_authenticate_;
   self->rpc_authenticate_.reset();
 
   // 服务器错误则忽略
-  if (0 != req.get_error_code() || util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
-                                       util::network::http_request::get_status_code_group(req.get_response_code())) {
+  if (0 != req.get_error_code() ||
+      atfw::util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
+          atfw::util::network::http_request::get_status_code_group(req.get_response_code())) {
     // only network error will trigger a etcd member update
     if (0 != req.get_error_code()) {
       self->check_socket_error_code(req.get_error_code());
@@ -1069,10 +1075,10 @@ int etcd_cluster::libcurl_callback_on_auth_authenticate(util::network::http_requ
 
     // Renew user token later
     if (std::chrono::system_clock::duration::zero() >= self->conf_.auth_user_get_retry_interval) {
-      self->conf_.auth_user_get_next_update_time = util::time::time_utility::sys_now();
+      self->conf_.auth_user_get_next_update_time = atfw::util::time::time_utility::sys_now();
     } else {
       self->conf_.auth_user_get_next_update_time =
-          util::time::time_utility::sys_now() + self->conf_.auth_user_get_retry_interval;
+          atfw::util::time::time_utility::sys_now() + self->conf_.auth_user_get_retry_interval;
     }
   } while (false);
 
@@ -1096,7 +1102,7 @@ bool etcd_cluster::create_request_auth_user_get() {
     return false;
   }
 
-  if (util::time::time_utility::sys_now() <= conf_.auth_user_get_next_update_time) {
+  if (atfw::util::time::time_utility::sys_now() <= conf_.auth_user_get_next_update_time) {
     return false;
   }
 
@@ -1106,12 +1112,13 @@ bool etcd_cluster::create_request_auth_user_get() {
   }
 
   if (std::chrono::system_clock::duration::zero() >= conf_.auth_user_get_retry_interval) {
-    conf_.auth_user_get_next_update_time = util::time::time_utility::sys_now() + std::chrono::seconds(3);
+    conf_.auth_user_get_next_update_time = atfw::util::time::time_utility::sys_now() + std::chrono::seconds(3);
   } else {
-    conf_.auth_user_get_next_update_time = util::time::time_utility::sys_now() + conf_.auth_user_get_retry_interval;
+    conf_.auth_user_get_next_update_time =
+        atfw::util::time::time_utility::sys_now() + conf_.auth_user_get_retry_interval;
   }
 
-  util::network::http_request::ptr_t req = util::network::http_request::create(
+  atfw::util::network::http_request::ptr_t req = atfw::util::network::http_request::create(
       curl_multi_.get(), LOG_WRAPPER_FWAPI_FORMAT("{}{}", conf_.path_node, ETCD_API_V3_AUTH_USER_GET));
 
   std::string username;
@@ -1129,12 +1136,13 @@ bool etcd_cluster::create_request_auth_user_get() {
     req->set_on_complete(libcurl_callback_on_auth_user_get);
 
     if (get_conf_http_debug_mode()) {
-      util::log::log_wrapper::ptr_t logger = logger_;
-      req->set_on_verbose([logger](util::network::http_request &self_req, curl_infotype type, char *data, size_t size) {
-        return details::etcd_cluster_verbose_callback(self_req, type, data, size, logger);
-      });
+      atfw::util::log::log_wrapper::ptr_t logger = logger_;
+      req->set_on_verbose(
+          [logger](atfw::util::network::http_request &self_req, curl_infotype type, char *data, size_t size) {
+            return details::etcd_cluster_verbose_callback(self_req, type, data, size, logger);
+          });
     }
-    int res = req->start(util::network::http_request::method_t::EN_MT_POST, false);
+    int res = req->start(atfw::util::network::http_request::method_t::EN_MT_POST, false);
     if (res != 0) {
       req->set_on_complete(nullptr);
       LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*this, "Etcd start user get request for user {} to {} failed, res: {}",
@@ -1153,19 +1161,20 @@ bool etcd_cluster::create_request_auth_user_get() {
   return !!rpc_authenticate_;
 }
 
-int etcd_cluster::libcurl_callback_on_auth_user_get(util::network::http_request &req) {
+int etcd_cluster::libcurl_callback_on_auth_user_get(atfw::util::network::http_request &req) {
   etcd_cluster *self = reinterpret_cast<etcd_cluster *>(req.get_priv_data());
   if (nullptr == self) {
     FWLOGERROR("Etcd user get shouldn't has request without private data");
     return 0;
   }
 
-  util::network::http_request::ptr_t keep_rpc = self->rpc_authenticate_;
+  atfw::util::network::http_request::ptr_t keep_rpc = self->rpc_authenticate_;
   self->rpc_authenticate_.reset();
 
   // 服务器错误则忽略
-  if (0 != req.get_error_code() || util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
-                                       util::network::http_request::get_status_code_group(req.get_response_code())) {
+  if (0 != req.get_error_code() ||
+      atfw::util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
+          atfw::util::network::http_request::get_status_code_group(req.get_response_code())) {
     // only network error will trigger a etcd member update
     if (0 != req.get_error_code()) {
       self->check_socket_error_code(req.get_error_code());
@@ -1272,12 +1281,12 @@ bool etcd_cluster::retry_request_member_update(const std::string &bad_url) {
   } else if (retry_interval <= std::chrono::system_clock::duration::zero()) {
     retry_interval = std::chrono::minutes(1);
   }
-  if (util::time::time_utility::sys_now() + retry_interval < conf_.etcd_members_next_update_time) {
-    conf_.etcd_members_next_update_time = util::time::time_utility::sys_now() + retry_interval;
+  if (atfw::util::time::time_utility::sys_now() + retry_interval < conf_.etcd_members_next_update_time) {
+    conf_.etcd_members_next_update_time = atfw::util::time::time_utility::sys_now() + retry_interval;
     return false;
   }
 
-  if (util::time::time_utility::sys_now() <= conf_.etcd_members_next_update_time) {
+  if (atfw::util::time::time_utility::sys_now() <= conf_.etcd_members_next_update_time) {
     return false;
   }
 
@@ -1298,9 +1307,10 @@ bool etcd_cluster::create_request_member_update() {
   }
 
   if (std::chrono::system_clock::duration::zero() >= conf_.etcd_members_update_interval) {
-    conf_.etcd_members_next_update_time = util::time::time_utility::sys_now() + std::chrono::minutes(1);
+    conf_.etcd_members_next_update_time = atfw::util::time::time_utility::sys_now() + std::chrono::minutes(1);
   } else {
-    conf_.etcd_members_next_update_time = util::time::time_utility::sys_now() + conf_.etcd_members_update_interval;
+    conf_.etcd_members_next_update_time =
+        atfw::util::time::time_utility::sys_now() + conf_.etcd_members_update_interval;
   }
 
   if (rpc_update_members_) {
@@ -1324,7 +1334,7 @@ bool etcd_cluster::create_request_member_update() {
     selected_host = &conf_.conf_hosts[random_generator_.random_between<size_t>(0, conf_.conf_hosts.size())];
   }
 
-  util::network::http_request::ptr_t req = util::network::http_request::create(
+  atfw::util::network::http_request::ptr_t req = atfw::util::network::http_request::create(
       curl_multi_.get(), LOG_WRAPPER_FWAPI_FORMAT("{}{}", (*selected_host), ETCD_API_V3_MEMBER_LIST));
 
   if (req) {
@@ -1337,7 +1347,7 @@ bool etcd_cluster::create_request_member_update() {
     req->set_priv_data(this);
     req->set_on_complete(libcurl_callback_on_member_update);
 
-    int res = req->start(util::network::http_request::method_t::EN_MT_POST, false);
+    int res = req->start(atfw::util::network::http_request::method_t::EN_MT_POST, false);
     if (res != 0) {
       req->set_on_complete(nullptr);
       LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*this, "Etcd start update member {} request to {} failed, res: {}",
@@ -1357,19 +1367,20 @@ bool etcd_cluster::create_request_member_update() {
   return true;
 }
 
-int etcd_cluster::libcurl_callback_on_member_update(util::network::http_request &req) {
+int etcd_cluster::libcurl_callback_on_member_update(atfw::util::network::http_request &req) {
   etcd_cluster *self = reinterpret_cast<etcd_cluster *>(req.get_priv_data());
   if (nullptr == self) {
     FWLOGERROR("Etcd member list shouldn't has request without private data");
     return 0;
   }
 
-  util::network::http_request::ptr_t keep_rpc = self->rpc_update_members_;
+  atfw::util::network::http_request::ptr_t keep_rpc = self->rpc_update_members_;
   self->rpc_update_members_.reset();
 
   // 服务器错误则忽略
-  if (0 != req.get_error_code() || util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
-                                       util::network::http_request::get_status_code_group(req.get_response_code())) {
+  if (0 != req.get_error_code() ||
+      atfw::util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
+          atfw::util::network::http_request::get_status_code_group(req.get_response_code())) {
     // only network error will trigger a etcd member update
     if (0 != req.get_error_code()) {
       self->retry_request_member_update(req.get_url());
@@ -1435,10 +1446,10 @@ int etcd_cluster::libcurl_callback_on_member_update(util::network::http_request 
     self->add_stats_success_request();
 
     if (std::chrono::system_clock::duration::zero() >= self->conf_.etcd_members_update_interval) {
-      self->conf_.etcd_members_next_update_time = util::time::time_utility::sys_now() + std::chrono::minutes(1);
+      self->conf_.etcd_members_next_update_time = atfw::util::time::time_utility::sys_now() + std::chrono::minutes(1);
     } else {
       self->conf_.etcd_members_next_update_time =
-          util::time::time_utility::sys_now() + self->conf_.etcd_members_update_interval;
+          atfw::util::time::time_utility::sys_now() + self->conf_.etcd_members_update_interval;
     }
 
     // 触发一次tick
@@ -1457,7 +1468,7 @@ bool etcd_cluster::create_request_lease_grant() {
     return false;
   }
 
-  if (util::time::time_utility::sys_now() <= conf_.keepalive_next_update_time) {
+  if (atfw::util::time::time_utility::sys_now() <= conf_.keepalive_next_update_time) {
     return false;
   }
 
@@ -1468,23 +1479,23 @@ bool etcd_cluster::create_request_lease_grant() {
 
   time_t request_timeout_ms = get_http_timeout_ms();
   if (check_flag(flag_t::RUNNING) && conf_.keepalive_interval > std::chrono::system_clock::duration::zero()) {
-    conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + conf_.keepalive_interval;
+    conf_.keepalive_next_update_time = atfw::util::time::time_utility::sys_now() + conf_.keepalive_interval;
     if (request_timeout_ms > std::chrono::duration_cast<std::chrono::milliseconds>(conf_.keepalive_interval).count()) {
       request_timeout_ms =
           static_cast<time_t>(std::chrono::duration_cast<std::chrono::milliseconds>(conf_.keepalive_interval).count());
     }
   } else if (conf_.keepalive_retry_interval > std::chrono::system_clock::duration::zero()) {
-    conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + conf_.keepalive_retry_interval;
+    conf_.keepalive_next_update_time = atfw::util::time::time_utility::sys_now() + conf_.keepalive_retry_interval;
     if (request_timeout_ms >
         std::chrono::duration_cast<std::chrono::milliseconds>(conf_.keepalive_retry_interval).count()) {
       request_timeout_ms = static_cast<time_t>(
           std::chrono::duration_cast<std::chrono::milliseconds>(conf_.keepalive_retry_interval).count());
     }
   } else {
-    conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + std::chrono::seconds(3);
+    conf_.keepalive_next_update_time = atfw::util::time::time_utility::sys_now() + std::chrono::seconds(3);
   }
 
-  util::network::http_request::ptr_t req = util::network::http_request::create(
+  atfw::util::network::http_request::ptr_t req = atfw::util::network::http_request::create(
       curl_multi_.get(), LOG_WRAPPER_FWAPI_FORMAT("{}{}", conf_.path_node, ETCD_API_V3_LEASE_GRANT));
 
   if (req) {
@@ -1502,12 +1513,13 @@ bool etcd_cluster::create_request_lease_grant() {
     req->set_on_complete(libcurl_callback_on_lease_keepalive);
 
     if (get_conf_http_debug_mode()) {
-      util::log::log_wrapper::ptr_t logger = logger_;
-      req->set_on_verbose([logger](util::network::http_request &self_req, curl_infotype type, char *data, size_t size) {
-        return details::etcd_cluster_verbose_callback(self_req, type, data, size, logger);
-      });
+      atfw::util::log::log_wrapper::ptr_t logger = logger_;
+      req->set_on_verbose(
+          [logger](atfw::util::network::http_request &self_req, curl_infotype type, char *data, size_t size) {
+            return details::etcd_cluster_verbose_callback(self_req, type, data, size, logger);
+          });
     }
-    int res = req->start(util::network::http_request::method_t::EN_MT_POST, false);
+    int res = req->start(atfw::util::network::http_request::method_t::EN_MT_POST, false);
     if (res != 0) {
       req->set_on_complete(nullptr);
       LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*this, "Etcd start to grant lease request to {} failed, res: {}",
@@ -1521,7 +1533,7 @@ bool etcd_cluster::create_request_lease_grant() {
   } else {
     add_stats_error_request();
     if (std::chrono::system_clock::duration::zero() >= conf_.keepalive_retry_interval) {
-      conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + conf_.keepalive_retry_interval;
+      conf_.keepalive_next_update_time = atfw::util::time::time_utility::sys_now() + conf_.keepalive_retry_interval;
     }
 
     LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(
@@ -1540,7 +1552,7 @@ bool etcd_cluster::create_request_lease_keepalive() {
     return false;
   }
 
-  if (util::time::time_utility::sys_now() <= conf_.keepalive_next_update_time) {
+  if (atfw::util::time::time_utility::sys_now() <= conf_.keepalive_next_update_time) {
     return false;
   }
 
@@ -1551,16 +1563,16 @@ bool etcd_cluster::create_request_lease_keepalive() {
 
   time_t request_timeout_ms = get_http_timeout_ms();
   if (std::chrono::system_clock::duration::zero() >= conf_.keepalive_interval) {
-    conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + std::chrono::seconds(3);
+    conf_.keepalive_next_update_time = atfw::util::time::time_utility::sys_now() + std::chrono::seconds(3);
   } else {
-    conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + conf_.keepalive_interval;
+    conf_.keepalive_next_update_time = atfw::util::time::time_utility::sys_now() + conf_.keepalive_interval;
     if (request_timeout_ms > std::chrono::duration_cast<std::chrono::milliseconds>(conf_.keepalive_interval).count()) {
       request_timeout_ms =
           static_cast<time_t>(std::chrono::duration_cast<std::chrono::milliseconds>(conf_.keepalive_interval).count());
     }
   }
 
-  util::network::http_request::ptr_t req = util::network::http_request::create(
+  atfw::util::network::http_request::ptr_t req = atfw::util::network::http_request::create(
       curl_multi_.get(), LOG_WRAPPER_FWAPI_FORMAT("{}{}", conf_.path_node, ETCD_API_V3_LEASE_KEEPALIVE));
 
   if (req) {
@@ -1574,7 +1586,7 @@ bool etcd_cluster::create_request_lease_keepalive() {
     req->set_priv_data(this);
     req->set_on_complete(libcurl_callback_on_lease_keepalive);
 
-    int res = req->start(util::network::http_request::method_t::EN_MT_POST, false);
+    int res = req->start(atfw::util::network::http_request::method_t::EN_MT_POST, false);
     if (res != 0) {
       req->set_on_complete(nullptr);
       LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*this, "Etcd start keepalive lease {} request to {} failed, res: {}",
@@ -1589,7 +1601,7 @@ bool etcd_cluster::create_request_lease_keepalive() {
   } else {
     add_stats_error_request();
     if (std::chrono::system_clock::duration::zero() >= conf_.keepalive_retry_interval) {
-      conf_.keepalive_next_update_time = util::time::time_utility::sys_now() + conf_.keepalive_retry_interval;
+      conf_.keepalive_next_update_time = atfw::util::time::time_utility::sys_now() + conf_.keepalive_retry_interval;
     }
     LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(
         *this, "Etcd start to keepalive lease {} request to {} failed, create http request failed", get_lease(),
@@ -1599,19 +1611,20 @@ bool etcd_cluster::create_request_lease_keepalive() {
   return true;
 }
 
-int etcd_cluster::libcurl_callback_on_lease_keepalive(util::network::http_request &req) {
+int etcd_cluster::libcurl_callback_on_lease_keepalive(atfw::util::network::http_request &req) {
   etcd_cluster *self = reinterpret_cast<etcd_cluster *>(req.get_priv_data());
   if (nullptr == self) {
     FWLOGERROR("Etcd lease keepalive shouldn't has request without private data");
     return 0;
   }
 
-  util::network::http_request::ptr_t keep_rpc = self->rpc_keepalive_;
+  atfw::util::network::http_request::ptr_t keep_rpc = self->rpc_keepalive_;
   self->rpc_keepalive_.reset();
 
   // 服务器错误则忽略
-  if (0 != req.get_error_code() || util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
-                                       util::network::http_request::get_status_code_group(req.get_response_code())) {
+  if (0 != req.get_error_code() ||
+      atfw::util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
+          atfw::util::network::http_request::get_status_code_group(req.get_response_code())) {
     // only network error will trigger a etcd member update
     if (0 != req.get_error_code()) {
       self->check_socket_error_code(req.get_error_code());
@@ -1693,12 +1706,12 @@ int etcd_cluster::libcurl_callback_on_lease_keepalive(util::network::http_reques
   return 0;
 }
 
-util::network::http_request::ptr_t etcd_cluster::create_request_lease_revoke() {
+atfw::util::network::http_request::ptr_t etcd_cluster::create_request_lease_revoke() {
   if (!curl_multi_ || 0 == get_lease() || conf_.path_node.empty()) {
-    return util::network::http_request::ptr_t();
+    return atfw::util::network::http_request::ptr_t();
   }
 
-  util::network::http_request::ptr_t ret = util::network::http_request::create(
+  atfw::util::network::http_request::ptr_t ret = atfw::util::network::http_request::create(
       curl_multi_.get(), LOG_WRAPPER_FWAPI_FORMAT("{}{}", conf_.path_node, ETCD_API_V3_LEASE_REVOKE));
 
   if (ret) {
@@ -1716,15 +1729,13 @@ util::network::http_request::ptr_t etcd_cluster::create_request_lease_revoke() {
   return ret;
 }
 
-LIBATAPP_MACRO_API util::network::http_request::ptr_t etcd_cluster::create_request_kv_get(const std::string &key,
-                                                                                          const std::string &range_end,
-                                                                                          int64_t limit,
-                                                                                          int64_t revision) {
+LIBATAPP_MACRO_API atfw::util::network::http_request::ptr_t etcd_cluster::create_request_kv_get(
+    const std::string &key, const std::string &range_end, int64_t limit, int64_t revision) {
   if (!curl_multi_ || conf_.path_node.empty() || check_flag(flag_t::CLOSING)) {
-    return util::network::http_request::ptr_t();
+    return atfw::util::network::http_request::ptr_t();
   }
 
-  util::network::http_request::ptr_t ret = util::network::http_request::create(
+  atfw::util::network::http_request::ptr_t ret = atfw::util::network::http_request::create(
       curl_multi_.get(), LOG_WRAPPER_FWAPI_FORMAT("{}{}", conf_.path_node, ETCD_API_V3_KV_GET));
 
   if (ret) {
@@ -1745,18 +1756,18 @@ LIBATAPP_MACRO_API util::network::http_request::ptr_t etcd_cluster::create_reque
   return ret;
 }
 
-LIBATAPP_MACRO_API util::network::http_request::ptr_t etcd_cluster::create_request_kv_set(
+LIBATAPP_MACRO_API atfw::util::network::http_request::ptr_t etcd_cluster::create_request_kv_set(
     const std::string &key, const std::string &value, bool assign_lease, bool prev_kv, bool ignore_value,
     bool ignore_lease) {
   if (!curl_multi_ || conf_.path_node.empty() || check_flag(flag_t::CLOSING)) {
-    return util::network::http_request::ptr_t();
+    return atfw::util::network::http_request::ptr_t();
   }
 
   if (assign_lease && 0 == get_lease()) {
-    return util::network::http_request::ptr_t();
+    return atfw::util::network::http_request::ptr_t();
   }
 
-  util::network::http_request::ptr_t ret = util::network::http_request::create(
+  atfw::util::network::http_request::ptr_t ret = atfw::util::network::http_request::create(
       curl_multi_.get(), LOG_WRAPPER_FWAPI_FORMAT("{}{}", conf_.path_node, ETCD_API_V3_KV_SET));
 
   if (ret) {
@@ -1783,14 +1794,13 @@ LIBATAPP_MACRO_API util::network::http_request::ptr_t etcd_cluster::create_reque
   return ret;
 }
 
-LIBATAPP_MACRO_API util::network::http_request::ptr_t etcd_cluster::create_request_kv_del(const std::string &key,
-                                                                                          const std::string &range_end,
-                                                                                          bool prev_kv) {
+LIBATAPP_MACRO_API atfw::util::network::http_request::ptr_t etcd_cluster::create_request_kv_del(
+    const std::string &key, const std::string &range_end, bool prev_kv) {
   if (!curl_multi_ || conf_.path_node.empty() || check_flag(flag_t::CLOSING)) {
-    return util::network::http_request::ptr_t();
+    return atfw::util::network::http_request::ptr_t();
   }
 
-  util::network::http_request::ptr_t ret = util::network::http_request::create(
+  atfw::util::network::http_request::ptr_t ret = atfw::util::network::http_request::create(
       curl_multi_.get(), LOG_WRAPPER_FWAPI_FORMAT("{}{}", conf_.path_node, ETCD_API_V3_KV_DELETE));
 
   if (ret) {
@@ -1810,13 +1820,13 @@ LIBATAPP_MACRO_API util::network::http_request::ptr_t etcd_cluster::create_reque
   return ret;
 }
 
-LIBATAPP_MACRO_API util::network::http_request::ptr_t etcd_cluster::create_request_watch(
+LIBATAPP_MACRO_API atfw::util::network::http_request::ptr_t etcd_cluster::create_request_watch(
     const std::string &key, const std::string &range_end, int64_t start_revision, bool prev_kv, bool progress_notify) {
   if (!curl_multi_ || conf_.path_node.empty() || check_flag(flag_t::CLOSING)) {
-    return util::network::http_request::ptr_t();
+    return atfw::util::network::http_request::ptr_t();
   }
 
-  util::network::http_request::ptr_t ret = util::network::http_request::create(
+  atfw::util::network::http_request::ptr_t ret = atfw::util::network::http_request::create(
       curl_multi_.get(), LOG_WRAPPER_FWAPI_FORMAT("{}{}", conf_.path_node, ETCD_API_V3_WATCH));
 
   if (ret) {
@@ -2011,7 +2021,7 @@ void etcd_cluster::check_socket_error_code(int socket_code) {
   }
 }
 
-LIBATAPP_MACRO_API void etcd_cluster::setup_http_request(util::network::http_request::ptr_t &req,
+LIBATAPP_MACRO_API void etcd_cluster::setup_http_request(atfw::util::network::http_request::ptr_t &req,
                                                          rapidjson::Document &doc, time_t timeout) {
   if (!req) {
     return;
@@ -2236,28 +2246,29 @@ LIBATAPP_MACRO_API void etcd_cluster::setup_http_request(util::network::http_req
   }
 
   if (get_conf_http_debug_mode()) {
-    util::log::log_wrapper::ptr_t logger = logger_;
-    req->set_on_verbose([logger](util::network::http_request &self_req, curl_infotype type, char *data, size_t size) {
-      return details::etcd_cluster_verbose_callback(self_req, type, data, size, logger);
-    });
+    atfw::util::log::log_wrapper::ptr_t logger = logger_;
+    req->set_on_verbose(
+        [logger](atfw::util::network::http_request &self_req, curl_infotype type, char *data, size_t size) {
+          return details::etcd_cluster_verbose_callback(self_req, type, data, size, logger);
+        });
   }
 
-  if (util::log::log_wrapper::check_level(WDTLOGGETCAT(util::log::log_wrapper::categorize_t::DEFAULT),
-                                          util::log::log_wrapper::level_t::LOG_LW_TRACE) ||
-      (logger_ && logger_->check_level(util::log::log_wrapper::level_t::LOG_LW_TRACE))) {
+  if (atfw::util::log::log_wrapper::check_level(WDTLOGGETCAT(atfw::util::log::log_wrapper::categorize_t::DEFAULT),
+                                                atfw::util::log::log_wrapper::level_t::LOG_LW_TRACE) ||
+      (logger_ && logger_->check_level(atfw::util::log::log_wrapper::level_t::LOG_LW_TRACE))) {
     auto logger = logger_;
-    req->set_on_progress(
-        [logger](util::network::http_request &self_req, const util::network::http_request::progress_t &process) {
-          FWLOGTRACE("Etcd cluster {} http request {} to {}, process: download {}/{}, upload {}/{}",
-                     self_req.get_priv_data(), reinterpret_cast<const void *>(&self_req), self_req.get_url(),
-                     process.dlnow, process.dltotal, process.ulnow, process.ultotal);
-          if (logger) {
-            FWINSTLOGTRACE(*logger, "Etcd cluster {} http request {} to {}, process: download {}/{}, upload {}/{}",
-                           self_req.get_priv_data(), reinterpret_cast<const void *>(&self_req), self_req.get_url(),
-                           process.dlnow, process.dltotal, process.ulnow, process.ultotal);
-          }
-          return 0;
-        });
+    req->set_on_progress([logger](atfw::util::network::http_request &self_req,
+                                  const atfw::util::network::http_request::progress_t &process) {
+      FWLOGTRACE("Etcd cluster {} http request {} to {}, process: download {}/{}, upload {}/{}",
+                 self_req.get_priv_data(), reinterpret_cast<const void *>(&self_req), self_req.get_url(), process.dlnow,
+                 process.dltotal, process.ulnow, process.ultotal);
+      if (logger) {
+        FWINSTLOGTRACE(*logger, "Etcd cluster {} http request {} to {}, process: download {}/{}, upload {}/{}",
+                       self_req.get_priv_data(), reinterpret_cast<const void *>(&self_req), self_req.get_url(),
+                       process.dlnow, process.dltotal, process.ulnow, process.ultotal);
+      }
+      return 0;
+    });
   }
 
   // Stringify the DOM

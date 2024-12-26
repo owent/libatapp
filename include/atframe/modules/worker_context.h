@@ -43,7 +43,7 @@ struct UTIL_SYMBOL_VISIBLE worker_meta {
 
 using worker_job_action_type = std::function<void(const worker_context&)>;
 
-using worker_job_action_pointer = ::util::memory::strong_rc_ptr<worker_job_action_type>;
+using worker_job_action_pointer = ::atfw::util::memory::strong_rc_ptr<worker_job_action_type>;
 
 struct UTIL_SYMBOL_VISIBLE worker_job_data {
   worker_job_event_type event = worker_job_event_type::kWorkerJobEventAction;
@@ -62,7 +62,7 @@ struct UTIL_SYMBOL_VISIBLE worker_tick_handle_data {
       : type(input_type), action(std::move(input_action)) {}
 };
 
-using worker_tick_action_pointer = ::util::memory::strong_rc_ptr<worker_tick_handle_data>;
+using worker_tick_action_pointer = ::atfw::util::memory::strong_rc_ptr<worker_tick_handle_data>;
 
 struct UTIL_SYMBOL_VISIBLE worker_tick_action_handle_data;
 using worker_tick_action_handle_type = std::shared_ptr<worker_tick_action_handle_data>;

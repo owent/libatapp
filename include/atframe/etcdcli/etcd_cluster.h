@@ -25,7 +25,7 @@ class etcd_watcher;
 class etcd_cluster;
 
 struct etcd_keepalive_deletor {
-  util::network::http_request::ptr_t rpc;
+  atfw::util::network::http_request::ptr_t rpc;
   std::string path;
   void *keepalive_addr;  // maybe already destroyed, just used to write log
   size_t retry_times;
@@ -153,9 +153,9 @@ class etcd_cluster {
   LIBATAPP_MACRO_API etcd_cluster();
   LIBATAPP_MACRO_API ~etcd_cluster();
 
-  LIBATAPP_MACRO_API void init(const util::network::http_request::curl_m_bind_ptr_t &curl_mgr);
+  LIBATAPP_MACRO_API void init(const atfw::util::network::http_request::curl_m_bind_ptr_t &curl_mgr);
 
-  LIBATAPP_MACRO_API util::network::http_request::ptr_t close(bool wait, bool revoke_lease);
+  LIBATAPP_MACRO_API atfw::util::network::http_request::ptr_t close(bool wait, bool revoke_lease);
   LIBATAPP_MACRO_API void reset();
   LIBATAPP_MACRO_API int tick();
   LIBATAPP_MACRO_API bool is_available() const;
@@ -166,9 +166,9 @@ class etcd_cluster {
 
   UTIL_FORCEINLINE const stats_t &get_stats() const { return stats_; }
 
-  LIBATAPP_MACRO_API void set_logger(const util::log::log_wrapper::ptr_t &logger,
-                                     util::log::log_formatter::level_t::type log_level) noexcept;
-  UTIL_FORCEINLINE const util::log::log_wrapper::ptr_t &get_logger() const noexcept { return logger_; }
+  LIBATAPP_MACRO_API void set_logger(const atfw::util::log::log_wrapper::ptr_t &logger,
+                                     atfw::util::log::log_formatter::level_t::type log_level) noexcept;
+  UTIL_FORCEINLINE const atfw::util::log::log_wrapper::ptr_t &get_logger() const noexcept { return logger_; }
 
   // ====================== apis for configure ==================
   UTIL_FORCEINLINE const std::vector<std::string> &get_available_hosts() const { return conf_.hosts; }
@@ -392,9 +392,10 @@ class etcd_cluster {
    * ErrCompacted is returned as a response.
    * @return http request
    */
-  LIBATAPP_MACRO_API util::network::http_request::ptr_t create_request_kv_get(const std::string &key,
-                                                                              const std::string &range_end = "",
-                                                                              int64_t limit = 0, int64_t revision = 0);
+  LIBATAPP_MACRO_API atfw::util::network::http_request::ptr_t create_request_kv_get(const std::string &key,
+                                                                                    const std::string &range_end = "",
+                                                                                    int64_t limit = 0,
+                                                                                    int64_t revision = 0);
 
   /**
    * @brief               create request for set key-value data
@@ -410,7 +411,7 @@ class etcd_cluster {
    * if the key does not exist.
    * @return http request
    */
-  LIBATAPP_MACRO_API util::network::http_request::ptr_t create_request_kv_set(
+  LIBATAPP_MACRO_API atfw::util::network::http_request::ptr_t create_request_kv_set(
       const std::string &key, const std::string &value, bool assign_lease = false, bool prev_kv = false,
       bool ignore_value = false, bool ignore_lease = false);
 
@@ -423,9 +424,9 @@ class etcd_cluster {
    * key-value pairs will be returned in the delete response.
    * @return http request
    */
-  LIBATAPP_MACRO_API util::network::http_request::ptr_t create_request_kv_del(const std::string &key,
-                                                                              const std::string &range_end = "",
-                                                                              bool prev_kv = false);
+  LIBATAPP_MACRO_API atfw::util::network::http_request::ptr_t create_request_kv_del(const std::string &key,
+                                                                                    const std::string &range_end = "",
+                                                                                    bool prev_kv = false);
 
   /**
    * @brief                   create request for watch
@@ -443,11 +444,11 @@ class etcd_cluster {
    * notifications based on current load.
    * @return http request
    */
-  LIBATAPP_MACRO_API util::network::http_request::ptr_t create_request_watch(const std::string &key,
-                                                                             const std::string &range_end = "",
-                                                                             int64_t start_revision = 0,
-                                                                             bool prev_kv = false,
-                                                                             bool progress_notify = true);
+  LIBATAPP_MACRO_API atfw::util::network::http_request::ptr_t create_request_watch(const std::string &key,
+                                                                                   const std::string &range_end = "",
+                                                                                   int64_t start_revision = 0,
+                                                                                   bool prev_kv = false,
+                                                                                   bool progress_notify = true);
 
   UTIL_FORCEINLINE int64_t get_lease() const { return conf_.lease; }
 
@@ -463,24 +464,24 @@ class etcd_cluster {
 
  private:
   void remove_keepalive_path(etcd_keepalive_deletor *keepalive_deletor, bool delay_delete);
-  static int libcurl_callback_on_remove_keepalive_path(util::network::http_request &req);
+  static int libcurl_callback_on_remove_keepalive_path(atfw::util::network::http_request &req);
 
   void retry_pending_actions();
   void set_lease(int64_t v, bool force_active_keepalives);
 
   bool create_request_auth_authenticate();
-  static int libcurl_callback_on_auth_authenticate(util::network::http_request &req);
+  static int libcurl_callback_on_auth_authenticate(atfw::util::network::http_request &req);
   bool create_request_auth_user_get();
-  static int libcurl_callback_on_auth_user_get(util::network::http_request &req);
+  static int libcurl_callback_on_auth_user_get(atfw::util::network::http_request &req);
 
   bool retry_request_member_update(const std::string &bad_url);
   bool create_request_member_update();
-  static int libcurl_callback_on_member_update(util::network::http_request &req);
+  static int libcurl_callback_on_member_update(atfw::util::network::http_request &req);
 
   bool create_request_lease_grant();
   bool create_request_lease_keepalive();
-  static int libcurl_callback_on_lease_keepalive(util::network::http_request &req);
-  util::network::http_request::ptr_t create_request_lease_revoke();
+  static int libcurl_callback_on_lease_keepalive(atfw::util::network::http_request &req);
+  atfw::util::network::http_request::ptr_t create_request_lease_revoke();
 
   void add_stats_error_request();
   void add_stats_success_request();
@@ -504,24 +505,24 @@ class etcd_cluster {
    */
   LIBATAPP_MACRO_API void check_socket_error_code(int socket_code);
 
-  LIBATAPP_MACRO_API void setup_http_request(util::network::http_request::ptr_t &req, rapidjson::Document &doc,
+  LIBATAPP_MACRO_API void setup_http_request(atfw::util::network::http_request::ptr_t &req, rapidjson::Document &doc,
                                              time_t timeout);
 
  private:
   using etcd_keepalive_deletor_map_t = std::unordered_map<std::string, etcd_keepalive_deletor *>;
 
   uint32_t flags_;
-  util::random::mt19937 random_generator_;
+  atfw::util::random::mt19937 random_generator_;
   conf_t conf_;
   stats_t stats_;
-  util::log::log_wrapper::ptr_t logger_;
-  util::log::log_formatter::level_t::type startup_log_level_;
-  util::log::log_formatter::level_t::type runtime_log_level_;
+  atfw::util::log::log_wrapper::ptr_t logger_;
+  atfw::util::log::log_formatter::level_t::type startup_log_level_;
+  atfw::util::log::log_formatter::level_t::type runtime_log_level_;
 
-  util::network::http_request::curl_m_bind_ptr_t curl_multi_;
-  util::network::http_request::ptr_t rpc_authenticate_;
-  util::network::http_request::ptr_t rpc_update_members_;
-  util::network::http_request::ptr_t rpc_keepalive_;
+  atfw::util::network::http_request::curl_m_bind_ptr_t curl_multi_;
+  atfw::util::network::http_request::ptr_t rpc_authenticate_;
+  atfw::util::network::http_request::ptr_t rpc_update_members_;
+  atfw::util::network::http_request::ptr_t rpc_keepalive_;
   std::vector<std::shared_ptr<etcd_keepalive> > keepalive_actors_;
   std::vector<std::shared_ptr<etcd_keepalive> > keepalive_retry_actors_;
   etcd_keepalive_deletor_map_t keepalive_deletors_;

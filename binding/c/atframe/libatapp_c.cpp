@@ -126,7 +126,7 @@ struct libatapp_c_on_cmd_option_functor {
   libatapp_c_on_cmd_option_functor(libatapp_c_context ctx, libatapp_c_on_cmd_option_fn_t fn, void *priv_data)
       : ctx_(ctx), callee_(fn), private_data_(priv_data) {}
 
-  int operator()(util::cli::callback_param params) {
+  int operator()(atfw::util::cli::callback_param params) {
     if (nullptr == callee_) {
       return 0;
     }
@@ -342,7 +342,7 @@ LIBATAPP_MACRO_API void __cdecl libatapp_c_custom_cmd_add_rsp(libatapp_c_custom_
     return;
   }
 
-  ::atapp::app::add_custom_command_rsp(*(util::cli::cmd_option_list *)sender, std::string(rsp, rsp_sz));
+  ::atapp::app::add_custom_command_rsp(*(atfw::util::cli::cmd_option_list *)sender, std::string(rsp, rsp_sz));
 }
 
 LIBATAPP_MACRO_API libatapp_c_context __cdecl libatapp_c_create() {
@@ -450,7 +450,7 @@ LIBATAPP_MACRO_API uint64_t __cdecl libatapp_c_get_configure(libatapp_c_context 
     return 0;
   }
 
-  util::config::ini_value &val = ATAPP_CONTEXT(context)->get_configure_loader().get_node(path);
+  atfw::util::config::ini_value &val = ATAPP_CONTEXT(context)->get_configure_loader().get_node(path);
   uint64_t ret = 0;
   for (ret = 0; ret < val.size() && ret < arr_sz; ++ret) {
     out_buf[ret] = val.as_cpp_string(static_cast<size_t>(ret)).c_str();
@@ -693,29 +693,32 @@ LIBATAPP_MACRO_API void __cdecl libatapp_c_module_set_on_tick(libatapp_c_module 
   ATAPP_MODULE(mod)->on_tick_private_data_ = priv_data;
 }
 
-LIBATAPP_MACRO_API int64_t __cdecl libatapp_c_get_unix_timestamp() { return util::time::time_utility::get_sys_now(); }
+LIBATAPP_MACRO_API int64_t __cdecl libatapp_c_get_unix_timestamp() {
+  return atfw::util::time::time_utility::get_sys_now();
+}
 
 LIBATAPP_MACRO_API void __cdecl libatapp_c_log_write(uint32_t tag, uint32_t level, const char *level_name,
                                                      const char *file_path, const char *func_name, uint32_t line_number,
                                                      const char *content) {
-  util::log::log_wrapper *log_cat = util::log::log_wrapper::mutable_log_cat(tag);
+  atfw::util::log::log_wrapper *log_cat = atfw::util::log::log_wrapper::mutable_log_cat(tag);
   if (nullptr == log_cat) {
     return;
   }
 
-  if (!log_cat->check_level(static_cast<util::log::log_wrapper::level_t::type>(level))) {
+  if (!log_cat->check_level(static_cast<atfw::util::log::log_wrapper::level_t::type>(level))) {
     return;
   }
 
-  log_cat->log(util::log::log_formatter::caller_info_t(static_cast<util::log::log_wrapper::level_t::type>(level),
-                                                       level_name, file_path, line_number, func_name),
-               "%s", content);
+  log_cat->log(
+      atfw::util::log::log_formatter::caller_info_t(static_cast<atfw::util::log::log_wrapper::level_t::type>(level),
+                                                    level_name, file_path, line_number, func_name),
+      "%s", content);
 }
 
-LIBATAPP_MACRO_API void __cdecl libatapp_c_log_update() { util::log::log_wrapper::update(); }
+LIBATAPP_MACRO_API void __cdecl libatapp_c_log_update() { atfw::util::log::log_wrapper::update(); }
 
 LIBATAPP_MACRO_API uint32_t __cdecl libatapp_c_log_get_level(uint32_t tag) {
-  util::log::log_wrapper *log_cat = util::log::log_wrapper::mutable_log_cat(tag);
+  atfw::util::log::log_wrapper *log_cat = atfw::util::log::log_wrapper::mutable_log_cat(tag);
   if (nullptr == log_cat) {
     return 0;
   }
@@ -724,16 +727,16 @@ LIBATAPP_MACRO_API uint32_t __cdecl libatapp_c_log_get_level(uint32_t tag) {
 }
 
 LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_log_check_level(uint32_t tag, uint32_t level) {
-  util::log::log_wrapper *log_cat = util::log::log_wrapper::mutable_log_cat(tag);
+  atfw::util::log::log_wrapper *log_cat = atfw::util::log::log_wrapper::mutable_log_cat(tag);
   if (nullptr == log_cat) {
     return 0;
   }
 
-  return log_cat->check_level(static_cast<util::log::log_wrapper::level_t::type>(level)) ? 1 : 0;
+  return log_cat->check_level(static_cast<atfw::util::log::log_wrapper::level_t::type>(level)) ? 1 : 0;
 }
 
 LIBATAPP_MACRO_API void __cdecl libatapp_c_log_set_project_directory(const char *project_dir, uint64_t dirsz) {
-  util::log::log_formatter::set_project_directory(project_dir, static_cast<size_t>(dirsz));
+  atfw::util::log::log_formatter::set_project_directory(project_dir, static_cast<size_t>(dirsz));
 }
 
 #ifdef __cplusplus

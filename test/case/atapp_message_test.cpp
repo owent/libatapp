@@ -19,16 +19,16 @@
 
 CASE_TEST(atapp_message, send_message_remote) {
   std::string conf_path_base;
-  util::file_system::dirname(__FILE__, 0, conf_path_base);
+  atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
   std::string conf_path_1 = conf_path_base + "/atapp_test_1.yaml";
 
-  if (!util::file_system::is_exist(conf_path_1.c_str())) {
+  if (!atfw::util::file_system::is_exist(conf_path_1.c_str())) {
     CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path_1 << " not found, skip this test" << std::endl;
     return;
   }
 
   std::string conf_path_2 = conf_path_base + "/atapp_test_2.yaml";
-  if (!util::file_system::is_exist(conf_path_2.c_str())) {
+  if (!atfw::util::file_system::is_exist(conf_path_2.c_str())) {
     CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path_2 << " not found, skip this test" << std::endl;
     return;
   }
@@ -69,7 +69,7 @@ CASE_TEST(atapp_message, send_message_remote) {
 
   app2.set_evt_on_forward_request(message_callback_fn);
 
-  auto app2_discovery = util::memory::make_strong_rc<atapp::etcd_discovery_node>();
+  auto app2_discovery = atfw::util::memory::make_strong_rc<atapp::etcd_discovery_node>();
   {
     atapp::protocol::atapp_discovery app2_discovery_info;
     app2.pack(app2_discovery_info);
@@ -79,7 +79,7 @@ CASE_TEST(atapp_message, send_message_remote) {
 
   {
     // Mutable app1 in app2 to get name of remote node
-    auto app1_discovery = util::memory::make_strong_rc<atapp::etcd_discovery_node>();
+    auto app1_discovery = atfw::util::memory::make_strong_rc<atapp::etcd_discovery_node>();
     atapp::protocol::atapp_discovery app1_discovery_info;
     app1.pack(app1_discovery_info);
     app1_discovery->copy_from(app1_discovery_info, atapp::etcd_discovery_node::node_version());
@@ -87,7 +87,7 @@ CASE_TEST(atapp_message, send_message_remote) {
   }
 
   CASE_MSG_INFO() << "Start to send message..." << std::endl;
-  auto now = util::time::time_utility::sys_now();
+  auto now = atfw::util::time::time_utility::sys_now();
   auto end_time = now + std::chrono::seconds(3);
 
   CASE_EXPECT_EQ(0, app1.send_message(app2.get_app_id(), 223, expect_message, strlen(expect_message), &set_sequence));
@@ -102,8 +102,8 @@ CASE_TEST(atapp_message, send_message_remote) {
     app1.run_noblock();
     app2.run_noblock();
 
-    now = util::time::time_utility::sys_now();
-    util::time::time_utility::update();
+    now = atfw::util::time::time_utility::sys_now();
+    atfw::util::time::time_utility::update();
   }
 
   CASE_EXPECT_EQ(0, app1.mutable_endpoint(app2_discovery)->get_pending_message_count());
@@ -115,8 +115,8 @@ CASE_TEST(atapp_message, send_message_remote) {
     app1.run_noblock();
     app2.run_noblock();
 
-    now = util::time::time_utility::sys_now();
-    util::time::time_utility::update();
+    now = atfw::util::time::time_utility::sys_now();
+    atfw::util::time::time_utility::update();
   }
 
   CASE_EXPECT_EQ(received_messge_count, 3);
@@ -124,10 +124,10 @@ CASE_TEST(atapp_message, send_message_remote) {
 
 CASE_TEST(atapp_message, send_message_loopback) {
   std::string conf_path_base;
-  util::file_system::dirname(__FILE__, 0, conf_path_base);
+  atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
   std::string conf_path_1 = conf_path_base + "/atapp_test_0.yaml";
 
-  if (!util::file_system::is_exist(conf_path_1.c_str())) {
+  if (!atfw::util::file_system::is_exist(conf_path_1.c_str())) {
     CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path_1 << " not found, skip this test" << std::endl;
     return;
   }
@@ -162,7 +162,7 @@ CASE_TEST(atapp_message, send_message_loopback) {
         return 0;
       });
 
-  auto now = util::time::time_utility::sys_now();
+  auto now = atfw::util::time::time_utility::sys_now();
   auto end_time = now + std::chrono::seconds(3);
 
   CASE_EXPECT_EQ(0, app1.send_message(app1.get_app_id(), 321, expect_message, strlen(expect_message), &set_sequence));
@@ -173,18 +173,18 @@ CASE_TEST(atapp_message, send_message_loopback) {
 
   while (received_messge_count < 2 && end_time > now) {
     app1.run_once(1, end_time - now);
-    now = util::time::time_utility::sys_now();
-    util::time::time_utility::update();
+    now = atfw::util::time::time_utility::sys_now();
+    atfw::util::time::time_utility::update();
   }
   CASE_EXPECT_EQ(received_messge_count, 2);
 
-  auto self_discovery = util::memory::make_strong_rc<atapp::etcd_discovery_node>();
+  auto self_discovery = atfw::util::memory::make_strong_rc<atapp::etcd_discovery_node>();
   atapp::protocol::atapp_discovery self_discovery_info;
   app1.pack(self_discovery_info);
   self_discovery->copy_from(self_discovery_info, atapp::etcd_discovery_node::node_version());
   CASE_EXPECT_TRUE(app1.mutable_endpoint(self_discovery));
 
-  now = util::time::time_utility::sys_now();
+  now = atfw::util::time::time_utility::sys_now();
   end_time = now + std::chrono::seconds(3);
 
   CASE_EXPECT_EQ(0, app1.send_message(self_discovery, 321, expect_message, strlen(expect_message), &set_sequence));
@@ -195,8 +195,8 @@ CASE_TEST(atapp_message, send_message_loopback) {
 
   while (received_messge_count < 4 && end_time > now) {
     app1.run_once(1, end_time - now);
-    now = util::time::time_utility::sys_now();
-    util::time::time_utility::update();
+    now = atfw::util::time::time_utility::sys_now();
+    atfw::util::time::time_utility::update();
   }
 
   CASE_EXPECT_EQ(received_messge_count, 4);

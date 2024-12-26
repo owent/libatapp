@@ -182,7 +182,7 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE module_impl {
   };
   suspended_stop_info suspended_stop_;
 
-  mutable std::unique_ptr<util::scoped_demangled_name> auto_demangled_name_;
+  mutable std::unique_ptr<atfw::util::scoped_demangled_name> auto_demangled_name_;
 
   friend class app;
 };

@@ -39,7 +39,7 @@ class atapp_connector_loopback : public atapp_connector_impl {
                                                       size_t data_size,
                                                       const atapp::protocol::atapp_metadata *metadata) override;
 
-  LIBATAPP_MACRO_API int32_t process(const util::time::time_utility::raw_time_t &max_end_timepoint,
+  LIBATAPP_MACRO_API int32_t process(const atfw::util::time::time_utility::raw_time_t &max_end_timepoint,
                                      int32_t max_loop_messages);
 
  private:

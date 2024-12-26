@@ -53,7 +53,7 @@ LIBATAPP_MACRO_API const char *module_impl::name() const {
   }
 
 #if defined(LIBATFRAME_UTILS_ENABLE_RTTI) && LIBATFRAME_UTILS_ENABLE_RTTI
-  auto_demangled_name_.reset(new util::scoped_demangled_name(typeid(*this).name()));
+  auto_demangled_name_.reset(new atfw::util::scoped_demangled_name(typeid(*this).name()));
   if (auto_demangled_name_) {
     return auto_demangled_name_->get();
   } else {
@@ -122,11 +122,11 @@ LIBATAPP_MACRO_API bool module_impl::check_suspend_stop() {
   }
 
   if (suspended_stop_.stop_suspend_timeout == std::chrono::system_clock::time_point::min()) {
-    suspended_stop_.stop_suspend_timeout = util::time::time_utility::sys_now();
+    suspended_stop_.stop_suspend_timeout = atfw::util::time::time_utility::sys_now();
     suspended_stop_.stop_suspend_timeout += suspended_stop_.stop_suspend_duration;
   }
 
-  if (util::time::time_utility::sys_now() >= suspended_stop_.stop_suspend_timeout) {
+  if (atfw::util::time::time_utility::sys_now() >= suspended_stop_.stop_suspend_timeout) {
     suspended_stop_.stop_suspend_callback = std::function<bool()>();
     return false;
   }

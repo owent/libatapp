@@ -228,8 +228,8 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::push_forward_message(int32_t type, ui
   return EN_ATBUS_ERR_SUCCESS;
 }
 
-LIBATAPP_MACRO_API int32_t atapp_endpoint::retry_pending_messages(const util::time::time_utility::raw_time_t &tick_time,
-                                                                  int32_t max_count) {
+LIBATAPP_MACRO_API int32_t
+atapp_endpoint::retry_pending_messages(const atfw::util::time::time_utility::raw_time_t &tick_time, int32_t max_count) {
   // Including equal
   if (nearest_waker_ <= tick_time) {
     nearest_waker_ = std::chrono::system_clock::from_time_t(0);
@@ -299,7 +299,7 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::retry_pending_messages(const util::ti
   return ret;
 }
 
-LIBATAPP_MACRO_API void atapp_endpoint::add_waker(util::time::time_utility::raw_time_t wakeup_time) {
+LIBATAPP_MACRO_API void atapp_endpoint::add_waker(atfw::util::time::time_utility::raw_time_t wakeup_time) {
   if (wakeup_time < nearest_waker_ || std::chrono::system_clock::to_time_t(nearest_waker_) == 0) {
     if (nullptr != owner_) {
       if (owner_->add_endpoint_waker(wakeup_time, watcher_, nearest_waker_)) {
@@ -307,7 +307,7 @@ LIBATAPP_MACRO_API void atapp_endpoint::add_waker(util::time::time_utility::raw_
         FWLOGDEBUG("atapp {:#x}({}) update waker for {}({:#x}, {}) to {}us later", owner_->get_app_id(),
                    owner_->get_app_name(), reinterpret_cast<const void *>(this), get_id(), get_name(),
                    std::max<int64_t>(std::chrono::duration_cast<std::chrono::microseconds>(
-                                         nearest_waker_ - util::time::time_utility::sys_now())
+                                         nearest_waker_ - atfw::util::time::time_utility::sys_now())
                                          .count(),
                                      0));
       }

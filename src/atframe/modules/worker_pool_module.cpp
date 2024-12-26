@@ -217,7 +217,8 @@ class UTIL_SYMBOL_LOCAL worker_pool_module::worker : public std::enable_shared_f
 
     std::lock_guard<std::recursive_mutex> lg{tick_handle_lock_};
     ret->iter = tick_handles_.data.insert(
-        tick_handles_.data.end(), ::util::memory::make_strong_rc<worker_tick_handle_data>(type, std::move(action)));
+        tick_handles_.data.end(),
+        ::atfw::util::memory::make_strong_rc<worker_tick_handle_data>(type, std::move(action)));
     return ret;
   }
 
@@ -432,11 +433,11 @@ void worker_pool_module::worker::start(std::shared_ptr<worker> self, std::shared
             std::memory_order_release);
 
         if (self->cpu_checkpoint_last_minute_ > self->cpu_checkpoint_last_second_ ||
-            self->cpu_checkpoint_last_minute_ + util::time::time_utility::MINITE_SECONDS <
+            self->cpu_checkpoint_last_minute_ + atfw::util::time::time_utility::MINITE_SECONDS <
                 self->cpu_checkpoint_last_second_) {
           self->cpu_checkpoint_last_minute_ =
               self->cpu_checkpoint_last_second_ -
-              self->cpu_checkpoint_last_second_ % util::time::time_utility::MINITE_SECONDS;
+              self->cpu_checkpoint_last_second_ % atfw::util::time::time_utility::MINITE_SECONDS;
 
           std::chrono::system_clock::time_point minute_start =
               std::chrono::system_clock::from_time_t(self->cpu_checkpoint_last_minute_);
@@ -863,7 +864,7 @@ LIBATAPP_MACRO_API int worker_pool_module::stop() {
 LIBATAPP_MACRO_API void worker_pool_module::cleanup() { internal_cleanup(); }
 
 LIBATAPP_MACRO_API int worker_pool_module::spawn(worker_job_action_type action, worker_context* selected_context) {
-  return spawn(util::memory::make_strong_rc<worker_job_action_type>(std::move(action)), selected_context);
+  return spawn(atfw::util::memory::make_strong_rc<worker_job_action_type>(std::move(action)), selected_context);
 }
 
 LIBATAPP_MACRO_API int worker_pool_module::spawn(worker_job_action_pointer action, worker_context* selected_context) {
@@ -905,7 +906,7 @@ LIBATAPP_MACRO_API int worker_pool_module::spawn(worker_job_action_pointer actio
 }
 
 LIBATAPP_MACRO_API int worker_pool_module::spawn(worker_job_action_type action, const worker_context& context) {
-  return spawn(util::memory::make_strong_rc<worker_job_action_type>(std::move(action)), context);
+  return spawn(atfw::util::memory::make_strong_rc<worker_job_action_type>(std::move(action)), context);
 }
 
 LIBATAPP_MACRO_API int worker_pool_module::spawn(worker_job_action_pointer action, const worker_context& context) {
@@ -1015,7 +1016,7 @@ LIBATAPP_MACRO_API size_t worker_pool_module::get_current_worker_count() const n
 }
 
 LIBATAPP_MACRO_API void worker_pool_module::foreach_worker_quickly(
-    ::util::nostd::function_ref<bool(const worker_context&, const worker_meta&)> fn) const {
+    ::atfw::util::nostd::function_ref<bool(const worker_context&, const worker_meta&)> fn) const {
   if (!worker_set_) {
     return;
   }
@@ -1064,7 +1065,7 @@ LIBATAPP_MACRO_API void worker_pool_module::foreach_worker_quickly(
 }
 
 LIBATAPP_MACRO_API void worker_pool_module::foreach_worker(
-    ::util::nostd::function_ref<bool(const worker_context&, const worker_meta&)> fn) {
+    ::atfw::util::nostd::function_ref<bool(const worker_context&, const worker_meta&)> fn) {
   if (!worker_set_) {
     return;
   }

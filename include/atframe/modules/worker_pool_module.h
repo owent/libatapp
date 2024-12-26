@@ -84,11 +84,11 @@ class worker_pool_module : public ::atapp::module_impl {
 
   // thread-safe
   LIBATAPP_MACRO_API void foreach_worker_quickly(
-      ::util::nostd::function_ref<bool(const worker_context&, const worker_meta&)> fn) const;
+      ::atfw::util::nostd::function_ref<bool(const worker_context&, const worker_meta&)> fn) const;
 
   // thread-safe
   LIBATAPP_MACRO_API void foreach_worker(
-      ::util::nostd::function_ref<bool(const worker_context&, const worker_meta&)> fn);
+      ::atfw::util::nostd::function_ref<bool(const worker_context&, const worker_meta&)> fn);
 
   // thread-safe, lockless
   LIBATAPP_MACRO_API size_t get_configure_worker_except_count() const noexcept;

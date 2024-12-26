@@ -182,7 +182,7 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE atapp_connector_impl {
   bool is_destroying_;
   handle_set_t handles_;
   protocol_set_t support_protocols_;
-  mutable std::unique_ptr<util::scoped_demangled_name> auto_demangled_name_;
+  mutable std::unique_ptr<atfw::util::scoped_demangled_name> auto_demangled_name_;
 
   friend struct atapp_connector_bind_helper;
   friend class app;

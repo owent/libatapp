@@ -152,7 +152,7 @@ LIBATAPP_MACRO_API void atapp_connector_loopback::on_discovery_event(etcd_discov
                                                                      const etcd_discovery_node::ptr_t &) {}
 
 LIBATAPP_MACRO_API int32_t atapp_connector_loopback::process(
-    const util::time::time_utility::raw_time_t &max_end_timepoint, int32_t max_loop_messages) {
+    const atfw::util::time::time_utility::raw_time_t &max_end_timepoint, int32_t max_loop_messages) {
   int32_t ret = 0;
   auto owner = get_owner();
   if (nullptr == owner) {
@@ -208,7 +208,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_loopback::process(
       pending_message_.pop_front();
     }
 
-    if (util::time::time_utility::sys_now() >= max_end_timepoint) {
+    if (atfw::util::time::time_utility::sys_now() >= max_end_timepoint) {
       break;
     }
   }
