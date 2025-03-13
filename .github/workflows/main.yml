@@ -40,7 +40,7 @@ jobs:
         shell: bash
         run: git submodule > '.github/.cache-key'
       - name: Cache packages
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             third_party/install
@@ -91,7 +91,7 @@ jobs:
         run: |
           git submodule > '.github/.cache-key'
       - name: Cache packages
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             third_party/install
@@ -120,7 +120,7 @@ jobs:
   #       shell: bash
   #       run: git submodule > '.github/.cache-key'
   #     - name: Cache packages
-  #       uses: actions/cache@v3
+  #       uses: actions/cache@v4
   #       with:
   #         path: |
   #           third_party/install
@@ -150,7 +150,7 @@ jobs:
         shell: bash
         run: git submodule > '.github/.cache-key'
       - name: Cache packages
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             third_party/install
@@ -196,7 +196,7 @@ jobs:
         shell: bash
         run: git submodule > '.github/.cache-key'
       - name: Cache packages
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             third_party/install
@@ -208,7 +208,7 @@ jobs:
         run: |
           bash ci/do_ci.sh codeql.configure
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v2
+        uses: github/codeql-action/init@v3
         with:
           config-file: ./.github/codeql/codeql-config.yml
       - name: Build
@@ -218,6 +218,6 @@ jobs:
         run: |
           bash ci/do_ci.sh codeql.build
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v2
+        uses: github/codeql-action/analyze@v3
         with:
           category: "/language:cpp"

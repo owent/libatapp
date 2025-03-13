@@ -771,14 +771,20 @@ static bool guess_configure_file_is_yaml(const std::string &file_path) {
       if (line.size() > 3 && 0 == memcmp(line.c_str(), utf8_bom, 3)) {
         line = line.substr(3);
       }
+      is_first_line = false;
     }
 
     const char *begin = line.c_str();
     const char *end = line.c_str() + line.size();
     for (; *begin && begin < end; ++begin) {
+      // comment line, ignore reset data of this line
+      if (*begin == '#') {
+        break;
+      }
+
       // YAML: Key: Value
-      //   ini section and ini key can not contain ':'
-      if (*begin == ':') {
+      //   ini section and ini key can not contain ':' or '-'
+      if (*begin == ':' || *begin == '-') {
         return true;
       }
 
@@ -789,8 +795,8 @@ static bool guess_configure_file_is_yaml(const std::string &file_path) {
       }
 
       // ini: Key = Value
-      //   YAML key can not contain '='
-      if (*begin == '=') {
+      //   YAML key can not contain '=' or ';'
+      if (*begin == '=' || *begin == ';') {
         return false;
       }
     }
