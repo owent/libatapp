@@ -5,7 +5,6 @@ set(PROJECT_LIBATAPP_ROOT_SRC_DIR ${CMAKE_CURRENT_LIST_DIR})
 list(APPEND PROJECT_LIBATAPP_PUBLIC_INCLUDE_DIRS ${PROJECT_LIBATAPP_ROOT_INC_DIR})
 
 set(PROJECT_LIBATAPP_SRC_LIST
-    "${PROJECT_LIBATAPP_GENERATED_DIR}/include/atframe/atapp_config.h"
     "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp.h"
     "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_conf.h"
     "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_conf_rapidjson.h"
@@ -40,7 +39,12 @@ set(PROJECT_LIBATAPP_SRC_LIST
     "${CMAKE_CURRENT_LIST_DIR}/atframe/etcdcli/etcd_watcher.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/atframe/modules/etcd_module.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/atframe/modules/worker_pool_module.cpp")
-source_group_by_dir(PROJECT_LIBATAPP_SRC_LIST)
+
+source_group(TREE "${PROJECT_SOURCE_DIR}" FILES ${PROJECT_LIBATAPP_SRC_LIST})
+
+list(APPEND PROJECT_LIBATAPP_SRC_LIST "${PROJECT_LIBATAPP_GENERATED_DIR}/include/atframe/atapp_config.h")
+source_group(TREE "${PROJECT_LIBATAPP_GENERATED_DIR}"
+             FILES "${PROJECT_LIBATAPP_GENERATED_DIR}/include/atframe/atapp_config.h")
 
 set(PROJECT_LIBATAPP_PROTOCOL_SRC_LIST "${PROJECT_LIBATAPP_GENERATED_DIR}/include/atframe/atapp_conf.pb.h"
                                        "${PROJECT_LIBATAPP_GENERATED_DIR}/src/atapp_conf.pb.cc")
@@ -166,8 +170,8 @@ if(PROJECT_LIBATAPP_PRIVATE_COMPILE_OPTIONS)
   target_compile_options(${PROJECT_LIBATAPP_LIB_LINK} PRIVATE ${PROJECT_LIBATAPP_PRIVATE_COMPILE_OPTIONS})
 endif()
 
-  set_property(TARGET ${PROJECT_LIBATAPP_LIB_LINK} PROPERTY FOLDER "atframework/atapp")
-  set_property(TARGET "${PROJECT_LIBATAPP_LIB_LINK}-protocol" PROPERTY FOLDER "atframework/atapp")
+set_property(TARGET ${PROJECT_LIBATAPP_LIB_LINK} PROPERTY FOLDER "atframework/atapp")
+set_property(TARGET "${PROJECT_LIBATAPP_LIB_LINK}-protocol" PROPERTY FOLDER "atframework/atapp")
 
 add_library("atframework::${PROJECT_LIBATAPP_LIB_LINK}-protocol" ALIAS "${PROJECT_LIBATAPP_LIB_LINK}-protocol")
 add_library("atframework::${PROJECT_LIBATAPP_LIB_LINK}" ALIAS "${PROJECT_LIBATAPP_LIB_LINK}")
