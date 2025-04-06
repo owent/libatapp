@@ -246,7 +246,7 @@ class app {
    */
   template <typename TModPtr>
   LIBATAPP_MACRO_API_HEAD_ONLY void add_module(TModPtr module) {
-    add_module(std::dynamic_pointer_cast<module_impl>(module));
+    add_module(module_ptr_t(std::forward<TModPtr>(module)));
   }
 
   /**
