@@ -186,7 +186,7 @@ static bool lower_bound_compare_index(const etcd_discovery_node::ptr_t &l, const
     return l->get_name_hash() < r.hash_code;
   }
 
-  return UTIL_STRFUNC_STRNCMP(l->get_discovery_info().name().c_str(), r.name.data(), r.name.size()) < 0;
+  return UTIL_STRFUNC_STRNCMP(l->get_discovery_info().name().data(), r.name.data(), r.name.size()) < 0;
 }
 
 static bool upper_bound_compare_index(const lower_upper_bound_pred_t &l, const etcd_discovery_node::ptr_t &r) {
@@ -206,7 +206,7 @@ static bool upper_bound_compare_index(const lower_upper_bound_pred_t &l, const e
     return l.hash_code < r->get_name_hash();
   }
 
-  return UTIL_STRFUNC_STRNCMP(l.name.data(), r->get_discovery_info().name().c_str(), l.name.size()) < 0;
+  return UTIL_STRFUNC_STRNCMP(l.name.data(), r->get_discovery_info().name().data(), l.name.size()) < 0;
 }
 
 static const std::vector<etcd_discovery_node::ptr_t> &get_empty_discovery_set() {
@@ -253,7 +253,7 @@ LIBATAPP_MACRO_API void etcd_discovery_node::copy_from(const atapp::protocol::at
                                                        const node_version &version) {
   node_info_.CopyFrom(input);
 
-  name_hash_ = consistent_hash_calc(input.name().c_str(), input.name().size(), LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
+  name_hash_ = consistent_hash_calc(input.name().data(), input.name().size(), LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
 
   node_version_ = version;
 }
@@ -358,8 +358,7 @@ etcd_discovery_set::metadata_hash_type::operator()(const metadata_type &metadata
   }
 
   if (!metadata.name().empty()) {
-    consistent_hash_combine(reinterpret_cast<const void *>(metadata.name().c_str()), metadata.name().size(),
-                            hash_value);
+    consistent_hash_combine(reinterpret_cast<const void *>(metadata.name().data()), metadata.name().size(), hash_value);
   }
 
   if (!metadata.namespace_name().empty()) {

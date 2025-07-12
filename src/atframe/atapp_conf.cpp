@@ -189,21 +189,21 @@ static void pick_const_data(gsl::string_view value, ATBUS_MACRO_PROTOBUF_NAMESPA
     if (unit == "ms" || unit == "millisecond" || unit == "milliseconds") {
       fallback = false;
       dur.set_seconds(tm_val / 1000);
-      dur.set_nanos((tm_val % 1000) * 1000000);
+      dur.set_nanos(static_cast<int32_t>((tm_val % 1000) * 1000000));
       break;
     }
 
     if (unit == "us" || unit == "microsecond" || unit == "microseconds") {
       fallback = false;
       dur.set_seconds(tm_val / 1000000);
-      dur.set_nanos((tm_val % 1000000) * 1000);
+      dur.set_nanos(static_cast<int32_t>((tm_val % 1000000) * 1000));
       break;
     }
 
     if (unit == "ns" || unit == "nanosecond" || unit == "nanoseconds") {
       fallback = false;
       dur.set_seconds(tm_val / 1000000000);
-      dur.set_nanos(tm_val % 1000000000);
+      dur.set_nanos(static_cast<int32_t>(tm_val % 1000000000));
       break;
     }
 
@@ -1154,7 +1154,8 @@ static void dump_field_item(const atfw::util::config::ini_value &src, ATBUS_MACR
     return;
   }
 
-  atfw::util::config::ini_value::node_type::const_iterator child_iter = src.get_children().find(fds->name());
+  atfw::util::config::ini_value::node_type::const_iterator child_iter =
+      src.get_children().find(static_cast<std::string>(fds->name()));
   // skip if not found, just skip
   if (child_iter == src.get_children().end()) {
     return;

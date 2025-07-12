@@ -750,7 +750,8 @@ static void dump_field_item(const rapidjson::Value &src, ATBUS_MACRO_PROTOBUF_NA
     return;
   }
 
-  rapidjson::Value::ConstMemberIterator iter = src.FindMember(fds->name().c_str());
+  auto key = rapidjson::StringRef(fds->name().data(), fds->name().size());
+  rapidjson::Value::ConstMemberIterator iter = src.FindMember(key);
   if (iter == src.MemberEnd()) {
     // field not found, just skip
     return;
