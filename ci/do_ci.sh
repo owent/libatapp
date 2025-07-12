@@ -65,8 +65,10 @@ if [[ "$1" == "format" ]]; then
   exit 0
 elif [[ "$1" == "coverage" ]]; then
   CONFIGURATION=Debug
+  bash cmake_dev.sh -lus -b $CONFIGURATION -r build_jobs_coverage_prepare -c $USE_CC -- \
+    "-DATBUS_MACRO_ABORT_ON_PROTECTED_ERROR=ON" "-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_LOW_MEMORY_MODE=ON"
   bash cmake_dev.sh -lus -b $CONFIGURATION -r build_jobs_coverage -c $USE_CC -- "-DCMAKE_C_FLAGS=$GCOV_FLAGS" "-DCMAKE_CXX_FLAGS=$GCOV_FLAGS" \
-    "-DCMAKE_EXE_LINKER_FLAGS=$GCOV_FLAGS -DATBUS_MACRO_ABORT_ON_PROTECTED_ERROR=ON" "-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_LOW_MEMORY_MODE=ON"
+    "-DCMAKE_EXE_LINKER_FLAGS=$GCOV_FLAGS" "-DATBUS_MACRO_ABORT_ON_PROTECTED_ERROR=ON" "-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_LOW_MEMORY_MODE=ON"
   cd build_jobs_coverage
   cmake --build . -j2 --config $CONFIGURATION || cmake --build . --config $CONFIGURATION
   ctest -VV . -C $CONFIGURATION -L libatapp.unit_test
