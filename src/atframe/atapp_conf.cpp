@@ -1154,7 +1154,8 @@ static void dump_field_item(const atfw::util::config::ini_value &src, ATBUS_MACR
     return;
   }
 
-  atfw::util::config::ini_value::node_type::const_iterator child_iter = src.get_children().find(fds->name());
+  atfw::util::config::ini_value::node_type::const_iterator child_iter =
+      src.get_children().find(static_cast<std::string>(fds->name()));
   // skip if not found, just skip
   if (child_iter == src.get_children().end()) {
     return;
