@@ -189,21 +189,21 @@ static void pick_const_data(gsl::string_view value, ATBUS_MACRO_PROTOBUF_NAMESPA
     if (unit == "ms" || unit == "millisecond" || unit == "milliseconds") {
       fallback = false;
       dur.set_seconds(tm_val / 1000);
-      dur.set_nanos((tm_val % 1000) * 1000000);
+      dur.set_nanos(static_cast<int32_t>((tm_val % 1000) * 1000000));
       break;
     }
 
     if (unit == "us" || unit == "microsecond" || unit == "microseconds") {
       fallback = false;
       dur.set_seconds(tm_val / 1000000);
-      dur.set_nanos((tm_val % 1000000) * 1000);
+      dur.set_nanos(static_cast<int32_t>((tm_val % 1000000) * 1000));
       break;
     }
 
     if (unit == "ns" || unit == "nanosecond" || unit == "nanoseconds") {
       fallback = false;
       dur.set_seconds(tm_val / 1000000000);
-      dur.set_nanos(tm_val % 1000000000);
+      dur.set_nanos(static_cast<int32_t>(tm_val % 1000000000));
       break;
     }
 

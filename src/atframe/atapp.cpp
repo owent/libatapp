@@ -1476,7 +1476,7 @@ LIBATAPP_MACRO_API void app::set_group(gsl::string_view value) {
 }
 
 LIBATAPP_MACRO_API void app::set_metadata_name(gsl::string_view value) {
-  if (gsl::string_view(conf_.metadata.name().c_str(), conf_.metadata.name().size()) == value) {
+  if (gsl::string_view(conf_.metadata.name().data(), conf_.metadata.name().size()) == value) {
     return;
   }
 
@@ -2544,7 +2544,7 @@ int app::apply_configure() {
 
   {
     uint64_t hash_out[2];
-    ::atfw::util::hash::murmur_hash3_x64_128(conf_.origin.name().c_str(), static_cast<int>(conf_.origin.name().size()),
+    ::atfw::util::hash::murmur_hash3_x64_128(conf_.origin.name().data(), static_cast<int>(conf_.origin.name().size()),
                                              LIBATAPP_MACRO_HASH_MAGIC_NUMBER, hash_out);
     conf_.hash_code = LOG_WRAPPER_FWAPI_FORMAT("{:016X}{:016X}", hash_out[0], hash_out[1]);
   }

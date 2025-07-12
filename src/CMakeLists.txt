@@ -57,10 +57,12 @@ add_custom_command(
     "${PROJECT_THIRD_PARTY_INSTALL_DIR}/include" "-I" "${ATFRAMEWORK_LIBATBUS_REPO_DIR}/include"
     "--cpp_out=dllexport_decl=LIBATAPP_MACRO_PROTOCOL_API:${PROJECT_LIBATAPP_GENERATED_DIR}/temp"
     "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_conf.proto"
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PROJECT_LIBATAPP_GENERATED_DIR}/temp/atframe/atapp_conf.pb.cc"
+  COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${PROJECT_LIBATAPP_GENERATED_DIR}/temp/atframe/atapp_conf.pb.cc"
           "${PROJECT_LIBATAPP_GENERATED_DIR}/src/atapp_conf.pb.cc"
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PROJECT_LIBATAPP_GENERATED_DIR}/temp/atframe/atapp_conf.pb.h"
+  COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${PROJECT_LIBATAPP_GENERATED_DIR}/temp/atframe/atapp_conf.pb.h"
           "${PROJECT_LIBATAPP_GENERATED_DIR}/include/atframe/atapp_conf.pb.h"
+  COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${PROJECT_SOURCE_DIR}/third_party/.clang-tidy"
+          "${PROJECT_LIBATAPP_GENERATED_DIR}/"
   DEPENDS "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/atapp_conf.proto"
           "${ATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_PROTOBUF_BIN_PROTOC}"
   WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
@@ -98,8 +100,12 @@ if(NOT APPLE)
   set_target_properties("${PROJECT_LIBATAPP_LIB_LINK}-protocol" PROPERTIES C_VISIBILITY_PRESET "hidden"
                                                                            CXX_VISIBILITY_PRESET "hidden")
 endif()
-set_target_properties("${PROJECT_LIBATAPP_LIB_LINK}-protocol" PROPERTIES VERSION ${LIBATAPP_VERSION}
-                                                                         WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
+set_target_properties(
+  "${PROJECT_LIBATAPP_LIB_LINK}-protocol"
+  PROPERTIES VERSION ${LIBATAPP_VERSION}
+             WINDOWS_EXPORT_ALL_SYMBOLS TRUE
+             CXX_INCLUDE_WHAT_YOU_USE ""
+             CXX_CLANG_TIDY "")
 target_link_libraries("${PROJECT_LIBATAPP_LIB_LINK}-protocol"
                       PUBLIC ${ATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_PROTOBUF_LINK_NAME})
 

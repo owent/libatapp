@@ -26,8 +26,6 @@ jobs:
         include:
           - os: ubuntu-latest
             cc: gcc
-          - os: ubuntu-20.04
-            cc: gcc-4.8
           - os: ubuntu-latest
             cc: clang-latest
           - os: macos-latest
@@ -54,19 +52,13 @@ jobs:
           if [ -e /opt/homebrew/lib/cmake/OpenSSL ]; then
             rm -rf /opt/homebrew/lib/cmake/OpenSSL || true
           fi
-          if [[ "xgcc-4.8" == "x$USE_CC" ]]; then
-            sudo apt-add-repository 'deb http://archive.ubuntu.com/ubuntu/ xenial main'
-            sudo apt-add-repository 'deb http://archive.ubuntu.com/ubuntu/ xenial universe'
-            sudo apt-get update ;
-            sudo apt-get install --no-install-recommends --no-install-suggests -y g++-4.8 ;
-            bash ci/do_ci.sh gcc.legacy.test ;
-          elif [[ "x$USE_CC" =~ xclang.* ]]; then
+          if [[ "x$USE_CC" =~ xclang.* ]]; then
             bash ci/do_ci.sh clang.test ;
           else
             bash ci/do_ci.sh gcc.test ;
           fi
-  vs2019_2022_build: # job id, can be any string
-    name: "Visual Studio 2019/2022 Build"
+  vs2022_build: # job id, can be any string
+    name: "Visual Studio 2022 Build"
     strategy:
       matrix:
         include:
@@ -76,10 +68,6 @@ jobs:
             platform: x64
           - os: windows-latest
             generator: "Visual Studio 17 2022"
-            build_shared_libs: "OFF"
-            platform: x64
-          - os: windows-2019
-            generator: "Visual Studio 16 2019"
             build_shared_libs: "OFF"
             platform: x64
     runs-on: ${{ matrix.os }}
