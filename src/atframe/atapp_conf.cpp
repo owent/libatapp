@@ -51,9 +51,9 @@
 #endif
 
 namespace atapp {
-namespace detail {
+namespace {
 static const char *skip_space(const char *begin, const char *end) {
-  while (begin && begin < end && *begin) {
+  while (nullptr != begin && begin < end && *begin) {
     if (::atfw::util::string::is_space(*begin)) {
       ++begin;
       continue;
@@ -68,7 +68,7 @@ static void dynamic_copy_protobuf_duration_or_timestamp(ATBUS_MACRO_PROTOBUF_NAM
                                                         const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &value) {
   // Database may be different and so descriptor may also be different
   // We can't use CopyFrom here
-  if (duration_ptr->GetDescriptor() == value.GetDescriptor()) {
+  if (duration_ptr->GetDescriptor() == ::google::protobuf::Duration::descriptor()) {
     duration_ptr->CopyFrom(value);
   } else {
     duration_ptr->GetReflection()->SetInt64(duration_ptr,
@@ -86,7 +86,7 @@ static void dynamic_copy_protobuf_duration_or_timestamp(ATBUS_MACRO_PROTOBUF_NAM
                                                         const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp &value) {
   // Database may be different and so descriptor may also be different
   // We can't use CopyFrom here
-  if (timestamp_ptr->GetDescriptor() == value.GetDescriptor()) {
+  if (timestamp_ptr->GetDescriptor() == ::google::protobuf::Timestamp::descriptor()) {
     timestamp_ptr->CopyFrom(value);
   } else {
     timestamp_ptr->GetReflection()->SetInt64(timestamp_ptr,
@@ -175,7 +175,7 @@ static void pick_const_data(gsl::string_view value, ATBUS_MACRO_PROTOBUF_NAMESPA
   word_begin = skip_space(word_begin, word_end);
 
   std::string unit;
-  if (word_begin && word_end && word_end > word_begin) {
+  if (nullptr != word_begin && nullptr != word_end && word_end > word_begin) {
     unit.assign(word_begin, word_end);
     std::transform(unit.begin(), unit.end(), unit.begin(), ::atfw::util::string::tolower<char>);
   }
@@ -246,7 +246,7 @@ static void pick_const_data(gsl::string_view value, ATBUS_MACRO_PROTOBUF_NAMESPA
   const char *word_end = word_begin + value.size();
   word_begin = skip_space(word_begin, word_end);
 
-  struct tm t;
+  struct tm t;  // NOLINT(cppcoreguidelines-pro-type-member-init)
   memset(&t, 0, sizeof(t));
 
   // year
@@ -355,7 +355,7 @@ static inline void dump_pick_field_min(Ty &out) {
 
 static inline void dump_pick_field_max(bool &out) { out = true; }
 
-static inline void dump_pick_field_max(std::string &out) { out = true; }
+static inline void dump_pick_field_max(std::string &out) { out = ""; }
 
 static inline void dump_pick_field_max(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &out) {
   out.set_seconds(std::numeric_limits<int64_t>::max());
@@ -419,7 +419,7 @@ static inline void dump_pick_field_from_str(float &out, gsl::string_view input, 
   } else {
     memcpy(input_string, input.data(), sizeof(input_string) - 1);
   }
-  char *end;
+  char *end = nullptr;
   out = static_cast<float>(strtod(input_string, &end));
 }
 
@@ -434,7 +434,7 @@ static inline void dump_pick_field_from_str(double &out, gsl::string_view input,
   } else {
     memcpy(input_string, input.data(), sizeof(input_string) - 1);
   }
-  char *end;
+  char *end = nullptr;
   out = strtod(input_string, &end);
 }
 
@@ -601,16 +601,18 @@ dump_pick_enum_field_with_extensions(gsl::string_view val_str,
     }
     if (ret == nullptr) {
       for (int i = 0; i < fds->enum_type()->value_count(); ++i) {
-        auto &enum_value_options = fds->enum_type()->value(i)->options();
+        const auto &enum_value_options = fds->enum_type()->value(i)->options();
         if (enum_value_options.HasExtension(atapp::protocol::ENUMVALUE)) {
-          auto &enumvalue_options = enum_value_options.GetExtension(atapp::protocol::ENUMVALUE);
+          const auto &enumvalue_options = enum_value_options.GetExtension(atapp::protocol::ENUMVALUE);
           if (!enumvalue_options.alias_name().empty()) {
             if (enumvalue_options.case_sensitive() && gsl::string_view(enumvalue_options.alias_name()) == val_str) {
               ret = fds->enum_type()->value(i);
               break;
-            } else if (!enumvalue_options.case_sensitive() &&
-                       0 == UTIL_STRFUNC_STRNCASE_CMP(val_str.data(), enumvalue_options.alias_name().c_str(),
-                                                      enumvalue_options.alias_name().size())) {
+            }
+
+            if (!enumvalue_options.case_sensitive() &&
+                0 == UTIL_STRFUNC_STRNCASE_CMP(val_str.data(), enumvalue_options.alias_name().c_str(),
+                                               enumvalue_options.alias_name().size())) {
               ret = fds->enum_type()->value(i);
               break;
             }
@@ -622,7 +624,7 @@ dump_pick_enum_field_with_extensions(gsl::string_view val_str,
     ret = fds->enum_type()->FindValueByNumber(0);
   }
 
-  return std::pair<const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::EnumValueDescriptor *, bool>(ret, is_default);
+  return {ret, is_default};
 }
 
 template <class ValueType>
@@ -644,22 +646,22 @@ static bool dump_field_with_value_delegate(
       return true;
     }
     return false;
-  } else {
-    std::string existed_field_key = atfw::util::log::format("{}{}", existed_set_prefix, fds->name());
-    if (value.second) {
-      if (nullptr == dump_existed_set || dump_existed_set->end() == dump_existed_set->find(existed_field_key)) {
-        (dst.GetReflection()->*set_fn)(&dst, fds, value.first);
-        return true;
-      }
-    } else {
+  }
+
+  std::string existed_field_key = atfw::util::log::format("{}{}", existed_set_prefix, fds->name());
+  if (value.second) {
+    if (nullptr == dump_existed_set || dump_existed_set->end() == dump_existed_set->find(existed_field_key)) {
       (dst.GetReflection()->*set_fn)(&dst, fds, value.first);
-      if (nullptr != dump_existed_set) {
-        dump_existed_set->insert(existed_field_key);
-      }
       return true;
     }
-    return false;
+  } else {
+    (dst.GetReflection()->*set_fn)(&dst, fds, value.first);
+    if (nullptr != dump_existed_set) {
+      dump_existed_set->insert(existed_field_key);
+    }
+    return true;
   }
+  return false;
 }
 
 template <class MessageType>
@@ -680,25 +682,25 @@ static bool dump_field_with_message_delegate(const std::pair<MessageType, bool> 
       }
     }
     return false;
-  } else {
-    std::string existed_field_key = atfw::util::log::format("{}{}", existed_set_prefix, fds->name());
-    ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *msg_ptr = nullptr;
-    if (value.second) {
-      if (nullptr == dump_existed_set || dump_existed_set->end() == dump_existed_set->find(existed_field_key)) {
-        msg_ptr = dst.GetReflection()->MutableMessage(&dst, fds);
-      }
-    } else {
-      msg_ptr = dst.GetReflection()->MutableMessage(&dst, fds);
-      if (nullptr != dump_existed_set) {
-        dump_existed_set->insert(existed_field_key);
-      }
-    }
-
-    if (nullptr != msg_ptr) {
-      dynamic_copy_protobuf_duration_or_timestamp(msg_ptr, value.first);
-    }
-    return nullptr != msg_ptr;
   }
+
+  std::string existed_field_key = atfw::util::log::format("{}{}", existed_set_prefix, fds->name());
+  ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *msg_ptr = nullptr;
+  if (value.second) {
+    if (nullptr == dump_existed_set || dump_existed_set->end() == dump_existed_set->find(existed_field_key)) {
+      msg_ptr = dst.GetReflection()->MutableMessage(&dst, fds);
+    }
+  } else {
+    msg_ptr = dst.GetReflection()->MutableMessage(&dst, fds);
+    if (nullptr != dump_existed_set) {
+      dump_existed_set->insert(existed_field_key);
+    }
+  }
+
+  if (nullptr != msg_ptr) {
+    dynamic_copy_protobuf_duration_or_timestamp(msg_ptr, value.first);
+  }
+  return nullptr != msg_ptr;
 }
 
 static bool dump_field_with_value(const std::pair<int32_t, bool> &value,
@@ -922,7 +924,7 @@ static void dump_pick_default_field(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &
       if (fds->is_repeated()) {
         int list_size = dst.GetReflection()->FieldSize(dst, fds);
         for (int i = 0; i < list_size; ++i) {
-          auto submsg = dst.GetReflection()->MutableRepeatedMessage(&dst, fds, i);
+          auto *submsg = dst.GetReflection()->MutableRepeatedMessage(&dst, fds, i);
           std::string new_prefix = atfw::util::log::format("{}{}.{}.", prefix, fds->name(), i);
           for (int j = 0; submsg != nullptr && j < submsg->GetDescriptor()->field_count(); ++j) {
             dump_pick_default_field(*submsg, submsg->GetDescriptor()->field(j), existed_set, new_prefix);
@@ -1288,7 +1290,7 @@ static void dump_pick_field(const YAML::Node &val, ATBUS_MACRO_PROTOBUF_NAMESPAC
         }
 
         if (val.IsMap()) {
-          ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *submsg;
+          ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *submsg = nullptr;
           if (fds->is_map()) {
             if (nullptr == fds->message_type()) {
               break;
@@ -1368,7 +1370,7 @@ static void dump_pick_field(const YAML::Node &val, ATBUS_MACRO_PROTOBUF_NAMESPAC
     }
 
 #if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
-  } catch (...) {
+  } catch (...) {  // NOLINT(bugprone-empty-catch)
     // Ignore error
   }
 #endif
@@ -1409,7 +1411,7 @@ static void dump_field_item(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPAC
     }
 
 #if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
-  } catch (...) {
+  } catch (...) {  // NOLINT(bugprone-empty-catch)
     // Ignore error
   }
 #endif
@@ -1643,12 +1645,12 @@ static void dump_message_item(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESP
     }
 
 #if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
-  } catch (...) {
+  } catch (...) {  // NOLINT(bugprone-empty-catch)
     // Ignore error
   }
 #endif
   for (int i = 0; i < desc->field_count(); ++i) {
-    detail::dump_field_item(src, dst, desc->field(i), dump_existed_set, prefix);
+    dump_field_item(src, dst, desc->field(i), dump_existed_set, prefix);
   }
 }
 
@@ -1661,21 +1663,21 @@ static bool dump_environment_message_item(gsl::string_view prefix, ATBUS_MACRO_P
 
   bool ret = false;
   for (int i = 0; i < desc->field_count(); ++i) {
-    bool res = detail::dump_environment_field_item(prefix, dst, desc->field(i), dump_existed_set, existed_set_prefix);
+    bool res = dump_environment_field_item(prefix, dst, desc->field(i), dump_existed_set, existed_set_prefix);
     ret = ret || res;
   }
 
   return ret;
 }
 
-}  // namespace detail
+}  // namespace
 
 LIBATAPP_MACRO_API void parse_timepoint(gsl::string_view in, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp &out) {
-  detail::pick_const_data(in, out);
+  pick_const_data(in, out);
 }
 
 LIBATAPP_MACRO_API void parse_duration(gsl::string_view in, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &out) {
-  detail::pick_const_data(in, out);
+  pick_const_data(in, out);
 }
 
 LIBATAPP_MACRO_API void ini_loader_dump_to(const atfw::util::config::ini_value &src,
@@ -1687,7 +1689,7 @@ LIBATAPP_MACRO_API void ini_loader_dump_to(const atfw::util::config::ini_value &
   }
 
   for (int i = 0; i < desc->field_count(); ++i) {
-    detail::dump_field_item(src, dst, desc->field(i), dump_existed_set, existed_set_prefix);
+    dump_field_item(src, dst, desc->field(i), dump_existed_set, existed_set_prefix);
   }
 }
 
@@ -1742,7 +1744,7 @@ LIBATAPP_MACRO_API void ini_loader_dump_to(const atfw::util::config::ini_value &
 
 LIBATAPP_MACRO_API void yaml_loader_dump_to(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                                             configure_key_set *dump_existed_set, gsl::string_view existed_set_prefix) {
-  detail::dump_message_item(src, dst, dump_existed_set, existed_set_prefix);
+  dump_message_item(src, dst, dump_existed_set, existed_set_prefix);
 }
 
 LIBATAPP_MACRO_API void yaml_loader_dump_to(const YAML::Node &src,
@@ -1792,7 +1794,7 @@ LIBATAPP_MACRO_API void yaml_loader_dump_to(const YAML::Node &src,
     }
 
 #if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
-  } catch (...) {
+  } catch (...) {  // NOLINT(bugprone-empty-catch)
     // Ignore error
   }
 #endif
@@ -1813,7 +1815,7 @@ LIBATAPP_MACRO_API const YAML::Node yaml_loader_get_child_by_path(const YAML::No
   const char *begin = path.data();
   const char *end = begin + path.size();
 
-  for (begin = detail::skip_space(begin, end); end > begin && *begin; begin = detail::skip_space(begin, end)) {
+  for (begin = skip_space(begin, end); end > begin && *begin; begin = skip_space(begin, end)) {
     const char *old_begin = begin;
     ++begin;
     while (*begin && end > begin && '.' != *begin && ' ' != *begin && '\t' != *begin && '\r' != *begin &&
@@ -1825,9 +1827,9 @@ LIBATAPP_MACRO_API const YAML::Node yaml_loader_get_child_by_path(const YAML::No
     key.assign(old_begin, begin);
 
     if (*begin) {
-      begin = detail::skip_space(begin, end);
+      begin = skip_space(begin, end);
       if ('.' == *begin) {
-        begin = detail::skip_space(begin + 1, end);
+        begin = skip_space(begin + 1, end);
       }
     }
 
@@ -1840,7 +1842,7 @@ LIBATAPP_MACRO_API const YAML::Node yaml_loader_get_child_by_path(const YAML::No
 
   keys_span.reserve(keys_storage.size());
   for (auto &key : keys_storage) {
-    keys_span.push_back(key);
+    keys_span.emplace_back(key);
   }
 
   return yaml_loader_get_child_by_path(src, keys_span);
@@ -1885,7 +1887,7 @@ LIBATAPP_MACRO_API const YAML::Node yaml_loader_get_child_by_path(const YAML::No
       }
     }
 #if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
-  } catch (...) {
+  } catch (...) {  // NOLINT(bugprone-empty-catch)
     // Ignore error
   }
 #endif
@@ -1897,18 +1899,18 @@ LIBATAPP_MACRO_API bool environment_loader_dump_to(gsl::string_view prefix,
                                                    ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                                                    configure_key_set *dump_existed_set,
                                                    gsl::string_view existed_set_prefix) {
-  return detail::dump_environment_message_item(prefix, dst, dump_existed_set, existed_set_prefix);
+  return dump_environment_message_item(prefix, dst, dump_existed_set, existed_set_prefix);
 }
 
 LIBATAPP_MACRO_API void default_loader_dump_to(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                                                const configure_key_set &existed_set) {
   for (int i = 0; i < dst.GetDescriptor()->field_count(); ++i) {
-    auto fds = dst.GetDescriptor()->field(i);
+    auto *fds = dst.GetDescriptor()->field(i);
     if (fds == nullptr) {
       continue;
     }
 
-    detail::dump_pick_default_field(dst, dst.GetDescriptor()->field(i), existed_set, "");
+    dump_pick_default_field(dst, dst.GetDescriptor()->field(i), existed_set, "");
   }
 }
 

@@ -4,6 +4,8 @@ if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.27.0")
   cmake_policy(SET CMP0144 NEW)
 endif()
 
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
 enable_testing()
 
 project(
