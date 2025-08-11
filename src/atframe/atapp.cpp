@@ -4395,8 +4395,8 @@ int app::command_handler_reload(atfw::util::cli::callback_param params) {
           msg, sizeof(msg), "app {}({:#x}) module {}({}) reload cost {}us, result: {}", get_app_name(), get_app_id(),
           module_name, reinterpret_cast<const void *>(reload_module.module.get()),
           std::chrono::duration_cast<std::chrono::microseconds>(reload_module.cost).count(), reload_module.result);
-      if (format_result.size > 0 && format_result.size < sizeof(msg)) {
-        msg[format_result.size] = 0;
+      if (format_result.size > 0 && static_cast<size_t>(format_result.size) < sizeof(msg)) {
+        msg[static_cast<size_t>(format_result.size)] = 0;
       } else {
         msg[sizeof(msg) - 1] = 0;
       }
@@ -4407,8 +4407,8 @@ int app::command_handler_reload(atfw::util::cli::callback_param params) {
       auto format_result = LOG_WRAPPER_FWAPI_FORMAT_TO_N(
           msg, sizeof(msg), "app {}({:#x}) run reload command success.({}us)", get_app_name(), get_app_id(),
           std::chrono::duration_cast<std::chrono::microseconds>(current_timepoint - previous_timepoint).count());
-      if (format_result.size > 0 && format_result.size < sizeof(msg)) {
-        msg[format_result.size] = 0;
+      if (format_result.size > 0 && static_cast<size_t>(format_result.size) < sizeof(msg)) {
+        msg[static_cast<size_t>(format_result.size)] = 0;
       } else {
         msg[sizeof(msg) - 1] = 0;
       }
@@ -4421,8 +4421,8 @@ int app::command_handler_reload(atfw::util::cli::callback_param params) {
           msg, sizeof(msg), "app {}({:#x}) module {}({}) reload cost {}us, result: {}", get_app_name(), get_app_id(),
           module_name, reinterpret_cast<const void *>(reload_module.module.get()),
           std::chrono::duration_cast<std::chrono::microseconds>(reload_module.cost).count(), reload_module.result);
-      if (format_result.size > 0 && format_result.size < sizeof(msg)) {
-        msg[format_result.size] = 0;
+      if (format_result.size > 0 && static_cast<size_t>(format_result.size) < sizeof(msg)) {
+        msg[static_cast<size_t>(format_result.size)] = 0;
       } else {
         msg[sizeof(msg) - 1] = 0;
       }
@@ -4434,8 +4434,8 @@ int app::command_handler_reload(atfw::util::cli::callback_param params) {
       auto format_result = LOG_WRAPPER_FWAPI_FORMAT_TO_N(
           msg, sizeof(msg), "app {}({:#x}) run reload command failed.({}us)", get_app_name(), get_app_id(),
           std::chrono::duration_cast<std::chrono::microseconds>(current_timepoint - previous_timepoint).count());
-      if (format_result.size > 0 && format_result.size < sizeof(msg)) {
-        msg[format_result.size] = 0;
+      if (format_result.size > 0 && static_cast<size_t>(format_result.size) < sizeof(msg)) {
+        msg[static_cast<size_t>(format_result.size)] = 0;
       } else {
         msg[sizeof(msg) - 1] = 0;
       }
