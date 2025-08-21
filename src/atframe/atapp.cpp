@@ -4541,8 +4541,8 @@ int app::command_handler_list_discovery(atfw::util::cli::callback_param params) 
 
 int app::bus_evt_callback_on_recv_msg(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
                                       const atbus::protocol::msg &msg, const void *buffer, size_t len) {
-  if (atbus::protocol::msg::kDataTransformReq != msg.msg_body_case() || 0 == msg.head().src_bus_id()) {
-    FWLOGERROR("receive a message from unknown source {} or invalid body case", msg.head().src_bus_id());
+  if (atbus::protocol::msg::kDataTransformReq != msg.message_body_case() || 0 == msg.head().source_bus_id()) {
+    FWLOGERROR("receive a message from unknown source {} or invalid body case", msg.head().source_bus_id());
     return EN_ATBUS_ERR_BAD_DATA;
   }
 
@@ -4588,12 +4588,12 @@ int app::bus_evt_callback_on_forward_response(const atbus::node &, const atbus::
 
   if (m->head().ret() < 0) {
     FWLOGERROR("app {:#x} receive a send failure from {:#x}, message cmd: {}, type: {}, ret: {}, sequence: {}",
-               get_app_id(), m->head().src_bus_id(), atbus::msg_handler::get_body_name(m->msg_body_case()),
+               get_app_id(), m->head().source_bus_id(), atbus::msg_handler::get_body_name(m->message_body_case()),
                m->head().type(), m->head().ret(), m->head().sequence());
   }
 
-  if (atbus::protocol::msg::kDataTransformRsp != m->msg_body_case() || 0 == m->head().src_bus_id()) {
-    FWLOGERROR("receive a message from unknown source {} or invalid body case", m->head().src_bus_id());
+  if (atbus::protocol::msg::kDataTransformRsp != m->message_body_case() || 0 == m->head().source_bus_id()) {
+    FWLOGERROR("receive a message from unknown source {} or invalid body case", m->head().source_bus_id());
     return EN_ATBUS_ERR_BAD_DATA;
   }
 
