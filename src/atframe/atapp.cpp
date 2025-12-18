@@ -2959,20 +2959,6 @@ namespace {
 static bool setup_load_sink_from_environment(gsl::string_view /*prefix*/, atapp::protocol::atapp_log_sink & /*out*/,
                                              configure_key_set * /*dump_existed_set*/,
                                              gsl::string_view /*exist_set_prefix*/) {
-  // if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_file_sink_name().data())) {
-  //   // Inner file sink
-  //   return environment_loader_dump_to(prefix, *out.mutable_log_backend_file(), dump_existed_set, exist_set_prefix);
-  // } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stdout_sink_name().data())) {
-  //   // Inner stdout sink
-  //   return environment_loader_dump_to(prefix, *out.mutable_log_backend_stdout(), dump_existed_set, exist_set_prefix);
-  // } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stderr_sink_name().data())) {
-  //   // Inner stderr sink
-  //   return environment_loader_dump_to(prefix, *out.mutable_log_backend_stderr(), dump_existed_set, exist_set_prefix);
-  // } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_syslog_sink_name().data())) {
-  //   // Inner syslog sink
-  //   return environment_loader_dump_to(prefix, *out.mutable_log_backend_syslog(), dump_existed_set, exist_set_prefix);
-  // }
-
   // We do not load custom log configure from environment right now
   return false;
 }
@@ -3085,22 +3071,6 @@ void app::parse_environment_log_categories_into(atapp::protocol::atapp_log &dst,
 namespace {
 static void setup_load_sink(const atfw::util::config::ini_value &log_sink_cfg_src, atapp::protocol::atapp_log_sink &out,
                             configure_key_set *dump_existed_set, gsl::string_view exist_set_prefix) {
-  // yaml_loader_dump_to(src, out); // already dumped before in setup_load_category(...)
-
-  // if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_file_sink_name().data())) {
-  //   // Inner file sink
-  //   ini_loader_dump_to(log_sink_cfg_src, *out.mutable_log_backend_file(), dump_existed_set, exist_set_prefix);
-  // } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stdout_sink_name().data())) {
-  //   // Inner stdout sink
-  //   ini_loader_dump_to(log_sink_cfg_src, *out.mutable_log_backend_stdout(), dump_existed_set, exist_set_prefix);
-  // } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stderr_sink_name().data())) {
-  //   // Inner stderr sink
-  //   ini_loader_dump_to(log_sink_cfg_src, *out.mutable_log_backend_stderr(), dump_existed_set, exist_set_prefix);
-  // } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_syslog_sink_name().data())) {
-  //   // Inner syslog sink
-  //   ini_loader_dump_to(log_sink_cfg_src, *out.mutable_log_backend_syslog(), dump_existed_set, exist_set_prefix);
-  // }
-
   if (out.backend_case() == atapp::protocol::atapp_log_sink::BACKEND_NOT_SET) {
     // Dump all configures into unresolved_key_values
     ini_loader_dump_to(log_sink_cfg_src, *out.mutable_unresolved_key_values(), "", dump_existed_set, exist_set_prefix);
@@ -3267,22 +3237,6 @@ namespace {
 
 static void setup_load_sink(const YAML::Node &log_sink_yaml_src, atapp::protocol::atapp_log_sink &out,
                             configure_key_set *dump_existed_set, gsl::string_view exist_set_prefix) {
-  // yaml_loader_dump_to(src, out); // already dumped before in setup_load_category(...)
-
-  // if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_file_sink_name().data())) {
-  //   // Inner file sink
-  //   yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_log_backend_file(), dump_existed_set, exist_set_prefix);
-  // } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stdout_sink_name().data())) {
-  //   // Inner stdout sink
-  //   yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_log_backend_stdout(), dump_existed_set, exist_set_prefix);
-  // } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stderr_sink_name().data())) {
-  //   // Inner stderr sink
-  //   yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_log_backend_stderr(), dump_existed_set, exist_set_prefix);
-  // } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_syslog_sink_name().data())) {
-  //   // Inner syslog sink
-  //   yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_log_backend_syslog(), dump_existed_set, exist_set_prefix);
-  // }
-
   if (out.backend_case() == atapp::protocol::atapp_log_sink::BACKEND_NOT_SET) {
     // Dump all configures into unresolved_key_values
     yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_unresolved_key_values(), "", dump_existed_set,
