@@ -2956,8 +2956,9 @@ atapp_endpoint::ptr_t app::auto_mutable_self_endpoint() {
 }
 
 namespace {
-static bool setup_load_sink_from_environment(gsl::string_view prefix, atapp::protocol::atapp_log_sink &out,
-                                             configure_key_set *dump_existed_set, gsl::string_view exist_set_prefix) {
+static bool setup_load_sink_from_environment(gsl::string_view /*prefix*/, atapp::protocol::atapp_log_sink & /*out*/,
+                                             configure_key_set * /*dump_existed_set*/,
+                                             gsl::string_view /*exist_set_prefix*/) {
   // if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_file_sink_name().data())) {
   //   // Inner file sink
   //   return environment_loader_dump_to(prefix, *out.mutable_log_backend_file(), dump_existed_set, exist_set_prefix);
