@@ -11,7 +11,7 @@
 
 #include "atframe/connectors/atapp_connector_impl.h"
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 
 class atapp_connector_loopback : public atapp_connector_impl {
   UTIL_DESIGN_PATTERN_NOCOPYABLE(atapp_connector_loopback)
@@ -57,4 +57,4 @@ class atapp_connector_loopback : public atapp_connector_impl {
   size_t pending_message_count_;
 #endif
 };
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

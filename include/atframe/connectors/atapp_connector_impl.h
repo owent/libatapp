@@ -22,7 +22,7 @@
 #include "atframe/atapp_config.h"
 #include "atframe/etcdcli/etcd_discovery.h"
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 
 class app;
 class atapp_endpoint;
@@ -188,4 +188,4 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE atapp_connector_impl {
   friend class app;
 };
 
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

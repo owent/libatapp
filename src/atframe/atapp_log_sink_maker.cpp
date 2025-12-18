@@ -16,11 +16,13 @@
 #  include <syslog.h>
 #endif
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 namespace detail {
 static atfw::util::log::log_wrapper::log_handler_t _log_sink_file(
-    atfw::util::log::log_wrapper& /*logger*/, int32_t /*index*/, const ::atapp::protocol::atapp_log& /*log_cfg*/,
-    const ::atapp::protocol::atapp_log_category& /*cat_cfg*/, const ::atapp::protocol::atapp_log_sink& sink_cfg) {
+    atfw::util::log::log_wrapper& /*logger*/, int32_t /*index*/,
+    const ::atframework::atapp::protocol::atapp_log& /*log_cfg*/,
+    const ::atframework::atapp::protocol::atapp_log_category& /*cat_cfg*/,
+    const ::atframework::atapp::protocol::atapp_log_sink& sink_cfg) {
   std::string file_pattern = sink_cfg.log_backend_file().file();
   if (file_pattern.empty()) {
     file_pattern = "server.%N.log";
@@ -67,8 +69,10 @@ static void _log_sink_stdout_handle(const atfw::util::log::log_wrapper::caller_i
 }
 
 static atfw::util::log::log_wrapper::log_handler_t _log_sink_stdout(
-    atfw::util::log::log_wrapper& /*logger*/, int32_t /*index*/, const ::atapp::protocol::atapp_log& /*log_cfg*/,
-    const ::atapp::protocol::atapp_log_category& /*cat_cfg*/, const ::atapp::protocol::atapp_log_sink& /*sink_cfg*/) {
+    atfw::util::log::log_wrapper& /*logger*/, int32_t /*index*/,
+    const ::atframework::atapp::protocol::atapp_log& /*log_cfg*/,
+    const ::atframework::atapp::protocol::atapp_log_category& /*cat_cfg*/,
+    const ::atframework::atapp::protocol::atapp_log_sink& /*sink_cfg*/) {
   return _log_sink_stdout_handle;
 }
 
@@ -90,15 +94,19 @@ static void _log_sink_stderr_handle(const atfw::util::log::log_wrapper::caller_i
 }
 
 static atfw::util::log::log_wrapper::log_handler_t _log_sink_stderr(
-    atfw::util::log::log_wrapper& /*logger*/, int32_t /*index*/, const ::atapp::protocol::atapp_log& /*log_cfg*/,
-    const ::atapp::protocol::atapp_log_category& /*cat_cfg*/, const ::atapp::protocol::atapp_log_sink& /*sink_cfg*/) {
+    atfw::util::log::log_wrapper& /*logger*/, int32_t /*index*/,
+    const ::atframework::atapp::protocol::atapp_log& /*log_cfg*/,
+    const ::atframework::atapp::protocol::atapp_log_category& /*cat_cfg*/,
+    const ::atframework::atapp::protocol::atapp_log_sink& /*sink_cfg*/) {
   return _log_sink_stderr_handle;
 }
 
 static atfw::util::log::log_wrapper::log_handler_t _log_sink_syslog(
-    atfw::util::log::log_wrapper& /*logger*/, int32_t /*index*/, const ::atapp::protocol::atapp_log& /*log_cfg*/,
-    const ::atapp::protocol::atapp_log_category& /*cat_cfg*/, const ::atapp::protocol::atapp_log_sink& sink_cfg) {
-  const ::atapp::protocol::atapp_log_sink_syslog& syslog_conf = sink_cfg.log_backend_syslog();
+    atfw::util::log::log_wrapper& /*logger*/, int32_t /*index*/,
+    const ::atframework::atapp::protocol::atapp_log& /*log_cfg*/,
+    const ::atframework::atapp::protocol::atapp_log_category& /*cat_cfg*/,
+    const ::atframework::atapp::protocol::atapp_log_sink& sink_cfg) {
+  const ::atframework::atapp::protocol::atapp_log_sink_syslog& syslog_conf = sink_cfg.log_backend_syslog();
 #if defined(LOG_SINK_ENABLE_SYSLOG_SUPPORT) && LOG_SINK_ENABLE_SYSLOG_SUPPORT
   int options = 0;
   for (const std::string& option : syslog_conf.options()) {
@@ -185,4 +193,4 @@ LIBATAPP_MACRO_API gsl::string_view log_sink_maker::get_syslog_sink_name() { ret
 
 LIBATAPP_MACRO_API log_sink_maker::log_reg_t log_sink_maker::get_syslog_sink_reg() { return detail::_log_sink_syslog; }
 
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

@@ -20,9 +20,9 @@
 
 #include "frame/test_macros.h"
 
-class atapp_setup_test_timeout_module : public ::atapp::module_impl {
+class atapp_setup_test_timeout_module : public ::atframework::atapp::module_impl {
  public:
-  int setup(::atapp::app_conf& conf) override {
+  int setup(::atframework::atapp::app_conf& conf) override {
     conf.origin.mutable_timer()->mutable_initialize_timeout()->set_seconds(1);
     return 0;
   }
@@ -30,11 +30,11 @@ class atapp_setup_test_timeout_module : public ::atapp::module_impl {
   const char* name() const override { return "atapp_setup_test_timeout_module"; }
 
   int init() override {
-    while (!get_app()->check_flag(::atapp::app::flag_t::TIMEOUT)) {
+    while (!get_app()->check_flag(::atframework::atapp::app::flag_t::TIMEOUT)) {
       get_app()->run_once(0, std::chrono::seconds{1});
     }
 
-    // Success here should be redirect into EN_ATAPP_ERR_OPERATION_TIMEOUT by atapp::app
+    // Success here should be redirect into EN_ATAPP_ERR_OPERATION_TIMEOUT by atframework::atapp::app
     return 0;
   }
 };
@@ -49,7 +49,7 @@ CASE_TEST(atapp_setup, timeout) {
     return;
   }
 
-  atapp::app app1;
+  atframework::atapp::app app1;
   const char* args1[] = {"app1", "-c", conf_path_1.c_str(), "start"};
 
   app1.add_module(std::make_shared<atapp_setup_test_timeout_module>());

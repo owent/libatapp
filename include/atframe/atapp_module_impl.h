@@ -17,7 +17,7 @@
 
 #include "atframe/atapp_config.h"
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 class app;
 struct app_conf;
 
@@ -44,7 +44,7 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE module_impl {
   LIBATAPP_MACRO_API virtual void on_unbind();
 
   /**
-   * @brief This callback is called after load configure and before initialization(inlcude log)
+   * @brief This callback is called after load configure and before initialization(include log)
    * @note Changing the origin configure is allowed here(even app id and name)
    */
   LIBATAPP_MACRO_API virtual int setup(app_conf &conf);
@@ -71,7 +71,7 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE module_impl {
 
   /**
    * @brief where to setup custom log sink
-   * @note This function will be called only once and before reload and init
+   * @note This function will be called after reload and before init
    * @return error code or 0
    */
   LIBATAPP_MACRO_API virtual int setup_log();
@@ -186,4 +186,4 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE module_impl {
 
   friend class app;
 };
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

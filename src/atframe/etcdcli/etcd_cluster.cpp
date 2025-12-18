@@ -28,7 +28,7 @@
 #  undef GetObject
 #endif
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 /**
  * @note APIs just like this
  * @see https://coreos.com/etcd/docs/latest/dev-guide/api_reference_v3.html
@@ -2280,4 +2280,4 @@ LIBATAPP_MACRO_API void etcd_cluster::setup_http_request(atfw::util::network::ht
   LIBATAPP_MACRO_ETCD_CLUSTER_LOG_TRACE(*this, "Etcd cluster setup request {} to {}, post data: {}",
                                         reinterpret_cast<const void *>(req.get()), req->get_url(), req->post_data());
 }
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

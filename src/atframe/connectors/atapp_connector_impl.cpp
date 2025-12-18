@@ -10,7 +10,7 @@
 #include "atframe/atapp.h"
 #include "atframe/connectors/atapp_endpoint.h"
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 
 LIBATAPP_MACRO_API_SYMBOL_HIDDEN void atapp_connector_bind_helper::unbind(atapp_connection_handle &handle,
                                                                           atapp_connector_impl &connect) {
@@ -262,4 +262,4 @@ LIBATAPP_MACRO_API const atapp_connector_impl::protocol_set_t &atapp_connector_i
     const noexcept {
   return support_protocols_;
 }
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

@@ -33,8 +33,8 @@ CASE_TEST(atapp_message, send_message_remote) {
     return;
   }
 
-  atapp::app app1;
-  atapp::app app2;
+  atframework::atapp::app app1;
+  atframework::atapp::app app2;
   const char* args1[] = {"app1", "-c", conf_path_1.c_str(), "start"};
   const char* args2[] = {"app2", "-c", conf_path_2.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args1, nullptr));
@@ -51,8 +51,8 @@ CASE_TEST(atapp_message, send_message_remote) {
 
   int received_messge_count = 0;
   auto message_callback_fn = [expect_message, &app1, &expect_sequence, &received_messge_count](
-                                 atapp::app&, const atapp::app::message_sender_t& sender,
-                                 const atapp::app::message_t& msg) {
+                                 atframework::atapp::app&, const atframework::atapp::app::message_sender_t& sender,
+                                 const atframework::atapp::app::message_t& msg) {
     CASE_EXPECT_EQ(app1.get_app_id(), sender.id);
     CASE_EXPECT_EQ(app1.get_app_name(), sender.name);
 
@@ -132,7 +132,7 @@ CASE_TEST(atapp_message, send_message_loopback) {
     return;
   }
 
-  atapp::app app1;
+  atframework::atapp::app app1;
   const char* args1[] = {"app1", "-c", conf_path_1.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args1, nullptr));
 
@@ -145,22 +145,23 @@ CASE_TEST(atapp_message, send_message_loopback) {
   char expect_message[] = "hello loopback";
 
   int received_messge_count = 0;
-  app1.set_evt_on_forward_request(
-      [expect_message, &expect_sequence, &received_messge_count](
-          atapp::app& app, const atapp::app::message_sender_t& sender, const atapp::app::message_t& msg) {
-        CASE_EXPECT_EQ(app.get_app_id(), sender.id);
-        CASE_EXPECT_EQ(app.get_app_name(), sender.name);
+  app1.set_evt_on_forward_request([expect_message, &expect_sequence, &received_messge_count](
+                                      atframework::atapp::app& app,
+                                      const atframework::atapp::app::message_sender_t& sender,
+                                      const atframework::atapp::app::message_t& msg) {
+    CASE_EXPECT_EQ(app.get_app_id(), sender.id);
+    CASE_EXPECT_EQ(app.get_app_name(), sender.name);
 
-        CASE_EXPECT_EQ(321, msg.type);
-        CASE_EXPECT_EQ(expect_sequence++, msg.message_sequence);
+    CASE_EXPECT_EQ(321, msg.type);
+    CASE_EXPECT_EQ(expect_sequence++, msg.message_sequence);
 
-        auto received_message = gsl::string_view{reinterpret_cast<const char*>(msg.data), msg.data_size};
-        CASE_EXPECT_EQ(expect_message, received_message);
-        CASE_MSG_INFO() << "Got message: " << received_message << std::endl;
+    auto received_message = gsl::string_view{reinterpret_cast<const char*>(msg.data), msg.data_size};
+    CASE_EXPECT_EQ(expect_message, received_message);
+    CASE_MSG_INFO() << "Got message: " << received_message << std::endl;
 
-        ++received_messge_count;
-        return 0;
-      });
+    ++received_messge_count;
+    return 0;
+  });
 
   auto now = atfw::util::time::time_utility::sys_now();
   auto end_time = now + std::chrono::seconds(3);

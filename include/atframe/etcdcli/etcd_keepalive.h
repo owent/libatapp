@@ -14,7 +14,7 @@
 
 #include "atframe/etcdcli/etcd_def.h"
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 class etcd_cluster;
 
 class etcd_keepalive : public std::enable_shared_from_this<etcd_keepalive> {
@@ -89,4 +89,4 @@ class etcd_keepalive : public std::enable_shared_from_this<etcd_keepalive> {
   };
   checker_t checker_;
 };
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

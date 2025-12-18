@@ -11,7 +11,7 @@
 
 #include "atframe/etcdcli/etcd_def.h"
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 
 class etcd_packer {
  public:
@@ -52,4 +52,4 @@ class etcd_packer {
   static LIBATAPP_MACRO_API void unpack_int(const rapidjson::Value &json_val, const char *key, uint64_t &out);
   static LIBATAPP_MACRO_API void unpack_bool(const rapidjson::Value &json_val, const char *key, bool &out);
 };
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

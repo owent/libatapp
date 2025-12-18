@@ -50,7 +50,7 @@
 
 #define ATAPP_DEFAULT_STOP_TIMEOUT 30000
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 app *app::last_instance_ = nullptr;
 
 namespace {
@@ -62,7 +62,8 @@ enum class atapp_pod_stateful_index : int32_t {
 
 namespace {
 static void _app_close_timer_handle(uv_handle_t *handle) {
-  ::atapp::app::timer_ptr_t *ptr = reinterpret_cast<::atapp::app::timer_ptr_t *>(handle->data);
+  ::atframework::atapp::app::timer_ptr_t *ptr =
+      reinterpret_cast<::atframework::atapp::app::timer_ptr_t *>(handle->data);
   if (nullptr == ptr) {
     if (nullptr != handle->loop) {
       uv_stop(handle->loop);
@@ -960,8 +961,27 @@ LIBATAPP_MACRO_API int app::reload() {
   }
 
   if (is_running()) {
-    // step 6. reset log
+    // step 6.1 reset log
     setup_log();
+
+    // step 6.2 reset log for atbus
+    for (int i = 0; i < conf_.log.category_size() && i < atfw::util::log::log_wrapper::categorize_t::MAX; ++i) {
+      if (!bus_node_) {
+        break;
+      }
+
+      int32_t log_index = conf_.log.category(i).index();
+      if (UTIL_STRFUNC_STRCASE_CMP(conf_.log.category(i).name().c_str(), "atbus") != 0) {
+        continue;
+      }
+
+      auto logger = WLOG_GETCAT(log_index);
+      if (nullptr == logger) {
+        continue;
+      }
+
+      setup_logger(*bus_node_->get_logger(), conf_.log.level(), conf_.log.category(i));
+    }
 
     // step 7. if inited, let all modules reload
     stats_.module_reload.clear();
@@ -1144,7 +1164,8 @@ LIBATAPP_MACRO_API int app::tick() {
           max_rss.first, max_rss.second, ru_ixrss.first, ru_ixrss.second, ru_idrss.first, ru_idrss.second,
           ru_isrss.first, ru_isrss.second, last_usage.ru_majflt);
       if (internal_module_etcd_) {
-        const ::atapp::etcd_cluster::stats_t &current = internal_module_etcd_->get_raw_etcd_ctx().get_stats();
+        const ::atframework::atapp::etcd_cluster::stats_t &current =
+            internal_module_etcd_->get_raw_etcd_ctx().get_stats();
         FWLOGINFO(
             "\tetcd module(last minite): request count: {}, failed request: {}, continue failed: {}, success "
             "request: "
@@ -1417,9 +1438,8 @@ LIBATAPP_MACRO_API void app::parse_log_configures_into(atapp::protocol::atapp_lo
   parse_yaml_log_categories_into(dst, configure_prefix_paths, existed_keys);
 
   std::sort(dst.mutable_category()->begin(), dst.mutable_category()->end(),
-            [](const ::atapp::protocol::atapp_log_category &l, const ::atapp::protocol::atapp_log_category &r) {
-              return l.index() < r.index();
-            });
+            [](const ::atframework::atapp::protocol::atapp_log_category &l,
+               const ::atframework::atapp::protocol::atapp_log_category &r) { return l.index() < r.index(); });
 
   // Dump default values
   default_loader_dump_to(dst, *existed_keys);
@@ -1657,11 +1677,12 @@ LIBATAPP_MACRO_API void app::pack(atapp::protocol::atapp_discovery &out) const {
   }
 }
 
-LIBATAPP_MACRO_API std::shared_ptr<::atapp::etcd_module> app::get_etcd_module() const noexcept {
+LIBATAPP_MACRO_API std::shared_ptr<::atframework::atapp::etcd_module> app::get_etcd_module() const noexcept {
   return internal_module_etcd_;
 }
 
-LIBATAPP_MACRO_API std::shared_ptr<::atapp::worker_pool_module> app::get_worker_pool_module() const noexcept {
+LIBATAPP_MACRO_API std::shared_ptr<::atframework::atapp::worker_pool_module> app::get_worker_pool_module()
+    const noexcept {
   return internal_module_worker_pool_;
 }
 
@@ -2430,7 +2451,7 @@ LIBATAPP_MACRO_API void app::setup_logger(atfw::util::log::log_wrapper &logger, 
 
   // register log handles
   for (int j = 0; j < log_conf.sink_size(); ++j) {
-    const ::atapp::protocol::atapp_log_sink &log_sink = log_conf.sink(j);
+    const ::atframework::atapp::protocol::atapp_log_sink &log_sink = log_conf.sink(j);
     int log_handle_min = atfw::util::log::log_wrapper::level_t::LOG_LW_FATAL,
         log_handle_max = atfw::util::log::log_wrapper::level_t::LOG_LW_DEBUG;
     if (!log_sink.level().min().empty()) {
@@ -2692,7 +2713,7 @@ int app::apply_configure() {
   conf_.bus_conf.retry_interval = conf_.origin.bus().retry_interval().seconds();
 
   conf_.bus_conf.fault_tolerant = static_cast<size_t>(conf_.origin.bus().fault_tolerant());
-  conf_.bus_conf.msg_size = static_cast<size_t>(conf_.origin.bus().msg_size());
+  conf_.bus_conf.message_size = static_cast<size_t>(conf_.origin.bus().message_size());
   conf_.bus_conf.recv_buffer_size = static_cast<size_t>(conf_.origin.bus().recv_buffer_size());
   conf_.bus_conf.send_buffer_size = static_cast<size_t>(conf_.origin.bus().send_buffer_size());
   conf_.bus_conf.send_buffer_number = static_cast<size_t>(conf_.origin.bus().send_buffer_number());
@@ -2937,19 +2958,19 @@ atapp_endpoint::ptr_t app::auto_mutable_self_endpoint() {
 namespace {
 static bool setup_load_sink_from_environment(gsl::string_view prefix, atapp::protocol::atapp_log_sink &out,
                                              configure_key_set *dump_existed_set, gsl::string_view exist_set_prefix) {
-  if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_file_sink_name().data())) {
-    // Inner file sink
-    return environment_loader_dump_to(prefix, *out.mutable_log_backend_file(), dump_existed_set, exist_set_prefix);
-  } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stdout_sink_name().data())) {
-    // Inner stdout sink
-    return environment_loader_dump_to(prefix, *out.mutable_log_backend_stdout(), dump_existed_set, exist_set_prefix);
-  } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stderr_sink_name().data())) {
-    // Inner stderr sink
-    return environment_loader_dump_to(prefix, *out.mutable_log_backend_stderr(), dump_existed_set, exist_set_prefix);
-  } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_syslog_sink_name().data())) {
-    // Inner syslog sink
-    return environment_loader_dump_to(prefix, *out.mutable_log_backend_syslog(), dump_existed_set, exist_set_prefix);
-  }
+  // if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_file_sink_name().data())) {
+  //   // Inner file sink
+  //   return environment_loader_dump_to(prefix, *out.mutable_log_backend_file(), dump_existed_set, exist_set_prefix);
+  // } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stdout_sink_name().data())) {
+  //   // Inner stdout sink
+  //   return environment_loader_dump_to(prefix, *out.mutable_log_backend_stdout(), dump_existed_set, exist_set_prefix);
+  // } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stderr_sink_name().data())) {
+  //   // Inner stderr sink
+  //   return environment_loader_dump_to(prefix, *out.mutable_log_backend_stderr(), dump_existed_set, exist_set_prefix);
+  // } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_syslog_sink_name().data())) {
+  //   // Inner syslog sink
+  //   return environment_loader_dump_to(prefix, *out.mutable_log_backend_syslog(), dump_existed_set, exist_set_prefix);
+  // }
 
   // We do not load custom log configure from environment right now
   return false;
@@ -3020,7 +3041,7 @@ static void setup_load_category_from_environment(
         break;
       }
 
-      ::atapp::protocol::atapp_log_sink *log_sink = log_cat->add_sink();
+      ::atframework::atapp::protocol::atapp_log_sink *log_sink = log_cat->add_sink();
       if (nullptr == log_sink) {
         FWLOGERROR("log {} malloc sink {} (index: {}) failed, skipped.", log_name, sink_type, log_handle_index);
         continue;
@@ -3065,19 +3086,21 @@ static void setup_load_sink(const atfw::util::config::ini_value &log_sink_cfg_sr
                             configure_key_set *dump_existed_set, gsl::string_view exist_set_prefix) {
   // yaml_loader_dump_to(src, out); // already dumped before in setup_load_category(...)
 
-  if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_file_sink_name().data())) {
-    // Inner file sink
-    ini_loader_dump_to(log_sink_cfg_src, *out.mutable_log_backend_file(), dump_existed_set, exist_set_prefix);
-  } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stdout_sink_name().data())) {
-    // Inner stdout sink
-    ini_loader_dump_to(log_sink_cfg_src, *out.mutable_log_backend_stdout(), dump_existed_set, exist_set_prefix);
-  } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stderr_sink_name().data())) {
-    // Inner stderr sink
-    ini_loader_dump_to(log_sink_cfg_src, *out.mutable_log_backend_stderr(), dump_existed_set, exist_set_prefix);
-  } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_syslog_sink_name().data())) {
-    // Inner syslog sink
-    ini_loader_dump_to(log_sink_cfg_src, *out.mutable_log_backend_syslog(), dump_existed_set, exist_set_prefix);
-  } else {
+  // if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_file_sink_name().data())) {
+  //   // Inner file sink
+  //   ini_loader_dump_to(log_sink_cfg_src, *out.mutable_log_backend_file(), dump_existed_set, exist_set_prefix);
+  // } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stdout_sink_name().data())) {
+  //   // Inner stdout sink
+  //   ini_loader_dump_to(log_sink_cfg_src, *out.mutable_log_backend_stdout(), dump_existed_set, exist_set_prefix);
+  // } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stderr_sink_name().data())) {
+  //   // Inner stderr sink
+  //   ini_loader_dump_to(log_sink_cfg_src, *out.mutable_log_backend_stderr(), dump_existed_set, exist_set_prefix);
+  // } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_syslog_sink_name().data())) {
+  //   // Inner syslog sink
+  //   ini_loader_dump_to(log_sink_cfg_src, *out.mutable_log_backend_syslog(), dump_existed_set, exist_set_prefix);
+  // }
+
+  if (out.backend_case() == atapp::protocol::atapp_log_sink::BACKEND_NOT_SET) {
     // Dump all configures into unresolved_key_values
     ini_loader_dump_to(log_sink_cfg_src, *out.mutable_unresolved_key_values(), "", dump_existed_set, exist_set_prefix);
   }
@@ -3179,7 +3202,7 @@ static void setup_load_category(
         break;
       }
 
-      ::atapp::protocol::atapp_log_sink *log_sink = log_cat->add_sink();
+      ::atframework::atapp::protocol::atapp_log_sink *log_sink = log_cat->add_sink();
       if (nullptr == log_sink) {
         FWLOGERROR("log {} malloc sink {} (index: {}) failed, skipped.", log_name, sink_type, log_handle_index);
         continue;
@@ -3245,19 +3268,21 @@ static void setup_load_sink(const YAML::Node &log_sink_yaml_src, atapp::protocol
                             configure_key_set *dump_existed_set, gsl::string_view exist_set_prefix) {
   // yaml_loader_dump_to(src, out); // already dumped before in setup_load_category(...)
 
-  if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_file_sink_name().data())) {
-    // Inner file sink
-    yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_log_backend_file(), dump_existed_set, exist_set_prefix);
-  } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stdout_sink_name().data())) {
-    // Inner stdout sink
-    yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_log_backend_stdout(), dump_existed_set, exist_set_prefix);
-  } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stderr_sink_name().data())) {
-    // Inner stderr sink
-    yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_log_backend_stderr(), dump_existed_set, exist_set_prefix);
-  } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_syslog_sink_name().data())) {
-    // Inner syslog sink
-    yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_log_backend_syslog(), dump_existed_set, exist_set_prefix);
-  } else {
+  // if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_file_sink_name().data())) {
+  //   // Inner file sink
+  //   yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_log_backend_file(), dump_existed_set, exist_set_prefix);
+  // } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stdout_sink_name().data())) {
+  //   // Inner stdout sink
+  //   yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_log_backend_stdout(), dump_existed_set, exist_set_prefix);
+  // } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_stderr_sink_name().data())) {
+  //   // Inner stderr sink
+  //   yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_log_backend_stderr(), dump_existed_set, exist_set_prefix);
+  // } else if (0 == UTIL_STRFUNC_STRCASE_CMP(out.type().c_str(), log_sink_maker::get_syslog_sink_name().data())) {
+  //   // Inner syslog sink
+  //   yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_log_backend_syslog(), dump_existed_set, exist_set_prefix);
+  // }
+
+  if (out.backend_case() == atapp::protocol::atapp_log_sink::BACKEND_NOT_SET) {
     // Dump all configures into unresolved_key_values
     yaml_loader_dump_to(log_sink_yaml_src, *out.mutable_unresolved_key_values(), "", dump_existed_set,
                         exist_set_prefix);
@@ -3511,9 +3536,9 @@ int app::setup_signal() {
 void app::setup_startup_log() {
   atfw::util::log::log_wrapper &wrapper = *WLOG_GETCAT(atfw::util::log::log_wrapper::categorize_t::DEFAULT);
 
-  ::atapp::protocol::atapp_log std_log_cfg;
-  ::atapp::protocol::atapp_log_category std_cat_cfg;
-  ::atapp::protocol::atapp_log_sink std_sink_cfg;
+  ::atframework::atapp::protocol::atapp_log std_log_cfg;
+  ::atframework::atapp::protocol::atapp_log_category std_cat_cfg;
+  ::atframework::atapp::protocol::atapp_log_sink std_sink_cfg;
 
   for (std::list<std::string>::iterator iter = conf_.startup_log.begin(); iter != conf_.startup_log.end(); ++iter) {
     if ((*iter).empty() || 0 == UTIL_STRFUNC_STRNCASE_CMP(log_sink_maker::get_stdout_sink_name().data(),
@@ -3625,27 +3650,28 @@ int app::setup_atbus() {
 
   // setup all callbacks
   bus_node_->set_on_recv_handle([this](const atbus::node &n, const atbus::endpoint *ep, const atbus::connection *conn,
-                                       const ::atbus::protocol::msg &m, const void *data, size_t data_size) -> int {
+                                       const ::atbus::message &m, const void *data, size_t data_size) -> int {
     return this->bus_evt_callback_on_recv_msg(n, ep, conn, m, data, data_size);
   });
 
-  bus_node_->set_on_forward_response_handle([this](const atbus::node &n, const atbus::endpoint *ep,
-                                                   const atbus::connection *conn,
-                                                   const ::atbus::protocol::msg *m) -> int {
-    return this->bus_evt_callback_on_forward_response(n, ep, conn, m);
-  });
+  // set logger
+  for (int i = 0; i < conf_.log.category_size() && i < atfw::util::log::log_wrapper::categorize_t::MAX; ++i) {
+    int32_t log_index = conf_.log.category(i).index();
+    if (UTIL_STRFUNC_STRCASE_CMP(conf_.log.category(i).name().c_str(), "atbus") != 0) {
+      continue;
+    }
 
-  bus_node_->set_on_error_handle([this](const atbus::node &n, const atbus::endpoint *ep, const atbus::connection *conn,
-                                        int status, int errorcode) -> int {
-    // error log
-    return this->bus_evt_callback_on_error(n, ep, conn, status, errorcode);
-  });
+    auto logger = WLOG_GETCAT(log_index);
+    if (nullptr == logger) {
+      continue;
+    }
 
-  bus_node_->set_on_info_log_handle([this](const atbus::node &n, const atbus::endpoint *ep,
-                                           const atbus::connection *conn, const char *content) -> int {
-    // normal log
-    return this->bus_evt_callback_on_info_log(n, ep, conn, content);
-  });
+    setup_logger(*bus_node_->get_logger(), conf_.log.level(), conf_.log.category(i));
+  }
+
+  bus_node_->set_on_forward_response_handle(
+      [this](const atbus::node &n, const atbus::endpoint *ep, const atbus::connection *conn,
+             const ::atbus::message *m) -> int { return this->bus_evt_callback_on_forward_response(n, ep, conn, m); });
 
   bus_node_->set_on_register_handle(
       [this](const atbus::node &n, const atbus::endpoint *ep, const atbus::connection *conn, int status) -> int {
@@ -4540,19 +4566,21 @@ int app::command_handler_list_discovery(atfw::util::cli::callback_param params) 
 }
 
 int app::bus_evt_callback_on_recv_msg(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
-                                      const atbus::protocol::msg &msg, const void *buffer, size_t len) {
-  if (atbus::protocol::msg::kDataTransformReq != msg.message_body_case() || 0 == msg.head().source_bus_id()) {
-    FWLOGERROR("receive a message from unknown source {} or invalid body case", msg.head().source_bus_id());
+                                      const atbus::message &msg, const void *buffer, size_t len) {
+  auto head = msg.get_head();
+  app_id_t source_bus_id = head == nullptr ? 0 : head->source_bus_id();
+  if (atbus::message_body_type::kDataTransformReq != msg.get_body_type() || 0 == source_bus_id) {
+    FWLOGERROR("receive a message from unknown source {} or invalid body case", source_bus_id);
     return EN_ATBUS_ERR_BAD_DATA;
   }
 
-  app_id_t from_id = msg.data_transform_req().from();
+  app_id_t from_id = msg.body().data_transform_req().from();
   app::message_t message;
   message.data = buffer;
   message.data_size = len;
   message.metadata = nullptr;
-  message.message_sequence = msg.head().sequence();
-  message.type = msg.head().type();
+  message.message_sequence = head == nullptr ? 0 : head->sequence();
+  message.type = head == nullptr ? 0 : head->type();
 
   app::message_sender_t sender;
   sender.id = from_id;
@@ -4577,41 +4605,45 @@ int app::bus_evt_callback_on_recv_msg(const atbus::node &, const atbus::endpoint
 }
 
 int app::bus_evt_callback_on_forward_response(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
-                                              const atbus::protocol::msg *m) {
-  ++stats_.last_proc_event_count;
-
+                                              const atbus::message *m) {
   // call failed callback if it's message transfer
   if (nullptr == m) {
     FWLOGERROR("app {:#x} receive a send failure without message", get_app_id());
     return EN_ATAPP_ERR_SEND_FAILED;
   }
 
-  if (m->head().ret() < 0) {
+  auto head = m->get_head();
+  if (nullptr == head) {
+    FWLOGERROR("app {:#x} receive a message without message head", get_app_id());
+    return EN_ATBUS_ERR_BAD_DATA;
+  }
+  auto body_type = m->get_body_type();
+  if (head->result_code() < 0) {
     FWLOGERROR("app {:#x} receive a send failure from {:#x}, message cmd: {}, type: {}, ret: {}, sequence: {}",
-               get_app_id(), m->head().source_bus_id(), atbus::msg_handler::get_body_name(m->message_body_case()),
-               m->head().type(), m->head().ret(), m->head().sequence());
+               get_app_id(), head->source_bus_id(), atbus::message_handler::get_body_name(body_type), head->type(),
+               head->result_code(), head->sequence());
   }
 
-  if (atbus::protocol::msg::kDataTransformRsp != m->message_body_case() || 0 == m->head().source_bus_id()) {
-    FWLOGERROR("receive a message from unknown source {} or invalid body case", m->head().source_bus_id());
+  if (atbus::message_body_type::kDataTransformRsp != body_type || 0 == head->source_bus_id()) {
+    FWLOGERROR("receive a message from unknown source {} or invalid body case", head->source_bus_id());
     return EN_ATBUS_ERR_BAD_DATA;
   }
 
+  auto &transform_rsp = m->body().data_transform_rsp();
   if (atbus_connector_) {
     atbus_connector_->on_receive_forward_response(
-        m->data_transform_rsp().from(), m->head().type(), m->head().sequence(), m->head().ret(),
-        reinterpret_cast<const void *>(m->data_transform_rsp().content().c_str()),
-        m->data_transform_rsp().content().size(), nullptr);
+        transform_rsp.from(), head->type(), head->sequence(), head->result_code(),
+        reinterpret_cast<const void *>(transform_rsp.content().c_str()), transform_rsp.content().size(), nullptr);
     return 0;
   }
 
-  app_id_t from_id = m->data_transform_rsp().from();
+  app_id_t from_id = transform_rsp.from();
   app::message_t message;
-  message.data = reinterpret_cast<const void *>(m->data_transform_rsp().content().c_str());
-  message.data_size = m->data_transform_rsp().content().size();
+  message.data = reinterpret_cast<const void *>(transform_rsp.content().c_str());
+  message.data_size = transform_rsp.content().size();
   message.metadata = nullptr;
-  message.message_sequence = m->head().sequence();
-  message.type = m->head().type();
+  message.message_sequence = head->sequence();
+  message.type = head->type();
 
   app::message_sender_t sender;
   sender.id = from_id;
@@ -4620,7 +4652,7 @@ int app::bus_evt_callback_on_forward_response(const atbus::node &, const atbus::
     sender.name = sender.remote->get_name();
   }
 
-  trigger_event_on_forward_response(sender, message, m->head().ret());
+  trigger_event_on_forward_response(sender, message, head->result_code());
   return 0;
 }
 
@@ -4776,7 +4808,7 @@ int app::bus_evt_callback_on_custom_command_request(const atbus::node &n, const 
   sender.response = &rsp;
   cmd_mgr->start(args_str, true, &sender);
 
-  size_t max_size = n.get_conf().msg_size;
+  size_t max_size = n.get_conf().message_size;
   size_t use_size = 0;
   size_t sum_size = 0;
   bool is_truncated = false;
@@ -5134,4 +5166,4 @@ int app::send_last_command(ev_loop_t *ev_loop) {
   }
   return ret;
 }
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

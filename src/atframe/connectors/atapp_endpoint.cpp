@@ -14,7 +14,7 @@
 #  undef max
 #endif
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 
 void atapp_endpoint::internal_accessor::close(atapp_endpoint &endpoint) { endpoint.reset(); }
 
@@ -375,7 +375,7 @@ void atapp_endpoint::trigger_on_receive_forward_response(atapp_connector_impl *c
     return;
   }
 
-  atapp::app *app = get_owner();
+  atframework::atapp::app *app = get_owner();
   if (nullptr == app) {
     return;
   }
@@ -400,4 +400,4 @@ void atapp_endpoint::trigger_on_receive_forward_response(atapp_connector_impl *c
   app->trigger_event_on_forward_response(sender, msg, error_code);
 }
 
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

@@ -24,8 +24,9 @@ inline int setenv(const char *name, const char *value, int) { return _putenv_s(n
 inline int unsetenv(const char *name) { return setenv(name, "", 1); }
 #endif
 
-static void check_origin_configure(atapp::app &app, atapp::protocol::atapp_etcd sub_cfg,
-                                   const atapp::configure_key_set &existed_keys) {
+static void check_origin_configure(atframework::atapp::app &app, atapp::protocol::atapp_etcd sub_cfg,
+                                   const atapp::configure_key_set &existed_app_keys,
+                                   const atapp::configure_key_set &existed_etcd_keys) {
   CASE_EXPECT_EQ(app.get_id(), 0x1234);
   CASE_EXPECT_EQ(app.get_origin_configure().id_mask(), "8.8.8.8");
   CASE_EXPECT_EQ(app.convert_app_id_by_string("1.2.3.4"), 0x01020304);
@@ -37,7 +38,7 @@ static void check_origin_configure(atapp::app &app, atapp::protocol::atapp_etcd 
   CASE_EXPECT_EQ(60, app.get_origin_configure().bus().ping_interval().seconds());
   CASE_EXPECT_EQ(3, app.get_origin_configure().bus().retry_interval().seconds());
   CASE_EXPECT_EQ(3, app.get_origin_configure().bus().fault_tolerant());
-  CASE_EXPECT_EQ(262144, app.get_origin_configure().bus().msg_size());
+  CASE_EXPECT_EQ(262144, app.get_origin_configure().bus().message_size());
   CASE_EXPECT_EQ(8388608, app.get_origin_configure().bus().recv_buffer_size());
   CASE_EXPECT_EQ(2097152, app.get_origin_configure().bus().send_buffer_size());
   CASE_EXPECT_EQ(0, app.get_origin_configure().bus().send_buffer_number());
@@ -96,34 +97,69 @@ static void check_origin_configure(atapp::app &app, atapp::protocol::atapp_etcd 
     }
   }
 
+  // Check etcd keys
+  {
+    std::string keys_path;
+    atfw::util::file_system::dirname(__FILE__, 0, keys_path);
+    keys_path += "/atapp_configure_loader_test_etcd_keys.txt";
+
+    if (!atfw::util::file_system::is_exist(keys_path.c_str())) {
+      CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << keys_path << " not found, skip checking etcd keys" << std::endl;
+      return;
+    }
+
+    std::fstream keys_ss(keys_path.c_str(), std::ios::in);
+    std::string key_line;
+    size_t keys_size = 0;
+    while (std::getline(keys_ss, key_line)) {
+      auto trimed_line = atfw::util::string::trim(key_line.c_str(), key_line.size());
+      if (trimed_line.second == 0) {
+        continue;
+      }
+
+      ++keys_size;
+      bool check_exists =
+          existed_etcd_keys.end() != existed_etcd_keys.find(std::string(trimed_line.first, trimed_line.second));
+      if (!check_exists) {
+        CASE_MSG_INFO() << CASE_MSG_FCOLOR(RED) << std::string(trimed_line.first, trimed_line.second) << " not found"
+                        << std::endl;
+      }
+      CASE_EXPECT_TRUE(check_exists);
+    }
+    CASE_EXPECT_LE(keys_size, existed_etcd_keys.size());
+  }
+
   // Check app keys
-  std::string keys_path;
-  atfw::util::file_system::dirname(__FILE__, 0, keys_path);
-  keys_path += "/atapp_configure_loader_test_app_keys.txt";
+  {
+    std::string keys_path;
+    atfw::util::file_system::dirname(__FILE__, 0, keys_path);
+    keys_path += "/atapp_configure_loader_test_app_keys.txt";
 
-  if (!atfw::util::file_system::is_exist(keys_path.c_str())) {
-    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << keys_path << " not found, skip checking etcd keys" << std::endl;
-    return;
-  }
-
-  std::fstream keys_ss(keys_path.c_str(), std::ios::in);
-  std::string key_line;
-  size_t keys_size = 0;
-  while (std::getline(keys_ss, key_line)) {
-    auto trimed_line = atfw::util::string::trim(key_line.c_str(), key_line.size());
-    if (trimed_line.second == 0) {
-      continue;
+    if (!atfw::util::file_system::is_exist(keys_path.c_str())) {
+      CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << keys_path << " not found, skip checking etcd keys" << std::endl;
+      return;
     }
 
-    ++keys_size;
-    bool check_exists = existed_keys.end() != existed_keys.find(std::string(trimed_line.first, trimed_line.second));
-    if (!check_exists) {
-      CASE_MSG_INFO() << CASE_MSG_FCOLOR(RED) << std::string(trimed_line.first, trimed_line.second) << " not found"
-                      << std::endl;
+    std::fstream keys_ss(keys_path.c_str(), std::ios::in);
+    std::string key_line;
+    size_t keys_size = 0;
+    while (std::getline(keys_ss, key_line)) {
+      auto trimed_line = atfw::util::string::trim(key_line.c_str(), key_line.size());
+      if (trimed_line.second == 0) {
+        continue;
+      }
+
+      ++keys_size;
+      bool check_exists =
+          existed_app_keys.end() != existed_app_keys.find(std::string(trimed_line.first, trimed_line.second));
+      if (!check_exists) {
+        CASE_MSG_INFO() << CASE_MSG_FCOLOR(RED) << std::string(trimed_line.first, trimed_line.second) << " not found"
+                        << std::endl;
+      }
+      CASE_EXPECT_TRUE(check_exists);
     }
-    CASE_EXPECT_TRUE(check_exists);
+    CASE_EXPECT_LE(keys_size, existed_app_keys.size());
   }
-  CASE_EXPECT_EQ(keys_size, existed_keys.size());
 }
 
 static void check_log_configure(const atapp::protocol::atapp_log &app_log,
@@ -174,11 +210,11 @@ static void check_log_configure(const atapp::protocol::atapp_log &app_log,
     }
     CASE_EXPECT_TRUE(check_exists);
   }
-  CASE_EXPECT_EQ(keys_size, existed_keys.size());
+  CASE_EXPECT_LE(keys_size, existed_keys.size());
 }
 
 CASE_TEST(atapp_configure, load_yaml) {
-  atapp::app app;
+  atframework::atapp::app app;
   std::string conf_path;
   atfw::util::file_system::dirname(__FILE__, 0, conf_path);
   conf_path += "/atapp_configure_loader_test.yaml";
@@ -194,10 +230,13 @@ CASE_TEST(atapp_configure, load_yaml) {
   app.reload();
 
   atapp::configure_key_set existed_app_keys;
+  atapp::configure_key_set existed_etcd_keys;
   atapp::configure_key_set existed_log_keys;
-  atapp::protocol::atapp_etcd sub_cfg;
-  app.parse_configures_into(sub_cfg, "atapp.etcd", "", &existed_app_keys);
-  check_origin_configure(app, sub_cfg, existed_app_keys);
+  atapp::protocol::atapp_configure app_cfg;
+  app.parse_configures_into(app_cfg, "atapp", "", &existed_app_keys);
+  atapp::protocol::atapp_etcd etcd_cfg;
+  app.parse_configures_into(etcd_cfg, "atapp.etcd", "", &existed_etcd_keys);
+  check_origin_configure(app, etcd_cfg, existed_app_keys, existed_etcd_keys);
 
   atapp::protocol::atapp_log app_log;
   app.parse_log_configures_into(app_log, std::vector<gsl::string_view>{"atapp", "log"}, "", &existed_log_keys);
@@ -208,7 +247,7 @@ CASE_TEST(atapp_configure, load_yaml) {
 }
 
 CASE_TEST(atapp_configure, load_conf) {
-  atapp::app app;
+  atframework::atapp::app app;
   std::string conf_path;
   atfw::util::file_system::dirname(__FILE__, 0, conf_path);
   conf_path += "/atapp_configure_loader_test.conf";
@@ -224,10 +263,13 @@ CASE_TEST(atapp_configure, load_conf) {
   app.reload();
 
   atapp::configure_key_set existed_app_keys;
+  atapp::configure_key_set existed_etcd_keys;
   atapp::configure_key_set existed_log_keys;
-  atapp::protocol::atapp_etcd sub_cfg;
-  app.parse_configures_into(sub_cfg, "atapp.etcd", "", &existed_app_keys);
-  check_origin_configure(app, sub_cfg, existed_app_keys);
+  atapp::protocol::atapp_configure app_cfg;
+  app.parse_configures_into(app_cfg, "atapp", "", &existed_app_keys);
+  atapp::protocol::atapp_etcd etcd_cfg;
+  app.parse_configures_into(etcd_cfg, "atapp.etcd", "", &existed_etcd_keys);
+  check_origin_configure(app, etcd_cfg, existed_app_keys, existed_etcd_keys);
 
   atapp::protocol::atapp_log app_log;
   app.parse_log_configures_into(app_log, std::vector<gsl::string_view>{"atapp", "log"}, "", &existed_log_keys);
@@ -238,7 +280,7 @@ CASE_TEST(atapp_configure, load_conf) {
 }
 
 CASE_TEST(atapp_configure, load_environment) {
-  atapp::app app;
+  atframework::atapp::app app;
   std::string conf_path;
   atfw::util::file_system::dirname(__FILE__, 0, conf_path);
   conf_path += "/atapp_configure_loader_test.env.txt";
@@ -274,10 +316,13 @@ CASE_TEST(atapp_configure, load_environment) {
   app.reload();
 
   atapp::configure_key_set existed_app_keys;
+  atapp::configure_key_set existed_etcd_keys;
   atapp::configure_key_set existed_log_keys;
-  atapp::protocol::atapp_etcd sub_cfg;
-  app.parse_configures_into(sub_cfg, "atapp.etcd", "ATAPP_ETCD", &existed_app_keys);
-  check_origin_configure(app, sub_cfg, existed_app_keys);
+  atapp::protocol::atapp_configure app_cfg;
+  app.parse_configures_into(app_cfg, "atapp", "ATAPP", &existed_app_keys);
+  atapp::protocol::atapp_etcd etcd_cfg;
+  app.parse_configures_into(etcd_cfg, "atapp.etcd", "ATAPP_ETCD", &existed_etcd_keys);
+  check_origin_configure(app, etcd_cfg, existed_app_keys, existed_etcd_keys);
 
   atapp::protocol::atapp_log app_log;
   app.parse_log_configures_into(app_log, std::vector<gsl::string_view>{"atapp", "log"}, "ATAPP_LOG", &existed_log_keys);

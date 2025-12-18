@@ -38,7 +38,7 @@
 #define ETCD_MODULE_BY_TYPE_NAME_DIR "by_type_name"
 #define ETCD_MODULE_BY_TAG_DIR "by_tag"
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 namespace detail {
 std::chrono::system_clock::duration convert_to_chrono(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &in,
                                                       time_t default_value_ms) {
@@ -788,7 +788,7 @@ LIBATAPP_MACRO_API int etcd_module::timeout() {
 LIBATAPP_MACRO_API const char *etcd_module::name() const { return "atapp: etcd module"; }
 
 LIBATAPP_MACRO_API int etcd_module::tick() {
-  atapp::app *owner = get_app();
+  atframework::atapp::app *owner = get_app();
   if (nullptr == owner) {
     return 0;
   }
@@ -878,7 +878,7 @@ etcd_module::get_shared_curl_multi_context() const {
 }
 
 LIBATAPP_MACRO_API std::string etcd_module::get_by_id_path() const {
-  const atapp::app *owner = get_app();
+  const atframework::atapp::app *owner = get_app();
   if (nullptr == owner) {
     return std::string();
   }
@@ -888,7 +888,7 @@ LIBATAPP_MACRO_API std::string etcd_module::get_by_id_path() const {
 }
 
 LIBATAPP_MACRO_API std::string etcd_module::get_by_type_id_path() const {
-  const atapp::app *owner = get_app();
+  const atframework::atapp::app *owner = get_app();
   if (nullptr == owner) {
     return std::string();
   }
@@ -898,7 +898,7 @@ LIBATAPP_MACRO_API std::string etcd_module::get_by_type_id_path() const {
 }
 
 LIBATAPP_MACRO_API std::string etcd_module::get_by_type_name_path() const {
-  const atapp::app *owner = get_app();
+  const atframework::atapp::app *owner = get_app();
   if (nullptr == owner) {
     return std::string();
   }
@@ -908,7 +908,7 @@ LIBATAPP_MACRO_API std::string etcd_module::get_by_type_name_path() const {
 }
 
 LIBATAPP_MACRO_API std::string etcd_module::get_by_name_path() const {
-  const atapp::app *owner = get_app();
+  const atframework::atapp::app *owner = get_app();
   if (nullptr == owner) {
     return std::string();
   }
@@ -918,7 +918,7 @@ LIBATAPP_MACRO_API std::string etcd_module::get_by_name_path() const {
 }
 
 LIBATAPP_MACRO_API std::string etcd_module::get_by_tag_path(const std::string &tag_name) const {
-  const atapp::app *owner = get_app();
+  const atframework::atapp::app *owner = get_app();
   if (nullptr == owner) {
     return std::string();
   }
@@ -1148,10 +1148,10 @@ LIBATAPP_MACRO_API atapp::etcd_watcher::ptr_t etcd_module::add_watcher_by_custom
   return p;
 }
 
-LIBATAPP_MACRO_API const ::atapp::etcd_cluster &etcd_module::get_raw_etcd_ctx() const { return etcd_ctx_; }
-LIBATAPP_MACRO_API ::atapp::etcd_cluster &etcd_module::get_raw_etcd_ctx() { return etcd_ctx_; }
+LIBATAPP_MACRO_API const ::atframework::atapp::etcd_cluster &etcd_module::get_raw_etcd_ctx() const { return etcd_ctx_; }
+LIBATAPP_MACRO_API ::atframework::atapp::etcd_cluster &etcd_module::get_raw_etcd_ctx() { return etcd_ctx_; }
 
-LIBATAPP_MACRO_API const ::atapp::etcd_response_header &etcd_module::get_last_etcd_event_header() const {
+LIBATAPP_MACRO_API const ::atframework::atapp::etcd_response_header &etcd_module::get_last_etcd_event_header() const {
   return last_etcd_event_header_;
 }
 
@@ -1406,8 +1406,9 @@ etcd_module::watcher_callback_list_wrapper_t::~watcher_callback_list_wrapper_t()
   }
 }
 
-void etcd_module::watcher_callback_list_wrapper_t::operator()(const ::atapp::etcd_response_header &header,
-                                                              const ::atapp::etcd_watcher::response_t &body) {
+void etcd_module::watcher_callback_list_wrapper_t::operator()(
+    const ::atframework::atapp::etcd_response_header &header,
+    const ::atframework::atapp::etcd_watcher::response_t &body) {
   if (nullptr == mod) {
     return;
   }
@@ -1442,7 +1443,7 @@ void etcd_module::watcher_callback_list_wrapper_t::operator()(const ::atapp::etc
 
   // decode data
   for (size_t i = 0; i < body.events.size(); ++i) {
-    const ::atapp::etcd_watcher::event_t &evt_data = body.events[i];
+    const ::atframework::atapp::etcd_watcher::event_t &evt_data = body.events[i];
     node_info_t node;
     etcd_discovery_node::node_version current_node_version;
 
@@ -1460,7 +1461,7 @@ void etcd_module::watcher_callback_list_wrapper_t::operator()(const ::atapp::etc
       _remove_old_node_index(node.node_discovery, old_names, old_ids);
     }
 
-    if (evt_data.evt_type == ::atapp::etcd_watch_event::EN_WEVT_DELETE) {
+    if (evt_data.evt_type == ::atframework::atapp::etcd_watch_event::EN_WEVT_DELETE) {
       node.action = node_action_t::EN_NAT_DELETE;
     } else {
       node.action = node_action_t::EN_NAT_PUT;
@@ -1508,8 +1509,9 @@ etcd_module::watcher_callback_one_wrapper_t::~watcher_callback_one_wrapper_t() {
   }
 }
 
-void etcd_module::watcher_callback_one_wrapper_t::operator()(const ::atapp::etcd_response_header &header,
-                                                             const ::atapp::etcd_watcher::response_t &body) {
+void etcd_module::watcher_callback_one_wrapper_t::operator()(
+    const ::atframework::atapp::etcd_response_header &header,
+    const ::atframework::atapp::etcd_watcher::response_t &body) {
   if (nullptr == mod) {
     return;
   }
@@ -1544,7 +1546,7 @@ void etcd_module::watcher_callback_one_wrapper_t::operator()(const ::atapp::etcd
 
   // decode data
   for (size_t i = 0; i < body.events.size(); ++i) {
-    const ::atapp::etcd_watcher::event_t &evt_data = body.events[i];
+    const ::atframework::atapp::etcd_watcher::event_t &evt_data = body.events[i];
     node_info_t node;
     etcd_discovery_node::node_version current_node_version;
 
@@ -1562,7 +1564,7 @@ void etcd_module::watcher_callback_one_wrapper_t::operator()(const ::atapp::etcd
       _remove_old_node_index(node.node_discovery, old_names, old_ids);
     }
 
-    if (evt_data.evt_type == ::atapp::etcd_watch_event::EN_WEVT_DELETE) {
+    if (evt_data.evt_type == ::atframework::atapp::etcd_watch_event::EN_WEVT_DELETE) {
       node.action = node_action_t::EN_NAT_DELETE;
     } else {
       node.action = node_action_t::EN_NAT_PUT;
@@ -1731,4 +1733,4 @@ void etcd_module::reset_inner_watchers_and_keepalives() {
   inner_keepalive_actors_.clear();
 }
 
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

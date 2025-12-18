@@ -17,7 +17,7 @@
 #  undef min
 #endif
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 
 LIBATAPP_MACRO_API module_impl::module_impl() : enabled_(true), actived_(false), owner_(nullptr) {
   suspended_stop_.stop_suspend_timeout = std::chrono::system_clock::time_point::min();
@@ -142,4 +142,4 @@ LIBATAPP_MACRO_API bool module_impl::check_suspend_stop() {
 LIBATAPP_MACRO_API app *module_impl::get_app() { return owner_; }
 
 LIBATAPP_MACRO_API const app *module_impl::get_app() const { return owner_; }
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

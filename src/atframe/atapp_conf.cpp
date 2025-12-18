@@ -50,7 +50,7 @@
 #  undef min
 #endif
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 namespace {
 static const char *skip_space(const char *begin, const char *end) {
   while (nullptr != begin && begin < end && *begin) {
@@ -861,7 +861,14 @@ static void dump_pick_default_field(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &
     }
   }
 
-  if (nullptr == fds->message_type()) {
+  bool allow_string_default_value = nullptr == fds->message_type();
+  if (!allow_string_default_value) {
+    allow_string_default_value =
+        fds->message_type()->full_name() == ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration::descriptor()->full_name() ||
+        fds->message_type()->full_name() == ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp::descriptor()->full_name();
+  }
+
+  if (allow_string_default_value) {
     if (!fds->options().HasExtension(atapp::protocol::CONFIGURE)) {
       return;
     }
@@ -878,14 +885,6 @@ static void dump_pick_default_field(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &
 
     // Already has value, skip. Only check leaf values
     if (existed_set.end() != existed_set.find(atfw::util::log::format("{}{}", prefix, fds->name()))) {
-      return;
-    }
-  } else {
-    bool allow_string_value =
-        fds->message_type()->full_name() == ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration::descriptor()->full_name() ||
-        fds->message_type()->full_name() == ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp::descriptor()->full_name();
-    if (allow_string_value &&
-        existed_set.end() != existed_set.find(atfw::util::log::format("{}{}", prefix, fds->name()))) {
       return;
     }
   }
@@ -970,46 +969,47 @@ static void dump_pick_default_field(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &
   }
 }
 
-static void dump_pick_map_key_field(gsl::string_view val_str, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
+static bool dump_pick_map_key_field(gsl::string_view val_str, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                                     const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds,
                                     configure_key_set *dump_existed_set, gsl::string_view existed_set_prefix) {
   if (nullptr == fds) {
-    return;
+    return false;
   }
 
   if (fds->is_repeated()) {
-    return;
+    return false;
   }
 
+  bool ret = false;
   switch (fds->cpp_type()) {
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_INT32: {
       auto value = dump_pick_field_with_extensions<int32_t>(val_str, fds);
-      dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+      ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
       break;
     };
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_INT64: {
       auto value = dump_pick_field_with_extensions<int64_t>(val_str, fds);
-      dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+      ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
       break;
     };
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_UINT32: {
       auto value = dump_pick_field_with_extensions<uint32_t>(val_str, fds);
-      dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+      ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
       break;
     };
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_UINT64: {
       auto value = dump_pick_field_with_extensions<uint64_t>(val_str, fds);
-      dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+      ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
       break;
     };
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_STRING: {
       auto value = dump_pick_field_with_extensions<std::string>(val_str, fds);
-      dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+      ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
       break;
     };
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_BOOL: {
       auto value = dump_pick_field_with_extensions<bool>(val_str, fds);
-      dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+      ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
       break;
     };
     default: {
@@ -1020,51 +1020,54 @@ static void dump_pick_map_key_field(gsl::string_view val_str, ATBUS_MACRO_PROTOB
       break;
     }
   }
+
+  return ret;
 }
 
-static void dump_pick_field(const atfw::util::config::ini_value &val, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
+static bool dump_pick_field(const atfw::util::config::ini_value &val, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds, size_t index,
                             configure_key_set *dump_existed_set, gsl::string_view existed_set_prefix) {
+  bool ret = false;
   if (nullptr == fds) {
-    return;
+    return ret;
   }
 
   switch (fds->cpp_type()) {
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_INT32: {
       auto value = dump_pick_field_with_extensions<int32_t>(val, fds, index);
-      dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+      ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
       break;
-    };
+    }
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_INT64: {
       auto value = dump_pick_field_with_extensions<int64_t>(val, fds, index);
-      dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+      ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
       break;
-    };
+    }
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_UINT32: {
       auto value = dump_pick_field_with_extensions<uint32_t>(val, fds, index);
-      dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+      ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
       break;
-    };
+    }
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_UINT64: {
       auto value = dump_pick_field_with_extensions<uint64_t>(val, fds, index);
-      dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+      ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
       break;
-    };
+    }
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_STRING: {
       auto value = dump_pick_field_with_extensions<std::string>(val.as_cpp_string(index), fds);
-      dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+      ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
       break;
-    };
+    }
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_MESSAGE: {
       // special message
       if (fds->message_type()->full_name() == ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration::descriptor()->full_name()) {
         auto value = dump_pick_field_with_extensions<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration>(val, fds, index);
-        dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+        ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
         break;
       } else if (fds->message_type()->full_name() ==
                  ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp::descriptor()->full_name()) {
         auto value = dump_pick_field_with_extensions<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp>(val, fds, index);
-        dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+        ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
         break;
       }
 
@@ -1085,15 +1088,28 @@ static void dump_pick_field(const atfw::util::config::ini_value &val, ATBUS_MACR
             continue;
           }
 
+          int idx = dst.GetReflection()->FieldSize(dst, fds);
           ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *submsg = dst.GetReflection()->AddMessage(&dst, fds);
           if (nullptr == submsg) {
             break;
           }
           std::string submsg_map_existed_set_key =
-              atfw::util::log::format("{}{}.{}.", existed_set_prefix, fds->name(), index);
+              atfw::util::log::format("{}{}.{}.", existed_set_prefix, fds->name(), idx);
 
-          dump_pick_map_key_field(iter->first, *submsg, key_fds, dump_existed_set, submsg_map_existed_set_key);
-          dump_pick_field(*iter->second, *submsg, value_fds, 0, dump_existed_set, submsg_map_existed_set_key);
+          bool has_data = false;
+          if (dump_pick_map_key_field(iter->first, *submsg, key_fds, dump_existed_set, submsg_map_existed_set_key)) {
+            has_data = true;
+          }
+          if (dump_pick_field(*iter->second, *submsg, value_fds, 0, dump_existed_set, submsg_map_existed_set_key)) {
+            has_data = true;
+          }
+
+          if (has_data) {
+            ret = true;
+            if (dump_existed_set != nullptr) {
+              dump_existed_set->insert(atfw::util::log::format("{}{}.{}", existed_set_prefix, fds->name(), idx));
+            }
+          }
         }
       } else if (fds->is_repeated()) {
         // repeated message is unpack by PARENT.0.field = XXX
@@ -1106,74 +1122,115 @@ static void dump_pick_field(const atfw::util::config::ini_value &val, ATBUS_MACR
 
           ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *submsg = dst.GetReflection()->AddMessage(&dst, fds);
           if (nullptr != submsg) {
-            ini_loader_dump_to(*idx_iter->second, *submsg, dump_existed_set,
-                               atfw::util::log::format("{}{}.{}.", existed_set_prefix, fds->name(), j));
+            if (ini_loader_dump_to(*idx_iter->second, *submsg, dump_existed_set,
+                                   atfw::util::log::format("{}{}.{}.", existed_set_prefix, fds->name(), j))) {
+              ret = true;
+              if (dump_existed_set != nullptr) {
+                dump_existed_set->insert(atfw::util::log::format("{}{}.{}.", existed_set_prefix, fds->name(), j));
+              }
+            }
           }
         }
         break;
       } else {
         ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *submsg = dst.GetReflection()->MutableMessage(&dst, fds);
         if (nullptr != submsg) {
-          ini_loader_dump_to(val, *submsg, dump_existed_set,
-                             atfw::util::log::format("{}{}.", existed_set_prefix, fds->name()));
+          if (ini_loader_dump_to(val, *submsg, dump_existed_set,
+                                 atfw::util::log::format("{}{}.", existed_set_prefix, fds->name()))) {
+            ret = true;
+            if (dump_existed_set != nullptr) {
+              dump_existed_set->insert(atfw::util::log::format("{}{}", existed_set_prefix, fds->name()));
+            }
+          }
         }
       }
 
       break;
-    };
+    }
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_DOUBLE: {
       auto value = dump_pick_field_with_extensions<double>(val, fds, index);
-      dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+      ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
       break;
-    };
+    }
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_FLOAT: {
       auto value = dump_pick_field_with_extensions<float>(val, fds, index);
-      dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+      ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
       break;
-    };
+    }
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_BOOL: {
       auto value = dump_pick_field_with_extensions<bool>(val, fds, index);
-      dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+      ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
       break;
-    };
+    }
     case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_ENUM: {
       auto value = dump_pick_enum_field_with_extensions(val.as_cpp_string(index), fds);
-      dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+      ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
       break;
-    };
+    }
     default: {
       FWLOGERROR("{} in {} with type={} is not supported now", fds->name(), dst.GetDescriptor()->full_name(),
                  fds->type_name());
       break;
     }
   }
+
+  return ret;
 }
 
-static void dump_field_item(const atfw::util::config::ini_value &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
+static bool dump_field_item(const atfw::util::config::ini_value &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds,
                             configure_key_set *dump_existed_set, gsl::string_view existed_set_prefix) {
   if (nullptr == fds) {
-    return;
+    return false;
+  }
+
+  // 同层级展开
+  if (!fds->is_repeated() && fds->options().HasExtension(atfw::atapp::protocol::CONFIGURE)) {
+    auto &opt_ext = fds->options().GetExtension(atfw::atapp::protocol::CONFIGURE);
+    auto &field_match = opt_ext.field_match();
+    if (!field_match.field_name().empty() && !field_match.field_value().empty()) {
+      atfw::util::config::ini_value::node_type::const_iterator field_value_iter =
+          src.get_children().find(field_match.field_name());
+      if (field_value_iter == src.get_children().end()) {
+        return false;
+      }
+      if (!field_value_iter->second) {
+        return false;
+      }
+      if (field_value_iter->second->as_cpp_string() != field_match.field_value()) {
+        return false;
+      }
+
+      ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *submsg = dst.GetReflection()->MutableMessage(&dst, fds);
+      if (nullptr == submsg) {
+        return false;
+      }
+      return ini_loader_dump_to(src, *submsg, dump_existed_set, existed_set_prefix);
+    }
   }
 
   atfw::util::config::ini_value::node_type::const_iterator child_iter =
       src.get_children().find(static_cast<std::string>(fds->name()));
   // skip if not found, just skip
   if (child_iter == src.get_children().end()) {
-    return;
+    return false;
   }
 
   if (!child_iter->second) {
-    return;
+    return false;
   }
 
   if (fds->is_repeated() && fds->cpp_type() != ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_MESSAGE) {
     size_t arrsz = child_iter->second->size();
+    int ret = false;
     for (size_t i = 0; i < arrsz; ++i) {
-      dump_pick_field(*child_iter->second, dst, fds, i, dump_existed_set, existed_set_prefix);
+      if (dump_pick_field(*child_iter->second, dst, fds, i, dump_existed_set, existed_set_prefix)) {
+        ret = true;
+      }
     }
+    return ret;
   } else {
-    dump_pick_field(*child_iter->second, dst, fds, 0, dump_existed_set, existed_set_prefix);
+    return dump_pick_field(*child_iter->second, dst, fds, 0, dump_existed_set, existed_set_prefix);
   }
 }
 
@@ -1222,68 +1279,70 @@ static std::pair<TRET, bool> dump_pick_field_with_extensions(
   return std::pair<TRET, bool>(value, is_default);
 }
 
-static void dump_message_item(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
+static bool dump_message_item(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                               configure_key_set *dump_existed_set, gsl::string_view existed_set_prefix);
 
-static void dump_pick_field(const YAML::Node &val, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
+static bool dump_pick_field(const YAML::Node &val, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds,
                             configure_key_set *dump_existed_set, gsl::string_view existed_set_prefix) {
   if (nullptr == fds) {
-    return;
+    return false;
   }
+
+  bool ret = false;
 
 #if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
   try {
 #endif
 
     if (!val) {
-      return;
+      return false;
     }
     if (val.IsNull() || val.IsSequence()) {
-      return;
+      return false;
     }
 
     switch (fds->cpp_type()) {
       case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_INT32: {
         auto value = dump_pick_field_with_extensions<int32_t>(val, fds);
-        dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+        ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
         break;
-      };
+      }
       case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_INT64: {
         auto value = dump_pick_field_with_extensions<int64_t>(val, fds);
-        dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+        ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
         break;
-      };
+      }
       case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_UINT32: {
         auto value = dump_pick_field_with_extensions<uint32_t>(val, fds);
-        dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+        ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
         break;
-      };
+      }
       case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_UINT64: {
         auto value = dump_pick_field_with_extensions<uint64_t>(val, fds);
-        dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+        ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
         break;
-      };
+      }
       case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_STRING: {
         if (!val.IsScalar()) {
           break;
         }
 
         auto value = dump_pick_field_with_extensions<std::string>(val.Scalar(), fds);
-        dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+        ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
         break;
-      };
+      }
       case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_MESSAGE: {
         // special message
         if (val.IsScalar()) {
           if (fds->message_type()->full_name() ==
               ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration::descriptor()->full_name()) {
             auto value = dump_pick_field_with_extensions<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration>(val, fds);
-            dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+            ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
           } else if (fds->message_type()->full_name() ==
                      ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp::descriptor()->full_name()) {
             auto value = dump_pick_field_with_extensions<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp>(val, fds);
-            dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+            ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
           }
 
           break;
@@ -1311,8 +1370,20 @@ static void dump_pick_field(const YAML::Node &val, ATBUS_MACRO_PROTOBUF_NAMESPAC
 
               std::string submsg_map_existed_set_key =
                   atfw::util::log::format("{}{}.{}.", existed_set_prefix, fds->name(), index);
-              dump_pick_field(iter->first, *submsg, key_fds, dump_existed_set, submsg_map_existed_set_key);
-              dump_pick_field(iter->second, *submsg, value_fds, dump_existed_set, submsg_map_existed_set_key);
+              bool has_data = false;
+              if (dump_pick_field(iter->first, *submsg, key_fds, dump_existed_set, submsg_map_existed_set_key)) {
+                has_data = true;
+              }
+              if (dump_pick_field(iter->second, *submsg, value_fds, dump_existed_set, submsg_map_existed_set_key)) {
+                has_data = true;
+              }
+
+              if (has_data) {
+                ret = true;
+                if (dump_existed_set != nullptr) {
+                  dump_existed_set->insert(atfw::util::log::format("{}{}.{}", existed_set_prefix, fds->name(), index));
+                }
+              }
             }
           } else if (fds->is_repeated()) {
             int index = dst.GetReflection()->FieldSize(dst, fds);
@@ -1320,48 +1391,59 @@ static void dump_pick_field(const YAML::Node &val, ATBUS_MACRO_PROTOBUF_NAMESPAC
             if (nullptr == submsg) {
               break;
             }
-            dump_message_item(val, *submsg, dump_existed_set,
-                              atfw::util::log::format("{}{}.{}.", existed_set_prefix, fds->name(), index));
+            if (dump_message_item(val, *submsg, dump_existed_set,
+                                  atfw::util::log::format("{}{}.{}.", existed_set_prefix, fds->name(), index))) {
+              ret = true;
+              if (dump_existed_set != nullptr) {
+                dump_existed_set->insert(atfw::util::log::format("{}{}.{}.", existed_set_prefix, fds->name(), index));
+              }
+            }
           } else {
             submsg = dst.GetReflection()->MutableMessage(&dst, fds);
             if (nullptr == submsg) {
               break;
             }
-            dump_message_item(val, *submsg, dump_existed_set,
-                              atfw::util::log::format("{}{}.", existed_set_prefix, fds->name()));
+
+            if (dump_message_item(val, *submsg, dump_existed_set,
+                                  atfw::util::log::format("{}{}.", existed_set_prefix, fds->name()))) {
+              ret = true;
+              if (dump_existed_set != nullptr) {
+                dump_existed_set->insert(atfw::util::log::format("{}{}", existed_set_prefix, fds->name()));
+              }
+            }
           }
         }
 
         break;
-      };
+      }
       case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_DOUBLE: {
         auto value = dump_pick_field_with_extensions<double>(val, fds);
-        dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+        ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
         break;
-      };
+      }
       case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_FLOAT: {
         auto value = dump_pick_field_with_extensions<float>(val, fds);
-        dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+        ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
         break;
-      };
+      }
       case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_BOOL: {
         if (!val.IsScalar()) {
           break;
         }
 
         auto value = dump_pick_field_with_extensions<bool>(val.Scalar(), fds);
-        dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+        ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
         break;
-      };
+      }
       case ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_ENUM: {
         if (!val.IsScalar()) {
           break;
         }
 
         auto value = dump_pick_enum_field_with_extensions(val.Scalar(), fds);
-        dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
+        ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
         break;
-      };
+      }
       default: {
         FWLOGERROR("{} in {} with type={} is not supported now", fds->name(), dst.GetDescriptor()->full_name(),
                    fds->type_name());
@@ -1374,40 +1456,68 @@ static void dump_pick_field(const YAML::Node &val, ATBUS_MACRO_PROTOBUF_NAMESPAC
     // Ignore error
   }
 #endif
+
+  return ret;
 }
 
-static void dump_field_item(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
+static bool dump_field_item(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds,
                             configure_key_set *dump_existed_set, gsl::string_view existed_set_prefix) {
   if (nullptr == fds) {
-    return;
+    return false;
   }
 
+  int ret = false;
 #if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
   try {
 #endif
+
+    // 同层级展开
+    if (!fds->is_repeated() && fds->options().HasExtension(atfw::atapp::protocol::CONFIGURE)) {
+      auto &opt_ext = fds->options().GetExtension(atfw::atapp::protocol::CONFIGURE);
+      auto &field_match = opt_ext.field_match();
+      if (!field_match.field_name().empty() && !field_match.field_value().empty()) {
+        const YAML::Node field_value_node = src[field_match.field_name()];
+        if (!field_value_node.IsScalar()) {
+          return false;
+        }
+        if (field_value_node.Scalar() != field_match.field_value()) {
+          return false;
+        }
+
+        ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *submsg = dst.GetReflection()->MutableMessage(&dst, fds);
+        if (nullptr == submsg) {
+          return false;
+        }
+        return dump_message_item(src, *submsg, dump_existed_set, existed_set_prefix);
+      }
+    }
+
     const YAML::Node child = src[fds->name()];
     if (!child) {
-      return;
+      return false;
     }
     if (child.IsNull()) {
-      return;
+      return false;
     }
 
     if (fds->is_repeated()) {
       // If it's not sequence, accept one element
+
       if (child.IsSequence()) {
         for (YAML::Node::const_iterator child_iter = child.begin(); child_iter != child.end(); ++child_iter) {
-          dump_pick_field(*child_iter, dst, fds, dump_existed_set, existed_set_prefix);
+          if (dump_pick_field(*child_iter, dst, fds, dump_existed_set, existed_set_prefix)) {
+            ret = true;
+          }
         }
       } else {
-        dump_pick_field(child, dst, fds, dump_existed_set, existed_set_prefix);
+        ret = dump_pick_field(child, dst, fds, dump_existed_set, existed_set_prefix);
       }
     } else {
       if (child.IsSequence()) {
-        return;
+        return false;
       }
-      dump_pick_field(child, dst, fds, dump_existed_set, existed_set_prefix);
+      ret = dump_pick_field(child, dst, fds, dump_existed_set, existed_set_prefix);
     }
 
 #if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
@@ -1415,6 +1525,7 @@ static void dump_field_item(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPAC
     // Ignore error
   }
 #endif
+  return ret;
 }
 
 static bool dump_environment_message_item(gsl::string_view prefix, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
@@ -1516,6 +1627,9 @@ static bool dump_environment_pick_field(const std::string &key, ATBUS_MACRO_PROT
                 key, *submsg, dump_existed_set,
                 atfw::util::log::format("{}{}.{}.", existed_set_prefix, fds->name(), index))) {
           ret = true;
+          if (dump_existed_set != nullptr) {
+            dump_existed_set->insert(atfw::util::log::format("{}{}.{}", existed_set_prefix, fds->name(), index));
+          }
         } else {
           dst.GetReflection()->RemoveLast(&dst, fds);
         }
@@ -1527,6 +1641,9 @@ static bool dump_environment_pick_field(const std::string &key, ATBUS_MACRO_PROT
         if (dump_environment_message_item(key, *submsg, dump_existed_set,
                                           atfw::util::log::format("{}{}.", existed_set_prefix, fds->name()))) {
           ret = true;
+          if (nullptr != dump_existed_set) {
+            dump_existed_set->insert(atfw::util::log::format("{}{}", existed_set_prefix, fds->name()));
+          }
         }
       }
 
@@ -1595,6 +1712,34 @@ static bool dump_environment_field_item(gsl::string_view prefix, ATBUS_MACRO_PRO
     return false;
   }
 
+  // 同层级展开
+  if (!fds->is_repeated() && fds->options().HasExtension(atfw::atapp::protocol::CONFIGURE)) {
+    auto &opt_ext = fds->options().GetExtension(atfw::atapp::protocol::CONFIGURE);
+    auto &field_match = opt_ext.field_match();
+    if (!field_match.field_name().empty() && !field_match.field_value().empty()) {
+      std::string env_key_prefix;
+      env_key_prefix.reserve(prefix.size() + 1 + fds->name().size());
+      if (!prefix.empty()) {
+        env_key_prefix = static_cast<std::string>(prefix);
+        env_key_prefix += "_";
+      }
+
+      env_key_prefix += field_match.field_name();
+      std::transform(env_key_prefix.begin(), env_key_prefix.end(), env_key_prefix.begin(),
+                     atfw::util::string::toupper<char>);
+      std::string field_value_env = atfw::util::file_system::getenv(env_key_prefix.c_str());
+      if (field_value_env != field_match.field_value()) {
+        return false;
+      }
+
+      ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *submsg = dst.GetReflection()->MutableMessage(&dst, fds);
+      if (nullptr == submsg) {
+        return false;
+      }
+      return dump_environment_message_item(std::string(prefix), *submsg, dump_existed_set, existed_set_prefix);
+    }
+  }
+
   std::string env_key_prefix;
   env_key_prefix.reserve(prefix.size() + 1 + fds->name().size());
   if (!prefix.empty()) {
@@ -1626,11 +1771,11 @@ static bool dump_environment_field_item(gsl::string_view prefix, ATBUS_MACRO_PRO
   }
 }
 
-static void dump_message_item(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
+static bool dump_message_item(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                               configure_key_set *dump_existed_set, gsl::string_view prefix) {
   const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Descriptor *desc = dst.GetDescriptor();
   if (nullptr == desc) {
-    return;
+    return false;
   }
 
 #if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
@@ -1638,10 +1783,10 @@ static void dump_message_item(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESP
 #endif
 
     if (!src) {
-      return;
+      return false;
     }
     if (!src.IsMap()) {
-      return;
+      return false;
     }
 
 #if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
@@ -1649,9 +1794,14 @@ static void dump_message_item(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESP
     // Ignore error
   }
 #endif
+  bool ret = false;
   for (int i = 0; i < desc->field_count(); ++i) {
-    dump_field_item(src, dst, desc->field(i), dump_existed_set, prefix);
+    if (dump_field_item(src, dst, desc->field(i), dump_existed_set, prefix)) {
+      ret = true;
+    }
   }
+
+  return ret;
 }
 
 static bool dump_environment_message_item(gsl::string_view prefix, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
@@ -1680,26 +1830,33 @@ LIBATAPP_MACRO_API void parse_duration(gsl::string_view in, ATBUS_MACRO_PROTOBUF
   pick_const_data(in, out);
 }
 
-LIBATAPP_MACRO_API void ini_loader_dump_to(const atfw::util::config::ini_value &src,
+LIBATAPP_MACRO_API bool ini_loader_dump_to(const atfw::util::config::ini_value &src,
                                            ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                                            configure_key_set *dump_existed_set, gsl::string_view existed_set_prefix) {
   const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Descriptor *desc = dst.GetDescriptor();
   if (nullptr == desc) {
-    return;
+    return false;
   }
 
+  bool ret = false;
   for (int i = 0; i < desc->field_count(); ++i) {
-    dump_field_item(src, dst, desc->field(i), dump_existed_set, existed_set_prefix);
+    if (dump_field_item(src, dst, desc->field(i), dump_existed_set, existed_set_prefix)) {
+      ret = true;
+    }
   }
+
+  return ret;
 }
 
-LIBATAPP_MACRO_API void ini_loader_dump_to(const atfw::util::config::ini_value &src,
+LIBATAPP_MACRO_API bool ini_loader_dump_to(const atfw::util::config::ini_value &src,
                                            ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Map<std::string, std::string> &dst,
                                            gsl::string_view prefix, configure_key_set *dump_existed_set,
                                            gsl::string_view existed_set_prefix) {
+  bool ret = false;
   if (src.size() > 0) {
     if (1 == src.size()) {
       dst[static_cast<std::string>(prefix)] = src.as_cpp_string();
+      ret = true;
 
       if (nullptr != dump_existed_set) {
         if (!existed_set_prefix.empty()) {
@@ -1714,6 +1871,7 @@ LIBATAPP_MACRO_API void ini_loader_dump_to(const atfw::util::config::ini_value &
         std::string sub_prefix =
             prefix.empty() ? atfw::util::log::format("{}", i) : atfw::util::log::format("{}.{}", prefix, i);
         dst[sub_prefix] = src.as_cpp_string(i);
+        ret = true;
 
         if (nullptr != dump_existed_set) {
           dump_existed_set->insert(atfw::util::log::format("{}{}", existed_set_prefix, i));
@@ -1727,19 +1885,23 @@ LIBATAPP_MACRO_API void ini_loader_dump_to(const atfw::util::config::ini_value &
     if (!iter->second) {
       continue;
     }
-    // First level skip fields already in ::atapp::protocol::atapp_log_sink
+    // First level skip fields already in ::atframework::atapp::protocol::atapp_log_sink
     if (prefix.empty()) {
       const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds =
-          ::atapp::protocol::atapp_log_sink::descriptor()->FindFieldByName(iter->first);
+          ::atframework::atapp::protocol::atapp_log_sink::descriptor()->FindFieldByName(iter->first);
       if (nullptr != fds && fds->name() != "unresolved_key_values") {
         continue;
       }
     }
 
     std::string sub_prefix = prefix.empty() ? iter->first : atfw::util::log::format("{}.{}", prefix, iter->first);
-    ini_loader_dump_to(*iter->second, dst, sub_prefix, dump_existed_set,
-                       atfw::util::log::format("{}{}.", existed_set_prefix, iter->first));
+    if (ini_loader_dump_to(*iter->second, dst, sub_prefix, dump_existed_set,
+                           atfw::util::log::format("{}{}.", existed_set_prefix, iter->first))) {
+      ret = true;
+    }
   }
+
+  return ret;
 }
 
 LIBATAPP_MACRO_API void yaml_loader_dump_to(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
@@ -2348,4 +2510,4 @@ LIBATAPP_MACRO_API bool protobuf_equal(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::
                                        const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &r) {
   return protobuf_equal_inner_message(l, r);
 }
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

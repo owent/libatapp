@@ -51,7 +51,7 @@
 #include <numeric>
 #include <vector>
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 namespace detail {
 #if defined(ATFRAMEWORK_UTILS_THREAD_TLS_USE_PTHREAD) && ATFRAMEWORK_UTILS_THREAD_TLS_USE_PTHREAD
 static pthread_once_t gt_rapidjson_loader_get_shared_buffer_tls_once = PTHREAD_ONCE_INIT;
@@ -989,4 +989,4 @@ LIBATAPP_MACRO_API void rapidjson_loader_load_from(rapidjson::Value &dst, rapidj
     }
   }
 }
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

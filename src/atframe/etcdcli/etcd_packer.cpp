@@ -13,7 +13,7 @@
 
 #include <config/compiler/migrate_prefix.h>
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 
 LIBATAPP_MACRO_API bool etcd_packer::parse_object(rapidjson::Document &doc, const char *data) {
 #if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
@@ -377,6 +377,6 @@ LIBATAPP_MACRO_API void etcd_packer::unpack_bool(const rapidjson::Value &json_va
   }
 }
 
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END
 
 #include <config/compiler/migrate_suffix.h>
