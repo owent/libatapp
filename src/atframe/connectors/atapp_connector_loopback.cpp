@@ -6,7 +6,7 @@
 #include <atframe/atapp.h>
 #include <atframe/connectors/atapp_connector_loopback.h>
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 
 LIBATAPP_MACRO_API atapp_connector_loopback::atapp_connector_loopback(app &owner)
     : atapp_connector_impl(owner),
@@ -216,4 +216,4 @@ LIBATAPP_MACRO_API int32_t atapp_connector_loopback::process(
   return ret;
 }
 
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

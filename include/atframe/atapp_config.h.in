@@ -75,3 +75,14 @@
 #if !defined(LIBATAPP_MACRO_API_SYMBOL_VISIBLE)
 #  define LIBATAPP_MACRO_API_SYMBOL_VISIBLE
 #endif
+
+#define LIBATAPP_MACRO_NAMESPACE_BEGIN namespace atframework { namespace atapp { inline namespace @ATFRAMEWORK_ATAPP_ABI_TAG@ {
+#define LIBATAPP_MACRO_NAMESPACE_END } } }
+#define LIBATAPP_MACRO_NAMESPACE_ID atframework::atframework::atapp::@ATFRAMEWORK_ATAPP_ABI_TAG@
+#define LIBATAPP_MACRO_NAMESPACE "atframework::atframework::atapp::@ATFRAMEWORK_ATAPP_ABI_TAG@"
+
+namespace atframework {
+namespace atapp {}
+}  // namespace atframework
+
+namespace atapp = atframework::atapp;

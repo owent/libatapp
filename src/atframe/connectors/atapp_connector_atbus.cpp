@@ -6,7 +6,7 @@
 #include <atframe/atapp.h>
 #include <atframe/connectors/atapp_connector_atbus.h>
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 
 LIBATAPP_MACRO_API atapp_connector_atbus::atapp_connector_atbus(app &owner) : atapp_connector_impl(owner) {
   register_protocol("mem");
@@ -254,4 +254,4 @@ int atapp_connector_atbus::on_remove_endpoint(const atbus::node &, atbus::endpoi
 
   return on_close_connect(*iter->second);
 }
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

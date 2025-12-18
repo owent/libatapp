@@ -27,7 +27,7 @@
 #  undef min
 #endif
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 
 struct UTIL_SYMBOL_VISIBLE worker_tick_action_handle_data {
   worker_tick_handle_type type;
@@ -1507,4 +1507,4 @@ void worker_pool_module::rebalance_jobs() {
   }
 }
 
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

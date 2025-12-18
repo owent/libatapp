@@ -19,11 +19,11 @@
 #  undef GetObject
 #endif
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 
 etcd_keepalive::default_checker_t::default_checker_t(const std::string &checked) : data(checked) {
-  ::atapp::protocol::atapp_discovery node;
-  if (::atapp::rapidjson_loader_parse(node, checked)) {
+  ::atframework::atapp::protocol::atapp_discovery node;
+  if (::atframework::atapp::rapidjson_loader_parse(node, checked)) {
     identity = node.identity();
   }
 }
@@ -36,8 +36,8 @@ bool etcd_keepalive::default_checker_t::operator()(const std::string &checked) c
   }
 
   if (!identity.empty()) {
-    ::atapp::protocol::atapp_discovery node;
-    if (::atapp::rapidjson_loader_parse(node, checked)) {
+    ::atframework::atapp::protocol::atapp_discovery node;
+    if (::atframework::atapp::rapidjson_loader_parse(node, checked)) {
       return node.identity().empty() || identity == node.identity();
     }
   }
@@ -300,4 +300,4 @@ int etcd_keepalive::libcurl_callback_on_set_data(atfw::util::network::http_reque
   self->active();
   return 0;
 }
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

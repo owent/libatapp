@@ -3,6 +3,17 @@
 
 #pragma once
 
+#include <gsl/select-gsl.h>
+
+#include <cli/cmd_option.h>
+#include <time/time_utility.h>
+
+#include <config/ini_loader.h>
+
+#include <network/http_request.h>
+
+#include <detail/libatbus_config.h>
+
 #include <atomic>
 #include <chrono>
 #include <functional>
@@ -17,15 +28,6 @@
 
 #include "atframe/atapp_conf.h"
 
-#include "gsl/select-gsl.h"
-
-#include "cli/cmd_option.h"
-#include "time/time_utility.h"
-
-#include "config/ini_loader.h"
-
-#include "network/http_request.h"
-
 #include "atframe/atapp_log_sink_maker.h"
 #include "atframe/atapp_module_impl.h"
 #include "atframe/connectors/atapp_connector_impl.h"
@@ -33,16 +35,14 @@
 
 #include "etcdcli/etcd_cluster.h"
 
-namespace atbus {
-namespace protocol {
-class msg;
-}
+ATBUS_MACRO_NAMESPACE_BEGIN
+class message;
 class node;
 class endpoint;
 class connection;
-}  // namespace atbus
+ATBUS_MACRO_NAMESPACE_END
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 
 class etcd_module;
 class worker_pool_module;
@@ -53,7 +53,7 @@ class app {
  public:
   using app_id_t = LIBATAPP_MACRO_BUSID_TYPE;
   using module_ptr_t = std::shared_ptr<module_impl>;
-  using yaml_conf_map_t = atbus::detail::auto_select_map<std::string, std::vector<YAML::Node>>::type;
+  using yaml_conf_map_t = std::unordered_map<std::string, std::vector<YAML::Node>>;
   using endpoint_index_by_id_t = std::unordered_map<uint64_t, atapp_endpoint::ptr_t>;
   using endpoint_index_by_name_t = std::unordered_map<std::string, atapp_endpoint::ptr_t>;
   using connector_protocol_map_t = std::unordered_map<std::string, std::shared_ptr<atapp_connector_impl>>;
@@ -388,9 +388,9 @@ class app {
 
   LIBATAPP_MACRO_API void pack(atapp::protocol::atapp_discovery &out) const;
 
-  LIBATAPP_MACRO_API std::shared_ptr<::atapp::etcd_module> get_etcd_module() const noexcept;
+  LIBATAPP_MACRO_API std::shared_ptr<::atframework::atapp::etcd_module> get_etcd_module() const noexcept;
 
-  LIBATAPP_MACRO_API std::shared_ptr<::atapp::worker_pool_module> get_worker_pool_module() const noexcept;
+  LIBATAPP_MACRO_API std::shared_ptr<::atframework::atapp::worker_pool_module> get_worker_pool_module() const noexcept;
 
   LIBATAPP_MACRO_API const etcd_discovery_set &get_global_discovery() const noexcept;
 
@@ -617,9 +617,9 @@ class app {
 
  private:
   int bus_evt_callback_on_recv_msg(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
-                                   const atbus::protocol::msg &, const void *, size_t);
+                                   const atbus::message &, const void *, size_t);
   int bus_evt_callback_on_forward_response(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
-                                           const atbus::protocol::msg *m);
+                                           const atbus::message *m);
   int bus_evt_callback_on_error(const atbus::node &, const atbus::endpoint *, const atbus::connection *, int, int);
   int bus_evt_callback_on_info_log(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
                                    const char *);
@@ -722,15 +722,15 @@ class app {
     uint64_t receive_custom_command_reponse_count;
 
     size_t endpoint_wake_count;
-    ::atapp::etcd_cluster::stats_t inner_etcd;
+    ::atframework::atapp::etcd_cluster::stats_t inner_etcd;
 
     std::vector<stats_data_module_reload_t> module_reload;
   };
   stats_data_t stats_;
 
   // inner modules
-  std::shared_ptr<::atapp::worker_pool_module> internal_module_worker_pool_;
-  std::shared_ptr<::atapp::etcd_module> internal_module_etcd_;
+  std::shared_ptr<::atframework::atapp::worker_pool_module> internal_module_worker_pool_;
+  std::shared_ptr<::atframework::atapp::etcd_module> internal_module_etcd_;
   etcd_discovery_set internal_empty_discovery_set_;
 
   // inner endpoints
@@ -746,4 +746,5 @@ class app {
   std::shared_ptr<atapp_connector_atbus> atbus_connector_;
   std::shared_ptr<atapp_connector_loopback> loopback_connector_;
 };
-}  // namespace atapp
+
+LIBATAPP_MACRO_NAMESPACE_END

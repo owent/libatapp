@@ -18,9 +18,9 @@
 #include <mutex>
 #include <thread>
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 
-class worker_pool_module : public ::atapp::module_impl {
+class worker_pool_module : public ::atframework::atapp::module_impl {
  public:
   struct worker_set;
   struct scaling_configure;
@@ -130,4 +130,4 @@ class worker_pool_module : public ::atapp::module_impl {
   std::shared_ptr<scaling_configure> scaling_configure_;
   std::shared_ptr<scaling_statistics> scaling_statistics_;
 };
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

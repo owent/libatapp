@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <detail/libatbus_config.h>
+
 #include <stdint.h>
 #include <list>
 #include <memory>
@@ -11,12 +13,12 @@
 
 #include "atframe/connectors/atapp_connector_impl.h"
 
-namespace atbus {
+ATBUS_MACRO_NAMESPACE_BEGIN
 class node;
 class endpoint;
-}  // namespace atbus
+ATBUS_MACRO_NAMESPACE_END
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 
 class atapp_connector_atbus : public atapp_connector_impl {
   UTIL_DESIGN_PATTERN_NOCOPYABLE(atapp_connector_atbus)
@@ -53,4 +55,5 @@ class atapp_connector_atbus : public atapp_connector_impl {
  private:
   std::unordered_map<uint64_t, atapp_connection_handle::ptr_t> handles_;
 };
-}  // namespace atapp
+
+LIBATAPP_MACRO_NAMESPACE_END

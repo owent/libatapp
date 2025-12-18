@@ -26,7 +26,7 @@
 
 #include "atframe/atapp_conf.h"
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 struct LIBATAPP_MACRO_API_HEAD_ONLY etcd_discovery_action_t {
   enum type {
     EN_NAT_UNKNOWN = 0,
@@ -254,4 +254,4 @@ class etcd_discovery_set {
   mutable index_cache_type default_index_;
   mutable std::unordered_map<metadata_type, index_cache_type, metadata_hash_type, metadata_equal_type> metadata_index_;
 };
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

@@ -17,7 +17,7 @@
 
 #include "atframe/etcdcli/etcd_def.h"
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 
 class etcd_cluster;
 
@@ -152,4 +152,4 @@ class etcd_watcher {
 
   watch_event_fn_t evt_handle_;
 };
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

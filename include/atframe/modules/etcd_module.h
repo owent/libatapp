@@ -32,8 +32,8 @@
 #include <string>
 #include <vector>
 
-namespace atapp {
-class etcd_module : public ::atapp::module_impl {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
+class etcd_module : public ::atframework::atapp::module_impl {
  public:
   using node_action_t = etcd_discovery_action_t;
 
@@ -48,14 +48,14 @@ class etcd_module : public ::atapp::module_impl {
 
   struct LIBATAPP_MACRO_API_HEAD_ONLY watcher_sender_list_t {
     std::reference_wrapper<etcd_module> atapp_module;
-    std::reference_wrapper<const ::atapp::etcd_response_header> etcd_header;
-    std::reference_wrapper<const ::atapp::etcd_watcher::response_t> etcd_body;
-    std::reference_wrapper<const ::atapp::etcd_watcher::event_t> event;
+    std::reference_wrapper<const ::atframework::atapp::etcd_response_header> etcd_header;
+    std::reference_wrapper<const ::atframework::atapp::etcd_watcher::response_t> etcd_body;
+    std::reference_wrapper<const ::atframework::atapp::etcd_watcher::event_t> event;
     std::reference_wrapper<const node_info_t> node;
 
-    inline watcher_sender_list_t(etcd_module &m, const ::atapp::etcd_response_header &h,
-                                 const ::atapp::etcd_watcher::response_t &b, const ::atapp::etcd_watcher::event_t &e,
-                                 const node_info_t &n)
+    inline watcher_sender_list_t(etcd_module &m, const ::atframework::atapp::etcd_response_header &h,
+                                 const ::atframework::atapp::etcd_watcher::response_t &b,
+                                 const ::atframework::atapp::etcd_watcher::event_t &e, const node_info_t &n)
         : atapp_module(std::ref(m)),
           etcd_header(std::cref(h)),
           etcd_body(std::cref(b)),
@@ -65,14 +65,14 @@ class etcd_module : public ::atapp::module_impl {
 
   struct LIBATAPP_MACRO_API_HEAD_ONLY watcher_sender_one_t {
     std::reference_wrapper<etcd_module> atapp_module;
-    std::reference_wrapper<const ::atapp::etcd_response_header> etcd_header;
-    std::reference_wrapper<const ::atapp::etcd_watcher::response_t> etcd_body;
-    std::reference_wrapper<const ::atapp::etcd_watcher::event_t> event;
+    std::reference_wrapper<const ::atframework::atapp::etcd_response_header> etcd_header;
+    std::reference_wrapper<const ::atframework::atapp::etcd_watcher::response_t> etcd_body;
+    std::reference_wrapper<const ::atframework::atapp::etcd_watcher::event_t> event;
     std::reference_wrapper<node_info_t> node;
 
-    inline watcher_sender_one_t(etcd_module &m, const ::atapp::etcd_response_header &h,
-                                const ::atapp::etcd_watcher::response_t &b, const ::atapp::etcd_watcher::event_t &e,
-                                node_info_t &n)
+    inline watcher_sender_one_t(etcd_module &m, const ::atframework::atapp::etcd_response_header &h,
+                                const ::atframework::atapp::etcd_watcher::response_t &b,
+                                const ::atframework::atapp::etcd_watcher::event_t &e, node_info_t &n)
         : atapp_module(std::ref(m)),
           etcd_header(std::cref(h)),
           etcd_body(std::cref(b)),
@@ -150,10 +150,10 @@ class etcd_module : public ::atapp::module_impl {
   LIBATAPP_MACRO_API atapp::etcd_watcher::ptr_t add_watcher_by_custom_path(const std::string &custom_path,
                                                                            watcher_one_callback_t fn);
 
-  LIBATAPP_MACRO_API const ::atapp::etcd_cluster &get_raw_etcd_ctx() const;
-  LIBATAPP_MACRO_API ::atapp::etcd_cluster &get_raw_etcd_ctx();
+  LIBATAPP_MACRO_API const ::atframework::atapp::etcd_cluster &get_raw_etcd_ctx() const;
+  LIBATAPP_MACRO_API ::atframework::atapp::etcd_cluster &get_raw_etcd_ctx();
 
-  LIBATAPP_MACRO_API const ::atapp::etcd_response_header &get_last_etcd_event_header() const;
+  LIBATAPP_MACRO_API const ::atframework::atapp::etcd_response_header &get_last_etcd_event_header() const;
 
   LIBATAPP_MACRO_API const atapp::protocol::atapp_etcd &get_configure() const;
   LIBATAPP_MACRO_API const std::string &get_configure_path() const;
@@ -189,7 +189,8 @@ class etcd_module : public ::atapp::module_impl {
 
     watcher_callback_list_wrapper_t(etcd_module &m, std::list<watcher_list_callback_t> &cbks, int64_t index);
     ~watcher_callback_list_wrapper_t();
-    void operator()(const ::atapp::etcd_response_header &header, const ::atapp::etcd_watcher::response_t &evt_data);
+    void operator()(const ::atframework::atapp::etcd_response_header &header,
+                    const ::atframework::atapp::etcd_watcher::response_t &evt_data);
   };
 
   struct watcher_callback_one_wrapper_t {
@@ -200,7 +201,8 @@ class etcd_module : public ::atapp::module_impl {
 
     watcher_callback_one_wrapper_t(etcd_module &m, watcher_one_callback_t cbk, int64_t index);
     ~watcher_callback_one_wrapper_t();
-    void operator()(const ::atapp::etcd_response_header &header, const ::atapp::etcd_watcher::response_t &evt_data);
+    void operator()(const ::atframework::atapp::etcd_response_header &header,
+                    const ::atframework::atapp::etcd_watcher::response_t &evt_data);
   };
 
   bool update_inner_watcher_event(node_info_t &node, const etcd_discovery_node::node_version &version);
@@ -225,7 +227,7 @@ class etcd_module : public ::atapp::module_impl {
   atfw::util::time::time_utility::raw_time_t tick_next_timepoint_;
   std::chrono::system_clock::duration tick_interval_;
   atapp::etcd_cluster etcd_ctx_;
-  ::atapp::etcd_response_header last_etcd_event_header_;
+  ::atframework::atapp::etcd_response_header last_etcd_event_header_;
 
   std::list<etcd_keepalive::ptr_t> inner_keepalive_actors_;
   std::string inner_keepalive_value_;
@@ -246,4 +248,4 @@ class etcd_module : public ::atapp::module_impl {
   mutable std::recursive_mutex node_event_lock_;
   node_event_callback_list_t node_event_callbacks_;
 };
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

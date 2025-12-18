@@ -24,7 +24,7 @@ CASE_TEST(atapp_worker_pool, basic_spawn) {
     return;
   }
 
-  atapp::app app;
+  atframework::atapp::app app;
   const char* args[] = {"app", "-c", conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app.init(nullptr, 4, args, nullptr));
 
@@ -124,7 +124,7 @@ CASE_TEST(atapp_worker_pool, stop) {
     return;
   }
 
-  atapp::app app;
+  atframework::atapp::app app;
   const char* args[] = {"app", "-c", conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app.init(nullptr, 4, args, nullptr));
 
@@ -202,7 +202,7 @@ CASE_TEST(atapp_worker_pool, foreach_stable_workers) {
     return;
   }
 
-  atapp::app app;
+  atframework::atapp::app app;
   const char* args[] = {"app", "-c", conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app.init(nullptr, 4, args, nullptr));
 
@@ -258,7 +258,7 @@ CASE_TEST(atapp_worker_pool, basic_tick) {
     return;
   }
 
-  atapp::app app;
+  atframework::atapp::app app;
   const char* args[] = {"app", "-c", conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app.init(nullptr, 4, args, nullptr));
 
@@ -333,7 +333,7 @@ CASE_TEST(atapp_worker_pool, stop_tick) {
     return;
   }
 
-  atapp::app app;
+  atframework::atapp::app app;
   const char* args[] = {"app", "-c", conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app.init(nullptr, 4, args, nullptr));
 

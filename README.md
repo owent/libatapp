@@ -13,19 +13,17 @@
 | ------------- | ------------------ | --------------------- |
 | Linux         | GCC                |
 | Linux         | Clang              | With libc++           |
-| Linux         | GCC 4.8            |
 | MinGW64       | GCC                | Dynamic linking       |
 | Windows       | Visual Studio 2022 | Dynamic linking       |
 | Windows       | Visual Studio 2022 | Static linking        |
-| Windows       | Visual Studio 2019 | Static linking        |
 | macOS         | AppleClang         | With libc++           |
 
 ## 依赖
 
 + 支持c++0x或c++11的编译器(为了代码尽量简洁,特别是少做无意义的平台兼容，依赖部分 C11和C++11的功能，所以不支持过低版本的编译器)
-  > + GCC: 4.8 及以上
+  > + GCC: 7.1 及以上
   > + Clang: 7 及以上
-  > + VC: VS2019 及以上
+  > + VC: VS2022 及以上
 
 + [cmake](https://cmake.org/download/) 3.24.0 以上
 
@@ -45,7 +43,7 @@
 #include <atframe/atapp.h>
 #include <common/file_system.h>
 
-static int app_handle_on_msg(atapp::app &app, const atapp::app::message_sender_t& source, const atapp::app::message_t &msg) {
+static int app_handle_on_msg(atframework::atapp::app &app, const atframework::atapp::app::message_sender_t& source, const atframework::atapp::app::message_t &msg) {
     std::string data;
     data.assign(reinterpret_cast<const char *>(msg.data), msg.data_size);
     FWLOGINFO("receive a message(from {:#x}, type={}) {}", source.id, msg.type, data);
@@ -53,7 +51,7 @@ static int app_handle_on_msg(atapp::app &app, const atapp::app::message_sender_t
     return app.get_bus_node()->send_data(source.id, msg.type, msg.data, msg.data_size);
 }
 
-static int app_handle_on_response(atapp::app & app, const atapp::app::message_sender_t& source, const atapp::app::message_t & msg, int32_t error_code) {
+static int app_handle_on_response(atframework::atapp::app & app, const atframework::atapp::app::message_sender_t& source, const atframework::atapp::app::message_t & msg, int32_t error_code) {
     if (error_code < 0) {
         FWLOGERROR("send data from {:#x} to {:#x} failed, sequence: {}, code: {}", app.get_id(), source.id, msg.msg_sequence, error_code);
     } else {
@@ -63,7 +61,7 @@ static int app_handle_on_response(atapp::app & app, const atapp::app::message_se
 }
 
 int main(int argc, char *argv[]) {
-    atapp::app app;
+    atframework::atapp::app app;
 
     // 设置工程目录，不设置的话日志打印出来都是绝对路劲，比较长
     {
@@ -100,7 +98,7 @@ static int app_option_handler_echo(atfw::util::cli::callback_param params) {
 }
 
 int main(int argc, char *argv[]) {
-    atapp::app app;
+    atframework::atapp::app app;
     // ...
     // setup options, 自定义命令行参数是区分大小写的
     atfw::util::cli::cmd_option::ptr_type opt_mgr = app.get_option_manager();
@@ -131,7 +129,7 @@ static int app_command_handler_echo(atfw::util::cli::callback_param params) {
 }
 
 int main(int argc, char *argv[]) {
-    atapp::app app;
+    atframework::atapp::app app;
     // ... 
     // setup cmd, 自定义远程命令是不区分大小写的
     atfw::util::cli::cmd_option_ci::ptr_type cmgr = app.get_command_manager();
@@ -200,7 +198,7 @@ public:
 };
 
 int main(int argc, char *argv[]) {
-    atapp::app app;
+    atframework::atapp::app app;
     // ... 
     // setup module, 自定义模块必需是shared_ptr
     app.add_module(std::make_shared<echo_module>());

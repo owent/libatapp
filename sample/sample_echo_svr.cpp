@@ -58,13 +58,13 @@ static int app_command_handler_echo(atfw::util::cli::callback_param params) {
 
   std::string content = ss.str();
   WLOGINFO("echo commander:%s", ss.str().c_str());
-  ::atapp::app::add_custom_command_rsp(params, std::string("echo: ") + content);
+  ::atframework::atapp::app::add_custom_command_rsp(params, std::string("echo: ") + content);
   return 0;
 }
 
 struct app_command_handler_transfer {
-  atapp::app *app_;
-  app_command_handler_transfer(atapp::app &a) : app_(&a) {}
+  atframework::atapp::app *app_;
+  app_command_handler_transfer(atframework::atapp::app &a) : app_(&a) {}
 
   int operator()(atfw::util::cli::callback_param params) {
     if (params.get_params_number() < 2) {
@@ -83,8 +83,8 @@ struct app_command_handler_transfer {
 };
 
 struct app_command_handler_listen {
-  atapp::app *app_;
-  explicit app_command_handler_listen(atapp::app &a) : app_(&a) {}
+  atframework::atapp::app *app_;
+  explicit app_command_handler_listen(atframework::atapp::app &a) : app_(&a) {}
 
   int operator()(atfw::util::cli::callback_param params) {
     if (params.get_params_number() < 1) {
@@ -97,8 +97,8 @@ struct app_command_handler_listen {
 };
 
 struct app_command_handler_connect {
-  atapp::app *app_;
-  explicit app_command_handler_connect(atapp::app &a) : app_(&a) {}
+  atframework::atapp::app *app_;
+  explicit app_command_handler_connect(atframework::atapp::app &a) : app_(&a) {}
 
   int operator()(atfw::util::cli::callback_param params) {
     if (params.get_params_number() < 1) {
@@ -120,8 +120,8 @@ static int app_option_handler_echo(atfw::util::cli::callback_param params) {
   return 0;
 }
 
-static int app_handle_on_msg(atapp::app &app, const atapp::app::message_sender_t &source,
-                             const atapp::app::message_t &msg) {
+static int app_handle_on_msg(atframework::atapp::app &app, const atframework::atapp::app::message_sender_t &source,
+                             const atframework::atapp::app::message_t &msg) {
   std::string data;
   data.assign(reinterpret_cast<const char *>(msg.data), msg.data_size);
   FWLOGINFO("receive a message(from {:#x}, type={}) {}", source.id, msg.type, data);
@@ -129,8 +129,8 @@ static int app_handle_on_msg(atapp::app &app, const atapp::app::message_sender_t
   return app.get_bus_node()->send_data(source.id, msg.type, msg.data, msg.data_size);
 }
 
-static int app_handle_on_response(atapp::app &app, const atapp::app::message_sender_t &source,
-                                  const atapp::app::message_t &msg, int32_t error_code) {
+static int app_handle_on_response(atframework::atapp::app &app, const atframework::atapp::app::message_sender_t &source,
+                                  const atframework::atapp::app::message_t &msg, int32_t error_code) {
   if (error_code < 0) {
     FWLOGERROR("send data from {:#x} to {:#x} failed, sequence: {}, code: {}", app.get_id(), source.id,
                msg.message_sequence, error_code);
@@ -141,18 +141,18 @@ static int app_handle_on_response(atapp::app &app, const atapp::app::message_sen
   return 0;
 }
 
-static int app_handle_on_connected(atapp::app &, atbus::endpoint &ep, int status) {
+static int app_handle_on_connected(atframework::atapp::app &, atbus::endpoint &ep, int status) {
   WLOGINFO("app 0x%llx connected, status: %d", static_cast<unsigned long long>(ep.get_id()), status);
   return 0;
 }
 
-static int app_handle_on_disconnected(atapp::app &, atbus::endpoint &ep, int status) {
+static int app_handle_on_disconnected(atframework::atapp::app &, atbus::endpoint &ep, int status) {
   WLOGINFO("app 0x%llx disconnected, status: %d", static_cast<unsigned long long>(ep.get_id()), status);
   return 0;
 }
 
 int main(int argc, char *argv[]) {
-  atapp::app app;
+  atframework::atapp::app app;
 
   // project directory
   {

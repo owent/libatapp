@@ -34,7 +34,7 @@
 
 #include "atframe/atapp_config.h"
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 struct app_conf {
   // bus configure
   std::string id_cmd;
@@ -100,11 +100,11 @@ using configure_key_set = std::unordered_set<std::string>;
 LIBATAPP_MACRO_API void parse_timepoint(gsl::string_view in, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp &out);
 LIBATAPP_MACRO_API void parse_duration(gsl::string_view in, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &out);
 
-LIBATAPP_MACRO_API void ini_loader_dump_to(const atfw::util::config::ini_value &src,
+LIBATAPP_MACRO_API bool ini_loader_dump_to(const atfw::util::config::ini_value &src,
                                            ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                                            configure_key_set *dump_existed_set = nullptr,
                                            gsl::string_view existed_set_prefix = "");
-LIBATAPP_MACRO_API void ini_loader_dump_to(const atfw::util::config::ini_value &src,
+LIBATAPP_MACRO_API bool ini_loader_dump_to(const atfw::util::config::ini_value &src,
                                            ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Map<std::string, std::string> &dst,
                                            gsl::string_view prefix, configure_key_set *dump_existed_set = nullptr,
                                            gsl::string_view existed_set_prefix = "");
@@ -132,4 +132,4 @@ LIBATAPP_MACRO_API void default_loader_dump_to(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID
 
 LIBATAPP_MACRO_API bool protobuf_equal(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &l,
                                        const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &r);
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

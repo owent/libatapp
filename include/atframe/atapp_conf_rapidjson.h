@@ -32,7 +32,7 @@ class Duration;
 }  // namespace protobuf
 }  // namespace google
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 
 struct LIBATAPP_MACRO_API_HEAD_ONLY rapidjson_loader_string_mode {
   enum type {
@@ -172,4 +172,4 @@ LIBATAPP_MACRO_API_HEAD_ONLY void rapidjson_loader_append_to_list(rapidjson::Val
   rapidjson_loader_mutable_member_helper<TVAL, std::is_convertible<TVAL, gsl::string_view>::value>::append(
       parent, std::forward<TVAL>(val), doc);
 }
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

@@ -44,16 +44,16 @@ class atappctl_module : public atapp::module_impl {
   int tick() override { return 0; }
 };
 
-static int app_handle_on_msg(atapp::app &, const atapp::app::message_sender_t &source,
-                             const atapp::app::message_t &msg) {
+static int app_handle_on_msg(atframework::atapp::app &, const atframework::atapp::app::message_sender_t &source,
+                             const atframework::atapp::app::message_t &msg) {
   std::string data;
   data.assign(reinterpret_cast<const char *>(msg.data), msg.data_size);
   FWLOGINFO("receive a message(from {:#x}, type={}) {}", source.id, msg.type, data);
   return 0;
 }
 
-static int app_handle_on_response(atapp::app &, const atapp::app::message_sender_t &source,
-                                  const atapp::app::message_t &, int32_t error_code) {
+static int app_handle_on_response(atframework::atapp::app &, const atframework::atapp::app::message_sender_t &source,
+                                  const atframework::atapp::app::message_t &, int32_t error_code) {
   if (error_code < 0) {
     FWLOGERROR("send data to {:#x} failed, code: {}", source.id, error_code);
   } else {
@@ -63,18 +63,18 @@ static int app_handle_on_response(atapp::app &, const atapp::app::message_sender
   return 0;
 }
 
-static int app_handle_on_connected(atapp::app &, atbus::endpoint &ep, int status) {
+static int app_handle_on_connected(atframework::atapp::app &, atbus::endpoint &ep, int status) {
   WLOGINFO("app 0x%llx connected, status: %d", static_cast<unsigned long long>(ep.get_id()), status);
   return 0;
 }
 
-static int app_handle_on_disconnected(atapp::app &, atbus::endpoint &ep, int status) {
+static int app_handle_on_disconnected(atframework::atapp::app &, atbus::endpoint &ep, int status) {
   WLOGINFO("app 0x%llx disconnected, status: %d", static_cast<unsigned long long>(ep.get_id()), status);
   return 0;
 }
 
 int main(int argc, char *argv[]) {
-  atapp::app app;
+  atframework::atapp::app app;
 
   // project directory
   {

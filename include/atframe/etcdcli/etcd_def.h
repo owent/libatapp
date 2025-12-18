@@ -9,7 +9,7 @@
 #include <atframe/atapp_config.h>
 #include <config/compile_optimize.h>
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 struct LIBATAPP_MACRO_API_HEAD_ONLY etcd_response_header {
   uint64_t cluster_id;
   uint64_t member_id;
@@ -32,4 +32,4 @@ struct LIBATAPP_MACRO_API_HEAD_ONLY etcd_watch_event {
     EN_WEVT_DELETE = 1  // delete
   };
 };
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

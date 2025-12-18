@@ -3,7 +3,9 @@ syntax = "proto3";
 import "google/protobuf/duration.proto";
 import "google/protobuf/descriptor.proto";
 
-package atapp.protocol;
+package atframework.atapp.protocol;
+
+option go_package = "github.com/atframework/libatapp-go/protocol/atframe";
 
 option optimize_for = SPEED;
 // option optimize_for = LITE_RUNTIME;
@@ -11,11 +13,19 @@ option optimize_for = SPEED;
 // --cpp_out=lite:,--cpp_out=
 option cc_enable_arenas = true;
 
+message atapp_configure_meta_oneof_field_match {
+  string field_name = 1;
+  string field_value = 2;
+}
+
 message atapp_configure_meta {
   string default_value = 1;
   string min_value = 2;
   string max_value = 3;
   bool size_mode = 4;
+
+  // TODO: （C++暂未支持）如果该层内field_name字段不与field_value匹配 则跳过解析
+  atapp_configure_meta_oneof_field_match field_match = 5;
 }
 
 extend google.protobuf.FieldOptions {
@@ -74,7 +84,7 @@ message atbus_configure {
   google.protobuf.Duration retry_interval = 203 [(atapp.protocol.CONFIGURE) = { default_value: "3s" }];
 
   uint64 fault_tolerant = 301 [(atapp.protocol.CONFIGURE) = { default_value: "3" }];
-  uint64 msg_size = 302 [(atapp.protocol.CONFIGURE) = { size_mode: true }];
+  uint64 message_size = 302 [(atapp.protocol.CONFIGURE) = { size_mode: true }];
   uint64 recv_buffer_size = 303 [(atapp.protocol.CONFIGURE) = { size_mode: true }];
   uint64 send_buffer_size = 304 [(atapp.protocol.CONFIGURE) = { size_mode: true }];
   uint64 send_buffer_number = 305;
@@ -117,7 +127,8 @@ message atapp_log_sink_std {}
 message atapp_log_sink_syslog {
   string ident = 1;
   repeated string options = 2;  // cons, ndelay, nowait, odelay, perror, pid
-  string facility = 3;          // auth, authpriv, cron, daemon, ftp, kern, lpr, mail, news, syslog, user, uucp
+  string facility = 3;          // auth, authpriv, cron, daemon, ftp, kern, lpr, mail,
+                                // news, syslog, user, uucp
 }
 
 message atapp_log_sink {
@@ -125,10 +136,14 @@ message atapp_log_sink {
   atapp_log_level_range level = 2;
 
   oneof backend {
-    atapp_log_sink_file log_backend_file = 21;
-    atapp_log_sink_std log_backend_stdout = 22;
-    atapp_log_sink_std log_backend_stderr = 23;
-    atapp_log_sink_syslog log_backend_syslog = 24;
+    atapp_log_sink_file log_backend_file = 21
+        [(atapp.protocol.CONFIGURE) = { field_match: { field_name: "type", field_value: "file" } }];
+    atapp_log_sink_std log_backend_stdout = 22
+        [(atapp.protocol.CONFIGURE) = { field_match: { field_name: "type", field_value: "stdout" } }];
+    atapp_log_sink_std log_backend_stderr = 23
+        [(atapp.protocol.CONFIGURE) = { field_match: { field_name: "type", field_value: "stderr" } }];
+    atapp_log_sink_syslog log_backend_syslog = 24
+        [(atapp.protocol.CONFIGURE) = { field_match: { field_name: "type", field_value: "syslog" } }];
   }
 
   map<string, string> unresolved_key_values = 101;
@@ -145,6 +160,8 @@ message atapp_log_category {
 message atapp_log {
   string level = 1;
   repeated atapp_log_category category = 2;
+  // TODO: (C++层支持)
+  string crash_output_file = 3;
 }
 
 message atapp_etcd_log_extend {
@@ -155,8 +172,9 @@ message atapp_etcd_http {
   bool debug = 1;
 
   string user_agent = 301;       // CURLOPT_USERAGENT
-  string proxy = 302;            // CURLOPT_HTTPPROXYTUNNEL, CURLOPT_PROXY: [SCHEME]://HOST[:PORT], SCHEME is one of
-                                 // http,https,socks4,socks4a,socks5,socks5h. PORT's default value is 1080
+  string proxy = 302;            // CURLOPT_HTTPPROXYTUNNEL, CURLOPT_PROXY: [SCHEME]://HOST[:PORT],
+                                 // SCHEME is one of http,https,socks4,socks4a,socks5,socks5h. PORT's
+                                 // default value is 1080
   string no_proxy = 303;         // curl 7.19.4 CURLOPT_NOPROXY
   string proxy_user_name = 304;  // curl 7.19.1 CURLOPT_PROXYUSERNAME
   string proxy_password = 305;   // curl 7.19.1 CURLOPT_PROXYPASSWORD
@@ -165,8 +183,9 @@ message atapp_etcd_http {
 message atapp_etcd_ssl {
   // @see https://curl.haxx.se/libcurl/c/curl_easy_setopt.html
   bool enable_alpn = 1;  // CURLOPT_SSL_ENABLE_ALPN
-  bool verify_peer = 2;  // CURLOPT_SSL_VERIFYPEER, CURLOPT_SSL_VERIFYHOST, CURLOPT_SSL_VERIFYSTATUS
-                         // and CURLOPT_PROXY_SSL_VERIFYPEER, CURLOPT_PROXY_SSL_VERIFYHOST
+  bool verify_peer = 2;  // CURLOPT_SSL_VERIFYPEER, CURLOPT_SSL_VERIFYHOST,
+                         // CURLOPT_SSL_VERIFYSTATUS and CURLOPT_PROXY_SSL_VERIFYPEER,
+                         // CURLOPT_PROXY_SSL_VERIFYHOST
 
   string ssl_min_version = 101;  // CURLOPT_SSLVERSION and CURLOPT_PROXY_SSLVERSION
 

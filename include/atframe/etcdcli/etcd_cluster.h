@@ -19,7 +19,7 @@
 
 #include "atframe/etcdcli/etcd_packer.h"
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 class etcd_keepalive;
 class etcd_watcher;
 class etcd_cluster;
@@ -606,4 +606,4 @@ class etcd_cluster {
     }
 #endif
 
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

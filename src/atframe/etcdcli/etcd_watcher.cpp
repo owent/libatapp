@@ -19,7 +19,7 @@
 #  undef GetObject
 #endif
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 
 LIBATAPP_MACRO_API etcd_watcher::etcd_watcher(etcd_cluster &owner, const std::string &path,
                                               const std::string &range_end, constrict_helper_t &)
@@ -558,4 +558,4 @@ int etcd_watcher::libcurl_callback_on_watch_write(atfw::util::network::http_requ
   return 0;
 }
 
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

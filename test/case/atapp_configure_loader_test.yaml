@@ -21,7 +21,7 @@ atapp:
     ping_interval: 60s
     retry_interval: 3s
     fault_tolerant: 3
-    msg_size: 256KB
+    message_size: 256KB
     recv_buffer_size: 8MB
     send_buffer_size: 2MB
     send_buffer_number: 0

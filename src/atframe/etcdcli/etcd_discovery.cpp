@@ -17,7 +17,7 @@
 #  undef max
 #endif
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 
 namespace {
 enum class search_mode_internal_flag : uint8_t {
@@ -1110,4 +1110,4 @@ etcd_discovery_set::index_cache_type *etcd_discovery_set::mutable_index_cache(
   return ret;
 }
 
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

@@ -15,19 +15,20 @@
 #include <libatbus.h>
 #include <libatbus_protocol.h>
 
-#define ATAPP_CONTEXT(x) ((::atapp::app *)(x))
+#define ATAPP_CONTEXT(x) ((::atframework::atapp::app *)(x))
 #define ATAPP_CONTEXT_IS_NULL(x) (nullptr == (x))
 
-#define ATAPP_MESSAGE(x) ((const ::atapp::app::message_t *)(x[1]))
+#define ATAPP_MESSAGE(x) ((const ::atframework::atapp::app::message_t *)(x[1]))
 #define ATAPP_MESSAGE_IS_NULL(x) (nullptr == (x))
 
-#define ATAPP_SENDER(x) ((const ::atapp::app::message_sender_t *)(x[0]))
+#define ATAPP_SENDER(x) ((const ::atframework::atapp::app::message_sender_t *)(x[0]))
 
 namespace detail {
 struct libatapp_c_on_msg_functor {
   libatapp_c_on_msg_functor(libatapp_c_on_msg_fn_t fn, void *priv_data) : callee_(fn), private_data_(priv_data) {}
 
-  int operator()(::atapp::app &self, const ::atapp::app::message_sender_t &source, const ::atapp::app::message_t &msg) {
+  int operator()(::atframework::atapp::app &self, const ::atframework::atapp::app::message_sender_t &source,
+                 const ::atframework::atapp::app::message_t &msg) {
     if (nullptr == callee_) {
       return 0;
     }
@@ -49,8 +50,8 @@ struct libatapp_c_on_send_fail_functor {
   libatapp_c_on_send_fail_functor(libatapp_c_on_send_fail_fn_t fn, void *priv_data)
       : callee_(fn), private_data_(priv_data) {}
 
-  int operator()(::atapp::app &self, const ::atapp::app::message_sender_t &source, const ::atapp::app::message_t &msg,
-                 int32_t) {
+  int operator()(::atframework::atapp::app &self, const ::atframework::atapp::app::message_sender_t &source,
+                 const ::atframework::atapp::app::message_t &msg, int32_t) {
     if (nullptr == callee_) {
       return 0;
     }
@@ -72,7 +73,7 @@ struct libatapp_c_on_connected_functor {
   libatapp_c_on_connected_functor(libatapp_c_on_connected_fn_t fn, void *priv_data)
       : callee_(fn), private_data_(priv_data) {}
 
-  int operator()(::atapp::app &self, ::atbus::endpoint &ep, int status) {
+  int operator()(::atframework::atapp::app &self, ::atbus::endpoint &ep, int status) {
     if (nullptr == callee_) {
       return 0;
     }
@@ -90,7 +91,7 @@ struct libatapp_c_on_disconnected_functor {
   libatapp_c_on_disconnected_functor(libatapp_c_on_disconnected_fn_t fn, void *priv_data)
       : callee_(fn), private_data_(priv_data) {}
 
-  int operator()(::atapp::app &self, ::atbus::endpoint &ep, int status) {
+  int operator()(::atframework::atapp::app &self, ::atbus::endpoint &ep, int status) {
     if (nullptr == callee_) {
       return 0;
     }
@@ -108,7 +109,7 @@ struct libatapp_c_on_all_module_inited_functor {
   libatapp_c_on_all_module_inited_functor(libatapp_c_on_all_module_inited_fn_t fn, void *priv_data)
       : callee_(fn), private_data_(priv_data) {}
 
-  int operator()(::atapp::app &self) {
+  int operator()(::atframework::atapp::app &self) {
     if (nullptr == callee_) {
       return 0;
     }
@@ -149,7 +150,7 @@ struct libatapp_c_on_cmd_option_functor {
   void *private_data_;
 };
 
-class libatapp_c_on_module final : public ::atapp::module_impl {
+class libatapp_c_on_module final : public ::atframework::atapp::module_impl {
  public:
   libatapp_c_on_module(const char *name) {
     name_ = name;
@@ -224,7 +225,7 @@ class libatapp_c_on_module final : public ::atapp::module_impl {
     return 0;
   }
 
-  using ::atapp::module_impl::get_app;
+  using ::atframework::atapp::module_impl::get_app;
 
  public:
   libatapp_c_module_on_init_fn_t on_init_;
@@ -342,14 +343,15 @@ LIBATAPP_MACRO_API void __cdecl libatapp_c_custom_cmd_add_rsp(libatapp_c_custom_
     return;
   }
 
-  ::atapp::app::add_custom_command_rsp(*(atfw::util::cli::cmd_option_list *)sender, std::string(rsp, rsp_sz));
+  ::atframework::atapp::app::add_custom_command_rsp(*(atfw::util::cli::cmd_option_list *)sender,
+                                                    std::string(rsp, rsp_sz));
 }
 
 LIBATAPP_MACRO_API libatapp_c_context __cdecl libatapp_c_create() {
   libatapp_c_context ret;
   assert(sizeof(void *) == sizeof(libatapp_c_context));
 
-  atapp::app *res = new (std::nothrow) atapp::app();
+  atframework::atapp::app *res = new (std::nothrow) atframework::atapp::app();
   ret = res;
   return ret;
 }
@@ -497,7 +499,7 @@ LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_is_stoping(libatapp_c_context cont
     return 0;
   }
 
-  return ATAPP_CONTEXT(context)->check_flag(atapp::app::flag_t::STOPING);
+  return ATAPP_CONTEXT(context)->check_flag(atframework::atapp::app::flag_t::STOPING);
 }
 
 LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_is_timeout(libatapp_c_context context) {
@@ -505,7 +507,7 @@ LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_is_timeout(libatapp_c_context cont
     return 0;
   }
 
-  return ATAPP_CONTEXT(context)->check_flag(atapp::app::flag_t::TIMEOUT);
+  return ATAPP_CONTEXT(context)->check_flag(atframework::atapp::app::flag_t::TIMEOUT);
 }
 
 LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_listen(libatapp_c_context context, const char *address) {

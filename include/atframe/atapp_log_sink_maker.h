@@ -10,6 +10,7 @@
 
 #include "atframe/atapp_config.h"
 
+namespace atframework {
 namespace atapp {
 namespace protocol {
 class atapp_log;
@@ -17,13 +18,16 @@ class atapp_log_category;
 class atapp_log_sink;
 }  // namespace protocol
 }  // namespace atapp
+}  // namespace atframework
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
+
 class log_sink_maker {
  public:
   using log_reg_t = std::function<atfw::util::log::log_wrapper::log_handler_t(
-      atfw::util::log::log_wrapper &, int32_t, const ::atapp::protocol::atapp_log &,
-      const ::atapp::protocol::atapp_log_category &, const ::atapp::protocol::atapp_log_sink &)>;
+      atfw::util::log::log_wrapper &, int32_t, const ::atframework::atapp::protocol::atapp_log &,
+      const ::atframework::atapp::protocol::atapp_log_category &,
+      const ::atframework::atapp::protocol::atapp_log_sink &)>;
 
  private:
   log_sink_maker();
@@ -46,4 +50,4 @@ class log_sink_maker {
 
   static LIBATAPP_MACRO_API log_reg_t get_syslog_sink_reg();
 };
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END

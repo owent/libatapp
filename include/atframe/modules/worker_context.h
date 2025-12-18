@@ -13,7 +13,7 @@
 #include <functional>
 #include <list>
 
-namespace atapp {
+LIBATAPP_MACRO_NAMESPACE_BEGIN
 
 struct UTIL_SYMBOL_VISIBLE worker_context {
   uint32_t worker_id = 0;
@@ -72,4 +72,4 @@ enum class worker_type : int32_t {
   kMain = 0,
 };
 
-}  // namespace atapp
+LIBATAPP_MACRO_NAMESPACE_END
