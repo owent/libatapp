@@ -221,7 +221,7 @@ LIBATAPP_MACRO_API app::app()
     OPENSSL_init_ssl(0, nullptr);
 #  endif
 #endif
-#ifdef CRYPTO_CIPHER_ENABLED
+#ifdef ATFW_UTIL_MACRO_CRYPTO_CIPHER_ENABLED
     atfw::util::crypto::cipher::init_global_algorithm();
 #endif
   }
@@ -372,7 +372,7 @@ LIBATAPP_MACRO_API app::~app() {
     last_instance_ = nullptr;
   }
 
-#ifdef CRYPTO_CIPHER_ENABLED
+#ifdef ATFW_UTIL_MACRO_CRYPTO_CIPHER_ENABLED
   atfw::util::crypto::cipher::cleanup_global_algorithm();
 #endif
 }
@@ -1661,9 +1661,8 @@ LIBATAPP_MACRO_API void app::pack(atapp::protocol::atapp_discovery &out) const {
 
     out.mutable_listen()->Reserve(static_cast<int>(bus_node_->get_listen_list().size()));
     // std::list<std::string>
-    for (std::list<std::string>::const_iterator iter = bus_node_->get_listen_list().begin();
-         iter != bus_node_->get_listen_list().end(); ++iter) {
-      out.add_listen(*iter);
+    for (auto &addr : bus_node_->get_listen_list()) {
+      out.add_listen(addr.address);
     }
     out.set_atbus_protocol_version(bus_node_->get_protocol_version());
     out.set_atbus_protocol_min_version(bus_node_->get_protocol_minimal_version());
