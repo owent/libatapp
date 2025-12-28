@@ -37,14 +37,18 @@ CASE_TEST(atapp_connector, get_address_type) {
                      atframework::atapp::app::address_type_t::EN_ACAT_LOCAL_PROCESS));
 
   CASE_EXPECT_TRUE(
-      !(app.get_address_type("ipv4://127.0.0.1:1234") & atframework::atapp::app::address_type_t::EN_ACAT_LOCAL_HOST));
+      (app.get_address_type("ipv4://127.0.0.1:1234") & atframework::atapp::app::address_type_t::EN_ACAT_LOCAL_HOST));
   CASE_EXPECT_TRUE(!(app.get_address_type("ipv4://127.0.0.1:1234") &
                      atframework::atapp::app::address_type_t::EN_ACAT_LOCAL_PROCESS));
+  CASE_EXPECT_TRUE(
+      !(app.get_address_type("ipv4://1.2.3.4:1234") & atframework::atapp::app::address_type_t::EN_ACAT_LOCAL_HOST));
 
   CASE_EXPECT_TRUE(
-      !(app.get_address_type("ipv6://::1:1234") & atframework::atapp::app::address_type_t::EN_ACAT_LOCAL_HOST));
+      (app.get_address_type("ipv6://::1:1234") & atframework::atapp::app::address_type_t::EN_ACAT_LOCAL_HOST));
   CASE_EXPECT_TRUE(
       !(app.get_address_type("ipv6://::1:1234") & atframework::atapp::app::address_type_t::EN_ACAT_LOCAL_PROCESS));
+  CASE_EXPECT_TRUE(
+      !(app.get_address_type("ipv6://2000::1:1234") & atframework::atapp::app::address_type_t::EN_ACAT_LOCAL_HOST));
 
   CASE_EXPECT_TRUE(
       !(app.get_address_type("dns://localhost:1234") & atframework::atapp::app::address_type_t::EN_ACAT_LOCAL_HOST));
