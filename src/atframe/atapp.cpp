@@ -934,6 +934,9 @@ LIBATAPP_MACRO_API int app::reload() {
   std::list<std::string> pending_load_files;
   if (!conf_.conf_file.empty()) {
     pending_load_files.push_back(conf_.conf_file);
+    FWLOGWARNING("============ load config file {} ============", conf_.conf_file);
+  } else {
+    FWLOGWARNING("============ config file empty ============");
   }
   if (!reload_all_configure_files(yaml_loader_, cfg_loader_, loaded_files, pending_load_files)) {
     print_help();
@@ -2441,7 +2444,7 @@ LIBATAPP_MACRO_API void app::setup_logger(atfw::util::log::log_wrapper &logger, 
       stacktrace_level_max = atfw::util::log::log_formatter::get_level_by_name(log_conf.stacktrace().max().c_str());
     }
 
-    logger.set_stacktrace_level(stacktrace_level_max, stacktrace_level_min);
+    logger.set_stacktrace_level(stacktrace_level_min, stacktrace_level_max);
   }
 
   // For now, only log level can be reload
@@ -2451,8 +2454,8 @@ LIBATAPP_MACRO_API void app::setup_logger(atfw::util::log::log_wrapper &logger, 
   // register log handles
   for (int j = 0; j < log_conf.sink_size(); ++j) {
     const ::atframework::atapp::protocol::atapp_log_sink &log_sink = log_conf.sink(j);
-    int log_handle_min = atfw::util::log::log_wrapper::level_t::LOG_LW_FATAL,
-        log_handle_max = atfw::util::log::log_wrapper::level_t::LOG_LW_DEBUG;
+    int log_handle_min = atfw::util::log::log_wrapper::level_t::LOG_LW_DEBUG,
+        log_handle_max = atfw::util::log::log_wrapper::level_t::LOG_LW_FATAL;
     if (!log_sink.level().min().empty()) {
       log_handle_min = atfw::util::log::log_formatter::get_level_by_name(log_sink.level().min().c_str());
     }

@@ -53,18 +53,18 @@ static atfw::util::log::log_wrapper::log_handler_t _log_sink_file(
 
 static void _log_sink_stdout_handle(const atfw::util::log::log_wrapper::caller_info_t& caller, const char* content,
                                     size_t content_size) {
-  if (caller.level_id <= atfw::util::log::log_formatter::level_t::LOG_LW_ERROR) {
-    atfw::util::cli::shell_stream ss(std::cout);
-    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << content << std::endl;
-  } else if (caller.level_id == atfw::util::log::log_formatter::level_t::LOG_LW_WARNING) {
-    atfw::util::cli::shell_stream ss(std::cout);
-    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW << content << std::endl;
+  if (caller.level_id <= atfw::util::log::log_formatter::level_t::LOG_LW_NOTICE) {
+    std::cout.write(content, content_size);
+    std::cout << std::endl;
   } else if (caller.level_id == atfw::util::log::log_formatter::level_t::LOG_LW_INFO) {
     atfw::util::cli::shell_stream ss(std::cout);
     ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_GREEN << content << std::endl;
+  } else if (caller.level_id == atfw::util::log::log_formatter::level_t::LOG_LW_WARNING) {
+    atfw::util::cli::shell_stream ss(std::cout);
+    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW << content << std::endl;
   } else {
-    std::cout.write(content, content_size);
-    std::cout << std::endl;
+    atfw::util::cli::shell_stream ss(std::cout);
+    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << content << std::endl;
   }
 }
 
@@ -78,18 +78,18 @@ static atfw::util::log::log_wrapper::log_handler_t _log_sink_stdout(
 
 static void _log_sink_stderr_handle(const atfw::util::log::log_wrapper::caller_info_t& caller, const char* content,
                                     size_t content_size) {
-  if (caller.level_id <= atfw::util::log::log_formatter::level_t::LOG_LW_ERROR) {
-    atfw::util::cli::shell_stream ss(std::cerr);
-    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << content << std::endl;
-  } else if (caller.level_id == atfw::util::log::log_formatter::level_t::LOG_LW_WARNING) {
-    atfw::util::cli::shell_stream ss(std::cerr);
-    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW << content << std::endl;
+  if (caller.level_id <= atfw::util::log::log_formatter::level_t::LOG_LW_NOTICE) {
+    std::cerr.write(content, content_size);
+    std::cerr << std::endl;
   } else if (caller.level_id == atfw::util::log::log_formatter::level_t::LOG_LW_INFO) {
     atfw::util::cli::shell_stream ss(std::cerr);
     ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_GREEN << content << std::endl;
+  } else if (caller.level_id == atfw::util::log::log_formatter::level_t::LOG_LW_WARNING) {
+    atfw::util::cli::shell_stream ss(std::cerr);
+    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW << content << std::endl;
   } else {
-    std::cerr.write(content, content_size);
-    std::cerr << std::endl;
+    atfw::util::cli::shell_stream ss(std::cerr);
+    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << content << std::endl;
   }
 }
 
