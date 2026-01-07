@@ -47,7 +47,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_start_listen(const atbus::c
     return EN_ATAPP_ERR_NOT_INITED;
   }
 
-  std::shared_ptr<atbus::node> node = get_owner()->get_bus_node();
+  atbus::node::ptr_t node = get_owner()->get_bus_node();
   if (!node) {
     return EN_ATAPP_ERR_SETUP_ATBUS;
   }
@@ -62,7 +62,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_start_connect(const etcd_di
     return EN_ATAPP_ERR_NOT_INITED;
   }
 
-  std::shared_ptr<atbus::node> node = get_owner()->get_bus_node();
+  atbus::node::ptr_t node = get_owner()->get_bus_node();
   if (!node) {
     return EN_ATAPP_ERR_SETUP_ATBUS;
   }
@@ -152,7 +152,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_send_forward_request(atapp_
     return EN_ATAPP_ERR_NOT_INITED;
   }
 
-  std::shared_ptr<atbus::node> node = get_owner()->get_bus_node();
+  atbus::node::ptr_t node = get_owner()->get_bus_node();
   if (!node) {
     return EN_ATAPP_ERR_SETUP_ATBUS;
   }

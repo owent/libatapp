@@ -1354,8 +1354,7 @@ LIBATAPP_MACRO_API app::app_id_t app::get_type_id() const noexcept {
 
 LIBATAPP_MACRO_API const std::string &app::get_hash_code() const noexcept { return conf_.hash_code; }
 
-LIBATAPP_MACRO_API std::shared_ptr<atbus::node> app::get_bus_node() { return bus_node_; }
-LIBATAPP_MACRO_API const std::shared_ptr<atbus::node> app::get_bus_node() const noexcept { return bus_node_; }
+LIBATAPP_MACRO_API atbus::node::ptr_t app::get_bus_node() const noexcept { return bus_node_; }
 
 LIBATAPP_MACRO_API void app::enable_fallback_to_atbus_connector() { set_flag(flag_t::DISABLE_ATBUS_FALLBACK, false); }
 

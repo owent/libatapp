@@ -296,8 +296,7 @@ class app {
 
   LIBATAPP_MACRO_API const std::string &get_hash_code() const noexcept;
 
-  LIBATAPP_MACRO_API std::shared_ptr<atbus::node> get_bus_node();
-  LIBATAPP_MACRO_API const std::shared_ptr<atbus::node> get_bus_node() const noexcept;
+  LIBATAPP_MACRO_API atbus::node::ptr_t get_bus_node() const noexcept;
 
   LIBATAPP_MACRO_API void enable_fallback_to_atbus_connector();
   LIBATAPP_MACRO_API void disable_fallback_to_atbus_connector();
@@ -688,7 +687,7 @@ class app {
   mutable std::string build_version_;
 
   ev_loop_t *ev_loop_;
-  std::shared_ptr<atbus::node> bus_node_;
+  atbus::node::ptr_t bus_node_;
   std::atomic<uint64_t> flags_;
   mode_t::type mode_;
   tick_timer_t tick_timer_;
