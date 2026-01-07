@@ -12,6 +12,7 @@ LIBATAPP_MACRO_API atapp_connector_atbus::atapp_connector_atbus(app &owner) : at
   register_protocol("mem");
   register_protocol("shm");
   register_protocol("unix");
+  register_protocol("pipe");
   register_protocol("ipv4");
   register_protocol("ipv6");
   register_protocol("dns");
