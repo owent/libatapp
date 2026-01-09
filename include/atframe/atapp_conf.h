@@ -38,8 +38,8 @@ LIBATAPP_MACRO_NAMESPACE_BEGIN
 struct app_conf {
   // bus configure
   std::string id_cmd;
-  atbus::node::bus_id_t id;
-  std::vector<atbus::node::bus_id_t> id_mask;  // convert a.b.c.d -> id
+  atbus::bus_id_t id;
+  std::vector<atbus::bus_id_t> id_mask;  // convert a.b.c.d -> id
   std::string conf_file;
   std::string pid_file;
   std::string start_error_file;
