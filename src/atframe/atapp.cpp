@@ -1354,8 +1354,7 @@ LIBATAPP_MACRO_API app::app_id_t app::get_type_id() const noexcept {
 
 LIBATAPP_MACRO_API const std::string &app::get_hash_code() const noexcept { return conf_.hash_code; }
 
-LIBATAPP_MACRO_API std::shared_ptr<atbus::node> app::get_bus_node() { return bus_node_; }
-LIBATAPP_MACRO_API const std::shared_ptr<atbus::node> app::get_bus_node() const noexcept { return bus_node_; }
+LIBATAPP_MACRO_API atbus::node::ptr_t app::get_bus_node() const noexcept { return bus_node_; }
 
 LIBATAPP_MACRO_API void app::enable_fallback_to_atbus_connector() { set_flag(flag_t::DISABLE_ATBUS_FALLBACK, false); }
 
@@ -3651,7 +3650,7 @@ int app::setup_atbus() {
       });
 
   bus_node_->set_on_custom_cmd_handle([this](const atbus::node &n, const atbus::endpoint *ep,
-                                             const atbus::connection *conn, atbus::node::bus_id_t bus_id,
+                                             const atbus::connection *conn, atbus::bus_id_t bus_id,
                                              const std::vector<std::pair<const void *, size_t>> &request_body,
                                              std::list<std::string> &response_body) -> int {
     return this->bus_evt_callback_on_custom_command_request(n, ep, conn, bus_id, request_body, response_body);
@@ -5070,7 +5069,7 @@ int app::send_last_command(ev_loop_t *ev_loop) {
   }
 
   bus_node_->set_on_custom_rsp_handle([this](const atbus::node &n, const atbus::endpoint *response_ep,
-                                             const atbus::connection *conn, atbus::node::bus_id_t bus_id,
+                                             const atbus::connection *conn, atbus::bus_id_t bus_id,
                                              const std::vector<std::pair<const void *, size_t>> &response_body,
                                              uint64_t sequence) -> int {
     return this->bus_evt_callback_on_custom_command_response(n, response_ep, conn, bus_id, response_body, sequence);
