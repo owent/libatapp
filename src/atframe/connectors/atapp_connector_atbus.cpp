@@ -47,7 +47,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_start_listen(const atbus::c
     return EN_ATAPP_ERR_NOT_INITED;
   }
 
-  std::shared_ptr<atbus::node> node = get_owner()->get_bus_node();
+  atbus::node::ptr_t node = get_owner()->get_bus_node();
   if (!node) {
     return EN_ATAPP_ERR_SETUP_ATBUS;
   }
@@ -62,7 +62,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_start_connect(const etcd_di
     return EN_ATAPP_ERR_NOT_INITED;
   }
 
-  std::shared_ptr<atbus::node> node = get_owner()->get_bus_node();
+  atbus::node::ptr_t node = get_owner()->get_bus_node();
   if (!node) {
     return EN_ATAPP_ERR_SETUP_ATBUS;
   }
@@ -76,8 +76,21 @@ LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_start_connect(const etcd_di
     return EN_ATBUS_ERR_ATNODE_INVALID_ID;
   }
 
+  // TODO: 自己总是允许
+
+  // TODO: 直接上游总是允许
+
+  // TODO: 优先使用已有直连
+
+  // TODO: 按拓扑关系 - 直连/递归上游（仅邻居和远方节点）
+  // TODO: 按拓扑关系 - 直连上游（间接上游）
+  // TODO: 按拓扑关系 - 直连下游（间接下游）
+  // TODO: 按拓扑关系 - 直接上游转发
+
+  // TODO: 是否需要等待新连接
+
   // need connect atbus only if the node is parent or immediate family
-  if (node->is_child_node(atbus_id)) {
+  if (node->is_downstream_node(atbus_id)) {
     if (handle) {
       handles_[atbus_id] = handle;
       handle->set_private_data_u64(atbus_id);
@@ -95,7 +108,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_start_connect(const etcd_di
       break;
     }
 
-    if (parent_atbus_endpoint->is_child_node(atbus_id)) {
+    if (parent_atbus_endpoint->is_downstream_node(atbus_id)) {
       break;
     }
 
@@ -152,7 +165,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_send_forward_request(atapp_
     return EN_ATAPP_ERR_NOT_INITED;
   }
 
-  std::shared_ptr<atbus::node> node = get_owner()->get_bus_node();
+  atbus::node::ptr_t node = get_owner()->get_bus_node();
   if (!node) {
     return EN_ATAPP_ERR_SETUP_ATBUS;
   }

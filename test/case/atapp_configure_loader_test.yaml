@@ -22,7 +22,7 @@ atapp:
     retry_interval: 3s
     fault_tolerant: 3
     message_size: 256KB
-    recv_buffer_size: 8MB
+    receive_buffer_size: 8MB
     send_buffer_size: 2MB
     send_buffer_number: 0
   timer:
