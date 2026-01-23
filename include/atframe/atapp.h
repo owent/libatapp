@@ -615,11 +615,12 @@ class app {
   int command_handler_list_discovery(atfw::util::cli::callback_param params);
 
  private:
-  int bus_evt_callback_on_recv_msg(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
-                                   const atbus::message &, const void *, size_t);
+  int bus_evt_callback_on_forward_request(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
+                                          const atbus::message &, const void *, size_t);
   int bus_evt_callback_on_forward_response(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
                                            const atbus::message *m);
-  int bus_evt_callback_on_error(const atbus::node &, const atbus::endpoint *, const atbus::connection *, int, int);
+  int bus_evt_callback_on_error(const atbus::node &, const atbus::endpoint *, const atbus::connection *, int,
+                                ATBUS_ERROR_TYPE);
   int bus_evt_callback_on_info_log(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
                                    const char *);
   int bus_evt_callback_on_reg(const atbus::node &, const atbus::endpoint *, const atbus::connection *, int);
