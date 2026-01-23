@@ -807,7 +807,7 @@ static bool guess_configure_file_is_yaml(const std::string &file_path) {
 }
 
 static bool reload_all_configure_files(app::yaml_conf_map_t &yaml_map, atfw::util::config::ini_loader &conf_loader,
-                                       atbus::detail::auto_select_set<std::string>::type &loaded_files,
+                                       std::unordered_set<std::string> &loaded_files,
                                        std::list<std::string> &pending_load_files) {
   bool ret = true;
   size_t conf_external_loaded_index;
@@ -930,7 +930,7 @@ LIBATAPP_MACRO_API int app::reload() {
   yaml_loader_.clear();
 
   // step 2. load configures from file or environment variables
-  atbus::detail::auto_select_set<std::string>::type loaded_files;
+  std::unordered_set<std::string> loaded_files;
   std::list<std::string> pending_load_files;
   if (!conf_.conf_file.empty()) {
     pending_load_files.push_back(conf_.conf_file);
@@ -2715,7 +2715,7 @@ int app::apply_configure() {
 
   conf_.bus_conf.fault_tolerant = static_cast<size_t>(conf_.origin.bus().fault_tolerant());
   conf_.bus_conf.message_size = static_cast<size_t>(conf_.origin.bus().message_size());
-  conf_.bus_conf.recv_buffer_size = static_cast<size_t>(conf_.origin.bus().recv_buffer_size());
+  conf_.bus_conf.receive_buffer_size = static_cast<size_t>(conf_.origin.bus().receive_buffer_size());
   conf_.bus_conf.send_buffer_size = static_cast<size_t>(conf_.origin.bus().send_buffer_size());
   conf_.bus_conf.send_buffer_number = static_cast<size_t>(conf_.origin.bus().send_buffer_number());
 
@@ -2782,8 +2782,9 @@ void app::run_ev_loop(int run_mode) {
       }
 
       // stop atbus after all module closed
-      if (check_flag(flag_t::STOPPED) && bus_node_ && ::atbus::node::state_t::CREATED != bus_node_->get_state() &&
-          !bus_node_->check_flag(::atbus::node::flag_t::EN_FT_SHUTDOWN)) {
+      if (check_flag(flag_t::STOPPED) && bus_node_ &&
+          ::atbus::node::state_t::type::kCreated != bus_node_->get_state() &&
+          !bus_node_->check_flag(::atbus::node::flag_t::type::kShutdown)) {
         bus_node_->shutdown(0);
       }
     }
@@ -3605,9 +3606,10 @@ int app::setup_atbus() {
   }
 
   // setup all callbacks
-  bus_node_->set_on_recv_handle([this](const atbus::node &n, const atbus::endpoint *ep, const atbus::connection *conn,
-                                       const ::atbus::message &m, const void *data, size_t data_size) -> int {
-    return this->bus_evt_callback_on_recv_msg(n, ep, conn, m, data, data_size);
+  bus_node_->set_on_forward_request_handle([this](const atbus::node &n, const atbus::endpoint *ep,
+                                                  const atbus::connection *conn, const ::atbus::message &m,
+                                                  const void *data, size_t data_size) -> int {
+    return this->bus_evt_callback_on_forward_request(n, ep, conn, m, data, data_size);
   });
 
   // set logger
@@ -3649,12 +3651,12 @@ int app::setup_atbus() {
         return this->bus_evt_callback_on_invalid_connection(n, conn, error_code);
       });
 
-  bus_node_->set_on_custom_cmd_handle([this](const atbus::node &n, const atbus::endpoint *ep,
-                                             const atbus::connection *conn, atbus::bus_id_t bus_id,
-                                             const std::vector<std::pair<const void *, size_t>> &request_body,
-                                             std::list<std::string> &response_body) -> int {
-    return this->bus_evt_callback_on_custom_command_request(n, ep, conn, bus_id, request_body, response_body);
-  });
+  bus_node_->set_on_custom_command_request_handle(
+      [this](const atbus::node &n, const atbus::endpoint *ep, const atbus::connection *conn, atbus::bus_id_t bus_id,
+             const std::vector<std::pair<const void *, size_t>> &request_body,
+             std::list<std::string> &response_body) -> int {
+        return this->bus_evt_callback_on_custom_command_request(n, ep, conn, bus_id, request_body, response_body);
+      });
 
   bus_node_->set_on_new_connection_handle([this](const atbus::node &n, const atbus::connection *conn) -> int {
     return this->bus_evt_callback_on_new_connection(n, conn);
@@ -3715,8 +3717,8 @@ int app::setup_atbus() {
   }
 
   // if has father node, block and connect to father node
-  if (atbus::node::state_t::CONNECTING_PARENT == bus_node_->get_state() ||
-      atbus::node::state_t::LOST_PARENT == bus_node_->get_state()) {
+  if (atbus::node::state_t::type::kConnectingUpstream == bus_node_->get_state() ||
+      atbus::node::state_t::type::kLostUpstream == bus_node_->get_state()) {
     while (nullptr == bus_node_->get_parent_endpoint()) {
       if (check_flag(flag_t::TIMEOUT)) {
         FWLOGERROR("connection to parent node {} timeout", conf_.bus_conf.parent_address);
@@ -4521,8 +4523,8 @@ int app::command_handler_list_discovery(atfw::util::cli::callback_param params) 
   return 0;
 }
 
-int app::bus_evt_callback_on_recv_msg(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
-                                      const atbus::message &msg, const void *buffer, size_t len) {
+int app::bus_evt_callback_on_forward_request(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
+                                             const atbus::message &msg, const void *buffer, size_t len) {
   auto head = msg.get_head();
   app_id_t source_bus_id = head == nullptr ? 0 : head->source_bus_id();
   if (atbus::message_body_type::kDataTransformReq != msg.get_body_type() || 0 == source_bus_id) {
@@ -4613,10 +4615,10 @@ int app::bus_evt_callback_on_forward_response(const atbus::node &, const atbus::
 }
 
 int app::bus_evt_callback_on_error(const atbus::node &n, const atbus::endpoint *ep, const atbus::connection *conn,
-                                   int status, int errcode) {
+                                   int status, ATBUS_ERROR_TYPE errcode) {
   // meet eof or reset by peer is not a error
-  if (UV_EOF == errcode || UV_ECONNRESET == errcode) {
-    const char *msg = UV_EOF == errcode ? "got EOF" : "reset by peer";
+  if (UV_EOF == status || UV_ECONNRESET == status) {
+    const char *msg = UV_EOF == status ? "got EOF" : "reset by peer";
     if (nullptr != conn) {
       if (nullptr != ep) {
         FWLOGINFO("bus node {:#x} endpoint {:#x} connection {}({}) closed: {}", n.get_id(), ep->get_id(),
@@ -5068,12 +5070,12 @@ int app::send_last_command(ev_loop_t *ev_loop) {
     arr_size[i] = last_command_[i].size();
   }
 
-  bus_node_->set_on_custom_rsp_handle([this](const atbus::node &n, const atbus::endpoint *response_ep,
-                                             const atbus::connection *conn, atbus::bus_id_t bus_id,
-                                             const std::vector<std::pair<const void *, size_t>> &response_body,
-                                             uint64_t sequence) -> int {
-    return this->bus_evt_callback_on_custom_command_response(n, response_ep, conn, bus_id, response_body, sequence);
-  });
+  bus_node_->set_on_custom_command_response_handle(
+      [this](const atbus::node &n, const atbus::endpoint *response_ep, const atbus::connection *conn,
+             atbus::bus_id_t bus_id, const std::vector<std::pair<const void *, size_t>> &response_body,
+             uint64_t sequence) -> int {
+        return this->bus_evt_callback_on_custom_command_response(n, response_ep, conn, bus_id, response_body, sequence);
+      });
 
   FWLOGDEBUG("send command message to {:#x} with address = {}", ep->get_id(), use_addr.address);
   ret = bus_node_->send_custom_cmd(ep->get_id(), &arr_buff[0], &arr_size[0], last_command_.size());
