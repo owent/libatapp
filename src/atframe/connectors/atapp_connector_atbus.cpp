@@ -395,7 +395,7 @@ int atapp_connector_atbus::on_update_endpoint(const atbus::node &n, const atbus:
     if (endpoint->get_pending_message_size() > 0) {
       FWLOGINFO("bus node {:#x} add_waker for {:#x} with {} pending messages(size: {})", n.get_id(), ep->get_id(),
                 endpoint->get_pending_message_count(), endpoint->get_pending_message_size());
-      endpoint->add_waker(get_owner()->get_last_tick_time());
+      endpoint->add_waker(get_owner()->get_next_tick_time());
     }
   }
 

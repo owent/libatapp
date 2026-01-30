@@ -51,7 +51,7 @@ LIBATAPP_MACRO_API_SYMBOL_HIDDEN void atapp_endpoint_bind_helper::unbind(atapp_c
                                                                          atapp_endpoint &endpoint) {
   if (endpoint.refer_connections_.erase(&handle) > 0) {
     if (endpoint.refer_connections_.empty()) {
-      endpoint.gc_timepoint_ = endpoint.owner_->get_last_tick_time();
+      endpoint.gc_timepoint_ = endpoint.owner_->get_next_tick_time();
       auto &endpoint_gc_timeout = endpoint.owner_->get_origin_configure().timer().endpoint_gc_timeout();
 
       if (endpoint_gc_timeout.seconds() < 0) {
@@ -92,7 +92,7 @@ LIBATAPP_MACRO_API_SYMBOL_HIDDEN void atapp_endpoint_bind_helper::bind(atapp_con
   if (handle.is_ready()) {
     app *owner = endpoint.get_owner();
     if (nullptr != owner) {
-      endpoint.add_waker(owner->get_last_tick_time());
+      endpoint.add_waker(owner->get_next_tick_time());
     }
   }
 }
@@ -155,7 +155,7 @@ LIBATAPP_MACRO_API void atapp_connection_handle::set_ready() noexcept {
   if (nullptr != endpiont_ && nullptr != connector_) {
     app *owner = connector_->get_owner();
     if (nullptr != owner) {
-      endpiont_->add_waker(owner->get_last_tick_time());
+      endpiont_->add_waker(owner->get_next_tick_time());
     }
   }
 }
