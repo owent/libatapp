@@ -28,6 +28,17 @@ LIBATAPP_MACRO_API atapp_endpoint::atapp_endpoint(app &owner, construct_helper_t
 #endif
 {
   nearest_waker_ = std::chrono::system_clock::from_time_t(0);
+
+  gc_timepoint_ = owner.get_last_tick_time();
+  auto &endpoint_gc_timeout = owner.get_origin_configure().timer().endpoint_gc_timeout();
+  if (endpoint_gc_timeout.seconds() < 0) {
+    gc_timepoint_ += std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::seconds(60));
+  } else {
+    gc_timepoint_ += std::chrono::duration_cast<std::chrono::system_clock::duration>(
+        std::chrono::seconds(endpoint_gc_timeout.seconds()));
+    gc_timepoint_ += std::chrono::duration_cast<std::chrono::system_clock::duration>(
+        std::chrono::nanoseconds(endpoint_gc_timeout.nanos()));
+  }
 }
 
 LIBATAPP_MACRO_API atapp_endpoint::ptr_t atapp_endpoint::create(app &owner) {
@@ -125,8 +136,8 @@ LIBATAPP_MACRO_API void atapp_endpoint::update_discovery(const etcd_discovery_no
   }
 }
 
-LIBATAPP_MACRO_API int32_t atapp_endpoint::push_forward_message(int32_t type, uint64_t &msg_sequence, const void *data,
-                                                                size_t data_size,
+LIBATAPP_MACRO_API int32_t atapp_endpoint::push_forward_message(int32_t type, uint64_t &msg_sequence,
+                                                                gsl::span<const unsigned char> data,
                                                                 const atapp::protocol::atapp_metadata *metadata) {
   // Closing
   if (closing_ || nullptr == owner_) {
@@ -137,13 +148,12 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::push_forward_message(int32_t type, ui
         connector = handle->get_connector();
       }
 
-      trigger_on_receive_forward_response(connector, handle, type, msg_sequence, EN_ATBUS_ERR_CLOSING, data, data_size,
-                                          metadata);
+      trigger_on_receive_forward_response(connector, handle, type, msg_sequence, EN_ATBUS_ERR_CLOSING, data, metadata);
     } while (false);
     return EN_ATBUS_ERR_CLOSING;
   }
 
-  if (nullptr == data || 0 == data_size) {
+  if (data.empty()) {
     return EN_ATBUS_ERR_SUCCESS;
   }
 
@@ -163,9 +173,9 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::push_forward_message(int32_t type, ui
       break;
     }
 
-    int32_t ret = connector->on_send_forward_request(handle, type, &msg_sequence, data, data_size, metadata);
+    int32_t ret = connector->on_send_forward_request(handle, type, &msg_sequence, data, metadata);
     if (0 != ret) {
-      trigger_on_receive_forward_response(connector, handle, type, msg_sequence, ret, data, data_size, metadata);
+      trigger_on_receive_forward_response(connector, handle, type, msg_sequence, ret, data, metadata);
     }
 
     return ret;
@@ -186,7 +196,7 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::push_forward_message(int32_t type, ui
       failed_error_code = EN_ATBUS_ERR_BUFF_LIMIT;
     }
 
-    if (send_buffer_size > 0 && pending_message_size_ + data_size > send_buffer_size) {
+    if (send_buffer_size > 0 && pending_message_size_ + data.size() > send_buffer_size) {
       failed_error_code = EN_ATBUS_ERR_BUFF_LIMIT;
     }
   }
@@ -198,8 +208,7 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::push_forward_message(int32_t type, ui
       connector = handle->get_connector();
     }
 
-    trigger_on_receive_forward_response(connector, handle, type, msg_sequence, failed_error_code, data, data_size,
-                                        metadata);
+    trigger_on_receive_forward_response(connector, handle, type, msg_sequence, failed_error_code, data, metadata);
     return failed_error_code;
   }
 
@@ -208,10 +217,10 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::push_forward_message(int32_t type, ui
   pending_message_t &msg = pending_message_.back();
   msg.type = type;
   msg.message_sequence = msg_sequence;
-  msg.data.resize(data_size);
+  msg.data.resize(data.size());
   msg.expired_timepoint = owner_->get_last_tick_time();
   msg.expired_timepoint += owner_->get_configure_message_timeout();
-  memcpy(&msg.data[0], data, data_size);
+  memcpy(&msg.data[0], data.data(), data.size());
   if (nullptr != metadata) {
     msg.metadata.reset(new atapp::protocol::atapp_metadata());
     if (msg.metadata) {
@@ -219,7 +228,7 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::push_forward_message(int32_t type, ui
     }
   }
 
-  pending_message_size_ += data_size;
+  pending_message_size_ += data.size();
 #if defined(LIBATAPP_ENABLE_CUSTOM_COUNT_FOR_STD_LIST) && LIBATAPP_ENABLE_CUSTOM_COUNT_FOR_STD_LIST
   ++pending_message_count_;
 #endif
@@ -260,7 +269,7 @@ atapp_endpoint::retry_pending_messages(const atfw::util::time::time_utility::raw
     if (max_count > 0 && nullptr != handle && nullptr != connector) {
       --max_count;
       res = connector->on_send_forward_request(handle, msg.type, &msg.message_sequence,
-                                               reinterpret_cast<const void *>(msg.data.data()), msg.data.size(),
+                                               gsl::span<const unsigned char>(msg.data.data(), msg.data.size()),
                                                msg.metadata.get());
     } else if (msg.expired_timepoint > tick_time || max_count <= 0) {
       break;
@@ -268,7 +277,7 @@ atapp_endpoint::retry_pending_messages(const atfw::util::time::time_utility::raw
 
     if (0 != res) {
       trigger_on_receive_forward_response(connector, handle, msg.type, msg.message_sequence, res,
-                                          reinterpret_cast<const void *>(msg.data.data()), msg.data.size(),
+                                          gsl::span<const unsigned char>(msg.data.data(), msg.data.size()),
                                           msg.metadata.get());
     }
 
@@ -343,7 +352,7 @@ void atapp_endpoint::cancel_pending_messages() {
   while (!pending_message_.empty()) {
     const pending_message_t &msg = pending_message_.front();
     trigger_on_receive_forward_response(connector, handle, msg.type, msg.message_sequence, EN_ATBUS_ERR_CLOSING,
-                                        reinterpret_cast<const void *>(msg.data.data()), msg.data.size(),
+                                        gsl::span<const unsigned char>(msg.data.data(), msg.data.size()),
                                         msg.metadata.get());
 
     UTIL_LIKELY_IF (pending_message_size_ >= msg.data.size()) {
@@ -365,13 +374,26 @@ void atapp_endpoint::cancel_pending_messages() {
 #endif
 }
 
+LIBATAPP_MACRO_API atfw::util::time::time_utility::raw_time_t atapp_endpoint::get_gc_timepoint() const noexcept {
+  return gc_timepoint_;
+}
+
+LIBATAPP_MACRO_API atfw::util::time::time_utility::raw_time_t atapp_endpoint::get_next_pending_message_timeout()
+    const noexcept {
+  if (pending_message_.empty()) {
+    return std::chrono::system_clock::from_time_t(0);
+  }
+
+  return pending_message_.front().expired_timepoint;
+}
+
 void atapp_endpoint::trigger_on_receive_forward_response(atapp_connector_impl *connector,
                                                          atapp_connection_handle *handle, int32_t type,
-                                                         uint64_t sequence, int32_t error_code, const void *data,
-                                                         size_t data_size,
+                                                         uint64_t sequence, int32_t error_code,
+                                                         gsl::span<const unsigned char> data,
                                                          const atapp::protocol::atapp_metadata *metadata) {
   if (nullptr != connector && nullptr != handle) {
-    connector->on_receive_forward_response(handle, type, sequence, error_code, data, data_size, metadata);
+    connector->on_receive_forward_response(handle, type, sequence, error_code, data, metadata);
     return;
   }
 
@@ -383,7 +405,6 @@ void atapp_endpoint::trigger_on_receive_forward_response(atapp_connector_impl *c
   // notify app
   app::message_t msg;
   msg.data = data;
-  msg.data_size = data_size;
   msg.metadata = metadata;
   msg.message_sequence = sequence;
   msg.type = type;
