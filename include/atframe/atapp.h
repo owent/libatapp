@@ -299,6 +299,8 @@ class app {
   LIBATAPP_MACRO_API bool is_fallback_to_atbus_connector_enabled() const noexcept;
 
   LIBATAPP_MACRO_API atfw::util::time::time_utility::raw_time_t get_last_tick_time() const noexcept;
+  LIBATAPP_MACRO_API atfw::util::time::time_utility::raw_time_t get_next_tick_time() const noexcept;
+  LIBATAPP_MACRO_API atfw::util::time::time_utility::raw_time_t get_next_custom_timer_tick_time() const noexcept;
 
   LIBATAPP_MACRO_API atfw::util::config::ini_loader &get_configure_loader();
   LIBATAPP_MACRO_API const atfw::util::config::ini_loader &get_configure_loader() const noexcept;

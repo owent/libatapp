@@ -49,6 +49,7 @@
 #include "atframe/connectors/atapp_connector_loopback.h"
 
 #define ATAPP_DEFAULT_STOP_TIMEOUT 30000
+#define ATAPP_DEFAULT_CUSTOM_TIMER_TICK_MS 100
 
 LIBATAPP_MACRO_NAMESPACE_BEGIN
 app *app::last_instance_ = nullptr;
@@ -162,12 +163,14 @@ static bool internal_setup_signal_action(int sig, TFn fn) {
 }
 
 static time_t get_custom_timer_tick() {
-  return 10 * atfw::util::time::time_utility::get_sys_now() + atfw::util::time::time_utility::get_now_usec() / 100000;
+  return (1000 / ATAPP_DEFAULT_CUSTOM_TIMER_TICK_MS) * atfw::util::time::time_utility::get_sys_now() +
+         atfw::util::time::time_utility::get_now_usec() / (100 * ATAPP_DEFAULT_CUSTOM_TIMER_TICK_MS);
 }
 
 template <class Rep, class Period>
 static time_t get_custom_timer_tick_offset(std::chrono::duration<Rep, Period> dur) {
-  return static_cast<time_t>(std::chrono::duration_cast<std::chrono::milliseconds>(dur).count() / 100);
+  return static_cast<time_t>(std::chrono::duration_cast<std::chrono::milliseconds>(dur).count() /
+                             ATAPP_DEFAULT_CUSTOM_TIMER_TICK_MS);
 }
 
 static atbus::protocol::ATBUS_CRYPTO_ALGORITHM_TYPE convert_atbus_configure(
@@ -1524,6 +1527,15 @@ LIBATAPP_MACRO_API atfw::util::time::time_utility::raw_time_t app::get_last_tick
   return tick_timer_.last_tick_timepoint;
 }
 
+LIBATAPP_MACRO_API atfw::util::time::time_utility::raw_time_t app::get_next_tick_time() const noexcept {
+  return tick_timer_.last_tick_timepoint + conf_.timer_tick_interval;
+}
+
+LIBATAPP_MACRO_API atfw::util::time::time_utility::raw_time_t app::get_next_custom_timer_tick_time() const noexcept {
+  return tick_timer_.last_tick_timepoint + std::chrono::duration_cast<std::chrono::system_clock::duration>(
+                                               std::chrono::milliseconds{ATAPP_DEFAULT_CUSTOM_TIMER_TICK_MS});
+}
+
 LIBATAPP_MACRO_API atfw::util::config::ini_loader &app::get_configure_loader() { return cfg_loader_; }
 LIBATAPP_MACRO_API const atfw::util::config::ini_loader &app::get_configure_loader() const noexcept {
   return cfg_loader_;
@@ -2437,7 +2449,7 @@ LIBATAPP_MACRO_API atapp_endpoint::ptr_t app::mutable_endpoint(const etcd_discov
 
   // Wake and maybe it's should be cleanup if it's a new endpoint
   if (is_created && ret) {
-    ret->add_waker(get_last_tick_time());
+    ret->add_waker(get_next_tick_time());
     atapp_connection_handle::ptr_t handle = std::make_shared<atapp_connection_handle>();
 
     bool is_loopback = (0 == id || id == get_app_id()) && (name.empty() || name == get_app_name());
