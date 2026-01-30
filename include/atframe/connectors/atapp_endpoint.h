@@ -79,8 +79,9 @@ class atapp_endpoint {
   LIBATAPP_MACRO_API void remove_connection_handle(atapp_connection_handle &handle);
   LIBATAPP_MACRO_API atapp_connection_handle *get_ready_connection_handle() const noexcept;
 
-  LIBATAPP_MACRO_API int32_t push_forward_message(int32_t type, uint64_t &msg_sequence, const void *data,
-                                                  size_t data_size, const atapp::protocol::atapp_metadata *metadata);
+  LIBATAPP_MACRO_API int32_t push_forward_message(int32_t type, uint64_t &msg_sequence,
+                                                  gsl::span<const unsigned char> data,
+                                                  const atapp::protocol::atapp_metadata *metadata);
 
   LIBATAPP_MACRO_API int32_t retry_pending_messages(const atfw::util::time::time_utility::raw_time_t &tick_time,
                                                     int32_t max_count = 0);
@@ -91,18 +92,24 @@ class atapp_endpoint {
   LIBATAPP_MACRO_API size_t get_pending_message_count() const noexcept;
   LIBATAPP_MACRO_API size_t get_pending_message_size() const noexcept;
 
+  LIBATAPP_MACRO_API atfw::util::time::time_utility::raw_time_t get_gc_timepoint() const noexcept;
+
+  LIBATAPP_MACRO_API atfw::util::time::time_utility::raw_time_t get_next_pending_message_timeout() const noexcept;
+
  private:
   void reset();
   void cancel_pending_messages();
 
   void trigger_on_receive_forward_response(atapp_connector_impl *connector, atapp_connection_handle *handle,
-                                           int32_t type, uint64_t sequence, int32_t error_code, const void *data,
-                                           size_t data_size, const atapp::protocol::atapp_metadata *metadata);
+                                           int32_t type, uint64_t sequence, int32_t error_code,
+                                           gsl::span<const unsigned char> data,
+                                           const atapp::protocol::atapp_metadata *metadata);
 
  private:
   bool closing_;
   app *owner_;
   atfw::util::time::time_utility::raw_time_t nearest_waker_;
+  atfw::util::time::time_utility::raw_time_t gc_timepoint_;
   weak_ptr_t watcher_;
   handle_set_t refer_connections_;
   etcd_discovery_node::ptr_t discovery_;

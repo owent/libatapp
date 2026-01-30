@@ -19,6 +19,7 @@
 #include <string>
 #include <unordered_set>
 
+#include "atframe/atapp_common_types.h"
 #include "atframe/atapp_config.h"
 #include "atframe/etcdcli/etcd_discovery.h"
 
@@ -59,6 +60,7 @@ class atapp_connection_handle {
   LIBATAPP_MACRO_API void close();
   LIBATAPP_MACRO_API bool is_closing() const noexcept;
   LIBATAPP_MACRO_API void set_ready() noexcept;
+  LIBATAPP_MACRO_API void set_unready() noexcept;
   LIBATAPP_MACRO_API bool is_ready() const noexcept;
 
   UTIL_FORCEINLINE void set_private_data_ptr(void *input) noexcept { private_data_ptr_ = input; }
@@ -132,7 +134,14 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE atapp_connector_impl {
    *       address_type_t::EN_ACAT_LOCAL_PROCESS should be set if address can only be connected by local process
    * @return must be xor of address_type_t::type
    */
-  virtual uint32_t get_address_type(const atbus::channel::channel_address_t &addr) const = 0;
+  virtual uint32_t get_address_type(const atbus::channel::channel_address_t &addr) const noexcept = 0;
+
+  /**
+   * @brief check address connectable
+   * @return true if this address can be connected by this connector
+   */
+  virtual bool check_address_connectable(const atbus::channel::channel_address_t &addr,
+                                         const etcd_discovery_node &discovery) const noexcept = 0;
 
   /**
    * @brief if this connector is allowed to connect to loopback endpoint
@@ -154,13 +163,14 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE atapp_connector_impl {
    * @note just return non-zero when something wrong happend and this connection will not be used
    * @return 0 or error code
    */
-  LIBATAPP_MACRO_API virtual int32_t on_start_connect(const etcd_discovery_node *discovery,
+  LIBATAPP_MACRO_API virtual int32_t on_start_connect(const etcd_discovery_node &discovery, atapp_endpoint &endpoint,
                                                       const atbus::channel::channel_address_t &addr,
                                                       const atapp_connection_handle::ptr_t &handle);
-  LIBATAPP_MACRO_API virtual int32_t on_close_connect(
+  LIBATAPP_MACRO_API virtual int32_t on_close_connection(
       atapp_connection_handle &handle);  // can not renew handle any more
   LIBATAPP_MACRO_API virtual int32_t on_send_forward_request(atapp_connection_handle *handle, int32_t type,
-                                                             uint64_t *msg_sequence, const void *data, size_t data_size,
+                                                             uint64_t *msg_sequence,
+                                                             gsl::span<const unsigned char> data,
                                                              const atapp::protocol::atapp_metadata *metadata);
 
   /**
@@ -168,17 +178,17 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE atapp_connector_impl {
    */
   LIBATAPP_MACRO_API virtual void on_receive_forward_response(atapp_connection_handle *handle, int32_t type,
                                                               uint64_t msg_sequence, int32_t error_code,
-                                                              const void *data, size_t data_size,
+                                                              gsl::span<const unsigned char> data,
                                                               const atapp::protocol::atapp_metadata *metadata);
 
   LIBATAPP_MACRO_API virtual void on_discovery_event(etcd_discovery_action_t::type, const etcd_discovery_node::ptr_t &);
 
   LIBATAPP_MACRO_API const protocol_set_t &get_support_protocols() const noexcept;
 
-  UTIL_FORCEINLINE app *get_owner() const noexcept { return owner_; }
+  UTIL_FORCEINLINE app *ATFW_UTIL_MACRO_NONNULL get_owner() const noexcept { return owner_; }
 
  private:
-  app *owner_;
+  app *ATFW_UTIL_MACRO_NONNULL owner_;
   bool is_destroying_;
   handle_set_t handles_;
   protocol_set_t support_protocols_;

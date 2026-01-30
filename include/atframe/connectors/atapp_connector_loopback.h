@@ -21,22 +21,24 @@ class atapp_connector_loopback : public atapp_connector_impl {
   LIBATAPP_MACRO_API atapp_connector_loopback(app &owner);
   LIBATAPP_MACRO_API virtual ~atapp_connector_loopback();
   LIBATAPP_MACRO_API const char *name() noexcept override;
-  LIBATAPP_MACRO_API uint32_t get_address_type(const atbus::channel::channel_address_t &addr) const override;
+  LIBATAPP_MACRO_API uint32_t get_address_type(const atbus::channel::channel_address_t &addr) const noexcept override;
+  LIBATAPP_MACRO_API bool check_address_connectable(const atbus::channel::channel_address_t &addr,
+                                                    const etcd_discovery_node &discovery) const noexcept override;
   LIBATAPP_MACRO_API int32_t on_start_listen(const atbus::channel::channel_address_t &addr) override;
-  LIBATAPP_MACRO_API int32_t on_start_connect(const etcd_discovery_node *discovery,
+  LIBATAPP_MACRO_API int32_t on_start_connect(const etcd_discovery_node &discovery, atapp_endpoint &endpoint,
                                               const atbus::channel::channel_address_t &addr,
                                               const atapp_connection_handle::ptr_t &handle) override;
-  LIBATAPP_MACRO_API int32_t on_close_connect(atapp_connection_handle &handle) override;
+  LIBATAPP_MACRO_API int32_t on_close_connection(atapp_connection_handle &handle) override;
   LIBATAPP_MACRO_API int32_t on_send_forward_request(atapp_connection_handle *handle, int32_t type,
-                                                     uint64_t *msg_sequence, const void *data, size_t data_size,
+                                                     uint64_t *msg_sequence, gsl::span<const unsigned char> data,
                                                      const atapp::protocol::atapp_metadata *metadata) override;
 
   LIBATAPP_MACRO_API void on_discovery_event(etcd_discovery_action_t::type,
                                              const etcd_discovery_node::ptr_t &) override;
 
   LIBATAPP_MACRO_API void on_receive_forward_response(atapp_connection_handle *handle, int32_t type,
-                                                      uint64_t msg_sequence, int32_t error_code, const void *data,
-                                                      size_t data_size,
+                                                      uint64_t msg_sequence, int32_t error_code,
+                                                      gsl::span<const unsigned char> data,
                                                       const atapp::protocol::atapp_metadata *metadata) override;
 
   LIBATAPP_MACRO_API int32_t process(const atfw::util::time::time_utility::raw_time_t &max_end_timepoint,

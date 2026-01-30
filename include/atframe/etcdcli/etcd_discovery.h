@@ -100,6 +100,7 @@ class etcd_discovery_node {
   LIBATAPP_MACRO_API const on_destroy_fn_type &get_on_destroy() const;
   LIBATAPP_MACRO_API void reset_on_destroy();
 
+  LIBATAPP_MACRO_API void reset_ingress_index() const noexcept;
   LIBATAPP_MACRO_API const atapp::protocol::atapp_gateway &next_ingress_gateway() const;
   LIBATAPP_MACRO_API int32_t get_ingress_size() const;
 
@@ -189,7 +190,7 @@ class etcd_discovery_set {
       gsl::span<node_hash_type> output, const node_hash_type &key, const metadata_type *metadata = nullptr,
       node_hash_type::search_mode searchmode = node_hash_type::search_mode::kAll) const;
 
-  LIBATAPP_MACRO_API node_hash_type get_node_hash_by_consistent_hash(const void *buf, size_t bufsz,
+  LIBATAPP_MACRO_API node_hash_type get_node_hash_by_consistent_hash(gsl::span<const unsigned char> buf,
                                                                      const metadata_type *metadata = nullptr) const;
   LIBATAPP_MACRO_API node_hash_type get_node_hash_by_consistent_hash(uint64_t key,
                                                                      const metadata_type *metadata = nullptr) const;
@@ -199,7 +200,7 @@ class etcd_discovery_set {
                                                                      const metadata_type *metadata = nullptr) const;
 
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_consistent_hash(
-      const void *buf, size_t bufsz, const metadata_type *metadata = nullptr) const;
+      gsl::span<const unsigned char> buf, const metadata_type *metadata = nullptr) const;
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_consistent_hash(
       uint64_t key, const metadata_type *metadata = nullptr) const;
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_consistent_hash(

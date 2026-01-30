@@ -94,8 +94,8 @@ static std::pair<uint64_t, const char *> make_size_showup(uint64_t sz) {
   return std::pair<uint64_t, const char *>(sz, unit);
 }
 
-static uint64_t chrono_to_libuv_duration(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &in,
-                                         uint64_t default_value) {
+ATFW_UTIL_FORCEINLINE static uint64_t chrono_to_libuv_duration(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &in,
+                                                               uint64_t default_value) {
   uint64_t ret = static_cast<uint64_t>(in.seconds() * 1000 + in.nanos() / 1000000);
   if (ret <= 0) {
     ret = default_value;
@@ -104,7 +104,7 @@ static uint64_t chrono_to_libuv_duration(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID
   return ret;
 }
 
-static uint64_t chrono_to_libuv_duration(std::chrono::system_clock::duration in) {
+ATFW_UTIL_FORCEINLINE static uint64_t chrono_to_libuv_duration(std::chrono::system_clock::duration in) {
   auto ret = std::chrono::duration_cast<std::chrono::milliseconds>(in).count();
   if (ret < 0) {
     ret = 0;
@@ -161,10 +161,153 @@ static bool internal_setup_signal_action(int sig, TFn fn) {
   return true;
 }
 
+static time_t get_custom_timer_tick() {
+  return 10 * atfw::util::time::time_utility::get_sys_now() + atfw::util::time::time_utility::get_now_usec() / 100000;
+}
+
+template <class Rep, class Period>
+static time_t get_custom_timer_tick_offset(std::chrono::duration<Rep, Period> dur) {
+  return static_cast<time_t>(std::chrono::duration_cast<std::chrono::milliseconds>(dur).count() / 100);
+}
+
+static atbus::protocol::ATBUS_CRYPTO_ALGORITHM_TYPE convert_atbus_configure(
+    protocol::ATAPP_CRYPTO_ALGORITHM_TYPE algo) {
+  switch (algo) {
+    case protocol::ATAPP_CRYPTO_ALGORITHM_NONE:
+      return atbus::protocol::ATBUS_CRYPTO_ALGORITHM_NONE;
+    case protocol::ATAPP_CRYPTO_ALGORITHM_XXTEA:
+      return atbus::protocol::ATBUS_CRYPTO_ALGORITHM_XXTEA;
+    case protocol::ATAPP_CRYPTO_ALGORITHM_AES_128_CBC:
+      return atbus::protocol::ATBUS_CRYPTO_ALGORITHM_AES_128_CBC;
+    case protocol::ATAPP_CRYPTO_ALGORITHM_AES_192_CBC:
+      return atbus::protocol::ATBUS_CRYPTO_ALGORITHM_AES_192_CBC;
+    case protocol::ATAPP_CRYPTO_ALGORITHM_AES_256_CBC:
+      return atbus::protocol::ATBUS_CRYPTO_ALGORITHM_AES_256_CBC;
+    case protocol::ATAPP_CRYPTO_ALGORITHM_AES_128_GCM:
+      return atbus::protocol::ATBUS_CRYPTO_ALGORITHM_AES_128_GCM;
+    case protocol::ATAPP_CRYPTO_ALGORITHM_AES_192_GCM:
+      return atbus::protocol::ATBUS_CRYPTO_ALGORITHM_AES_192_GCM;
+    case protocol::ATAPP_CRYPTO_ALGORITHM_AES_256_GCM:
+      return atbus::protocol::ATBUS_CRYPTO_ALGORITHM_AES_256_GCM;
+    case protocol::ATAPP_CRYPTO_ALGORITHM_CHACHA20:
+      return atbus::protocol::ATBUS_CRYPTO_ALGORITHM_CHACHA20;
+    case protocol::ATAPP_CRYPTO_ALGORITHM_CHACHA20_POLY1305_IETF:
+      return atbus::protocol::ATBUS_CRYPTO_ALGORITHM_CHACHA20_POLY1305_IETF;
+    case protocol::ATAPP_CRYPTO_ALGORITHM_XCHACHA20_POLY1305_IETF:
+      return atbus::protocol::ATBUS_CRYPTO_ALGORITHM_XCHACHA20_POLY1305_IETF;
+    default:
+      return atbus::protocol::ATBUS_CRYPTO_ALGORITHM_NONE;
+  }
+}
+
+static atbus::protocol::ATBUS_CRYPTO_KEY_EXCHANGE_TYPE convert_atbus_configure(
+    protocol::ATAPP_CRYPTO_KEY_EXCHANGE_TYPE algo) {
+  switch (algo) {
+    case protocol::ATAPP_CRYPTO_KEY_EXCHANGE_NONE:
+      return atbus::protocol::ATBUS_CRYPTO_KEY_EXCHANGE_NONE;
+    case protocol::ATAPP_CRYPTO_KEY_EXCHANGE_X25519:
+      return atbus::protocol::ATBUS_CRYPTO_KEY_EXCHANGE_X25519;
+    case protocol::ATAPP_CRYPTO_KEY_EXCHANGE_SECP256R1:
+      return atbus::protocol::ATBUS_CRYPTO_KEY_EXCHANGE_SECP256R1;
+    case protocol::ATAPP_CRYPTO_KEY_EXCHANGE_SECP384R1:
+      return atbus::protocol::ATBUS_CRYPTO_KEY_EXCHANGE_SECP384R1;
+    case protocol::ATAPP_CRYPTO_KEY_EXCHANGE_SECP521R1:
+      return atbus::protocol::ATBUS_CRYPTO_KEY_EXCHANGE_SECP521R1;
+    default:
+      return atbus::protocol::ATBUS_CRYPTO_KEY_EXCHANGE_NONE;
+  }
+}
+
+static atbus::protocol::ATBUS_COMPRESSION_ALGORITHM_TYPE convert_atbus_configure(
+    protocol::ATAPP_COMPRESSION_ALGORITHM_TYPE algo) {
+  switch (algo) {
+    case protocol::ATAPP_COMPRESSION_ALGORITHM_NONE:
+      return atbus::protocol::ATBUS_COMPRESSION_ALGORITHM_NONE;
+    case protocol::ATAPP_COMPRESSION_ALGORITHM_ZSTD:
+      return atbus::protocol::ATBUS_COMPRESSION_ALGORITHM_ZSTD;
+    case protocol::ATAPP_COMPRESSION_ALGORITHM_LZ4:
+      return atbus::protocol::ATBUS_COMPRESSION_ALGORITHM_LZ4;
+    case protocol::ATAPP_COMPRESSION_ALGORITHM_SNAPPY:
+      return atbus::protocol::ATBUS_COMPRESSION_ALGORITHM_SNAPPY;
+    case protocol::ATAPP_COMPRESSION_ALGORITHM_ZLIB:
+      return atbus::protocol::ATBUS_COMPRESSION_ALGORITHM_ZLIB;
+    default:
+      return atbus::protocol::ATBUS_COMPRESSION_ALGORITHM_NONE;
+  }
+}
+
+static atbus::protocol::ATBUS_COMPRESSION_LEVEL convert_atbus_configure(protocol::ATAPP_COMPRESSION_LEVEL algo) {
+  switch (algo) {
+    case protocol::ATAPP_COMPRESSION_LEVEL_DEFAULT:
+      return atbus::protocol::ATBUS_COMPRESSION_LEVEL_DEFAULT;
+    case protocol::ATAPP_COMPRESSION_LEVEL_STORAGE:
+      return atbus::protocol::ATBUS_COMPRESSION_LEVEL_STORAGE;
+    case protocol::ATAPP_COMPRESSION_LEVEL_FAST:
+      return atbus::protocol::ATBUS_COMPRESSION_LEVEL_FAST;
+    case protocol::ATAPP_COMPRESSION_LEVEL_LOW_CPU:
+      return atbus::protocol::ATBUS_COMPRESSION_LEVEL_LOW_CPU;
+    case protocol::ATAPP_COMPRESSION_LEVEL_BALANCED:
+      return atbus::protocol::ATBUS_COMPRESSION_LEVEL_BALANCED;
+    case protocol::ATAPP_COMPRESSION_LEVEL_HIGH_RATIO:
+      return atbus::protocol::ATBUS_COMPRESSION_LEVEL_HIGH_RATIO;
+    case protocol::ATAPP_COMPRESSION_LEVEL_MAX_RATIO:
+      return atbus::protocol::ATBUS_COMPRESSION_LEVEL_MAX_RATIO;
+    default:
+      return atbus::protocol::ATBUS_COMPRESSION_LEVEL_DEFAULT;
+  }
+}
+
+static void apply_atbus_configure(atbus::node::conf_t &to, const protocol::atbus_configure &from) {
+  atbus::node::default_conf(&to);
+
+  to.upstream_address = from.proxy();
+  to.loop_times = from.loop_times();
+  to.ttl = from.ttl();
+  to.backlog = from.backlog();
+  to.access_token_max_number = static_cast<size_t>(from.access_token_max_number());
+  {
+    to.access_tokens.reserve(static_cast<size_t>(from.access_tokens_size()));
+    for (int i = 0; i < from.access_tokens_size(); ++i) {
+      const std::string &access_token = from.access_tokens(i);
+      to.access_tokens.push_back(std::vector<unsigned char>());
+      to.access_tokens.back().assign(
+          reinterpret_cast<const unsigned char *>(access_token.data()),
+          reinterpret_cast<const unsigned char *>(access_token.data()) + access_token.size());
+    }
+  }
+  to.overwrite_listen_path = from.overwrite_listen_path();
+
+  protobuf_to_chrono_set_duration(to.first_idle_timeout, from.first_idle_timeout());
+  protobuf_to_chrono_set_duration(to.ping_interval, from.ping_interval());
+  protobuf_to_chrono_set_duration(to.retry_interval, from.retry_interval());
+
+  to.fault_tolerant = static_cast<size_t>(from.fault_tolerant());
+  to.message_size = static_cast<size_t>(from.message_size());
+  to.receive_buffer_size = static_cast<size_t>(from.receive_buffer_size());
+  to.send_buffer_size = static_cast<size_t>(from.send_buffer_size());
+  to.send_buffer_number = static_cast<size_t>(from.send_buffer_number());
+
+  // crypto
+  to.crypto_key_exchange_type = convert_atbus_configure(from.crypto().key_exchange_type());
+  protobuf_to_chrono_set_duration(to.crypto_key_refresh_interval, from.crypto().key_refresh_interval());
+  to.crypto_allow_algorithms.clear();
+  to.crypto_allow_algorithms.reserve(static_cast<size_t>(from.crypto().algorithm_size()));
+  for (int i = 0; i < from.crypto().algorithm_size(); ++i) {
+    to.crypto_allow_algorithms.push_back(convert_atbus_configure(from.crypto().algorithm(i)));
+  }
+
+  // compression
+  to.compression_allow_algorithms.clear();
+  to.compression_allow_algorithms.reserve(static_cast<size_t>(from.compression().algorithm_size()));
+  for (int i = 0; i < from.compression().algorithm_size(); ++i) {
+    to.compression_allow_algorithms.push_back(convert_atbus_configure(from.compression().algorithm(i)));
+  }
+  to.compression_level = convert_atbus_configure(from.compression().level());
+}
+
 }  // namespace
 
-LIBATAPP_MACRO_API app::message_t::message_t()
-    : type(0), message_sequence(0), data(nullptr), data_size(0), metadata(nullptr) {}
+LIBATAPP_MACRO_API app::message_t::message_t() : type(0), message_sequence(0), data(), metadata(nullptr) {}
 LIBATAPP_MACRO_API app::message_t::~message_t() {}
 
 LIBATAPP_MACRO_API app::message_t::message_t(const message_t &other) { (*this) = other; }
@@ -173,7 +316,6 @@ LIBATAPP_MACRO_API app::message_t &app::message_t::operator=(const message_t &ot
   type = other.type;
   message_sequence = other.message_sequence;
   data = other.data;
-  data_size = other.data_size;
   metadata = other.metadata;
   return *this;
 }
@@ -248,18 +390,16 @@ LIBATAPP_MACRO_API app::app()
   atfw::util::time::time_utility::update();
   tick_timer_.last_tick_timepoint = atfw::util::time::time_utility::sys_now();
   tick_timer_.last_stop_timepoint = std::chrono::system_clock::from_time_t(0);
-  tick_timer_.sec = atfw::util::time::time_utility::get_sys_now();
-  tick_timer_.usec = 0;
-  tick_timer_.inner_break = nullptr;
+  tick_timer_.internal_break = nullptr;
   tick_timer_.tick_compensation = std::chrono::system_clock::duration::zero();
 
   stats_.last_checkpoint_min = 0;
   stats_.endpoint_wake_count = 0;
-  stats_.inner_etcd.sum_error_requests = 0;
-  stats_.inner_etcd.continue_error_requests = 0;
-  stats_.inner_etcd.sum_success_requests = 0;
-  stats_.inner_etcd.continue_success_requests = 0;
-  stats_.inner_etcd.sum_create_requests = 0;
+  stats_.internal_etcd.sum_error_requests = 0;
+  stats_.internal_etcd.continue_error_requests = 0;
+  stats_.internal_etcd.sum_success_requests = 0;
+  stats_.internal_etcd.continue_success_requests = 0;
+  stats_.internal_etcd.sum_create_requests = 0;
   stats_.last_proc_event_count = 0;
   stats_.receive_custom_command_request_count = 0;
   stats_.receive_custom_command_reponse_count = 0;
@@ -267,7 +407,7 @@ LIBATAPP_MACRO_API app::app()
   atbus_connector_ = add_connector<atapp_connector_atbus>();
   loopback_connector_ = add_connector<atapp_connector_loopback>();
 
-  // inner modules
+  // internal modules
   internal_module_worker_pool_ = std::make_shared<atapp::worker_pool_module>();
   add_module(internal_module_worker_pool_);
   internal_module_etcd_ = std::make_shared<atapp::etcd_module>();
@@ -288,21 +428,26 @@ LIBATAPP_MACRO_API app::~app() {
     }
 
     atfw::util::time::time_utility::update();
-    time_t now =
-        atfw::util::time::time_utility::get_sys_now() * 1000 + atfw::util::time::time_utility::get_now_usec() / 1000;
-    time_t offset = get_origin_configure().timer().stop_timeout().seconds() * 1000;
-    offset += get_origin_configure().timer().stop_timeout().nanos() / 1000000;
-    if (offset <= 0) {
-      offset = 30000;
+    process_custom_timers();
+    atfw::util::time::time_utility::raw_time_t now = atfw::util::time::time_utility::sys_now();
+    std::chrono::seconds offset_sec = std::chrono::seconds{get_origin_configure().timer().stop_timeout().seconds()};
+    std::chrono::nanoseconds offset_nanos =
+        std::chrono::nanoseconds{get_origin_configure().timer().stop_timeout().nanos()};
+    atfw::util::time::time_utility::raw_time_t timeout = now;
+    if (offset_sec > std::chrono::seconds{0} || offset_nanos >= std::chrono::nanoseconds{1000000}) {
+      timeout += std::chrono::duration_cast<std::chrono::system_clock::duration>(offset_sec);
+      timeout += std::chrono::duration_cast<std::chrono::system_clock::duration>(offset_nanos);
+    } else {
+      timeout += std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::seconds{30});
     }
 
-    time_t timeout = now + offset;
     while (!is_closed() && timeout > now) {
-      run_once(0, std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::seconds(timeout - now)));
+      run_once(0, timeout - now);
 
       atfw::util::time::time_utility::update();
-      now =
-          atfw::util::time::time_utility::get_sys_now() * 1000 + atfw::util::time::time_utility::get_now_usec() / 1000;
+      process_custom_timers();
+
+      now = atfw::util::time::time_utility::sys_now();
     }
   }
 
@@ -427,6 +572,7 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
 
   // update time first
   atfw::util::time::time_utility::update();
+  custom_timer_controller_.init(get_custom_timer_tick());
 
   // step 1. bind default options
   // step 2. load options from cmd line
@@ -719,10 +865,10 @@ LIBATAPP_MACRO_API int app::run_once(uint64_t min_event_count, std::chrono::syst
 
   do {
     if (timeout_duration.count() > 0) {
-      if (nullptr == tick_timer_.inner_break) {
-        tick_timer_.inner_break = &timeout;
-      } else if (timeout < *tick_timer_.inner_break) {
-        tick_timer_.inner_break = &timeout;
+      if (nullptr == tick_timer_.internal_break) {
+        tick_timer_.internal_break = &timeout;
+      } else if (timeout < *tick_timer_.internal_break) {
+        tick_timer_.internal_break = &timeout;
       }
     }
 
@@ -741,8 +887,8 @@ LIBATAPP_MACRO_API int app::run_once(uint64_t min_event_count, std::chrono::syst
     }
   } while (evt_count < min_event_count);
 
-  if (&timeout == tick_timer_.inner_break) {
-    tick_timer_.inner_break = nullptr;
+  if (&timeout == tick_timer_.internal_break) {
+    tick_timer_.internal_break = nullptr;
   }
 
   return ret;
@@ -986,7 +1132,20 @@ LIBATAPP_MACRO_API int app::reload() {
       setup_logger(*bus_node_->get_logger(), conf_.log.level(), conf_.log.category(i));
     }
 
-    // step 7. if inited, let all modules reload
+    // step 7.1 reload atbus configure
+    if (bus_node_) {
+      bus_node_->reload_crypto(
+          conf_.bus_conf.crypto_key_exchange_type, conf_.bus_conf.crypto_key_refresh_interval,
+          gsl::span<const atbus::protocol::ATBUS_CRYPTO_ALGORITHM_TYPE>(conf_.bus_conf.crypto_allow_algorithms));
+      bus_node_->reload_compression(gsl::span<const atbus::protocol::ATBUS_COMPRESSION_ALGORITHM_TYPE>(
+                                        conf_.bus_conf.compression_allow_algorithms),
+                                    conf_.bus_conf.compression_level);
+    }
+    if (atbus_connector_) {
+      atbus_connector_->reload();
+    }
+
+    // step 7.2 if inited, let all modules reload
     stats_.module_reload.clear();
     stats_.module_reload.reserve(modules_.size());
     for (module_ptr_t &mod : modules_) {
@@ -1053,12 +1212,6 @@ LIBATAPP_MACRO_API int app::tick() {
 
   tick_timer_.last_tick_timepoint = atfw::util::time::time_utility::sys_now();
   do {
-    tick_timer_.sec = atfw::util::time::time_utility::get_sys_now();
-    tick_timer_.usec = static_cast<time_t>(
-        std::chrono::duration_cast<std::chrono::microseconds>(atfw::util::time::time_utility::sys_now() -
-                                                              std::chrono::system_clock::from_time_t(tick_timer_.sec))
-            .count());
-
     active_count = 0;
     int res;
     // step 1. proc available modules
@@ -1074,8 +1227,8 @@ LIBATAPP_MACRO_API int app::tick() {
     }
 
     // step 2. proc atbus
-    if (bus_node_ && ::atbus::node::state_t::CREATED != bus_node_->get_state()) {
-      res = bus_node_->proc(tick_timer_.sec, tick_timer_.usec);
+    if (bus_node_ && ::atbus::node::state_t::type::kCreated != bus_node_->get_state()) {
+      res = bus_node_->proc(tick_timer_.last_tick_timepoint);
       if (res < 0) {
         FWLOGERROR("atbus node run tick and return {}", res);
       } else {
@@ -1083,10 +1236,13 @@ LIBATAPP_MACRO_API int app::tick() {
       }
     }
 
-    // step 3. process inner events
+    // step 3. process internal events
     // This should be called at last, because it only concern time
     atfw::util::time::time_utility::update();
-    active_count += process_inner_events(atfw::util::time::time_utility::sys_now() + conf_.timer_tick_interval);
+    active_count += process_internal_events(atfw::util::time::time_utility::sys_now() + conf_.timer_tick_interval);
+
+    // step 4. process custom timers
+    active_count += process_custom_timers();
 
     // only tick time less than tick interval will run loop again
     if (active_count > 0) {
@@ -1113,8 +1269,8 @@ LIBATAPP_MACRO_API int app::tick() {
       }
     }
 
-    if (nullptr != tick_timer_.inner_break && tick_timer_.last_tick_timepoint >= *tick_timer_.inner_break) {
-      tick_timer_.inner_break = nullptr;
+    if (nullptr != tick_timer_.internal_break && tick_timer_.last_tick_timepoint >= *tick_timer_.internal_break) {
+      tick_timer_.internal_break = nullptr;
       uv_stop(loop);
     }
   }
@@ -1173,17 +1329,17 @@ LIBATAPP_MACRO_API int app::tick() {
             "\tetcd module(last minite): request count: {}, failed request: {}, continue failed: {}, success "
             "request: "
             "{}, continue success request {}",
-            current.sum_create_requests - stats_.inner_etcd.sum_create_requests,
-            current.sum_error_requests - stats_.inner_etcd.sum_error_requests,
-            current.continue_error_requests - stats_.inner_etcd.continue_error_requests,
-            current.sum_success_requests - stats_.inner_etcd.sum_success_requests,
-            current.continue_success_requests - stats_.inner_etcd.continue_success_requests);
+            current.sum_create_requests - stats_.internal_etcd.sum_create_requests,
+            current.sum_error_requests - stats_.internal_etcd.sum_error_requests,
+            current.continue_error_requests - stats_.internal_etcd.continue_error_requests,
+            current.sum_success_requests - stats_.internal_etcd.sum_success_requests,
+            current.continue_success_requests - stats_.internal_etcd.continue_success_requests);
         FWLOGINFO(
             "\tetcd module(sum): request count: {}, failed request: {}, continue failed: {}, success request: "
             "{}, continue success request {}",
             current.sum_create_requests, current.sum_error_requests, current.continue_error_requests,
             current.sum_success_requests, current.continue_success_requests);
-        stats_.inner_etcd = current;
+        stats_.internal_etcd = current;
       }
 
       FWLOGINFO("\tendpoint wake count: {}, by_id index size: {}, by_name index size: {}, waker size: {}",
@@ -1194,7 +1350,7 @@ LIBATAPP_MACRO_API int app::tick() {
     } else {
       uv_getrusage(&stats_.last_checkpoint_usage);
       if (internal_module_etcd_) {
-        stats_.inner_etcd = internal_module_etcd_->get_raw_etcd_ctx().get_stats();
+        stats_.internal_etcd = internal_module_etcd_->get_raw_etcd_ctx().get_stats();
       }
     }
 
@@ -1649,18 +1805,6 @@ LIBATAPP_MACRO_API void app::pack(atapp::protocol::atapp_discovery &out) const {
   out.mutable_metadata()->CopyFrom(get_metadata());
 
   if (bus_node_) {
-    const std::vector<atbus::endpoint_subnet_conf> &subnets = bus_node_->get_conf().subnets;
-    for (size_t i = 0; i < subnets.size(); ++i) {
-      atapp::protocol::atbus_subnet_range *subset = out.add_atbus_subnets();
-      if (nullptr == subset) {
-        FWLOGERROR("pack configures for {}(0x{:x}) but malloc atbus_subnet_range failed", get_app_name(), get_app_id());
-        break;
-      }
-
-      subset->set_id_prefix(subnets[i].id_prefix);
-      subset->set_mask_bits(subnets[i].mask_bits);
-    }
-
     out.mutable_listen()->Reserve(static_cast<int>(bus_node_->get_listen_list().size()));
     // std::list<std::string>
     for (auto &addr : bus_node_->get_listen_list()) {
@@ -1795,7 +1939,7 @@ LIBATAPP_MACRO_API int32_t app::listen(const std::string &address) {
   return connector_protocol->on_start_listen(addr);
 }
 
-LIBATAPP_MACRO_API int32_t app::send_message(uint64_t target_node_id, int32_t type, const void *data, size_t data_size,
+LIBATAPP_MACRO_API int32_t app::send_message(uint64_t target_node_id, int32_t type, gsl::span<const unsigned char> data,
                                              uint64_t *msg_sequence, const atapp::protocol::atapp_metadata *metadata) {
   if (!check_flag(flag_t::INITIALIZED)) {
     return EN_ATAPP_ERR_NOT_INITED;
@@ -1814,10 +1958,10 @@ LIBATAPP_MACRO_API int32_t app::send_message(uint64_t target_node_id, int32_t ty
 
     int32_t ret;
     if (nullptr != msg_sequence) {
-      ret = cache->push_forward_message(type, *msg_sequence, data, data_size, metadata);
+      ret = cache->push_forward_message(type, *msg_sequence, data, metadata);
     } else {
       uint64_t msg_seq = 0;
-      ret = cache->push_forward_message(type, msg_seq, data, data_size, metadata);
+      ret = cache->push_forward_message(type, msg_seq, data, metadata);
     }
     return ret;
   } while (false);
@@ -1833,7 +1977,7 @@ LIBATAPP_MACRO_API int32_t app::send_message(uint64_t target_node_id, int32_t ty
       break;
     }
 
-    return send_message(node, type, data, data_size, msg_sequence, metadata);
+    return send_message(node, type, data, msg_sequence, metadata);
   } while (false);
 
   // Fallback to old atbus connector
@@ -1844,11 +1988,20 @@ LIBATAPP_MACRO_API int32_t app::send_message(uint64_t target_node_id, int32_t ty
     return EN_ATAPP_ERR_NOT_INITED;
   }
 
-  return bus_node_->send_data(target_node_id, type, data, data_size, msg_sequence);
+  atbus::node::send_data_options_t opts;
+  if (msg_sequence != nullptr) {
+    opts.sequence = *msg_sequence;
+  }
+  int ret = bus_node_->send_data(target_node_id, type, data, opts);
+  if (msg_sequence != nullptr) {
+    *msg_sequence = opts.sequence;
+  }
+
+  return ret;
 }
 
-LIBATAPP_MACRO_API int32_t app::send_message(const std::string &target_node_name, int32_t type, const void *data,
-                                             size_t data_size, uint64_t *msg_sequence,
+LIBATAPP_MACRO_API int32_t app::send_message(const std::string &target_node_name, int32_t type,
+                                             gsl::span<const unsigned char> data, uint64_t *msg_sequence,
                                              const atapp::protocol::atapp_metadata *metadata) {
   if (!check_flag(flag_t::INITIALIZED)) {
     return EN_ATAPP_ERR_NOT_INITED;
@@ -1866,10 +2019,10 @@ LIBATAPP_MACRO_API int32_t app::send_message(const std::string &target_node_name
 
     int32_t ret;
     if (nullptr != msg_sequence) {
-      ret = cache->push_forward_message(type, *msg_sequence, data, data_size, metadata);
+      ret = cache->push_forward_message(type, *msg_sequence, data, metadata);
     } else {
       uint64_t msg_seq = 0;
-      ret = cache->push_forward_message(type, msg_seq, data, data_size, metadata);
+      ret = cache->push_forward_message(type, msg_seq, data, metadata);
     }
     return ret;
   } while (false);
@@ -1884,11 +2037,11 @@ LIBATAPP_MACRO_API int32_t app::send_message(const std::string &target_node_name
     return EN_ATBUS_ERR_ATNODE_NOT_FOUND;
   }
 
-  return send_message(node, type, data, data_size, msg_sequence, metadata);
+  return send_message(node, type, data, msg_sequence, metadata);
 }
 
 LIBATAPP_MACRO_API int32_t app::send_message(const etcd_discovery_node::ptr_t &target_node_discovery, int32_t type,
-                                             const void *data, size_t data_size, uint64_t *msg_sequence,
+                                             gsl::span<const unsigned char> data, uint64_t *msg_sequence,
                                              const atapp::protocol::atapp_metadata *metadata) {
   if (!check_flag(flag_t::INITIALIZED)) {
     return EN_ATAPP_ERR_NOT_INITED;
@@ -1905,122 +2058,124 @@ LIBATAPP_MACRO_API int32_t app::send_message(const etcd_discovery_node::ptr_t &t
 
   int32_t ret;
   if (nullptr != msg_sequence) {
-    ret = cache->push_forward_message(type, *msg_sequence, data, data_size, metadata);
+    ret = cache->push_forward_message(type, *msg_sequence, data, metadata);
   } else {
     uint64_t msg_seq = 0;
-    ret = cache->push_forward_message(type, msg_seq, data, data_size, metadata);
+    ret = cache->push_forward_message(type, msg_seq, data, metadata);
   }
   return ret;
 }
 
-LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(const void *hash_buf, size_t hash_bufsz, int32_t type,
-                                                                const void *data, size_t data_size,
+LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(gsl::span<const unsigned char> hash_buf, int32_t type,
+                                                                gsl::span<const unsigned char> data,
                                                                 uint64_t *msg_sequence,
                                                                 const atapp::protocol::atapp_metadata *metadata) {
   if (!internal_module_etcd_) {
     return EN_ATAPP_ERR_DISCOVERY_DISABLED;
   }
 
-  return send_message_by_consistent_hash(internal_module_etcd_->get_global_discovery(), hash_buf, hash_bufsz, type,
-                                         data, data_size, msg_sequence, metadata);
-}
-
-LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(uint64_t hash_key, int32_t type, const void *data,
-                                                                size_t data_size, uint64_t *msg_sequence,
-                                                                const atapp::protocol::atapp_metadata *metadata) {
-  if (!internal_module_etcd_) {
-    return EN_ATAPP_ERR_DISCOVERY_DISABLED;
-  }
-
-  return send_message_by_consistent_hash(internal_module_etcd_->get_global_discovery(), hash_key, type, data, data_size,
+  return send_message_by_consistent_hash(internal_module_etcd_->get_global_discovery(), hash_buf, type, data,
                                          msg_sequence, metadata);
 }
 
-LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(int64_t hash_key, int32_t type, const void *data,
-                                                                size_t data_size, uint64_t *msg_sequence,
+LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(uint64_t hash_key, int32_t type,
+                                                                gsl::span<const unsigned char> data,
+                                                                uint64_t *msg_sequence,
                                                                 const atapp::protocol::atapp_metadata *metadata) {
   if (!internal_module_etcd_) {
     return EN_ATAPP_ERR_DISCOVERY_DISABLED;
   }
 
-  return send_message_by_consistent_hash(internal_module_etcd_->get_global_discovery(), hash_key, type, data, data_size,
+  return send_message_by_consistent_hash(internal_module_etcd_->get_global_discovery(), hash_key, type, data,
+                                         msg_sequence, metadata);
+}
+
+LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(int64_t hash_key, int32_t type,
+                                                                gsl::span<const unsigned char> data,
+                                                                uint64_t *msg_sequence,
+                                                                const atapp::protocol::atapp_metadata *metadata) {
+  if (!internal_module_etcd_) {
+    return EN_ATAPP_ERR_DISCOVERY_DISABLED;
+  }
+
+  return send_message_by_consistent_hash(internal_module_etcd_->get_global_discovery(), hash_key, type, data,
                                          msg_sequence, metadata);
 }
 
 LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(const std::string &hash_key, int32_t type,
-                                                                const void *data, size_t data_size,
+                                                                gsl::span<const unsigned char> data,
                                                                 uint64_t *msg_sequence,
                                                                 const atapp::protocol::atapp_metadata *metadata) {
   if (!internal_module_etcd_) {
     return EN_ATAPP_ERR_DISCOVERY_DISABLED;
   }
 
-  return send_message_by_consistent_hash(internal_module_etcd_->get_global_discovery(), hash_key, type, data, data_size,
+  return send_message_by_consistent_hash(internal_module_etcd_->get_global_discovery(), hash_key, type, data,
                                          msg_sequence, metadata);
 }
 
-LIBATAPP_MACRO_API int32_t app::send_message_by_random(int32_t type, const void *data, size_t data_size,
+LIBATAPP_MACRO_API int32_t app::send_message_by_random(int32_t type, gsl::span<const unsigned char> data,
                                                        uint64_t *msg_sequence,
                                                        const atapp::protocol::atapp_metadata *metadata) {
   if (!internal_module_etcd_) {
     return EN_ATAPP_ERR_DISCOVERY_DISABLED;
   }
 
-  return send_message_by_random(internal_module_etcd_->get_global_discovery(), type, data, data_size, msg_sequence,
-                                metadata);
+  return send_message_by_random(internal_module_etcd_->get_global_discovery(), type, data, msg_sequence, metadata);
 }
 
-LIBATAPP_MACRO_API int32_t app::send_message_by_round_robin(int32_t type, const void *data, size_t data_size,
+LIBATAPP_MACRO_API int32_t app::send_message_by_round_robin(int32_t type, gsl::span<const unsigned char> data,
                                                             uint64_t *msg_sequence,
                                                             const atapp::protocol::atapp_metadata *metadata) {
   if (!internal_module_etcd_) {
     return EN_ATAPP_ERR_DISCOVERY_DISABLED;
   }
 
-  return send_message_by_round_robin(internal_module_etcd_->get_global_discovery(), type, data, data_size, msg_sequence,
-                                     metadata);
+  return send_message_by_round_robin(internal_module_etcd_->get_global_discovery(), type, data, msg_sequence, metadata);
 }
 
 LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(const etcd_discovery_set &discovery_set,
-                                                                const void *hash_buf, size_t hash_bufsz, int32_t type,
-                                                                const void *data, size_t data_size,
+                                                                gsl::span<const unsigned char> hash_buf, int32_t type,
+                                                                gsl::span<const unsigned char> data,
                                                                 uint64_t *msg_sequence,
                                                                 const atapp::protocol::atapp_metadata *metadata) {
-  etcd_discovery_node::ptr_t node = discovery_set.get_node_by_consistent_hash(hash_buf, hash_bufsz, metadata);
+  etcd_discovery_node::ptr_t node = discovery_set.get_node_by_consistent_hash(hash_buf, metadata);
   if (!node) {
     return EN_ATBUS_ERR_ATNODE_NOT_FOUND;
   }
 
-  return send_message(node, type, data, data_size, msg_sequence, metadata);
+  return send_message(node, type, data, msg_sequence, metadata);
 }
 
 LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(const etcd_discovery_set &discovery_set,
-                                                                uint64_t hash_key, int32_t type, const void *data,
-                                                                size_t data_size, uint64_t *msg_sequence,
+                                                                uint64_t hash_key, int32_t type,
+                                                                gsl::span<const unsigned char> data,
+                                                                uint64_t *msg_sequence,
                                                                 const atapp::protocol::atapp_metadata *metadata) {
   etcd_discovery_node::ptr_t node = discovery_set.get_node_by_consistent_hash(hash_key, metadata);
   if (!node) {
     return EN_ATBUS_ERR_ATNODE_NOT_FOUND;
   }
 
-  return send_message(node, type, data, data_size, msg_sequence, metadata);
+  return send_message(node, type, data, msg_sequence, metadata);
 }
 
 LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(const etcd_discovery_set &discovery_set,
-                                                                int64_t hash_key, int32_t type, const void *data,
-                                                                size_t data_size, uint64_t *msg_sequence,
+                                                                int64_t hash_key, int32_t type,
+                                                                gsl::span<const unsigned char> data,
+                                                                uint64_t *msg_sequence,
                                                                 const atapp::protocol::atapp_metadata *metadata) {
   etcd_discovery_node::ptr_t node = discovery_set.get_node_by_consistent_hash(hash_key, metadata);
   if (!node) {
     return EN_ATBUS_ERR_ATNODE_NOT_FOUND;
   }
 
-  return send_message(node, type, data, data_size, msg_sequence, metadata);
+  return send_message(node, type, data, msg_sequence, metadata);
 }
 
 LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(const etcd_discovery_set &discovery_set,
                                                                 const std::string &hash_key, int32_t type,
-                                                                const void *data, size_t data_size,
+                                                                gsl::span<const unsigned char> data,
                                                                 uint64_t *msg_sequence,
                                                                 const atapp::protocol::atapp_metadata *metadata) {
   etcd_discovery_node::ptr_t node = discovery_set.get_node_by_consistent_hash(hash_key, metadata);
@@ -2028,29 +2183,29 @@ LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(const etcd_disco
     return EN_ATBUS_ERR_ATNODE_NOT_FOUND;
   }
 
-  return send_message(node, type, data, data_size, msg_sequence, metadata);
+  return send_message(node, type, data, msg_sequence, metadata);
 }
 
 LIBATAPP_MACRO_API int32_t app::send_message_by_random(const etcd_discovery_set &discovery_set, int32_t type,
-                                                       const void *data, size_t data_size, uint64_t *msg_sequence,
+                                                       gsl::span<const unsigned char> data, uint64_t *msg_sequence,
                                                        const atapp::protocol::atapp_metadata *metadata) {
   etcd_discovery_node::ptr_t node = discovery_set.get_node_by_random(metadata);
   if (!node) {
     return EN_ATBUS_ERR_ATNODE_NOT_FOUND;
   }
 
-  return send_message(node, type, data, data_size, msg_sequence, metadata);
+  return send_message(node, type, data, msg_sequence, metadata);
 }
 
 LIBATAPP_MACRO_API int32_t app::send_message_by_round_robin(const etcd_discovery_set &discovery_set, int32_t type,
-                                                            const void *data, size_t data_size, uint64_t *msg_sequence,
+                                                            gsl::span<const unsigned char> data, uint64_t *msg_sequence,
                                                             const atapp::protocol::atapp_metadata *metadata) {
   etcd_discovery_node::ptr_t node = discovery_set.get_node_by_round_robin(metadata);
   if (!node) {
     return EN_ATBUS_ERR_ATNODE_NOT_FOUND;
   }
 
-  return send_message(node, type, data, data_size, msg_sequence, metadata);
+  return send_message(node, type, data, msg_sequence, metadata);
 }
 
 LIBATAPP_MACRO_API bool app::add_log_sink_maker(gsl::string_view name, log_sink_maker::log_reg_t fn) {
@@ -2291,7 +2446,7 @@ LIBATAPP_MACRO_API atapp_endpoint::ptr_t app::mutable_endpoint(const etcd_discov
     if (handle.use_count() == 1 && loopback_connector_ && is_loopback) {
       atbus::channel::channel_address_t addr;
       atbus::channel::make_address("loopback://", get_app_name().c_str(), 0, addr);
-      int res = loopback_connector_->on_start_connect(discovery.get(), addr, handle);
+      int res = loopback_connector_->on_start_connect(*discovery, *ret, addr, handle);
       if (0 == res && handle.use_count() > 1) {
         atapp_connector_bind_helper::bind(*handle, *loopback_connector_);
         atapp_endpoint_bind_helper::bind(*handle, *ret);
@@ -2304,6 +2459,7 @@ LIBATAPP_MACRO_API atapp_endpoint::ptr_t app::mutable_endpoint(const etcd_discov
       }
     } else {
       int32_t gateway_size = discovery->get_ingress_size();
+      discovery->reset_ingress_index();
       for (int32_t i = 0; handle && i < gateway_size; ++i) {
         atbus::channel::channel_address_t addr;
         const atapp::protocol::atapp_gateway &gateway = discovery->next_ingress_gateway();
@@ -2334,12 +2490,17 @@ LIBATAPP_MACRO_API atapp_endpoint::ptr_t app::mutable_endpoint(const etcd_discov
           connector_protocol = iter->second;
         }
 
-        // Skip loopback and use inner loopback connector
+        // Skip loopback and use internal loopback connector
         if (is_loopback && !connector_protocol->support_loopback()) {
           continue;
         }
 
-        int res = connector_protocol->on_start_connect(discovery.get(), addr, handle);
+        // Skip if this address can not be connected by this node
+        if (!connector_protocol->check_address_connectable(addr, *discovery)) {
+          continue;
+        }
+
+        int res = connector_protocol->on_start_connect(*discovery, *ret, addr, handle);
         if (0 == res && handle.use_count() > 1) {
           atapp_connector_bind_helper::bind(*handle, *connector_protocol);
           atapp_endpoint_bind_helper::bind(*handle, *ret);
@@ -2484,6 +2645,19 @@ LIBATAPP_MACRO_API void app::setup_logger(atfw::util::log::log_wrapper &logger, 
 
   while (logger.sink_size() > new_sink_number) {
     logger.pop_sink();
+  }
+}
+
+LIBATAPP_MACRO_API int app::add_custom_timer_with_system_clock(std::chrono::system_clock::duration delta,
+                                                               jiffies_timer_handle_t &&fn, void *priv_data,
+                                                               jiffies_timer_watcher_t *watcher) {
+  return custom_timer_controller_.add_timer(get_custom_timer_tick_offset(delta), std::move(fn), priv_data, watcher);
+}
+
+LIBATAPP_MACRO_API void app::remove_custom_timer(jiffies_timer_watcher_t &watcher) {
+  auto timer_handle = watcher.lock();
+  if (timer_handle) {
+    jiffies_timer_t::remove_timer(*timer_handle);
   }
 }
 
@@ -2674,56 +2848,14 @@ int app::apply_configure() {
   }
 
   // atbus configure
-  atbus::node::default_conf(&conf_.bus_conf);
-
-  {
-    conf_.bus_conf.subnets.reserve(static_cast<size_t>(conf_.origin.bus().subnets_size()));
-    for (int i = 0; i < conf_.origin.bus().subnets_size(); ++i) {
-      const std::string &subset = conf_.origin.bus().subnets(i);
-      std::string::size_type sep_pos = subset.find('/');
-      if (std::string::npos == sep_pos) {
-        conf_.bus_conf.subnets.push_back(
-            atbus::endpoint_subnet_conf(0, atfw::util::string::to_int<uint32_t>(subset.c_str())));
-      } else {
-        conf_.bus_conf.subnets.push_back(
-            atbus::endpoint_subnet_conf(convert_app_id_by_string(subset.c_str()),
-                                        atfw::util::string::to_int<uint32_t>(subset.c_str() + sep_pos + 1)));
-      }
-    }
-  }
-
-  conf_.bus_conf.parent_address = conf_.origin.bus().proxy();
-  conf_.bus_conf.loop_times = conf_.origin.bus().loop_times();
-  conf_.bus_conf.ttl = conf_.origin.bus().ttl();
-  conf_.bus_conf.backlog = conf_.origin.bus().backlog();
-  conf_.bus_conf.access_token_max_number = static_cast<size_t>(conf_.origin.bus().access_token_max_number());
-  {
-    conf_.bus_conf.access_tokens.reserve(static_cast<size_t>(conf_.origin.bus().access_tokens_size()));
-    for (int i = 0; i < conf_.origin.bus().access_tokens_size(); ++i) {
-      const std::string &access_token = conf_.origin.bus().access_tokens(i);
-      conf_.bus_conf.access_tokens.push_back(std::vector<unsigned char>());
-      conf_.bus_conf.access_tokens.back().assign(
-          reinterpret_cast<const unsigned char *>(access_token.data()),
-          reinterpret_cast<const unsigned char *>(access_token.data()) + access_token.size());
-    }
-  }
-  conf_.bus_conf.overwrite_listen_path = conf_.origin.bus().overwrite_listen_path();
-
-  conf_.bus_conf.first_idle_timeout = conf_.origin.bus().first_idle_timeout().seconds();
-  conf_.bus_conf.ping_interval = conf_.origin.bus().ping_interval().seconds();
-  conf_.bus_conf.retry_interval = conf_.origin.bus().retry_interval().seconds();
-
-  conf_.bus_conf.fault_tolerant = static_cast<size_t>(conf_.origin.bus().fault_tolerant());
-  conf_.bus_conf.message_size = static_cast<size_t>(conf_.origin.bus().message_size());
-  conf_.bus_conf.receive_buffer_size = static_cast<size_t>(conf_.origin.bus().receive_buffer_size());
-  conf_.bus_conf.send_buffer_size = static_cast<size_t>(conf_.origin.bus().send_buffer_size());
-  conf_.bus_conf.send_buffer_number = static_cast<size_t>(conf_.origin.bus().send_buffer_number());
+  apply_atbus_configure(conf_.bus_conf, conf_.origin.bus());
 
   return 0;
 }  // namespace atapp
 
 void app::run_ev_loop(int run_mode) {
   atfw::util::time::time_utility::update();
+  process_custom_timers();
 
   ev_loop_t *loop = get_evloop();
   if (bus_node_) {
@@ -2785,7 +2917,7 @@ void app::run_ev_loop(int run_mode) {
       if (check_flag(flag_t::STOPPED) && bus_node_ &&
           ::atbus::node::state_t::type::kCreated != bus_node_->get_state() &&
           !bus_node_->check_flag(::atbus::node::flag_t::type::kShutdown)) {
-        bus_node_->shutdown(0);
+        bus_node_->shutdown(EN_ATBUS_ERR_SUCCESS);
       }
     }
 
@@ -2902,7 +3034,7 @@ void app::process_signal(int signo) {
   }
 }
 
-int32_t app::process_inner_events(const atfw::util::time::time_utility::raw_time_t &end_tick) {
+int32_t app::process_internal_events(const atfw::util::time::time_utility::raw_time_t &end_tick) {
   int32_t ret = 0;
   bool more_messages = true;
   bool first_round = true;
@@ -2922,9 +3054,13 @@ int32_t app::process_inner_events(const atfw::util::time::time_utility::raw_time
           round_res += res;
         }
 
-        // TODO(owent): Support for delay recycle?
+        // Delay recycle
         if (!ep->has_connection_handle()) {
-          remove_endpoint(ep);
+          if (tick_timer_.last_tick_timepoint >= ep->get_gc_timepoint()) {
+            remove_endpoint(ep);
+          } else {
+            ep->add_waker(ep->get_gc_timepoint());
+          }
         }
       }
     }
@@ -2942,6 +3078,19 @@ int32_t app::process_inner_events(const atfw::util::time::time_utility::raw_time
   }
 
   return ret;
+}
+
+int32_t app::process_custom_timers() {
+  int res = custom_timer_controller_.tick(get_custom_timer_tick());
+  if (res == jiffies_timer_t::error_type_t::EN_JTET_NOT_INITED) {
+    custom_timer_controller_.init(get_custom_timer_tick());
+    res = custom_timer_controller_.tick(get_custom_timer_tick());
+  }
+
+  if (res < 0) {
+    res = 0;
+  }
+  return res;
 }
 
 atapp_endpoint::ptr_t app::auto_mutable_self_endpoint() {
@@ -3604,12 +3753,15 @@ int app::setup_atbus() {
     bus_node_.reset();
     return EN_ATAPP_ERR_SETUP_ATBUS;
   }
+  if (atbus_connector_) {
+    atbus_connector_->reload();
+  }
 
   // setup all callbacks
   bus_node_->set_on_forward_request_handle([this](const atbus::node &n, const atbus::endpoint *ep,
                                                   const atbus::connection *conn, const ::atbus::message &m,
-                                                  const void *data, size_t data_size) -> int {
-    return this->bus_evt_callback_on_forward_request(n, ep, conn, m, data, data_size);
+                                                  gsl::span<const unsigned char> data) -> int {
+    return this->bus_evt_callback_on_forward_request(n, ep, conn, m, data);
   });
 
   // set logger
@@ -3633,7 +3785,7 @@ int app::setup_atbus() {
 
   bus_node_->set_on_register_handle(
       [this](const atbus::node &n, const atbus::endpoint *ep, const atbus::connection *conn, int status) -> int {
-        return this->bus_evt_callback_on_reg(n, ep, conn, status);
+        return this->bus_evt_callback_on_register(n, ep, conn, status);
       });
 
   bus_node_->set_on_shutdown_handle([this](const atbus::node &n, int reason) -> int {
@@ -3653,14 +3805,17 @@ int app::setup_atbus() {
 
   bus_node_->set_on_custom_command_request_handle(
       [this](const atbus::node &n, const atbus::endpoint *ep, const atbus::connection *conn, atbus::bus_id_t bus_id,
-             const std::vector<std::pair<const void *, size_t>> &request_body,
-             std::list<std::string> &response_body) -> int {
+             gsl::span<gsl::span<const unsigned char>> request_body, std::list<std::string> &response_body) -> int {
         return this->bus_evt_callback_on_custom_command_request(n, ep, conn, bus_id, request_body, response_body);
       });
 
   bus_node_->set_on_new_connection_handle([this](const atbus::node &n, const atbus::connection *conn) -> int {
     return this->bus_evt_callback_on_new_connection(n, conn);
   });
+  bus_node_->set_on_close_connection_handle(
+      [this](const atbus::node &n, const atbus::endpoint *ep, const atbus::connection *conn) -> int {
+        return this->bus_evt_callback_on_close_connection(n, ep, conn);
+      });
   bus_node_->set_on_add_endpoint_handle([this](const atbus::node &n, atbus::endpoint *ep, int error_code) -> int {
     return this->bus_evt_callback_on_add_endpoint(n, ep, error_code);
   });
@@ -3719,9 +3874,9 @@ int app::setup_atbus() {
   // if has father node, block and connect to father node
   if (atbus::node::state_t::type::kConnectingUpstream == bus_node_->get_state() ||
       atbus::node::state_t::type::kLostUpstream == bus_node_->get_state()) {
-    while (nullptr == bus_node_->get_parent_endpoint()) {
+    while (nullptr == bus_node_->get_upstream_endpoint()) {
       if (check_flag(flag_t::TIMEOUT)) {
-        FWLOGERROR("connection to parent node {} timeout", conf_.bus_conf.parent_address);
+        FWLOGERROR("connection to parent node {} timeout", conf_.bus_conf.upstream_address);
         ret = -1;
         break;
       }
@@ -4524,7 +4679,7 @@ int app::command_handler_list_discovery(atfw::util::cli::callback_param params) 
 }
 
 int app::bus_evt_callback_on_forward_request(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
-                                             const atbus::message &msg, const void *buffer, size_t len) {
+                                             const atbus::message &msg, gsl::span<const unsigned char> buffer) {
   auto head = msg.get_head();
   app_id_t source_bus_id = head == nullptr ? 0 : head->source_bus_id();
   if (atbus::message_body_type::kDataTransformReq != msg.get_body_type() || 0 == source_bus_id) {
@@ -4535,7 +4690,6 @@ int app::bus_evt_callback_on_forward_request(const atbus::node &, const atbus::e
   app_id_t from_id = msg.body().data_transform_req().from();
   app::message_t message;
   message.data = buffer;
-  message.data_size = len;
   message.metadata = nullptr;
   message.message_sequence = head == nullptr ? 0 : head->sequence();
   message.type = head == nullptr ? 0 : head->type();
@@ -4550,12 +4704,12 @@ int app::bus_evt_callback_on_forward_request(const atbus::node &, const atbus::e
   int res = trigger_event_on_forward_request(sender, message);
   if (res < 0) {
     FWLOGERROR("{} forward data {}(type={}, sequence={}) bytes failed, error code: {}",
-               atbus_connector_ ? atbus_connector_->name() : "[null]", len, message.type, message.message_sequence,
-               res);
+               atbus_connector_ ? atbus_connector_->name() : "[null]", buffer.size(), message.type,
+               message.message_sequence, res);
   } else {
     FWLOGDEBUG("{} forward data {}(type={}, sequence={}) bytes success, result code: {}",
-               atbus_connector_ ? atbus_connector_->name() : "[null]", len, message.type, message.message_sequence,
-               res);
+               atbus_connector_ ? atbus_connector_->name() : "[null]", buffer.size(), message.type,
+               message.message_sequence, res);
   }
 
   ++stats_.last_proc_event_count;
@@ -4591,14 +4745,16 @@ int app::bus_evt_callback_on_forward_response(const atbus::node &, const atbus::
   if (atbus_connector_) {
     atbus_connector_->on_receive_forward_response(
         transform_rsp.from(), head->type(), head->sequence(), head->result_code(),
-        reinterpret_cast<const void *>(transform_rsp.content().c_str()), transform_rsp.content().size(), nullptr);
+        gsl::span<const unsigned char>(reinterpret_cast<const unsigned char *>(transform_rsp.content().c_str()),
+                                       transform_rsp.content().size()),
+        nullptr);
     return 0;
   }
 
   app_id_t from_id = transform_rsp.from();
   app::message_t message;
-  message.data = reinterpret_cast<const void *>(transform_rsp.content().c_str());
-  message.data_size = transform_rsp.content().size();
+  message.data = gsl::span<const unsigned char>(
+      reinterpret_cast<const unsigned char *>(transform_rsp.content().c_str()), transform_rsp.content().size());
   message.metadata = nullptr;
   message.message_sequence = head->sequence();
   message.type = head->type();
@@ -4668,8 +4824,8 @@ int app::bus_evt_callback_on_info_log(const atbus::node &n, const atbus::endpoin
   return 0;
 }
 
-int app::bus_evt_callback_on_reg(const atbus::node &n, const atbus::endpoint *ep, const atbus::connection *conn,
-                                 int res) {
+int app::bus_evt_callback_on_register(const atbus::node &n, const atbus::endpoint *ep, const atbus::connection *conn,
+                                      int res) {
   ++stats_.last_proc_event_count;
 
   if (nullptr != conn) {
@@ -4713,14 +4869,14 @@ int app::bus_evt_callback_on_invalid_connection(const atbus::node &n, const atbu
     FWLOGERROR("bus node {:#x} recv a invalid nullptr connection , res: {}", n.get_id(), res);
   } else {
     // already disconncted finished.
-    if (atbus::connection::state_t::DISCONNECTED != conn->get_status()) {
+    if (atbus::connection::state_t::type::kDisconnected != conn->get_status()) {
       if (is_closing()) {
         FWLOGINFO(
             "bus node {:#x} make a invalid connection {}({}) when closing, all unfinished connection will be aborted. "
             "res: {}",
             n.get_id(), reinterpret_cast<const void *>(conn), conn->get_address().address, res);
       } else {
-        if (conn->check_flag(atbus::connection::flag_t::TEMPORARY)) {
+        if (conn->check_flag(atbus::connection::flag_t::type::kTemporary)) {
           FWLOGWARNING("bus node {:#x} temporary connection {}({}) expired. res: {}", n.get_id(),
                        reinterpret_cast<const void *>(conn), conn->get_address().address, res);
         } else {
@@ -4735,7 +4891,7 @@ int app::bus_evt_callback_on_invalid_connection(const atbus::node &n, const atbu
 
 int app::bus_evt_callback_on_custom_command_request(const atbus::node &n, const atbus::endpoint *,
                                                     const atbus::connection *, app_id_t /*src_id*/,
-                                                    const std::vector<std::pair<const void *, size_t>> &args,
+                                                    gsl::span<gsl::span<const unsigned char>> args,
                                                     std::list<std::string> &rsp) {
   ++stats_.last_proc_event_count;
   ++stats_.receive_custom_command_request_count;
@@ -4748,7 +4904,7 @@ int app::bus_evt_callback_on_custom_command_request(const atbus::node &n, const 
   args_str.resize(args.size());
 
   for (size_t i = 0; i < args_str.size(); ++i) {
-    args_str[i].assign(reinterpret_cast<const char *>(args[i].first), args[i].second);
+    args_str[i].assign(reinterpret_cast<const char *>(args[i].data()), args[i].size());
     if (args_str[i].size() > 256) {
       ss_log << " ";
       ss_log.write(args_str[i].c_str(), 64);
@@ -4812,6 +4968,19 @@ int app::bus_evt_callback_on_new_connection(const atbus::node &n, const atbus::c
   return 0;
 }
 
+int app::bus_evt_callback_on_close_connection(const atbus::node &n, const atbus::endpoint *ep,
+                                              const atbus::connection *conn) {
+  if (nullptr == conn) {
+    return 0;
+  }
+
+  if (ep != nullptr && atbus_connector_) {
+    return atbus_connector_->on_update_endpoint(n, ep, 0);
+  }
+
+  return 0;
+}
+
 int app::bus_evt_callback_on_add_endpoint(const atbus::node &n, atbus::endpoint *ep, int res) {
   ++stats_.last_proc_event_count;
 
@@ -4850,8 +5019,7 @@ int app::bus_evt_callback_on_remove_endpoint(const atbus::node &n, atbus::endpoi
 
 int app::bus_evt_callback_on_custom_command_response(const atbus::node &, const atbus::endpoint *,
                                                      const atbus::connection *, app_id_t src_id,
-                                                     const std::vector<std::pair<const void *, size_t>> &args,
-                                                     uint64_t /*seq*/) {
+                                                     gsl::span<gsl::span<const unsigned char>> args, uint64_t /*seq*/) {
   ++stats_.last_proc_event_count;
   ++stats_.receive_custom_command_reponse_count;
   if (args.empty()) {
@@ -4860,7 +5028,7 @@ int app::bus_evt_callback_on_custom_command_response(const atbus::node &, const 
 
   atfw::util::cli::shell_stream ss(std::cout);
   for (size_t i = 0; i < args.size(); ++i) {
-    std::string text(static_cast<const char *>(args[i].first), args[i].second);
+    std::string text(reinterpret_cast<const char *>(args[i].data()), args[i].size());
     ss() << "Custom Command: (" << LOG_WRAPPER_FWAPI_FORMAT("{:#x}", src_id) << "): " << text << std::endl;
   }
 
@@ -4986,7 +5154,7 @@ int app::send_last_command(ev_loop_t *ev_loop) {
   }
 
   // no need to connect to parent node
-  conf_.bus_conf.parent_address.clear();
+  conf_.bus_conf.upstream_address.clear();
 
   // using 0 for command sender
   int ret = bus_node_->init(0, &conf_.bus_conf);
@@ -5006,9 +5174,8 @@ int app::send_last_command(ev_loop_t *ev_loop) {
   atbus::endpoint *ep = nullptr;
   if (is_sync_channel) {
     // preallocate endpoint when using shared memory channel, because this channel can not be connected without endpoint
-    std::vector<atbus::endpoint_subnet_conf> subnets;
     atbus::endpoint::ptr_t new_ep =
-        atbus::endpoint::create(bus_node_.get(), conf_.id, subnets, bus_node_->get_pid(), bus_node_->get_hostname());
+        atbus::endpoint::create(bus_node_.get(), conf_.id, bus_node_->get_pid(), bus_node_->get_hostname());
     ret = bus_node_->add_endpoint(new_ep);
     if (ret < 0) {
       FWLOGERROR("connect to {} failed. ret: {}", use_addr.address, ret);
@@ -5061,24 +5228,22 @@ int app::send_last_command(ev_loop_t *ev_loop) {
   flag_guard_t running_guard(*this, flag_t::RUNNING);
 
   // step 5. send data
-  std::vector<const void *> arr_buff;
-  std::vector<size_t> arr_size;
-  arr_buff.resize(last_command_.size());
-  arr_size.resize(last_command_.size());
+  std::vector<gsl::span<const unsigned char>> command_args;
+  command_args.reserve(last_command_.size());
   for (size_t i = 0; i < last_command_.size(); ++i) {
-    arr_buff[i] = last_command_[i].data();
-    arr_size[i] = last_command_[i].size();
+    command_args.push_back(gsl::span<const unsigned char>(
+        reinterpret_cast<const unsigned char *>(last_command_[i].data()), last_command_[i].size()));
   }
 
-  bus_node_->set_on_custom_command_response_handle(
-      [this](const atbus::node &n, const atbus::endpoint *response_ep, const atbus::connection *conn,
-             atbus::bus_id_t bus_id, const std::vector<std::pair<const void *, size_t>> &response_body,
-             uint64_t sequence) -> int {
-        return this->bus_evt_callback_on_custom_command_response(n, response_ep, conn, bus_id, response_body, sequence);
-      });
+  bus_node_->set_on_custom_command_response_handle([this](const atbus::node &n, const atbus::endpoint *response_ep,
+                                                          const atbus::connection *conn, atbus::bus_id_t bus_id,
+                                                          gsl::span<gsl::span<const unsigned char>> response_body,
+                                                          uint64_t sequence) -> int {
+    return this->bus_evt_callback_on_custom_command_response(n, response_ep, conn, bus_id, response_body, sequence);
+  });
 
   FWLOGDEBUG("send command message to {:#x} with address = {}", ep->get_id(), use_addr.address);
-  ret = bus_node_->send_custom_cmd(ep->get_id(), &arr_buff[0], &arr_size[0], last_command_.size());
+  ret = bus_node_->send_custom_command(ep->get_id(), gsl::make_span(command_args));
   if (ret < 0) {
     FWLOGERROR("send command failed. ret: {}", ret);
     return ret;

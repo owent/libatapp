@@ -25,10 +25,10 @@ LIBATAPP_MACRO_API_SYMBOL_HIDDEN void atapp_connector_bind_helper::unbind(atapp_
     // It's safe to recall close after set handle.connector_ = nullptr
     handle.close();
 
-    // child shoud call cleanup() to trigger on_close_connect event
+    // child shoud call cleanup() to trigger on_close_connection event
     // This callback must be called at last, because it may destroy handle
     if (!connect.is_destroying_) {
-      connect.on_close_connect(handle);
+      connect.on_close_connection(handle);
     }
   }
 }
@@ -51,8 +51,20 @@ LIBATAPP_MACRO_API_SYMBOL_HIDDEN void atapp_endpoint_bind_helper::unbind(atapp_c
                                                                          atapp_endpoint &endpoint) {
   if (endpoint.refer_connections_.erase(&handle) > 0) {
     if (endpoint.refer_connections_.empty()) {
+      endpoint.gc_timepoint_ = endpoint.owner_->get_last_tick_time();
+      auto &endpoint_gc_timeout = endpoint.owner_->get_origin_configure().timer().endpoint_gc_timeout();
+
+      if (endpoint_gc_timeout.seconds() < 0) {
+        endpoint.gc_timepoint_ +=
+            std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::seconds(60));
+      } else {
+        endpoint.gc_timepoint_ += std::chrono::duration_cast<std::chrono::system_clock::duration>(
+            std::chrono::seconds(endpoint_gc_timeout.seconds()));
+        endpoint.gc_timepoint_ += std::chrono::duration_cast<std::chrono::system_clock::duration>(
+            std::chrono::nanoseconds(endpoint_gc_timeout.nanos()));
+      }
       if (nullptr != endpoint.owner_) {
-        endpoint.add_waker(endpoint.owner_->get_last_tick_time());
+        endpoint.add_waker(endpoint.gc_timepoint_);
       }
     }
   }
@@ -148,6 +160,21 @@ LIBATAPP_MACRO_API void atapp_connection_handle::set_ready() noexcept {
   }
 }
 
+LIBATAPP_MACRO_API void atapp_connection_handle::set_unready() noexcept {
+  if (!is_ready()) {
+    return;
+  }
+  flags_ &= ~static_cast<uint32_t>(flags_t::EN_ACH_READY);
+
+  // 如果endpoint没有可用的connection了，需要按pending的message设置add_waker
+  atapp_endpoint *ep = get_endpoint();
+  if (ep != nullptr && !ep->has_connection_handle()) {
+    if (ep->get_pending_message_count() > 0) {
+      ep->add_waker(ep->get_next_pending_message_timeout());
+    }
+  }
+}
+
 LIBATAPP_MACRO_API bool atapp_connection_handle::is_ready() const noexcept {
   return 0 != (flags_ & flags_t::EN_ACH_READY);
 }
@@ -209,36 +236,31 @@ LIBATAPP_MACRO_API int32_t atapp_connector_impl::on_start_listen(const atbus::ch
   return EN_ATBUS_ERR_CHANNEL_NOT_SUPPORT;
 }
 
-LIBATAPP_MACRO_API int32_t atapp_connector_impl::on_start_connect(const etcd_discovery_node *,
+LIBATAPP_MACRO_API int32_t atapp_connector_impl::on_start_connect(const etcd_discovery_node &, atapp_endpoint &,
                                                                   const atbus::channel::channel_address_t &,
                                                                   const atapp_connection_handle::ptr_t &) {
   return EN_ATBUS_ERR_CHANNEL_NOT_SUPPORT;
 }
 
-LIBATAPP_MACRO_API int32_t atapp_connector_impl::on_close_connect(atapp_connection_handle &) {
+LIBATAPP_MACRO_API int32_t atapp_connector_impl::on_close_connection(atapp_connection_handle &) {
   return EN_ATBUS_ERR_SUCCESS;
 }
 
 LIBATAPP_MACRO_API int32_t atapp_connector_impl::on_send_forward_request(atapp_connection_handle *handle, int32_t type,
-                                                                         uint64_t *sequence, const void *,
-                                                                         size_t data_size,
+                                                                         uint64_t *sequence,
+                                                                         gsl::span<const unsigned char> data,
                                                                          const atapp::protocol::atapp_metadata *) {
-  FWLOGERROR("{} forward data {}(type={}, sequence={}) bytes using handle {} failed, not support", name(), data_size,
+  FWLOGERROR("{} forward data {}(type={}, sequence={}) bytes using handle {} failed, not support", name(), data.size(),
              type, (sequence == nullptr ? 0 : *sequence), reinterpret_cast<const void *>(handle));
   return EN_ATBUS_ERR_CHANNEL_NOT_SUPPORT;
 }
 
 LIBATAPP_MACRO_API void atapp_connector_impl::on_receive_forward_response(
-    atapp_connection_handle *handle, int32_t type, uint64_t sequence, int32_t error_code, const void *data,
-    size_t data_size, const atapp::protocol::atapp_metadata *metadata) {
-  if (nullptr == get_owner()) {
-    return;
-  }
-
+    atapp_connection_handle *handle, int32_t type, uint64_t sequence, int32_t error_code,
+    gsl::span<const unsigned char> data, const atapp::protocol::atapp_metadata *metadata) {
   // notify app
   app::message_t msg;
   msg.data = data;
-  msg.data_size = data_size;
   msg.metadata = metadata;
   msg.message_sequence = sequence;
   msg.type = type;

@@ -24,7 +24,7 @@ LIBATAPP_MACRO_API atapp_connector_loopback::~atapp_connector_loopback() { clean
 LIBATAPP_MACRO_API const char *atapp_connector_loopback::name() noexcept { return "atapp::connector.loopback"; }
 
 LIBATAPP_MACRO_API uint32_t
-atapp_connector_loopback::get_address_type(const atbus::channel::channel_address_t &) const {
+atapp_connector_loopback::get_address_type(const atbus::channel::channel_address_t &) const noexcept {
   uint32_t ret = 0;
   ret |= address_type_t::EN_ACAT_DUPLEX;
   ret |= address_type_t::EN_ACAT_LOCAL_HOST;
@@ -33,21 +33,18 @@ atapp_connector_loopback::get_address_type(const atbus::channel::channel_address
   return ret;
 }
 
-LIBATAPP_MACRO_API int32_t atapp_connector_loopback::on_start_listen(const atbus::channel::channel_address_t &) {
-  if (nullptr == get_owner()) {
-    return EN_ATAPP_ERR_NOT_INITED;
-  }
+LIBATAPP_MACRO_API bool atapp_connector_loopback::check_address_connectable(
+    const atbus::channel::channel_address_t &, const etcd_discovery_node &) const noexcept {
+  return true;
+}
 
+LIBATAPP_MACRO_API int32_t atapp_connector_loopback::on_start_listen(const atbus::channel::channel_address_t &) {
   return EN_ATAPP_ERR_SUCCESS;
 }
 
-LIBATAPP_MACRO_API int32_t atapp_connector_loopback::on_start_connect(const etcd_discovery_node *,
+LIBATAPP_MACRO_API int32_t atapp_connector_loopback::on_start_connect(const etcd_discovery_node &, atapp_endpoint &,
                                                                       const atbus::channel::channel_address_t &,
                                                                       const atapp_connection_handle::ptr_t &handle) {
-  if (nullptr == get_owner()) {
-    return EN_ATAPP_ERR_NOT_INITED;
-  }
-
   uintptr_t key = reinterpret_cast<uintptr_t>(handle.get());
   if (handle) {
     handles_[key] = handle;
@@ -58,7 +55,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_loopback::on_start_connect(const etcd
   return EN_ATAPP_ERR_SUCCESS;
 }
 
-LIBATAPP_MACRO_API int32_t atapp_connector_loopback::on_close_connect(atapp_connection_handle &handle) {
+LIBATAPP_MACRO_API int32_t atapp_connector_loopback::on_close_connection(atapp_connection_handle &handle) {
   uintptr_t key = reinterpret_cast<uintptr_t>(&handle);
   // remove handle
   auto iter = handles_.find(key);
@@ -69,13 +66,13 @@ LIBATAPP_MACRO_API int32_t atapp_connector_loopback::on_close_connect(atapp_conn
 }
 
 LIBATAPP_MACRO_API int32_t atapp_connector_loopback::on_send_forward_request(
-    atapp_connection_handle *handle, int32_t type, uint64_t *sequence, const void *data, size_t data_size,
+    atapp_connection_handle *handle, int32_t type, uint64_t *sequence, gsl::span<const unsigned char> data,
     const atapp::protocol::atapp_metadata *metadata) {
-  if (nullptr == get_owner() || nullptr == handle) {
+  if (nullptr == handle) {
     return EN_ATAPP_ERR_NOT_INITED;
   }
 
-  if (nullptr == data || data_size <= 0) {
+  if (data.empty()) {
     return EN_ATBUS_ERR_SUCCESS;
   }
 
@@ -91,7 +88,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_loopback::on_send_forward_request(
     return EN_ATBUS_ERR_BUFF_LIMIT;
   }
 
-  if (send_buffer_size > 0 && pending_message_size_ + data_size > send_buffer_size) {
+  if (send_buffer_size > 0 && pending_message_size_ + data.size() > send_buffer_size) {
     return EN_ATBUS_ERR_BUFF_LIMIT;
   }
 
@@ -99,8 +96,8 @@ LIBATAPP_MACRO_API int32_t atapp_connector_loopback::on_send_forward_request(
   pending_message_t &msg = pending_message_.back();
   msg.type = type;
   msg.message_sequence = nullptr == sequence ? 0 : *sequence;
-  msg.data.resize(data_size);
-  memcpy(&msg.data[0], data, data_size);
+  msg.data.resize(data.size());
+  memcpy(&msg.data[0], data.data(), data.size());
   if (nullptr != metadata) {
     msg.metadata.reset(new atapp::protocol::atapp_metadata());
     if (msg.metadata) {
@@ -108,7 +105,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_loopback::on_send_forward_request(
     }
   }
 
-  pending_message_size_ += data_size;
+  pending_message_size_ += data.size();
 #if defined(LIBATAPP_ENABLE_CUSTOM_COUNT_FOR_STD_LIST) && LIBATAPP_ENABLE_CUSTOM_COUNT_FOR_STD_LIST
   ++pending_message_count_;
 #endif
@@ -116,8 +113,8 @@ LIBATAPP_MACRO_API int32_t atapp_connector_loopback::on_send_forward_request(
 }
 
 LIBATAPP_MACRO_API void atapp_connector_loopback::on_receive_forward_response(
-    atapp_connection_handle *handle, int32_t type, uint64_t msg_sequence, int32_t error_code, const void *data,
-    size_t data_size, const atapp::protocol::atapp_metadata *metadata) {
+    atapp_connection_handle *handle, int32_t type, uint64_t msg_sequence, int32_t error_code,
+    gsl::span<const unsigned char> data, const atapp::protocol::atapp_metadata *metadata) {
   auto owner = get_owner();
   if (nullptr == owner) {
     return;
@@ -126,7 +123,6 @@ LIBATAPP_MACRO_API void atapp_connector_loopback::on_receive_forward_response(
   // notify app
   app::message_t msg;
   msg.data = data;
-  msg.data_size = data_size;
   msg.metadata = metadata;
   msg.message_sequence = msg_sequence;
   msg.type = type;
@@ -169,8 +165,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_loopback::process(
       pending_message_t &pending_msg = pending_message_.front();
 
       app::message_t msg;
-      msg.data = pending_msg.data.data();
-      msg.data_size = pending_msg.data.size();
+      msg.data = gsl::span<const unsigned char>{pending_msg.data.data(), pending_msg.data.size()};
       msg.metadata = pending_msg.metadata.get();
       msg.message_sequence = pending_msg.message_sequence;
       msg.type = pending_msg.type;

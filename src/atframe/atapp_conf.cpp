@@ -35,7 +35,9 @@
 
 #include <algorithm>
 #include <limits>
+#include <mutex>
 #include <sstream>
+#include <string>
 #include <unordered_map>
 
 #if defined(GetMessage)
@@ -334,6 +336,86 @@ static void pick_const_data(gsl::string_view value, ATBUS_MACRO_PROTOBUF_NAMESPA
   timepoint.set_seconds(res);
 }
 
+struct ATFW_UTIL_SYMBOL_LOCAL enum_alias_mapping_t {
+  std::unordered_map<std::string, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::EnumValueDescriptor *> origin;
+  std::unordered_map<std::string, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::EnumValueDescriptor *> no_case;
+};
+
+static const enum_alias_mapping_t *get_enum_value_alias_mapping(
+    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::EnumDescriptor *desc) {
+  if (desc == nullptr) {
+    return nullptr;
+  }
+
+  static std::mutex g_enum_alias_mutex;
+  std::lock_guard<std::mutex> lg(g_enum_alias_mutex);
+  static std::unordered_map<std::string, atfw::util::memory::strong_rc_ptr<enum_alias_mapping_t>> g_enum_alias_mappings;
+
+  std::string full_name = std::string{desc->full_name()};
+  auto it = g_enum_alias_mappings.find(full_name);
+  if (it != g_enum_alias_mappings.end()) {
+    return it->second.get();
+  }
+
+  atfw::util::memory::strong_rc_ptr<enum_alias_mapping_t> res =
+      atfw::util::memory::make_strong_rc<enum_alias_mapping_t>();
+  g_enum_alias_mappings[full_name] = res;
+
+  for (int i = 0; i < desc->value_count(); ++i) {
+    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::EnumValueDescriptor *value_desc = desc->value(i);
+    if (value_desc == nullptr) {
+      continue;
+    }
+
+    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::EnumValueOptions &options = value_desc->options();
+    if (!options.HasExtension(protocol::ENUMVALUE)) {
+      continue;
+    }
+
+    const protocol::atapp_configure_enumvalue_options &ext = options.GetExtension(protocol::ENUMVALUE);
+    for (int j = 0; j < ext.alias_name_size(); ++j) {
+      if (ext.alias_name(j).empty()) {
+        continue;
+      }
+
+      res->origin[std::string{ext.alias_name(j)}] = value_desc;
+      if (!ext.case_sensitive()) {
+        std::string lower_alias = std::string{ext.alias_name(j)};
+        std::transform(lower_alias.begin(), lower_alias.end(), lower_alias.begin(),
+                       ::atfw::util::string::tolower<char>);
+        res->no_case[lower_alias] = value_desc;
+      }
+    }
+  }
+
+  return res.get();
+}
+
+static const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::EnumValueDescriptor *pick_enum_value_from_alias(
+    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::EnumDescriptor *desc, gsl::string_view input) {
+  const enum_alias_mapping_t *mapping = get_enum_value_alias_mapping(desc);
+  if (mapping == nullptr) {
+    return nullptr;
+  }
+
+  auto it = mapping->origin.find(static_cast<std::string>(input));
+  if (it != mapping->origin.end()) {
+    return it->second;
+  }
+
+  if (!mapping->no_case.empty()) {
+    std::string lower_input = static_cast<std::string>(input);
+    std::transform(lower_input.begin(), lower_input.end(), lower_input.begin(), ::atfw::util::string::tolower<char>);
+    it = mapping->no_case.find(lower_input);
+
+    if (it != mapping->no_case.end()) {
+      return it->second;
+    }
+  }
+
+  return nullptr;
+}
+
 static inline void dump_pick_field_min(bool &out) { out = false; }
 
 static inline void dump_pick_field_min(std::string &) {}
@@ -600,28 +682,13 @@ dump_pick_enum_field_with_extensions(gsl::string_view val_str,
       ret = fds->enum_type()->FindValueByName(static_cast<std::string>(val_str));
     }
     if (ret == nullptr) {
-      for (int i = 0; i < fds->enum_type()->value_count(); ++i) {
-        const auto &enum_value_options = fds->enum_type()->value(i)->options();
-        if (enum_value_options.HasExtension(atapp::protocol::ENUMVALUE)) {
-          const auto &enumvalue_options = enum_value_options.GetExtension(atapp::protocol::ENUMVALUE);
-          if (!enumvalue_options.alias_name().empty()) {
-            if (enumvalue_options.case_sensitive() && gsl::string_view(enumvalue_options.alias_name()) == val_str) {
-              ret = fds->enum_type()->value(i);
-              break;
-            }
-
-            if (!enumvalue_options.case_sensitive() &&
-                0 == UTIL_STRFUNC_STRNCASE_CMP(val_str.data(), enumvalue_options.alias_name().c_str(),
-                                               enumvalue_options.alias_name().size())) {
-              ret = fds->enum_type()->value(i);
-              break;
-            }
-          }
-        }
-      }
+      ret = pick_enum_value_from_alias(fds->enum_type(), val_str);
     }
-  } else {
+  }
+
+  if (ret == nullptr) {
     ret = fds->enum_type()->FindValueByNumber(0);
+    is_default = true;
   }
 
   return {ret, is_default};
