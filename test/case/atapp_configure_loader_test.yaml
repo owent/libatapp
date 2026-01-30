@@ -25,6 +25,37 @@ atapp:
     receive_buffer_size: 8MB
     send_buffer_size: 2MB
     send_buffer_number: 0
+    topology:
+      rule:
+        allow_direct_connection: true
+        require_same_upstream: true
+        require_same_process: false
+        require_same_host: true
+        match_label:
+          region:
+            value:
+              - cn
+              - us
+          env:
+            value:
+              - test
+      data:
+        label:
+          region: cn
+          env: test
+    crypto:
+      key_exchange_type: 1
+      key_refresh_interval: 5s
+      algorithm:
+        - aes-128-gcm
+        - 32
+        - ATAPP_CRYPTO_ALGORITHM_XCHACHA20_POLY1305_IETF
+    compression:
+      algorithm:
+        - zstd
+        - 200
+        - ATAPP_COMPRESSION_ALGORITHM_ZLIB
+      level: ATAPP_COMPRESSION_LEVEL_FAST
   timer:
     tick_interval: 32ms
     stop_timeout: 10s

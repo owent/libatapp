@@ -3,7 +3,9 @@
 
 #pragma once
 
+// clang-format off
 #include <config/compiler/protobuf_prefix.h>
+// clang-format on
 
 #include <yaml-cpp/yaml.h>
 
@@ -11,7 +13,9 @@
 #include <google/protobuf/duration.pb.h>
 #include <google/protobuf/timestamp.pb.h>
 
+// clang-format off
 #include <config/compiler/protobuf_suffix.h>
+// clang-format on
 
 #include <libatbus_protocol.h>
 
@@ -86,12 +90,14 @@ enum ATAPP_ERROR_TYPE {
   EN_ATAPP_ERR_SETUP_ATBUS = -1101,
   EN_ATAPP_ERR_SEND_FAILED = -1102,
   EN_ATAPP_ERR_DISCOVERY_DISABLED = -1103,
+  EN_ATAPP_ERR_TOPOLOGY_UNKNOWN = -1104,
   EN_ATAPP_ERR_WORKER_POOL_BUSY = -1201,
   EN_ATAPP_ERR_WORKER_POOL_NO_AVAILABLE_WORKER = -1202,
   EN_ATAPP_ERR_WORKER_POOL_CLOSED = -1203,
   EN_ATAPP_ERR_COMMAND_IS_NULL = -1801,
   EN_ATAPP_ERR_NO_AVAILABLE_ADDRESS = -1802,
   EN_ATAPP_ERR_CONNECT_ATAPP_FAILED = -1803,
+  EN_ATAPP_ERR_TRY_NEXT = -1804,
   EN_ATAPP_ERR_MIN = -1999,
 };
 
@@ -99,6 +105,35 @@ using configure_key_set = std::unordered_set<std::string>;
 
 LIBATAPP_MACRO_API void parse_timepoint(gsl::string_view in, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp &out);
 LIBATAPP_MACRO_API void parse_duration(gsl::string_view in, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &out);
+
+template <class Rep, class Period>
+ATFW_UTIL_FORCEINLINE std::chrono::duration<Rep, Period> protobuf_to_chrono_convert_duration(
+    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &in) {
+  return std::chrono::duration<Rep, Period>(
+      std::chrono::duration_cast<std::chrono::duration<Rep, Period>>(std::chrono::seconds(in.seconds())) +
+      std::chrono::duration_cast<std::chrono::duration<Rep, Period>>(std::chrono::nanoseconds(in.nanos())));
+}
+
+template <class Rep, class Period>
+ATFW_UTIL_FORCEINLINE void protobuf_to_chrono_set_duration(std::chrono::duration<Rep, Period> &out,
+                                                           const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &in) {
+  out = protobuf_to_chrono_convert_duration<Rep, Period>(in);
+}
+
+template <class Clock, class Rep, class Period>
+ATFW_UTIL_FORCEINLINE std::chrono::time_point<Clock, std::chrono::duration<Rep, Period>>
+protobuf_to_chrono_convert_timepoint(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp &in) {
+  std::chrono::system_clock::time_point tp = std::chrono::system_clock::from_time_t(in.seconds());
+  tp += std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::nanoseconds(in.nanos()));
+  return std::chrono::time_point_cast<std::chrono::time_point<Clock, std::chrono::duration<Rep, Period>>>(tp);
+}
+
+template <class Clock, class Rep, class Period>
+ATFW_UTIL_FORCEINLINE void protobuf_to_chrono_set_duration(
+    std::chrono::time_point<Clock, std::chrono::duration<Rep, Period>> &out,
+    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp &in) {
+  out = protobuf_to_chrono_convert_timepoint<Clock, Rep, Period>(in);
+}
 
 LIBATAPP_MACRO_API bool ini_loader_dump_to(const atfw::util::config::ini_value &src,
                                            ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
