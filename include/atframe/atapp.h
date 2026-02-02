@@ -292,7 +292,7 @@ class app {
 
   LIBATAPP_MACRO_API const std::string &get_hash_code() const noexcept;
 
-  LIBATAPP_MACRO_API atbus::node::ptr_t get_bus_node() const noexcept;
+  ATFW_UTIL_FORCEINLINE const atbus::node::ptr_t &get_bus_node() const noexcept { return bus_node_; }
 
   LIBATAPP_MACRO_API void enable_fallback_to_atbus_connector();
   LIBATAPP_MACRO_API void disable_fallback_to_atbus_connector();
@@ -529,14 +529,36 @@ class app {
                                                             jiffies_timer_handle_t &&fn, void *priv_data,
                                                             jiffies_timer_watcher_t *watcher = nullptr);
 
-  template <class Rep, class Period>
-  ATFW_UTIL_FORCEINLINE int add_custom_timer(std::chrono::duration<Rep, Period> delta, jiffies_timer_handle_t &&fn,
-                                             void *priv_data, jiffies_timer_watcher_t *watcher = nullptr) {
+  LIBATAPP_MACRO_API int add_custom_timer_with_system_clock(std::chrono::system_clock::time_point timeout,
+                                                            jiffies_timer_handle_t &&fn, void *priv_data,
+                                                            jiffies_timer_watcher_t *watcher = nullptr);
+
+  template <class Rep, class Period, class HandleType>
+  ATFW_UTIL_FORCEINLINE int add_custom_timer(std::chrono::duration<Rep, Period> delta, HandleType &&fn, void *priv_data,
+                                             jiffies_timer_watcher_t *watcher = nullptr) {
     return add_custom_timer_with_system_clock(std::chrono::duration_cast<std::chrono::system_clock::duration>(delta),
-                                              std::move(fn), priv_data, watcher);
+                                              jiffies_timer_handle_t{std::forward<HandleType>(fn)}, priv_data, watcher);
+  }
+
+  template <class Clock, class Rep, class Period, class HandleType>
+  ATFW_UTIL_FORCEINLINE int add_custom_timer(std::chrono::time_point<Clock, std::chrono::duration<Rep, Period>> timeout,
+                                             HandleType &&fn, void *priv_data,
+                                             jiffies_timer_watcher_t *watcher = nullptr) {
+    return add_custom_timer_with_system_clock(
+        std::chrono::time_point_cast<std::chrono::system_clock::time_point>(timeout),
+        jiffies_timer_handle_t{std::forward<HandleType>(fn)}, priv_data, watcher);
   }
 
   LIBATAPP_MACRO_API void remove_custom_timer(jiffies_timer_watcher_t &watcher);
+
+#if !defined(NDEBUG)
+  static LIBATAPP_MACRO_API atfw::util::time::time_utility::raw_time_t get_sys_now() noexcept;
+  static LIBATAPP_MACRO_API void set_sys_now(atfw::util::time::time_utility::raw_time_t tp) noexcept;
+#else
+  ATFW_UTIL_FORCEINLINE static atfw::util::time::time_utility::raw_time_t get_sys_now() noexcept {
+    return atfw::util::time::time_utility::sys_now();
+  }
+#endif
 
  private:
   static void ev_stop_timeout(uv_timer_t *handle);

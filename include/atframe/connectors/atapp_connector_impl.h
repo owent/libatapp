@@ -63,23 +63,23 @@ class atapp_connection_handle {
   LIBATAPP_MACRO_API void set_unready() noexcept;
   LIBATAPP_MACRO_API bool is_ready() const noexcept;
 
-  UTIL_FORCEINLINE void set_private_data_ptr(void *input) noexcept { private_data_ptr_ = input; }
-  UTIL_FORCEINLINE void *get_private_data_ptr() const noexcept { return private_data_ptr_; }
-  UTIL_FORCEINLINE void set_private_data_u64(uint64_t input) noexcept { private_data_u64_ = input; }
-  UTIL_FORCEINLINE uint64_t get_private_data_u64() const noexcept { return private_data_u64_; }
-  UTIL_FORCEINLINE void set_private_data_i64(int64_t input) noexcept { private_data_i64_ = input; }
-  UTIL_FORCEINLINE int64_t get_private_data_i64() const noexcept { return private_data_i64_; }
-  UTIL_FORCEINLINE void set_private_data_uptr(uintptr_t input) noexcept { private_data_uptr_ = input; }
-  UTIL_FORCEINLINE uintptr_t get_private_data_uptr() const noexcept { return private_data_uptr_; }
-  UTIL_FORCEINLINE void set_private_data_iptr(intptr_t input) noexcept { private_data_iptr_ = input; }
-  UTIL_FORCEINLINE intptr_t get_private_data_iptr() const noexcept { return private_data_iptr_; }
+  ATFW_UTIL_FORCEINLINE void set_private_data_ptr(void *input) noexcept { private_data_ptr_ = input; }
+  ATFW_UTIL_FORCEINLINE void *get_private_data_ptr() const noexcept { return private_data_ptr_; }
+  ATFW_UTIL_FORCEINLINE void set_private_data_u64(uint64_t input) noexcept { private_data_u64_ = input; }
+  ATFW_UTIL_FORCEINLINE uint64_t get_private_data_u64() const noexcept { return private_data_u64_; }
+  ATFW_UTIL_FORCEINLINE void set_private_data_i64(int64_t input) noexcept { private_data_i64_ = input; }
+  ATFW_UTIL_FORCEINLINE int64_t get_private_data_i64() const noexcept { return private_data_i64_; }
+  ATFW_UTIL_FORCEINLINE void set_private_data_uptr(uintptr_t input) noexcept { private_data_uptr_ = input; }
+  ATFW_UTIL_FORCEINLINE uintptr_t get_private_data_uptr() const noexcept { return private_data_uptr_; }
+  ATFW_UTIL_FORCEINLINE void set_private_data_iptr(intptr_t input) noexcept { private_data_iptr_ = input; }
+  ATFW_UTIL_FORCEINLINE intptr_t get_private_data_iptr() const noexcept { return private_data_iptr_; }
 
   LIBATAPP_MACRO_API void set_on_destroy(on_destroy_fn_type fn);
   LIBATAPP_MACRO_API const on_destroy_fn_type &get_on_destroy() const;
   LIBATAPP_MACRO_API void reset_on_destroy();
 
-  UTIL_FORCEINLINE atapp_connector_impl *get_connector() const noexcept { return connector_; }
-  UTIL_FORCEINLINE atapp_endpoint *get_endpoint() const noexcept { return endpiont_; }
+  ATFW_UTIL_FORCEINLINE atapp_connector_impl *get_connector() const noexcept { return connector_; }
+  ATFW_UTIL_FORCEINLINE atapp_endpoint *get_endpoint() const noexcept { return endpiont_; }
 
  private:
   uint32_t flags_;
@@ -185,7 +185,7 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE atapp_connector_impl {
 
   LIBATAPP_MACRO_API const protocol_set_t &get_support_protocols() const noexcept;
 
-  UTIL_FORCEINLINE app *ATFW_UTIL_MACRO_NONNULL get_owner() const noexcept { return owner_; }
+  ATFW_UTIL_FORCEINLINE app *ATFW_UTIL_MACRO_NONNULL get_owner() const noexcept { return owner_; }
 
  private:
   app *ATFW_UTIL_MACRO_NONNULL owner_;

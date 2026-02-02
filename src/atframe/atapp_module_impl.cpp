@@ -122,11 +122,11 @@ LIBATAPP_MACRO_API bool module_impl::check_suspend_stop() {
   }
 
   if (suspended_stop_.stop_suspend_timeout == std::chrono::system_clock::time_point::min()) {
-    suspended_stop_.stop_suspend_timeout = atfw::util::time::time_utility::sys_now();
+    suspended_stop_.stop_suspend_timeout = owner_->get_sys_now();
     suspended_stop_.stop_suspend_timeout += suspended_stop_.stop_suspend_duration;
   }
 
-  if (atfw::util::time::time_utility::sys_now() >= suspended_stop_.stop_suspend_timeout) {
+  if (owner_->get_sys_now() >= suspended_stop_.stop_suspend_timeout) {
     suspended_stop_.stop_suspend_callback = std::function<bool()>();
     return false;
   }
@@ -139,7 +139,4 @@ LIBATAPP_MACRO_API bool module_impl::check_suspend_stop() {
   return true;
 }
 
-LIBATAPP_MACRO_API app *module_impl::get_app() { return owner_; }
-
-LIBATAPP_MACRO_API const app *module_impl::get_app() const { return owner_; }
 LIBATAPP_MACRO_NAMESPACE_END

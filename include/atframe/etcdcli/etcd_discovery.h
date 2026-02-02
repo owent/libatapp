@@ -47,20 +47,20 @@ class etcd_discovery_node {
     int64_t modify_revision;
     int64_t version;
 
-    UTIL_FORCEINLINE node_version() : create_revision(0), modify_revision(0), version(0) {}
-    UTIL_FORCEINLINE node_version(const node_version &other)
+    ATFW_UTIL_FORCEINLINE node_version() : create_revision(0), modify_revision(0), version(0) {}
+    ATFW_UTIL_FORCEINLINE node_version(const node_version &other)
         : create_revision(other.create_revision), modify_revision(other.modify_revision), version(other.version) {}
-    UTIL_FORCEINLINE node_version(node_version &&other)
+    ATFW_UTIL_FORCEINLINE node_version(node_version &&other)
         : create_revision(other.create_revision), modify_revision(other.modify_revision), version(other.version) {}
 
-    UTIL_FORCEINLINE node_version &operator=(const node_version &other) {
+    ATFW_UTIL_FORCEINLINE node_version &operator=(const node_version &other) {
       create_revision = other.create_revision;
       modify_revision = other.modify_revision;
       version = other.version;
       return *this;
     }
 
-    UTIL_FORCEINLINE node_version &operator=(node_version &&other) {
+    ATFW_UTIL_FORCEINLINE node_version &operator=(node_version &&other) {
       create_revision = other.create_revision;
       modify_revision = other.modify_revision;
       version = other.version;
@@ -75,26 +75,26 @@ class etcd_discovery_node {
   LIBATAPP_MACRO_API etcd_discovery_node();
   LIBATAPP_MACRO_API ~etcd_discovery_node();
 
-  UTIL_FORCEINLINE const atapp::protocol::atapp_discovery &get_discovery_info() const { return node_info_; }
-  UTIL_FORCEINLINE const node_version &get_version() const noexcept { return node_version_; }
+  ATFW_UTIL_FORCEINLINE const atapp::protocol::atapp_discovery &get_discovery_info() const { return node_info_; }
+  ATFW_UTIL_FORCEINLINE const node_version &get_version() const noexcept { return node_version_; }
 
   LIBATAPP_MACRO_API void copy_from(const atapp::protocol::atapp_discovery &input, const node_version &version);
   LIBATAPP_MACRO_API void update_version(const node_version &version, bool upgrade);
   LIBATAPP_MACRO_API void copy_to(atapp::protocol::atapp_discovery &output) const;
   LIBATAPP_MACRO_API void copy_key_to(atapp::protocol::atapp_discovery &output) const;
 
-  UTIL_FORCEINLINE const std::pair<uint64_t, uint64_t> &get_name_hash() const noexcept { return name_hash_; }
+  ATFW_UTIL_FORCEINLINE const std::pair<uint64_t, uint64_t> &get_name_hash() const noexcept { return name_hash_; }
 
-  UTIL_FORCEINLINE void set_private_data_ptr(void *input) noexcept { private_data_ptr_ = input; }
-  UTIL_FORCEINLINE void *get_private_data_ptr() const noexcept { return private_data_ptr_; }
-  UTIL_FORCEINLINE void set_private_data_u64(uint64_t input) noexcept { private_data_u64_ = input; }
-  UTIL_FORCEINLINE uint64_t get_private_data_u64() const noexcept { return private_data_u64_; }
-  UTIL_FORCEINLINE void set_private_data_i64(int64_t input) noexcept { private_data_i64_ = input; }
-  UTIL_FORCEINLINE int64_t get_private_data_i64() const noexcept { return private_data_i64_; }
-  UTIL_FORCEINLINE void set_private_data_uptr(uintptr_t input) noexcept { private_data_uptr_ = input; }
-  UTIL_FORCEINLINE uintptr_t get_private_data_uptr() const noexcept { return private_data_uptr_; }
-  UTIL_FORCEINLINE void set_private_data_iptr(intptr_t input) noexcept { private_data_iptr_ = input; }
-  UTIL_FORCEINLINE intptr_t get_private_data_iptr() const noexcept { return private_data_iptr_; }
+  ATFW_UTIL_FORCEINLINE void set_private_data_ptr(void *input) noexcept { private_data_ptr_ = input; }
+  ATFW_UTIL_FORCEINLINE void *get_private_data_ptr() const noexcept { return private_data_ptr_; }
+  ATFW_UTIL_FORCEINLINE void set_private_data_u64(uint64_t input) noexcept { private_data_u64_ = input; }
+  ATFW_UTIL_FORCEINLINE uint64_t get_private_data_u64() const noexcept { return private_data_u64_; }
+  ATFW_UTIL_FORCEINLINE void set_private_data_i64(int64_t input) noexcept { private_data_i64_ = input; }
+  ATFW_UTIL_FORCEINLINE int64_t get_private_data_i64() const noexcept { return private_data_i64_; }
+  ATFW_UTIL_FORCEINLINE void set_private_data_uptr(uintptr_t input) noexcept { private_data_uptr_ = input; }
+  ATFW_UTIL_FORCEINLINE uintptr_t get_private_data_uptr() const noexcept { return private_data_uptr_; }
+  ATFW_UTIL_FORCEINLINE void set_private_data_iptr(intptr_t input) noexcept { private_data_iptr_ = input; }
+  ATFW_UTIL_FORCEINLINE intptr_t get_private_data_iptr() const noexcept { return private_data_iptr_; }
 
   LIBATAPP_MACRO_API void set_on_destroy(on_destroy_fn_type fn);
   LIBATAPP_MACRO_API const on_destroy_fn_type &get_on_destroy() const;

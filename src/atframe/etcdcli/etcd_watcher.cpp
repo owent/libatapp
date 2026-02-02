@@ -13,6 +13,8 @@
 #include <atframe/etcdcli/etcd_cluster.h>
 #include <atframe/etcdcli/etcd_watcher.h>
 
+#include <atframe/atapp.h>
+
 #include <memory>
 
 #ifdef GetObject
@@ -77,7 +79,7 @@ void etcd_watcher::process() {
 
   rpc_.is_actived = false;
 
-  if (rpc_.watcher_next_request_time > atfw::util::time::time_utility::sys_now()) {
+  if (rpc_.watcher_next_request_time > app::get_sys_now()) {
     return;
   }
 
@@ -99,9 +101,9 @@ void etcd_watcher::process() {
         int64_t offset = (rpc_.startup_random_delay_max - rpc_.startup_random_delay_min).count();
         std::chrono::system_clock::duration select_offset =
             std::chrono::system_clock::duration(random_generator.random_between<int64_t>(0, offset));
-        rpc_.watcher_next_request_time = atfw::util::time::time_utility::sys_now() + select_offset;
+        rpc_.watcher_next_request_time = app::get_sys_now() + select_offset;
       } else {
-        rpc_.watcher_next_request_time = atfw::util::time::time_utility::sys_now() + rpc_.startup_random_delay_min;
+        rpc_.watcher_next_request_time = app::get_sys_now() + rpc_.startup_random_delay_min;
       }
 
       auto delay_timepoint =
@@ -125,7 +127,7 @@ void etcd_watcher::process() {
     if (!rpc_.rpc_opr_) {
       LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*owner_, "Etcd watcher {} create range request to {} failed",
                                             reinterpret_cast<const void *>(this), path_);
-      rpc_.watcher_next_request_time = atfw::util::time::time_utility::sys_now() + rpc_.retry_interval;
+      rpc_.watcher_next_request_time = app::get_sys_now() + rpc_.retry_interval;
       return;
     }
 
@@ -157,7 +159,7 @@ void etcd_watcher::process() {
   if (!rpc_.rpc_opr_) {
     LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*owner_, "Etcd watcher {} create watch request to {} from revision {} failed",
                                           reinterpret_cast<const void *>(this), path_, rpc_.last_revision + 1);
-    rpc_.watcher_next_request_time = atfw::util::time::time_utility::sys_now() + rpc_.retry_interval;
+    rpc_.watcher_next_request_time = app::get_sys_now() + rpc_.retry_interval;
     return;
   }
 
@@ -205,7 +207,7 @@ int etcd_watcher::libcurl_callback_on_range_completed(atfw::util::network::http_
                                           reinterpret_cast<const void *>(self), req.get_error_code(),
                                           req.get_response_code(), req.get_error_msg(), response_content);
 
-    self->rpc_.watcher_next_request_time = atfw::util::time::time_utility::sys_now() + self->rpc_.retry_interval;
+    self->rpc_.watcher_next_request_time = app::get_sys_now() + self->rpc_.retry_interval;
 
     self->owner_->check_socket_error_code(req.get_error_code());
     self->owner_->check_authorization_expired(req.get_response_code(), response_content);
@@ -216,7 +218,7 @@ int etcd_watcher::libcurl_callback_on_range_completed(atfw::util::network::http_
   if (self->rpc_.is_retry_mode) {
     self->rpc_.is_retry_mode = false;
     // reset request time to invoke watch request immediately
-    self->rpc_.watcher_next_request_time = atfw::util::time::time_utility::sys_now();
+    self->rpc_.watcher_next_request_time = app::get_sys_now();
 
     // 立刻开启下一次watch
     self->active();
@@ -233,7 +235,7 @@ int etcd_watcher::libcurl_callback_on_range_completed(atfw::util::network::http_
     LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self->owner_, "Etcd watcher {} got range response parse failed: {}",
                                           reinterpret_cast<const void *>(self), http_content);
 
-    self->rpc_.watcher_next_request_time = atfw::util::time::time_utility::sys_now() + self->rpc_.retry_interval;
+    self->rpc_.watcher_next_request_time = app::get_sys_now() + self->rpc_.retry_interval;
     self->active();
     return 0;
   }
@@ -252,7 +254,7 @@ int etcd_watcher::libcurl_callback_on_range_completed(atfw::util::network::http_
     LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self->owner_, "Etcd watcher {} got range response without header",
                                           reinterpret_cast<const void *>(self));
 
-    self->rpc_.watcher_next_request_time = atfw::util::time::time_utility::sys_now() + self->rpc_.retry_interval;
+    self->rpc_.watcher_next_request_time = app::get_sys_now() + self->rpc_.retry_interval;
     self->active();
     return 0;
   }
@@ -309,7 +311,7 @@ int etcd_watcher::libcurl_callback_on_range_completed(atfw::util::network::http_
   }
 
   // reset request time to invoke watch request immediately
-  self->rpc_.watcher_next_request_time = atfw::util::time::time_utility::sys_now();
+  self->rpc_.watcher_next_request_time = app::get_sys_now();
 
   // 立刻开启下一次watch
   self->active();
@@ -339,12 +341,12 @@ int etcd_watcher::libcurl_callback_on_watch_completed(atfw::util::network::http_
           reinterpret_cast<const void *>(self), req.get_error_code(), req.get_response_code(), req.get_error_msg(),
           req.get_response_stream().str());
 
-      self->rpc_.watcher_next_request_time = atfw::util::time::time_utility::sys_now() + self->rpc_.retry_interval;
+      self->rpc_.watcher_next_request_time = app::get_sys_now() + self->rpc_.retry_interval;
 
     } else {
       FWLOGINFO("Etcd watcher {} watch request finished, start another request later, msg: {}.\n{}",
                 reinterpret_cast<const void *>(self), req.get_error_msg(), req.get_response_stream().str());
-      self->rpc_.watcher_next_request_time = atfw::util::time::time_utility::sys_now();
+      self->rpc_.watcher_next_request_time = app::get_sys_now();
     }
 
     self->owner_->check_socket_error_code(req.get_error_code());

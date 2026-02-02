@@ -315,8 +315,8 @@ LIBATAPP_MACRO_API void atapp_endpoint::add_waker(atfw::util::time::time_utility
         nearest_waker_ = wakeup_time;
         FWLOGDEBUG("atapp {:#x}({}) update waker for {}({:#x}, {}) to {}us later", owner_->get_app_id(),
                    owner_->get_app_name(), reinterpret_cast<const void *>(this), get_id(), get_name(),
-                   std::max<int64_t>(std::chrono::duration_cast<std::chrono::microseconds>(
-                                         nearest_waker_ - atfw::util::time::time_utility::sys_now())
+                   std::max<int64_t>(std::chrono::duration_cast<std::chrono::microseconds>(nearest_waker_ -
+                                                                                           get_owner()->get_sys_now())
                                          .count(),
                                      0));
       }

@@ -149,13 +149,13 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE module_impl {
    * @brief get owner atapp object
    * @return return owner atapp object, nullptr if not added
    */
-  LIBATAPP_MACRO_API app *get_app();
+  ATFW_UTIL_FORCEINLINE app *ATFW_UTIL_MACRO_NONNULL get_app() { return owner_; }
 
   /**
    * @brief get owner atapp object
    * @return return owner atapp object, nullptr if not added
    */
-  LIBATAPP_MACRO_API const app *get_app() const;
+  ATFW_UTIL_FORCEINLINE const app *ATFW_UTIL_MACRO_NONNULL get_app() const noexcept { return owner_; }
 
  protected:
   LIBATAPP_MACRO_API bool is_enabled() const;
@@ -173,7 +173,7 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE module_impl {
  private:
   bool enabled_;
   bool actived_;
-  app *owner_;
+  app *ATFW_UTIL_MACRO_NONNULL owner_;
 
   struct suspended_stop_info {
     std::function<bool()> stop_suspend_callback;
