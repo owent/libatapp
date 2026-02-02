@@ -23,6 +23,8 @@
 
 #include <atframe/etcdcli/etcd_cluster.h>
 
+#include <atframe/atapp.h>
+
 // Patch for MSVC
 #if defined(GetObject)
 #  undef GetObject
@@ -392,7 +394,7 @@ LIBATAPP_MACRO_API int etcd_cluster::tick() {
   }
 
   // update members
-  if (atfw::util::time::time_utility::sys_now() > conf_.etcd_members_next_update_time) {
+  if (app::get_sys_now() > conf_.etcd_members_next_update_time) {
     ret += create_request_member_update() ? 1 : 0;
   }
 
@@ -422,7 +424,7 @@ LIBATAPP_MACRO_API int etcd_cluster::tick() {
 
       // run actions after lease granted
       return ret;
-    } else if (atfw::util::time::time_utility::sys_now() > conf_.keepalive_next_update_time) {
+    } else if (app::get_sys_now() > conf_.keepalive_next_update_time) {
       ret += create_request_lease_keepalive() ? 1 : 0;
     }
   } else if (!check_flag(flag_t::RUNNING)) {
@@ -953,7 +955,7 @@ bool etcd_cluster::create_request_auth_authenticate() {
     return false;
   }
 
-  if (atfw::util::time::time_utility::sys_now() <= conf_.authorization_next_update_time) {
+  if (app::get_sys_now() <= conf_.authorization_next_update_time) {
     return false;
   }
 
@@ -963,10 +965,9 @@ bool etcd_cluster::create_request_auth_authenticate() {
   }
 
   if (std::chrono::system_clock::duration::zero() >= conf_.authorization_retry_interval) {
-    conf_.authorization_next_update_time = atfw::util::time::time_utility::sys_now() + std::chrono::seconds(3);
+    conf_.authorization_next_update_time = app::get_sys_now() + std::chrono::seconds(3);
   } else {
-    conf_.authorization_next_update_time =
-        atfw::util::time::time_utility::sys_now() + conf_.authorization_retry_interval;
+    conf_.authorization_next_update_time = app::get_sys_now() + conf_.authorization_retry_interval;
   }
 
   atfw::util::network::http_request::ptr_t req = atfw::util::network::http_request::create(
@@ -1007,10 +1008,9 @@ bool etcd_cluster::create_request_auth_authenticate() {
                                          req->get_url());
     rpc_authenticate_ = req;
     if (std::chrono::system_clock::duration::zero() >= conf_.auth_user_get_retry_interval) {
-      conf_.auth_user_get_next_update_time = atfw::util::time::time_utility::sys_now() + std::chrono::seconds(3);
+      conf_.auth_user_get_next_update_time = app::get_sys_now() + std::chrono::seconds(3);
     } else {
-      conf_.auth_user_get_next_update_time =
-          atfw::util::time::time_utility::sys_now() + conf_.auth_user_get_retry_interval;
+      conf_.auth_user_get_next_update_time = app::get_sys_now() + conf_.auth_user_get_retry_interval;
     }
   } else {
     add_stats_error_request();
@@ -1075,10 +1075,9 @@ int etcd_cluster::libcurl_callback_on_auth_authenticate(atfw::util::network::htt
 
     // Renew user token later
     if (std::chrono::system_clock::duration::zero() >= self->conf_.auth_user_get_retry_interval) {
-      self->conf_.auth_user_get_next_update_time = atfw::util::time::time_utility::sys_now();
+      self->conf_.auth_user_get_next_update_time = app::get_sys_now();
     } else {
-      self->conf_.auth_user_get_next_update_time =
-          atfw::util::time::time_utility::sys_now() + self->conf_.auth_user_get_retry_interval;
+      self->conf_.auth_user_get_next_update_time = app::get_sys_now() + self->conf_.auth_user_get_retry_interval;
     }
   } while (false);
 
@@ -1102,7 +1101,7 @@ bool etcd_cluster::create_request_auth_user_get() {
     return false;
   }
 
-  if (atfw::util::time::time_utility::sys_now() <= conf_.auth_user_get_next_update_time) {
+  if (app::get_sys_now() <= conf_.auth_user_get_next_update_time) {
     return false;
   }
 
@@ -1112,10 +1111,9 @@ bool etcd_cluster::create_request_auth_user_get() {
   }
 
   if (std::chrono::system_clock::duration::zero() >= conf_.auth_user_get_retry_interval) {
-    conf_.auth_user_get_next_update_time = atfw::util::time::time_utility::sys_now() + std::chrono::seconds(3);
+    conf_.auth_user_get_next_update_time = app::get_sys_now() + std::chrono::seconds(3);
   } else {
-    conf_.auth_user_get_next_update_time =
-        atfw::util::time::time_utility::sys_now() + conf_.auth_user_get_retry_interval;
+    conf_.auth_user_get_next_update_time = app::get_sys_now() + conf_.auth_user_get_retry_interval;
   }
 
   atfw::util::network::http_request::ptr_t req = atfw::util::network::http_request::create(
@@ -1281,12 +1279,12 @@ bool etcd_cluster::retry_request_member_update(const std::string &bad_url) {
   } else if (retry_interval <= std::chrono::system_clock::duration::zero()) {
     retry_interval = std::chrono::minutes(1);
   }
-  if (atfw::util::time::time_utility::sys_now() + retry_interval < conf_.etcd_members_next_update_time) {
-    conf_.etcd_members_next_update_time = atfw::util::time::time_utility::sys_now() + retry_interval;
+  if (app::get_sys_now() + retry_interval < conf_.etcd_members_next_update_time) {
+    conf_.etcd_members_next_update_time = app::get_sys_now() + retry_interval;
     return false;
   }
 
-  if (atfw::util::time::time_utility::sys_now() <= conf_.etcd_members_next_update_time) {
+  if (app::get_sys_now() <= conf_.etcd_members_next_update_time) {
     return false;
   }
 
@@ -1307,10 +1305,9 @@ bool etcd_cluster::create_request_member_update() {
   }
 
   if (std::chrono::system_clock::duration::zero() >= conf_.etcd_members_update_interval) {
-    conf_.etcd_members_next_update_time = atfw::util::time::time_utility::sys_now() + std::chrono::minutes(1);
+    conf_.etcd_members_next_update_time = app::get_sys_now() + std::chrono::minutes(1);
   } else {
-    conf_.etcd_members_next_update_time =
-        atfw::util::time::time_utility::sys_now() + conf_.etcd_members_update_interval;
+    conf_.etcd_members_next_update_time = app::get_sys_now() + conf_.etcd_members_update_interval;
   }
 
   if (rpc_update_members_) {
@@ -1446,10 +1443,9 @@ int etcd_cluster::libcurl_callback_on_member_update(atfw::util::network::http_re
     self->add_stats_success_request();
 
     if (std::chrono::system_clock::duration::zero() >= self->conf_.etcd_members_update_interval) {
-      self->conf_.etcd_members_next_update_time = atfw::util::time::time_utility::sys_now() + std::chrono::minutes(1);
+      self->conf_.etcd_members_next_update_time = app::get_sys_now() + std::chrono::minutes(1);
     } else {
-      self->conf_.etcd_members_next_update_time =
-          atfw::util::time::time_utility::sys_now() + self->conf_.etcd_members_update_interval;
+      self->conf_.etcd_members_next_update_time = app::get_sys_now() + self->conf_.etcd_members_update_interval;
     }
 
     // 触发一次tick
@@ -1468,7 +1464,7 @@ bool etcd_cluster::create_request_lease_grant() {
     return false;
   }
 
-  if (atfw::util::time::time_utility::sys_now() <= conf_.keepalive_next_update_time) {
+  if (app::get_sys_now() <= conf_.keepalive_next_update_time) {
     return false;
   }
 
@@ -1479,20 +1475,20 @@ bool etcd_cluster::create_request_lease_grant() {
 
   time_t request_timeout_ms = get_http_timeout_ms();
   if (check_flag(flag_t::RUNNING) && conf_.keepalive_interval > std::chrono::system_clock::duration::zero()) {
-    conf_.keepalive_next_update_time = atfw::util::time::time_utility::sys_now() + conf_.keepalive_interval;
+    conf_.keepalive_next_update_time = app::get_sys_now() + conf_.keepalive_interval;
     if (request_timeout_ms > std::chrono::duration_cast<std::chrono::milliseconds>(conf_.keepalive_interval).count()) {
       request_timeout_ms =
           static_cast<time_t>(std::chrono::duration_cast<std::chrono::milliseconds>(conf_.keepalive_interval).count());
     }
   } else if (conf_.keepalive_retry_interval > std::chrono::system_clock::duration::zero()) {
-    conf_.keepalive_next_update_time = atfw::util::time::time_utility::sys_now() + conf_.keepalive_retry_interval;
+    conf_.keepalive_next_update_time = app::get_sys_now() + conf_.keepalive_retry_interval;
     if (request_timeout_ms >
         std::chrono::duration_cast<std::chrono::milliseconds>(conf_.keepalive_retry_interval).count()) {
       request_timeout_ms = static_cast<time_t>(
           std::chrono::duration_cast<std::chrono::milliseconds>(conf_.keepalive_retry_interval).count());
     }
   } else {
-    conf_.keepalive_next_update_time = atfw::util::time::time_utility::sys_now() + std::chrono::seconds(3);
+    conf_.keepalive_next_update_time = app::get_sys_now() + std::chrono::seconds(3);
   }
 
   atfw::util::network::http_request::ptr_t req = atfw::util::network::http_request::create(
@@ -1533,7 +1529,7 @@ bool etcd_cluster::create_request_lease_grant() {
   } else {
     add_stats_error_request();
     if (std::chrono::system_clock::duration::zero() >= conf_.keepalive_retry_interval) {
-      conf_.keepalive_next_update_time = atfw::util::time::time_utility::sys_now() + conf_.keepalive_retry_interval;
+      conf_.keepalive_next_update_time = app::get_sys_now() + conf_.keepalive_retry_interval;
     }
 
     LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(
@@ -1552,7 +1548,7 @@ bool etcd_cluster::create_request_lease_keepalive() {
     return false;
   }
 
-  if (atfw::util::time::time_utility::sys_now() <= conf_.keepalive_next_update_time) {
+  if (app::get_sys_now() <= conf_.keepalive_next_update_time) {
     return false;
   }
 
@@ -1563,9 +1559,9 @@ bool etcd_cluster::create_request_lease_keepalive() {
 
   time_t request_timeout_ms = get_http_timeout_ms();
   if (std::chrono::system_clock::duration::zero() >= conf_.keepalive_interval) {
-    conf_.keepalive_next_update_time = atfw::util::time::time_utility::sys_now() + std::chrono::seconds(3);
+    conf_.keepalive_next_update_time = app::get_sys_now() + std::chrono::seconds(3);
   } else {
-    conf_.keepalive_next_update_time = atfw::util::time::time_utility::sys_now() + conf_.keepalive_interval;
+    conf_.keepalive_next_update_time = app::get_sys_now() + conf_.keepalive_interval;
     if (request_timeout_ms > std::chrono::duration_cast<std::chrono::milliseconds>(conf_.keepalive_interval).count()) {
       request_timeout_ms =
           static_cast<time_t>(std::chrono::duration_cast<std::chrono::milliseconds>(conf_.keepalive_interval).count());
@@ -1601,7 +1597,7 @@ bool etcd_cluster::create_request_lease_keepalive() {
   } else {
     add_stats_error_request();
     if (std::chrono::system_clock::duration::zero() >= conf_.keepalive_retry_interval) {
-      conf_.keepalive_next_update_time = atfw::util::time::time_utility::sys_now() + conf_.keepalive_retry_interval;
+      conf_.keepalive_next_update_time = app::get_sys_now() + conf_.keepalive_retry_interval;
     }
     LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(
         *this, "Etcd start to keepalive lease {} request to {} failed, create http request failed", get_lease(),

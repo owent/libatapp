@@ -250,7 +250,7 @@ LIBATAPP_MACRO_API etcd_module::etcd_module()
       maybe_update_internal_keepalive_area_(false),
       maybe_update_internal_keepalive_metadata_(false),
       watcher_snapshot_index_allocator_(0) {
-  tick_next_timepoint_ = atfw::util::time::time_utility::sys_now();
+  tick_next_timepoint_ = get_app()->get_sys_now();
   tick_interval_ = std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::milliseconds(128));
 
   last_etcd_event_header_.cluster_id = 0;

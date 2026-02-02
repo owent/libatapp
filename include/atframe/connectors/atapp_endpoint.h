@@ -71,7 +71,7 @@ class atapp_endpoint {
   LIBATAPP_MACRO_API uint64_t get_id() const noexcept;
   LIBATAPP_MACRO_API const std::string &get_name() const noexcept;
 
-  UTIL_FORCEINLINE bool has_connection_handle() const noexcept { return !refer_connections_.empty(); }
+  ATFW_UTIL_FORCEINLINE bool has_connection_handle() const noexcept { return !refer_connections_.empty(); }
   LIBATAPP_MACRO_API const etcd_discovery_node::ptr_t &get_discovery() const noexcept;
   LIBATAPP_MACRO_API void update_discovery(const etcd_discovery_node::ptr_t &discovery) noexcept;
 
@@ -87,7 +87,7 @@ class atapp_endpoint {
                                                     int32_t max_count = 0);
   LIBATAPP_MACRO_API void add_waker(atfw::util::time::time_utility::raw_time_t wakeup_time);
 
-  UTIL_FORCEINLINE app *get_owner() const noexcept { return owner_; }
+  ATFW_UTIL_FORCEINLINE app *get_owner() const noexcept { return owner_; }
 
   LIBATAPP_MACRO_API size_t get_pending_message_count() const noexcept;
   LIBATAPP_MACRO_API size_t get_pending_message_size() const noexcept;

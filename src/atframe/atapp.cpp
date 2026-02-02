@@ -162,15 +162,16 @@ static bool internal_setup_signal_action(int sig, TFn fn) {
   return true;
 }
 
-static time_t get_custom_timer_tick() {
-  return (1000 / ATAPP_DEFAULT_CUSTOM_TIMER_TICK_MS) * atfw::util::time::time_utility::get_sys_now() +
-         atfw::util::time::time_utility::get_now_usec() / (100 * ATAPP_DEFAULT_CUSTOM_TIMER_TICK_MS);
-}
-
 template <class Rep, class Period>
 static time_t get_custom_timer_tick_offset(std::chrono::duration<Rep, Period> dur) {
   return static_cast<time_t>(std::chrono::duration_cast<std::chrono::milliseconds>(dur).count() /
                              ATAPP_DEFAULT_CUSTOM_TIMER_TICK_MS);
+}
+
+template <class Clock, class Rep, class Period>
+static time_t get_custom_timer_tick(std::chrono::time_point<Clock, std::chrono::duration<Rep, Period>> tp) {
+  std::chrono::system_clock::time_point stp = std::chrono::time_point_cast<std::chrono::system_clock::time_point>(tp);
+  return get_custom_timer_tick_offset(stp.time_since_epoch());
 }
 
 static atbus::protocol::ATBUS_CRYPTO_ALGORITHM_TYPE convert_atbus_configure(
@@ -308,6 +309,13 @@ static void apply_atbus_configure(atbus::node::conf_t &to, const protocol::atbus
   to.compression_level = convert_atbus_configure(from.compression().level());
 }
 
+#if !defined(NDEBUG)
+static std::chrono::system_clock::duration &atapp_get_sys_now_offset() {
+  static std::chrono::system_clock::duration offset = std::chrono::system_clock::duration::zero();
+  return offset;
+}
+#endif
+
 }  // namespace
 
 LIBATAPP_MACRO_API app::message_t::message_t() : type(0), message_sequence(0), data(), metadata(nullptr) {}
@@ -391,7 +399,7 @@ LIBATAPP_MACRO_API app::app()
                                                                           (1000 - conf_.timer_reserve_permille) / 1000};
 
   atfw::util::time::time_utility::update();
-  tick_timer_.last_tick_timepoint = atfw::util::time::time_utility::sys_now();
+  tick_timer_.last_tick_timepoint = get_sys_now();
   tick_timer_.last_stop_timepoint = std::chrono::system_clock::from_time_t(0);
   tick_timer_.internal_break = nullptr;
   tick_timer_.tick_compensation = std::chrono::system_clock::duration::zero();
@@ -431,8 +439,9 @@ LIBATAPP_MACRO_API app::~app() {
     }
 
     atfw::util::time::time_utility::update();
+    atfw::util::time::time_utility::raw_time_t now = get_sys_now();
+    tick_timer_.last_tick_timepoint = now;
     process_custom_timers();
-    atfw::util::time::time_utility::raw_time_t now = atfw::util::time::time_utility::sys_now();
     std::chrono::seconds offset_sec = std::chrono::seconds{get_origin_configure().timer().stop_timeout().seconds()};
     std::chrono::nanoseconds offset_nanos =
         std::chrono::nanoseconds{get_origin_configure().timer().stop_timeout().nanos()};
@@ -451,6 +460,7 @@ LIBATAPP_MACRO_API app::~app() {
       process_custom_timers();
 
       now = atfw::util::time::time_utility::sys_now();
+      tick_timer_.last_tick_timepoint = now;
     }
   }
 
@@ -575,7 +585,8 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
 
   // update time first
   atfw::util::time::time_utility::update();
-  custom_timer_controller_.init(get_custom_timer_tick());
+  tick_timer_.last_tick_timepoint = get_sys_now();
+  custom_timer_controller_.init(get_custom_timer_tick(tick_timer_.last_tick_timepoint));
 
   // step 1. bind default options
   // step 2. load options from cmd line
@@ -863,7 +874,7 @@ LIBATAPP_MACRO_API int app::run_once(uint64_t min_event_count, std::chrono::syst
   atfw::util::time::time_utility::raw_time_t timeout;
   if (timeout_duration.count() > 0) {
     atfw::util::time::time_utility::update();
-    timeout = atfw::util::time::time_utility::sys_now() + timeout_duration;
+    timeout = get_sys_now() + timeout_duration;
   }
 
   do {
@@ -1208,13 +1219,13 @@ LIBATAPP_MACRO_API int app::tick() {
   int32_t active_count;
   atfw::util::time::time_utility::update();
   // record start time point
-  atfw::util::time::time_utility::raw_time_t start_tp = atfw::util::time::time_utility::sys_now();
+  atfw::util::time::time_utility::raw_time_t start_tp = get_sys_now();
   atfw::util::time::time_utility::raw_time_t end_tp = start_tp;
 
   end_tp += conf_.timer_tick_round_timeout;
 
-  tick_timer_.last_tick_timepoint = atfw::util::time::time_utility::sys_now();
   do {
+    tick_timer_.last_tick_timepoint = get_sys_now();
     active_count = 0;
     int res;
     // step 1. proc available modules
@@ -1242,7 +1253,7 @@ LIBATAPP_MACRO_API int app::tick() {
     // step 3. process internal events
     // This should be called at last, because it only concern time
     atfw::util::time::time_utility::update();
-    active_count += process_internal_events(atfw::util::time::time_utility::sys_now() + conf_.timer_tick_interval);
+    active_count += process_internal_events(tick_timer_.last_tick_timepoint + conf_.timer_tick_interval);
 
     // step 4. process custom timers
     active_count += process_custom_timers();
@@ -1252,7 +1263,7 @@ LIBATAPP_MACRO_API int app::tick() {
       stats_.last_proc_event_count += static_cast<uint64_t>(active_count);
     }
     atfw::util::time::time_utility::update();
-  } while (active_count > 0 && atfw::util::time::time_utility::sys_now() < end_tp);
+  } while (active_count > 0 && tick_timer_.last_tick_timepoint < end_tp);
 
   ev_loop_t *loop = get_evloop();
   // if is stoping, quit loop every tick
@@ -1512,8 +1523,6 @@ LIBATAPP_MACRO_API app::app_id_t app::get_type_id() const noexcept {
 }
 
 LIBATAPP_MACRO_API const std::string &app::get_hash_code() const noexcept { return conf_.hash_code; }
-
-LIBATAPP_MACRO_API atbus::node::ptr_t app::get_bus_node() const noexcept { return bus_node_; }
 
 LIBATAPP_MACRO_API void app::enable_fallback_to_atbus_connector() { set_flag(flag_t::DISABLE_ATBUS_FALLBACK, false); }
 
@@ -2666,12 +2675,38 @@ LIBATAPP_MACRO_API int app::add_custom_timer_with_system_clock(std::chrono::syst
   return custom_timer_controller_.add_timer(get_custom_timer_tick_offset(delta), std::move(fn), priv_data, watcher);
 }
 
+LIBATAPP_MACRO_API int app::add_custom_timer_with_system_clock(std::chrono::system_clock::time_point timeout_tp,
+                                                               jiffies_timer_handle_t &&fn, void *priv_data,
+                                                               jiffies_timer_watcher_t *watcher) {
+  time_t timeout_tick = get_custom_timer_tick(timeout_tp);
+  if (timeout_tick <= custom_timer_controller_.get_last_tick()) {
+    return custom_timer_controller_.add_timer(1, std::move(fn), priv_data, watcher);
+  }
+
+  return custom_timer_controller_.add_timer(timeout_tick - custom_timer_controller_.get_last_tick(), std::move(fn),
+                                            priv_data, watcher);
+}
+
 LIBATAPP_MACRO_API void app::remove_custom_timer(jiffies_timer_watcher_t &watcher) {
   auto timer_handle = watcher.lock();
   if (timer_handle) {
     jiffies_timer_t::remove_timer(*timer_handle);
   }
+  watcher.reset();
 }
+
+#if !defined(NDEBUG)
+
+LIBATAPP_MACRO_API atfw::util::time::time_utility::raw_time_t app::get_sys_now() noexcept {
+  return atfw::util::time::time_utility::sys_now() + atapp_get_sys_now_offset();
+}
+
+LIBATAPP_MACRO_API void app::set_sys_now(atfw::util::time::time_utility::raw_time_t tp) noexcept {
+  atfw::util::time::time_utility::update();
+  atapp_get_sys_now_offset() = tp - atfw::util::time::time_utility::sys_now();
+}
+
+#endif
 
 void app::ev_stop_timeout(uv_timer_t *handle) {
   assert(handle && handle->data);
@@ -3050,7 +3085,7 @@ int32_t app::process_internal_events(const atfw::util::time::time_utility::raw_t
   int32_t ret = 0;
   bool more_messages = true;
   bool first_round = true;
-  while ((first_round || atfw::util::time::time_utility::sys_now() < end_tick) && more_messages) {
+  while ((first_round || get_sys_now() < end_tick) && more_messages) {
     first_round = false;
     int32_t round_res = 0;
     if (!endpoint_waker_.empty() && endpoint_waker_.begin()->first.first <= tick_timer_.last_tick_timepoint) {
@@ -3093,10 +3128,11 @@ int32_t app::process_internal_events(const atfw::util::time::time_utility::raw_t
 }
 
 int32_t app::process_custom_timers() {
-  int res = custom_timer_controller_.tick(get_custom_timer_tick());
+  auto sys_now = check_flag(flag_t::IN_TICK) ? tick_timer_.last_tick_timepoint : get_sys_now();
+  int res = custom_timer_controller_.tick(get_custom_timer_tick(sys_now));
   if (res == jiffies_timer_t::error_type_t::EN_JTET_NOT_INITED) {
-    custom_timer_controller_.init(get_custom_timer_tick());
-    res = custom_timer_controller_.tick(get_custom_timer_tick());
+    custom_timer_controller_.init(get_custom_timer_tick(sys_now));
+    res = custom_timer_controller_.tick(get_custom_timer_tick(sys_now));
   }
 
   if (res < 0) {

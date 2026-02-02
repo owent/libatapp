@@ -45,7 +45,7 @@ class worker_pool_module : public ::atframework::atapp::module_impl {
   LIBATAPP_MACRO_API int tick(std::chrono::system_clock::time_point now);
 
   template <class ClockType, class DurationType>
-  UTIL_FORCEINLINE int tick(std::chrono::time_point<ClockType, DurationType> now) {
+  ATFW_UTIL_FORCEINLINE int tick(std::chrono::time_point<ClockType, DurationType> now) {
     return tick(std::chrono::time_point_cast<std::chrono::system_clock::time_point>(now));
   }
 

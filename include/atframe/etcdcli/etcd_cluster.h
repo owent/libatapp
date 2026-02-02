@@ -161,37 +161,37 @@ class etcd_cluster {
   LIBATAPP_MACRO_API bool is_available() const;
   LIBATAPP_MACRO_API void resolve_ready() noexcept;
 
-  UTIL_FORCEINLINE bool check_flag(uint32_t f) const { return 0 != (flags_ & f); }
+  ATFW_UTIL_FORCEINLINE bool check_flag(uint32_t f) const { return 0 != (flags_ & f); }
   LIBATAPP_MACRO_API void set_flag(flag_t::type f, bool v);
 
-  UTIL_FORCEINLINE const stats_t &get_stats() const { return stats_; }
+  ATFW_UTIL_FORCEINLINE const stats_t &get_stats() const { return stats_; }
 
   LIBATAPP_MACRO_API void set_logger(const atfw::util::log::log_wrapper::ptr_t &logger,
                                      atfw::util::log::log_formatter::level_t::type log_level) noexcept;
-  UTIL_FORCEINLINE const atfw::util::log::log_wrapper::ptr_t &get_logger() const noexcept { return logger_; }
+  ATFW_UTIL_FORCEINLINE const atfw::util::log::log_wrapper::ptr_t &get_logger() const noexcept { return logger_; }
 
   // ====================== apis for configure ==================
-  UTIL_FORCEINLINE const std::vector<std::string> &get_available_hosts() const { return conf_.hosts; }
-  UTIL_FORCEINLINE const std::string &get_selected_host() const { return conf_.path_node; }
+  ATFW_UTIL_FORCEINLINE const std::vector<std::string> &get_available_hosts() const { return conf_.hosts; }
+  ATFW_UTIL_FORCEINLINE const std::string &get_selected_host() const { return conf_.path_node; }
 
-  UTIL_FORCEINLINE void set_conf_authorization(const std::string &authorization) {
+  ATFW_UTIL_FORCEINLINE void set_conf_authorization(const std::string &authorization) {
     conf_.authorization = authorization;
   }
-  UTIL_FORCEINLINE const std::string &get_conf_authorization() const { return conf_.authorization; }
+  ATFW_UTIL_FORCEINLINE const std::string &get_conf_authorization() const { return conf_.authorization; }
   LIBATAPP_MACRO_API void pick_conf_authorization(std::string &username, std::string *password);
 
-  UTIL_FORCEINLINE int64_t get_keepalive_lease() const { return get_lease(); }
+  ATFW_UTIL_FORCEINLINE int64_t get_keepalive_lease() const { return get_lease(); }
 
-  UTIL_FORCEINLINE void set_conf_hosts(const std::vector<std::string> &hosts) { conf_.conf_hosts = hosts; }
-  UTIL_FORCEINLINE const std::vector<std::string> &get_conf_hosts() const { return conf_.conf_hosts; }
+  ATFW_UTIL_FORCEINLINE void set_conf_hosts(const std::vector<std::string> &hosts) { conf_.conf_hosts = hosts; }
+  ATFW_UTIL_FORCEINLINE const std::vector<std::string> &get_conf_hosts() const { return conf_.conf_hosts; }
 
-  UTIL_FORCEINLINE void set_conf_http_request_timeout(std::chrono::system_clock::duration v) {
+  ATFW_UTIL_FORCEINLINE void set_conf_http_request_timeout(std::chrono::system_clock::duration v) {
     conf_.http_request_timeout = v;
   }
-  UTIL_FORCEINLINE void set_conf_http_initialization_timeout(std::chrono::system_clock::duration v) {
+  ATFW_UTIL_FORCEINLINE void set_conf_http_initialization_timeout(std::chrono::system_clock::duration v) {
     conf_.http_initialization_timeout = v;
   }
-  UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_http_timeout() const {
+  ATFW_UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_http_timeout() const {
     if (check_flag(flag_t::READY)) {
       return conf_.http_request_timeout;
     } else {
@@ -200,176 +200,180 @@ class etcd_cluster {
   }
   LIBATAPP_MACRO_API time_t get_http_timeout_ms() const noexcept;
 
-  UTIL_FORCEINLINE void set_conf_http_connect_timeout(std::chrono::system_clock::duration v) {
+  ATFW_UTIL_FORCEINLINE void set_conf_http_connect_timeout(std::chrono::system_clock::duration v) {
     conf_.http_connect_timeout = v;
   }
-  UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_http_connect_timeout() const {
+  ATFW_UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_http_connect_timeout() const {
     return conf_.http_connect_timeout;
   }
   LIBATAPP_MACRO_API time_t get_http_connect_timeout_ms() const noexcept;
 
-  UTIL_FORCEINLINE void set_conf_dns_cache_timeout(std::chrono::system_clock::duration v) {
+  ATFW_UTIL_FORCEINLINE void set_conf_dns_cache_timeout(std::chrono::system_clock::duration v) {
     conf_.dns_cache_timeout = v;
   }
-  UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_dns_cache_timeout() const {
+  ATFW_UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_dns_cache_timeout() const {
     return conf_.dns_cache_timeout;
   }
 
-  UTIL_FORCEINLINE void set_conf_dns_servers(const std::string &servers) { conf_.dns_servers = servers; }
-  UTIL_FORCEINLINE const std::string &get_conf_dns_servers() const { return conf_.dns_servers; }
+  ATFW_UTIL_FORCEINLINE void set_conf_dns_servers(const std::string &servers) { conf_.dns_servers = servers; }
+  ATFW_UTIL_FORCEINLINE const std::string &get_conf_dns_servers() const { return conf_.dns_servers; }
 
-  UTIL_FORCEINLINE void set_conf_etcd_members_update_interval(std::chrono::system_clock::duration v) {
+  ATFW_UTIL_FORCEINLINE void set_conf_etcd_members_update_interval(std::chrono::system_clock::duration v) {
     conf_.etcd_members_update_interval = v;
   }
-  UTIL_FORCEINLINE void set_conf_etcd_members_update_interval_min(time_t v) {
+  ATFW_UTIL_FORCEINLINE void set_conf_etcd_members_update_interval_min(time_t v) {
     set_conf_etcd_members_update_interval(std::chrono::minutes(v));
   }
-  UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_etcd_members_update_interval() const {
+  ATFW_UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_etcd_members_update_interval() const {
     return conf_.etcd_members_update_interval;
   }
 
-  UTIL_FORCEINLINE void set_conf_etcd_members_retry_interval(std::chrono::system_clock::duration v) {
+  ATFW_UTIL_FORCEINLINE void set_conf_etcd_members_retry_interval(std::chrono::system_clock::duration v) {
     conf_.etcd_members_retry_interval = v;
   }
-  UTIL_FORCEINLINE void set_conf_etcd_members_retry_interval_min(time_t v) {
+  ATFW_UTIL_FORCEINLINE void set_conf_etcd_members_retry_interval_min(time_t v) {
     set_conf_etcd_members_retry_interval(std::chrono::minutes(v));
   }
-  UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_etcd_members_retry_interval() const {
+  ATFW_UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_etcd_members_retry_interval() const {
     return conf_.etcd_members_retry_interval;
   }
 
-  UTIL_FORCEINLINE void set_conf_keepalive_timeout(std::chrono::system_clock::duration v) {
+  ATFW_UTIL_FORCEINLINE void set_conf_keepalive_timeout(std::chrono::system_clock::duration v) {
     conf_.keepalive_timeout = v;
   }
-  UTIL_FORCEINLINE void set_conf_keepalive_timeout_sec(time_t v) {
+  ATFW_UTIL_FORCEINLINE void set_conf_keepalive_timeout_sec(time_t v) {
     set_conf_keepalive_timeout(std::chrono::seconds(v));
   }
-  UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_keepalive_timeout() const {
+  ATFW_UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_keepalive_timeout() const {
     return conf_.keepalive_timeout;
   }
 
-  UTIL_FORCEINLINE void set_conf_keepalive_interval(std::chrono::system_clock::duration v) {
+  ATFW_UTIL_FORCEINLINE void set_conf_keepalive_interval(std::chrono::system_clock::duration v) {
     conf_.keepalive_interval = v;
   }
-  UTIL_FORCEINLINE void set_conf_keepalive_interval_sec(time_t v) {
+  ATFW_UTIL_FORCEINLINE void set_conf_keepalive_interval_sec(time_t v) {
     set_conf_keepalive_interval(std::chrono::seconds(v));
   }
-  UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_keepalive_interval() const {
+  ATFW_UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_keepalive_interval() const {
     return conf_.keepalive_interval;
   }
 
-  UTIL_FORCEINLINE void set_conf_keepalive_retry_interval(std::chrono::system_clock::duration v) {
+  ATFW_UTIL_FORCEINLINE void set_conf_keepalive_retry_interval(std::chrono::system_clock::duration v) {
     conf_.keepalive_retry_interval = v;
   }
-  UTIL_FORCEINLINE void set_conf_keepalive_retry_interval_sec(time_t v) {
+  ATFW_UTIL_FORCEINLINE void set_conf_keepalive_retry_interval_sec(time_t v) {
     set_conf_keepalive_retry_interval(std::chrono::seconds(v));
   }
-  UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_keepalive_retry_interval() const {
+  ATFW_UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_keepalive_retry_interval() const {
     return conf_.keepalive_retry_interval;
   }
 
-  UTIL_FORCEINLINE void set_conf_keepalive_retry_times(size_t v) { conf_.keepalive_retry_times = v; }
-  UTIL_FORCEINLINE size_t get_conf_keepalive_retry_times() const { return conf_.keepalive_retry_times; }
+  ATFW_UTIL_FORCEINLINE void set_conf_keepalive_retry_times(size_t v) { conf_.keepalive_retry_times = v; }
+  ATFW_UTIL_FORCEINLINE size_t get_conf_keepalive_retry_times() const { return conf_.keepalive_retry_times; }
 
-  UTIL_FORCEINLINE void set_conf_ssl_enable_alpn(bool v) { conf_.ssl_enable_alpn = v; }
-  UTIL_FORCEINLINE bool get_conf_ssl_enable_alpn() const { return conf_.ssl_enable_alpn; }
+  ATFW_UTIL_FORCEINLINE void set_conf_ssl_enable_alpn(bool v) { conf_.ssl_enable_alpn = v; }
+  ATFW_UTIL_FORCEINLINE bool get_conf_ssl_enable_alpn() const { return conf_.ssl_enable_alpn; }
 
-  UTIL_FORCEINLINE void set_conf_ssl_verify_peer(bool v) { conf_.ssl_verify_peer = v; }
-  UTIL_FORCEINLINE bool get_conf_ssl_verify_peer() const { return conf_.ssl_verify_peer; }
+  ATFW_UTIL_FORCEINLINE void set_conf_ssl_verify_peer(bool v) { conf_.ssl_verify_peer = v; }
+  ATFW_UTIL_FORCEINLINE bool get_conf_ssl_verify_peer() const { return conf_.ssl_verify_peer; }
 
-  UTIL_FORCEINLINE void set_conf_http_debug_mode(bool v) { conf_.http_debug_mode = v; }
-  UTIL_FORCEINLINE bool get_conf_http_debug_mode() const { return conf_.http_debug_mode; }
+  ATFW_UTIL_FORCEINLINE void set_conf_http_debug_mode(bool v) { conf_.http_debug_mode = v; }
+  ATFW_UTIL_FORCEINLINE bool get_conf_http_debug_mode() const { return conf_.http_debug_mode; }
 
-  UTIL_FORCEINLINE void set_conf_etcd_members_auto_update_hosts(bool v) { conf_.auto_update_hosts = v; }
-  UTIL_FORCEINLINE bool get_conf_etcd_members_auto_update_hosts() const { return conf_.auto_update_hosts; }
+  ATFW_UTIL_FORCEINLINE void set_conf_etcd_members_auto_update_hosts(bool v) { conf_.auto_update_hosts = v; }
+  ATFW_UTIL_FORCEINLINE bool get_conf_etcd_members_auto_update_hosts() const { return conf_.auto_update_hosts; }
 
-  UTIL_FORCEINLINE void set_conf_ssl_min_version(ssl_version_t::type v) { conf_.ssl_min_version = v; }
-  UTIL_FORCEINLINE ssl_version_t::type get_conf_ssl_min_version() const { return conf_.ssl_min_version; }
+  ATFW_UTIL_FORCEINLINE void set_conf_ssl_min_version(ssl_version_t::type v) { conf_.ssl_min_version = v; }
+  ATFW_UTIL_FORCEINLINE ssl_version_t::type get_conf_ssl_min_version() const { return conf_.ssl_min_version; }
 
-  UTIL_FORCEINLINE void set_conf_user_agent(const std::string &v) { conf_.user_agent = v; }
-  UTIL_FORCEINLINE const std::string &get_conf_user_agent() const { return conf_.user_agent; }
+  ATFW_UTIL_FORCEINLINE void set_conf_user_agent(const std::string &v) { conf_.user_agent = v; }
+  ATFW_UTIL_FORCEINLINE const std::string &get_conf_user_agent() const { return conf_.user_agent; }
 
-  UTIL_FORCEINLINE void set_conf_proxy(const std::string &v) { conf_.proxy = v; }
-  UTIL_FORCEINLINE const std::string &get_conf_proxy() const { return conf_.proxy; }
+  ATFW_UTIL_FORCEINLINE void set_conf_proxy(const std::string &v) { conf_.proxy = v; }
+  ATFW_UTIL_FORCEINLINE const std::string &get_conf_proxy() const { return conf_.proxy; }
 
-  UTIL_FORCEINLINE void set_conf_no_proxy(const std::string &v) { conf_.no_proxy = v; }
-  UTIL_FORCEINLINE const std::string &get_conf_no_proxy() const { return conf_.no_proxy; }
+  ATFW_UTIL_FORCEINLINE void set_conf_no_proxy(const std::string &v) { conf_.no_proxy = v; }
+  ATFW_UTIL_FORCEINLINE const std::string &get_conf_no_proxy() const { return conf_.no_proxy; }
 
-  UTIL_FORCEINLINE void set_conf_proxy_user_name(const std::string &v) { conf_.proxy_user_name = v; }
-  UTIL_FORCEINLINE const std::string &get_conf_proxy_user_name() const { return conf_.proxy_user_name; }
+  ATFW_UTIL_FORCEINLINE void set_conf_proxy_user_name(const std::string &v) { conf_.proxy_user_name = v; }
+  ATFW_UTIL_FORCEINLINE const std::string &get_conf_proxy_user_name() const { return conf_.proxy_user_name; }
 
-  UTIL_FORCEINLINE void set_conf_proxy_password(const std::string &v) { conf_.proxy_password = v; }
-  UTIL_FORCEINLINE const std::string &get_conf_proxy_password() const { return conf_.proxy_password; }
+  ATFW_UTIL_FORCEINLINE void set_conf_proxy_password(const std::string &v) { conf_.proxy_password = v; }
+  ATFW_UTIL_FORCEINLINE const std::string &get_conf_proxy_password() const { return conf_.proxy_password; }
 
-  UTIL_FORCEINLINE void set_conf_ssl_client_cert(const std::string &v) { conf_.ssl_client_cert = v; }
-  UTIL_FORCEINLINE const std::string &get_conf_ssl_client_cert() const { return conf_.ssl_client_cert; }
+  ATFW_UTIL_FORCEINLINE void set_conf_ssl_client_cert(const std::string &v) { conf_.ssl_client_cert = v; }
+  ATFW_UTIL_FORCEINLINE const std::string &get_conf_ssl_client_cert() const { return conf_.ssl_client_cert; }
 
-  UTIL_FORCEINLINE void set_conf_ssl_client_cert_type(const std::string &v) { conf_.ssl_client_cert_type = v; }
-  UTIL_FORCEINLINE const std::string &get_conf_ssl_client_cert_type() const { return conf_.ssl_client_cert_type; }
+  ATFW_UTIL_FORCEINLINE void set_conf_ssl_client_cert_type(const std::string &v) { conf_.ssl_client_cert_type = v; }
+  ATFW_UTIL_FORCEINLINE const std::string &get_conf_ssl_client_cert_type() const { return conf_.ssl_client_cert_type; }
 
-  UTIL_FORCEINLINE void set_conf_ssl_client_key(const std::string &v) { conf_.ssl_client_key = v; }
-  UTIL_FORCEINLINE const std::string &get_conf_ssl_client_key() const { return conf_.ssl_client_key; }
+  ATFW_UTIL_FORCEINLINE void set_conf_ssl_client_key(const std::string &v) { conf_.ssl_client_key = v; }
+  ATFW_UTIL_FORCEINLINE const std::string &get_conf_ssl_client_key() const { return conf_.ssl_client_key; }
 
-  UTIL_FORCEINLINE void set_conf_ssl_client_key_type(const std::string &v) { conf_.ssl_client_key_type = v; }
-  UTIL_FORCEINLINE const std::string &get_conf_ssl_client_key_type() const { return conf_.ssl_client_key_type; }
+  ATFW_UTIL_FORCEINLINE void set_conf_ssl_client_key_type(const std::string &v) { conf_.ssl_client_key_type = v; }
+  ATFW_UTIL_FORCEINLINE const std::string &get_conf_ssl_client_key_type() const { return conf_.ssl_client_key_type; }
 
-  UTIL_FORCEINLINE void set_conf_ssl_client_key_passwd(const std::string &v) { conf_.ssl_client_key_passwd = v; }
-  UTIL_FORCEINLINE const std::string &get_conf_ssl_client_key_passwd() const { return conf_.ssl_client_key_passwd; }
+  ATFW_UTIL_FORCEINLINE void set_conf_ssl_client_key_passwd(const std::string &v) { conf_.ssl_client_key_passwd = v; }
+  ATFW_UTIL_FORCEINLINE const std::string &get_conf_ssl_client_key_passwd() const {
+    return conf_.ssl_client_key_passwd;
+  }
 
-  UTIL_FORCEINLINE void set_conf_ssl_ca_cert(const std::string &v) { conf_.ssl_ca_cert = v; }
-  UTIL_FORCEINLINE const std::string &get_conf_ssl_ca_cert() const { return conf_.ssl_ca_cert; }
+  ATFW_UTIL_FORCEINLINE void set_conf_ssl_ca_cert(const std::string &v) { conf_.ssl_ca_cert = v; }
+  ATFW_UTIL_FORCEINLINE const std::string &get_conf_ssl_ca_cert() const { return conf_.ssl_ca_cert; }
 
-  UTIL_FORCEINLINE void set_conf_ssl_client_tlsauth_username(const std::string &v) {
+  ATFW_UTIL_FORCEINLINE void set_conf_ssl_client_tlsauth_username(const std::string &v) {
     conf_.ssl_client_tlsauth_username = v;
   }
-  UTIL_FORCEINLINE const std::string &get_conf_ssl_client_tlsauth_username() const {
+  ATFW_UTIL_FORCEINLINE const std::string &get_conf_ssl_client_tlsauth_username() const {
     return conf_.ssl_client_tlsauth_username;
   }
 
-  UTIL_FORCEINLINE void set_conf_ssl_client_tlsauth_password(const std::string &v) {
+  ATFW_UTIL_FORCEINLINE void set_conf_ssl_client_tlsauth_password(const std::string &v) {
     conf_.ssl_client_tlsauth_password = v;
   }
-  UTIL_FORCEINLINE const std::string &get_conf_ssl_client_tlsauth_password() const {
+  ATFW_UTIL_FORCEINLINE const std::string &get_conf_ssl_client_tlsauth_password() const {
     return conf_.ssl_client_tlsauth_password;
   }
 
-  UTIL_FORCEINLINE void set_conf_ssl_proxy_cert(const std::string &v) { conf_.ssl_proxy_cert = v; }
-  UTIL_FORCEINLINE const std::string &get_conf_ssl_proxy_cert() const { return conf_.ssl_proxy_cert; }
+  ATFW_UTIL_FORCEINLINE void set_conf_ssl_proxy_cert(const std::string &v) { conf_.ssl_proxy_cert = v; }
+  ATFW_UTIL_FORCEINLINE const std::string &get_conf_ssl_proxy_cert() const { return conf_.ssl_proxy_cert; }
 
-  UTIL_FORCEINLINE void set_conf_ssl_proxy_cert_type(const std::string &v) { conf_.ssl_proxy_cert_type = v; }
-  UTIL_FORCEINLINE const std::string &get_conf_ssl_proxy_cert_type() const { return conf_.ssl_proxy_cert_type; }
+  ATFW_UTIL_FORCEINLINE void set_conf_ssl_proxy_cert_type(const std::string &v) { conf_.ssl_proxy_cert_type = v; }
+  ATFW_UTIL_FORCEINLINE const std::string &get_conf_ssl_proxy_cert_type() const { return conf_.ssl_proxy_cert_type; }
 
-  UTIL_FORCEINLINE void set_conf_ssl_proxy_key(const std::string &v) { conf_.ssl_proxy_key = v; }
-  UTIL_FORCEINLINE const std::string &get_conf_ssl_proxy_key() const { return conf_.ssl_proxy_key; }
+  ATFW_UTIL_FORCEINLINE void set_conf_ssl_proxy_key(const std::string &v) { conf_.ssl_proxy_key = v; }
+  ATFW_UTIL_FORCEINLINE const std::string &get_conf_ssl_proxy_key() const { return conf_.ssl_proxy_key; }
 
-  UTIL_FORCEINLINE void set_conf_ssl_proxy_key_type(const std::string &v) { conf_.ssl_proxy_key_type = v; }
-  UTIL_FORCEINLINE const std::string &get_conf_ssl_proxy_key_type() const { return conf_.ssl_proxy_key_type; }
+  ATFW_UTIL_FORCEINLINE void set_conf_ssl_proxy_key_type(const std::string &v) { conf_.ssl_proxy_key_type = v; }
+  ATFW_UTIL_FORCEINLINE const std::string &get_conf_ssl_proxy_key_type() const { return conf_.ssl_proxy_key_type; }
 
-  UTIL_FORCEINLINE void set_conf_ssl_proxy_key_passwd(const std::string &v) { conf_.ssl_proxy_key_passwd = v; }
-  UTIL_FORCEINLINE const std::string &get_conf_ssl_proxy_key_passwd() const { return conf_.ssl_proxy_key_passwd; }
+  ATFW_UTIL_FORCEINLINE void set_conf_ssl_proxy_key_passwd(const std::string &v) { conf_.ssl_proxy_key_passwd = v; }
+  ATFW_UTIL_FORCEINLINE const std::string &get_conf_ssl_proxy_key_passwd() const { return conf_.ssl_proxy_key_passwd; }
 
-  UTIL_FORCEINLINE void set_conf_ssl_proxy_tlsauth_username(const std::string &v) {
+  ATFW_UTIL_FORCEINLINE void set_conf_ssl_proxy_tlsauth_username(const std::string &v) {
     conf_.ssl_proxy_tlsauth_username = v;
   }
-  UTIL_FORCEINLINE const std::string &get_conf_ssl_proxy_tlsauth_username() const {
+  ATFW_UTIL_FORCEINLINE const std::string &get_conf_ssl_proxy_tlsauth_username() const {
     return conf_.ssl_proxy_tlsauth_username;
   }
 
-  UTIL_FORCEINLINE void set_conf_ssl_proxy_tlsauth_password(const std::string &v) {
+  ATFW_UTIL_FORCEINLINE void set_conf_ssl_proxy_tlsauth_password(const std::string &v) {
     conf_.ssl_proxy_tlsauth_password = v;
   }
-  UTIL_FORCEINLINE const std::string &get_conf_ssl_proxy_tlsauth_password() const {
+  ATFW_UTIL_FORCEINLINE const std::string &get_conf_ssl_proxy_tlsauth_password() const {
     return conf_.ssl_proxy_tlsauth_password;
   }
 
-  UTIL_FORCEINLINE void set_conf_ssl_proxy_ca_cert(const std::string &v) { conf_.ssl_proxy_ca_cert = v; }
-  UTIL_FORCEINLINE const std::string &get_conf_ssl_proxy_ca_cert() const { return conf_.ssl_proxy_ca_cert; }
+  ATFW_UTIL_FORCEINLINE void set_conf_ssl_proxy_ca_cert(const std::string &v) { conf_.ssl_proxy_ca_cert = v; }
+  ATFW_UTIL_FORCEINLINE const std::string &get_conf_ssl_proxy_ca_cert() const { return conf_.ssl_proxy_ca_cert; }
 
-  UTIL_FORCEINLINE void set_conf_ssl_cipher_list(const std::string &v) { conf_.ssl_cipher_list = v; }
-  UTIL_FORCEINLINE const std::string &get_conf_ssl_cipher_list() const { return conf_.ssl_cipher_list; }
+  ATFW_UTIL_FORCEINLINE void set_conf_ssl_cipher_list(const std::string &v) { conf_.ssl_cipher_list = v; }
+  ATFW_UTIL_FORCEINLINE const std::string &get_conf_ssl_cipher_list() const { return conf_.ssl_cipher_list; }
 
-  UTIL_FORCEINLINE void set_conf_ssl_cipher_list_tls13(const std::string &v) { conf_.ssl_cipher_list_tls13 = v; }
-  UTIL_FORCEINLINE const std::string &get_conf_ssl_cipher_list_tls13() const { return conf_.ssl_cipher_list_tls13; }
+  ATFW_UTIL_FORCEINLINE void set_conf_ssl_cipher_list_tls13(const std::string &v) { conf_.ssl_cipher_list_tls13 = v; }
+  ATFW_UTIL_FORCEINLINE const std::string &get_conf_ssl_cipher_list_tls13() const {
+    return conf_.ssl_cipher_list_tls13;
+  }
 
   // ================== apis for sub-services ==================
   LIBATAPP_MACRO_API bool add_keepalive(const std::shared_ptr<etcd_keepalive> &keepalive);
@@ -450,7 +454,7 @@ class etcd_cluster {
                                                                                    bool prev_kv = false,
                                                                                    bool progress_notify = true);
 
-  UTIL_FORCEINLINE int64_t get_lease() const { return conf_.lease; }
+  ATFW_UTIL_FORCEINLINE int64_t get_lease() const { return conf_.lease; }
 
   LIBATAPP_MACRO_API on_event_up_down_handle_t add_on_event_up(on_event_up_down_fn_t fn,
                                                                bool trigger_if_running = false);

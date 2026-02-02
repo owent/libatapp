@@ -203,7 +203,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_loopback::process(
       pending_message_.pop_front();
     }
 
-    if (atfw::util::time::time_utility::sys_now() >= max_end_timepoint) {
+    if (get_owner()->get_sys_now() >= max_end_timepoint) {
       break;
     }
   }
