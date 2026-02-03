@@ -74,7 +74,11 @@ struct ATFW_UTIL_SYMBOL_LOCAL atapp_connector_atbus::atbus_connection_handle_dat
 };
 
 LIBATAPP_MACRO_API atapp_connector_atbus::atapp_connector_atbus(app &owner)
-    : atapp_connector_impl(owner), atbus_topology_policy_allow_direct_connection_(false) {
+    : atapp_connector_impl(owner),
+      atbus_topology_policy_allow_direct_connection_(false),
+      last_connect_bus_id_(0),
+      last_connect_handle_(nullptr),
+      last_connect_result_(0) {
   register_protocol("mem");
   register_protocol("shm");
   register_protocol("unix");
@@ -196,6 +200,12 @@ LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_start_connect(const etcd_di
                                                                    atapp_endpoint &endpoint,
                                                                    const atbus::channel::channel_address_t &addr,
                                                                    const atapp_connection_handle::ptr_t &handle) {
+  // 上传会循环查询多个连接，对于atbus来说一次连接就会考虑所有拓扑关系，不需要重复查询
+  if (last_connect_bus_id_ != 0 && last_connect_bus_id_ == discovery.get_discovery_info().id() &&
+      last_connect_handle_ == handle.get()) {
+    return last_connect_result_;
+  }
+
   int32_t ret = try_connect_to(discovery, &addr, handle, true);
   if (handle) {
     // 上层过来的handle，一定是主动连接
@@ -204,6 +214,10 @@ LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_start_connect(const etcd_di
       set_flag(iter->second->flags, atbus_connection_handle_flags_t::kActiveConnection, true);
     }
   }
+
+  last_connect_bus_id_ = discovery.get_discovery_info().id();
+  last_connect_handle_ = handle.get();
+  last_connect_result_ = ret;
   return ret;
 }
 
@@ -277,6 +291,10 @@ LIBATAPP_MACRO_API void atapp_connector_atbus::on_receive_forward_response(
 
 LIBATAPP_MACRO_API void atapp_connector_atbus::on_discovery_event(etcd_discovery_action_t::type action,
                                                                   const etcd_discovery_node::ptr_t &discovery) {
+  // clear connect result cache
+  last_connect_bus_id_ = 0;
+  last_connect_handle_ = nullptr;
+
   // 服务发现信息上线，且该节点正在等待连接，则发起连接
   if (action == etcd_discovery_action_t::EN_NAT_PUT && discovery) {
     resume_handle_discovery(*discovery);
@@ -290,6 +308,10 @@ LIBATAPP_MACRO_API void atapp_connector_atbus::on_discovery_event(etcd_discovery
 }
 
 LIBATAPP_MACRO_API void atapp_connector_atbus::remove_topology_peer(atbus::bus_id_t target_bus_id) {
+  // clear connect result cache
+  last_connect_bus_id_ = 0;
+  last_connect_handle_ = nullptr;
+
   handle_map_t::iterator iter = handles_.find(target_bus_id);
   if (iter == handles_.end()) {
     return;
@@ -306,6 +328,10 @@ LIBATAPP_MACRO_API void atapp_connector_atbus::remove_topology_peer(atbus::bus_i
 LIBATAPP_MACRO_API void atapp_connector_atbus::update_topology_peer(atbus::bus_id_t target_bus_id,
                                                                     atbus::bus_id_t proxy_bus_id,
                                                                     atbus::topology_data::ptr_t data) {
+  // clear connect result cache
+  last_connect_bus_id_ = 0;
+  last_connect_handle_ = nullptr;
+
   // 拓扑关系刷新
   handle_map_t::iterator iter = handles_.find(target_bus_id);
   if (iter == handles_.end()) {

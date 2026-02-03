@@ -37,6 +37,7 @@
 #define ETCD_MODULE_BY_TYPE_ID_DIR "by_type_id"
 #define ETCD_MODULE_BY_TYPE_NAME_DIR "by_type_name"
 #define ETCD_MODULE_BY_TAG_DIR "by_tag"
+#define ETCD_MODULE_TOPOLOGY "topology"
 
 LIBATAPP_MACRO_NAMESPACE_BEGIN
 namespace detail {
