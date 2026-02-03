@@ -168,10 +168,8 @@ static time_t get_custom_timer_tick_offset(std::chrono::duration<Rep, Period> du
                              ATAPP_DEFAULT_CUSTOM_TIMER_TICK_MS);
 }
 
-template <class Clock, class Rep, class Period>
-static time_t get_custom_timer_tick(std::chrono::time_point<Clock, std::chrono::duration<Rep, Period>> tp) {
-  std::chrono::system_clock::time_point stp = std::chrono::time_point_cast<std::chrono::system_clock::time_point>(tp);
-  return get_custom_timer_tick_offset(stp.time_since_epoch());
+inline static time_t get_custom_timer_tick(std::chrono::system_clock::time_point tp) {
+  return get_custom_timer_tick_offset(tp.time_since_epoch());
 }
 
 static atbus::protocol::ATBUS_CRYPTO_ALGORITHM_TYPE convert_atbus_configure(
@@ -4894,7 +4892,7 @@ int app::bus_evt_callback_on_register(const atbus::node &n, const atbus::endpoin
   }
 
   if (nullptr != ep && atbus_connector_) {
-    atbus_connector_->on_update_endpoint(n, ep, 0);
+    atbus_connector_->on_register(n, ep, conn, res);
   }
 
   return 0;
@@ -4934,6 +4932,11 @@ int app::bus_evt_callback_on_invalid_connection(const atbus::node &n, const atbu
       }
     }
   }
+
+  if (atbus_connector_) {
+    atbus_connector_->on_invalid_connection(n, conn, res);
+  }
+
   return 0;
 }
 
@@ -5009,8 +5012,8 @@ int app::bus_evt_callback_on_new_connection(const atbus::node &n, const atbus::c
     return 0;
   }
 
-  if (conn->is_connected() && conn->get_binding() != nullptr && atbus_connector_) {
-    return atbus_connector_->on_update_endpoint(n, conn->get_binding(), 0);
+  if (atbus_connector_) {
+    atbus_connector_->on_new_connection(n, conn);
   }
 
   return 0;
@@ -5022,8 +5025,8 @@ int app::bus_evt_callback_on_close_connection(const atbus::node &n, const atbus:
     return 0;
   }
 
-  if (ep != nullptr && atbus_connector_) {
-    return atbus_connector_->on_update_endpoint(n, ep, 0);
+  if (atbus_connector_) {
+    atbus_connector_->on_close_connection(n, ep, conn);
   }
 
   return 0;

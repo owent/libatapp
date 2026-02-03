@@ -127,7 +127,8 @@ ATFW_UTIL_FORCEINLINE std::chrono::time_point<Clock, std::chrono::duration<Rep, 
 protobuf_to_chrono_convert_timepoint(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp &in) {
   std::chrono::system_clock::time_point tp = std::chrono::system_clock::from_time_t(in.seconds());
   tp += std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::nanoseconds(in.nanos()));
-  return std::chrono::time_point_cast<std::chrono::time_point<Clock, std::chrono::duration<Rep, Period>>>(tp);
+  return std::chrono::time_point_cast<std::chrono::time_point<Clock, std::chrono::duration<Rep, Period>>,
+                                      std::chrono::system_clock, std::chrono::system_clock::duration>(tp);
 }
 
 template <class Clock, class Rep, class Period>
