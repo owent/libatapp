@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent
 
 #pragma once
@@ -249,3 +250,4 @@ class etcd_module : public ::atframework::atapp::module_impl {
   node_event_callback_list_t node_event_callbacks_;
 };
 LIBATAPP_MACRO_NAMESPACE_END
+

@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent
 
 #include <cstring>
@@ -380,3 +381,4 @@ LIBATAPP_MACRO_API void etcd_packer::unpack_bool(const rapidjson::Value &json_va
 LIBATAPP_MACRO_NAMESPACE_END
 
 #include <config/compiler/migrate_suffix.h>
+

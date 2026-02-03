@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent
 
 #pragma once
@@ -60,3 +61,4 @@ class atapp_connector_loopback : public atapp_connector_impl {
 #endif
 };
 LIBATAPP_MACRO_NAMESPACE_END
+

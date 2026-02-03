@@ -1,4 +1,4 @@
-// Copyright 2022 atframework
+// Copyright 2026 atframework
 
 #include <atframe/atapp.h>
 
@@ -206,3 +206,4 @@ CASE_TEST(atapp_message, send_message_loopback) {
 
   CASE_EXPECT_EQ(received_messge_count, 4);
 }
+

@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent on 2016-04-23
 
 #pragma once
@@ -784,3 +785,4 @@ class app {
 };
 
 LIBATAPP_MACRO_NAMESPACE_END
+

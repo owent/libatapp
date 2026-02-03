@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Create by owent
 
 #include "atframe/etcdcli/etcd_keepalive.h"
@@ -301,3 +302,4 @@ int etcd_keepalive::libcurl_callback_on_set_data(atfw::util::network::http_reque
   return 0;
 }
 LIBATAPP_MACRO_NAMESPACE_END
+

@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent on 2017-12-26
 
 #pragma once
@@ -90,3 +91,4 @@ class etcd_keepalive : public std::enable_shared_from_this<etcd_keepalive> {
   checker_t checker_;
 };
 LIBATAPP_MACRO_NAMESPACE_END
+

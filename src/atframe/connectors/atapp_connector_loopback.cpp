@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent on 2021-07-20
 
 #include <detail/libatbus_error.h>
@@ -212,3 +213,4 @@ LIBATAPP_MACRO_API int32_t atapp_connector_loopback::process(
 }
 
 LIBATAPP_MACRO_NAMESPACE_END
+

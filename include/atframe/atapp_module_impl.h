@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent on 2016-05-18
 
 #pragma once
@@ -187,3 +188,4 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE module_impl {
   friend class app;
 };
 LIBATAPP_MACRO_NAMESPACE_END
+

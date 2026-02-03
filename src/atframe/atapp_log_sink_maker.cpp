@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent
 
 #include "atframe/atapp_log_sink_maker.h"
@@ -194,3 +195,4 @@ LIBATAPP_MACRO_API gsl::string_view log_sink_maker::get_syslog_sink_name() { ret
 LIBATAPP_MACRO_API log_sink_maker::log_reg_t log_sink_maker::get_syslog_sink_reg() { return detail::_log_sink_syslog; }
 
 LIBATAPP_MACRO_NAMESPACE_END
+

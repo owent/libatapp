@@ -1,4 +1,4 @@
-// Copyright 2022 atframework
+// Copyright 2026 atframework
 
 #include <atframe/atapp.h>
 
@@ -401,3 +401,4 @@ CASE_TEST(atapp_worker_pool, stop_tick) {
   tick_times_after = tick_times.load();
   CASE_EXPECT_LT(tick_times_after, tick_times_before + 2);
 }
+

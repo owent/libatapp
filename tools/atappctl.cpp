@@ -1,4 +1,6 @@
 
+// Copyright 2026 atframework
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -102,3 +104,4 @@ int main(int argc, char *argv[]) {
 
   return ret;
 }
+

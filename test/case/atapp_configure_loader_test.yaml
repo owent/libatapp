@@ -1,3 +1,4 @@
+# Copyright 2026 atframework
 atapp:
   id: 0x00001234
   id_mask: 8.8.8.8
@@ -118,3 +119,4 @@ atapp:
             level:
               min: fatal
               max: debug
+

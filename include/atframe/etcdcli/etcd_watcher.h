@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent on 2017-12-26
 
 #pragma once
@@ -153,3 +154,4 @@ class etcd_watcher {
   watch_event_fn_t evt_handle_;
 };
 LIBATAPP_MACRO_NAMESPACE_END
+

@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent
 
 #if defined(_WIN32)
@@ -990,3 +991,4 @@ LIBATAPP_MACRO_API void rapidjson_loader_load_from(rapidjson::Value &dst, rapidj
   }
 }
 LIBATAPP_MACRO_NAMESPACE_END
+

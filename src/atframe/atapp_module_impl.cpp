@@ -1,4 +1,5 @@
-// Copyright 2022 atframework
+// Copyright 2026 atframework
+//
 // Created by owent
 
 #include <config/atframe_utils_build_feature.h>
@@ -140,3 +141,4 @@ LIBATAPP_MACRO_API bool module_impl::check_suspend_stop() {
 }
 
 LIBATAPP_MACRO_NAMESPACE_END
+
