@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent
 
 #pragma once
@@ -123,3 +124,4 @@ class atapp_endpoint {
   friend struct atapp_endpoint_bind_helper;
 };
 LIBATAPP_MACRO_NAMESPACE_END
+

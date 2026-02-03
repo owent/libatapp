@@ -1,4 +1,4 @@
-// Copyright 2022 atframework
+// Copyright 2026 atframework
 
 #include <atframe/atapp.h>
 
@@ -55,3 +55,4 @@ CASE_TEST(atapp_connector, get_address_type) {
   CASE_EXPECT_TRUE(
       !(app.get_address_type("dns://localhost:1234") & atframework::atapp::app::address_type_t::EN_ACAT_LOCAL_PROCESS));
 }
+

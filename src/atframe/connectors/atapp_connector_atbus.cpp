@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent
 
 #include <string/string_format.h>
@@ -1538,3 +1539,4 @@ void atapp_connector_atbus::unbind_connection_handle_proxy(atbus_connection_hand
 }
 
 LIBATAPP_MACRO_NAMESPACE_END
+

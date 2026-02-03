@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent on 2017-11-17
 
 #pragma once
@@ -33,3 +34,4 @@ struct LIBATAPP_MACRO_API_HEAD_ONLY etcd_watch_event {
   };
 };
 LIBATAPP_MACRO_NAMESPACE_END
+

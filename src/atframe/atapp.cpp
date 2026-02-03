@@ -1,4 +1,5 @@
-// Copyright 2021 Tencent
+// Copyright 2026 atframework
+//
 // Created by owent
 
 #include "atframe/atapp.h"
@@ -5341,3 +5342,4 @@ int app::send_last_command(ev_loop_t *ev_loop) {
   return ret;
 }
 LIBATAPP_MACRO_NAMESPACE_END
+

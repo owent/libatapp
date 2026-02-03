@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent
 
 #include "atframe/modules/etcd_module.h"
@@ -1735,3 +1736,4 @@ void etcd_module::reset_inner_watchers_and_keepalives() {
 }
 
 LIBATAPP_MACRO_NAMESPACE_END
+

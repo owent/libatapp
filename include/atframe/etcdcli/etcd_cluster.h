@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent on 2017-11-17
 
 #pragma once
@@ -611,3 +612,4 @@ class etcd_cluster {
 #endif
 
 LIBATAPP_MACRO_NAMESPACE_END
+

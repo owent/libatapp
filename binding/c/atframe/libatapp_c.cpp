@@ -1,4 +1,6 @@
 
+// Copyright 2026 atframework
+
 #include <algorithm>
 #include <cstddef>
 #include <cstdio>
@@ -750,3 +752,4 @@ LIBATAPP_MACRO_API void __cdecl libatapp_c_log_set_project_directory(const char 
 #ifdef __cplusplus
 }
 #endif
+

@@ -1,4 +1,4 @@
-// Copyright 2022 atframework
+// Copyright 2026 atframework
 
 #include <atframe/atapp.h>
 #include <atframe/atapp_module_impl.h>
@@ -61,3 +61,4 @@ CASE_TEST(atapp_setup, timeout) {
   auto after = atfw::util::time::time_utility::sys_now();
   CASE_EXPECT_LE(std::chrono::duration_cast<std::chrono::seconds>(after - before).count(), 3);
 }
+

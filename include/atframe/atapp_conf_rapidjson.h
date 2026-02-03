@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent on
 
 #pragma once
@@ -173,3 +174,4 @@ LIBATAPP_MACRO_API_HEAD_ONLY void rapidjson_loader_append_to_list(rapidjson::Val
       parent, std::forward<TVAL>(val), doc);
 }
 LIBATAPP_MACRO_NAMESPACE_END
+

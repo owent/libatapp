@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent
 
 #include <common/string_oprs.h>
@@ -1124,3 +1125,4 @@ etcd_discovery_set::index_cache_type *etcd_discovery_set::mutable_index_cache(
 }
 
 LIBATAPP_MACRO_NAMESPACE_END
+

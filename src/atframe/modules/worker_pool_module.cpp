@@ -1,4 +1,5 @@
-// Copyright 2024 atframework
+// Copyright 2026 atframework
+//
 // Created by owent
 
 #include "atframe/modules/worker_pool_module.h"
@@ -1508,3 +1509,4 @@ void worker_pool_module::rebalance_jobs() {
 }
 
 LIBATAPP_MACRO_NAMESPACE_END
+

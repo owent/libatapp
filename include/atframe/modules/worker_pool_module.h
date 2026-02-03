@@ -1,4 +1,5 @@
-// Copyright 2024 atframework
+// Copyright 2026 atframework
+//
 // Created by owent
 
 #pragma once
@@ -131,3 +132,4 @@ class worker_pool_module : public ::atframework::atapp::module_impl {
   std::shared_ptr<scaling_statistics> scaling_statistics_;
 };
 LIBATAPP_MACRO_NAMESPACE_END
+

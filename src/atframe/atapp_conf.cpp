@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent
 
 #if defined(_WIN32)
@@ -2578,3 +2579,4 @@ LIBATAPP_MACRO_API bool protobuf_equal(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::
   return protobuf_equal_inner_message(l, r);
 }
 LIBATAPP_MACRO_NAMESPACE_END
+

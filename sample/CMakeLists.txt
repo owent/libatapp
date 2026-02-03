@@ -1,3 +1,4 @@
+# Copyright 2026 atframework
 echowithcolor(COLOR GREEN "-- Configure ${CMAKE_CURRENT_LIST_DIR}")
 
 include("${CMAKE_CURRENT_LIST_DIR}/sample.custom-macro.cmake")
@@ -15,17 +16,17 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/sample")
 foreach(SAMPLE_SRC_FILE IN LISTS SAMPLE_SRC_LIST)
   get_filename_component(SAMPLE_SRC_BIN_NAME "${SAMPLE_SRC_FILE}" NAME_WE)
 
-  add_executable(${SAMPLE_SRC_BIN_NAME} ${SAMPLE_SRC_FILE})
-  target_link_libraries(${SAMPLE_SRC_BIN_NAME} atapp)
+  add_executable(atapp_${SAMPLE_SRC_BIN_NAME} ${SAMPLE_SRC_FILE})
+  target_link_libraries(atapp_${SAMPLE_SRC_BIN_NAME} atapp)
 
   set_target_properties(
-    ${SAMPLE_SRC_BIN_NAME}
+    atapp_${SAMPLE_SRC_BIN_NAME}
     PROPERTIES INSTALL_RPATH_USE_LINK_PATH YES
                BUILD_WITH_INSTALL_RPATH NO
                BUILD_RPATH_USE_ORIGIN YES)
 
-  set_property(TARGET ${SAMPLE_SRC_BIN_NAME} PROPERTY FOLDER "atframework/sample/atapp")
+  set_property(TARGET atapp_${SAMPLE_SRC_BIN_NAME} PROPERTY FOLDER "atframework/sample/atapp")
   if(MSVC)
-    add_target_properties(${SAMPLE_SRC_BIN_NAME} LINK_FLAGS /NODEFAULTLIB:library)
+    add_target_properties(atapp_${SAMPLE_SRC_BIN_NAME} LINK_FLAGS /NODEFAULTLIB:library)
   endif()
 endforeach()

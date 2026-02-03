@@ -1,4 +1,5 @@
 #!/bin/sh
+# Copyright 2026 atframework
 
 ETC_DIR="$(dirname $0)";
 

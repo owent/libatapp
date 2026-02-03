@@ -1,4 +1,4 @@
-// Copyright 2022 atframework
+// Copyright 2026 atframework
 
 #include <atframe/atapp.h>
 
@@ -347,3 +347,4 @@ CASE_TEST_EVENT_ON_EXIT(unit_test_event_on_exit_close_libuv) {
   }
   uv_loop_close(uv_default_loop());
 }
+

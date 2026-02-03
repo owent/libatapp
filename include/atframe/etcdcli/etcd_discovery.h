@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent on 2020-08-18
 
 #pragma once
@@ -256,3 +257,4 @@ class etcd_discovery_set {
   mutable std::unordered_map<metadata_type, index_cache_type, metadata_hash_type, metadata_equal_type> metadata_index_;
 };
 LIBATAPP_MACRO_NAMESPACE_END
+

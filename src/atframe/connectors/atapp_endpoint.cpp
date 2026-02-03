@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent
 
 #include <detail/libatbus_error.h>
@@ -422,3 +423,4 @@ void atapp_endpoint::trigger_on_receive_forward_response(atapp_connector_impl *c
 }
 
 LIBATAPP_MACRO_NAMESPACE_END
+

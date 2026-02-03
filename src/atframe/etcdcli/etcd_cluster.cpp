@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent
 
 #include <assert.h>
@@ -2277,3 +2278,4 @@ LIBATAPP_MACRO_API void etcd_cluster::setup_http_request(atfw::util::network::ht
                                         reinterpret_cast<const void *>(req.get()), req->get_url(), req->post_data());
 }
 LIBATAPP_MACRO_NAMESPACE_END
+

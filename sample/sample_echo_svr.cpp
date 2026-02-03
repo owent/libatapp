@@ -1,4 +1,6 @@
 
+// Copyright 2026 atframework
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -76,8 +78,10 @@ struct app_command_handler_transfer {
     if (params.get_params_number() > 2) {
       type = params[2]->to_int();
     }
-    app_->get_bus_node()->send_data(params[0]->to_uint64(), type, params[1]->to_cpp_string().c_str(),
-                                    params[1]->to_cpp_string().size(), false);
+    const std::string &data = params[1]->to_cpp_string();
+    app_->get_bus_node()->send_data(
+        params[0]->to_uint64(), type,
+        gsl::span<const unsigned char>(reinterpret_cast<const unsigned char *>(data.data()), data.size()));
     return 0;
   }
 };
@@ -123,10 +127,10 @@ static int app_option_handler_echo(atfw::util::cli::callback_param params) {
 static int app_handle_on_msg(atframework::atapp::app &app, const atframework::atapp::app::message_sender_t &source,
                              const atframework::atapp::app::message_t &msg) {
   std::string data;
-  data.assign(reinterpret_cast<const char *>(msg.data), msg.data_size);
+  data.assign(reinterpret_cast<const char *>(msg.data.data()), msg.data.size());
   FWLOGINFO("receive a message(from {:#x}, type={}) {}", source.id, msg.type, data);
 
-  return app.get_bus_node()->send_data(source.id, msg.type, msg.data, msg.data_size);
+  return app.get_bus_node()->send_data(source.id, msg.type, msg.data);
 }
 
 static int app_handle_on_response(atframework::atapp::app &app, const atframework::atapp::app::message_sender_t &source,

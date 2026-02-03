@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent
 
 #include <libatbus.h>
@@ -561,3 +562,4 @@ int etcd_watcher::libcurl_callback_on_watch_write(atfw::util::network::http_requ
 }
 
 LIBATAPP_MACRO_NAMESPACE_END
+

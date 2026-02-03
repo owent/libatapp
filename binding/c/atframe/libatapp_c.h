@@ -1,3 +1,5 @@
+// Copyright 2026 atframework
+
 #ifndef LIBATAPP_BINDING_C_LIBATAPP_C_H_
 #define LIBATAPP_BINDING_C_LIBATAPP_C_H_
 
@@ -166,3 +168,4 @@ LIBATAPP_MACRO_API void __cdecl libatapp_c_log_set_project_directory(const char 
 #endif
 
 #endif
+

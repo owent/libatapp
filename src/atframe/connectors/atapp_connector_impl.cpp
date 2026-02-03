@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent
 
 #include "atframe/connectors/atapp_connector_impl.h"
@@ -285,3 +286,4 @@ LIBATAPP_MACRO_API const atapp_connector_impl::protocol_set_t &atapp_connector_i
   return support_protocols_;
 }
 LIBATAPP_MACRO_NAMESPACE_END
+

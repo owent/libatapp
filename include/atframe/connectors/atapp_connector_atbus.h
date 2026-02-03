@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent
 
 #pragma once
@@ -142,3 +143,4 @@ class atapp_connector_atbus : public atapp_connector_impl,
 };
 
 LIBATAPP_MACRO_NAMESPACE_END
+

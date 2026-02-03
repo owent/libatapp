@@ -1,3 +1,4 @@
+# Copyright 2026 atframework
 echowithcolor(COLOR GREEN "-- Configure ${CMAKE_CURRENT_LIST_DIR}")
 
 set(PROJECT_LIBATAPP_ROOT_SRC_DIR ${CMAKE_CURRENT_LIST_DIR})
@@ -202,3 +203,4 @@ install(
 install(FILES "${PROJECT_LIBATAPP_GENERATED_DIR}/include/atframe/atapp_conf.pb.h"
               "${PROJECT_LIBATAPP_GENERATED_DIR}/include/atframe/atapp_config.h"
         DESTINATION "${ATFRAMEWORK_INSTALL_INCLUDEDIR}/atframe/")
+
