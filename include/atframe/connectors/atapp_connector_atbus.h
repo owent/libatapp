@@ -136,6 +136,9 @@ class atapp_connector_atbus : public atapp_connector_impl,
   atbus::topology_data::ptr_t atbus_topology_data_;
   atbus::topology_policy_rule atbus_topology_policy_rule_;
   bool atbus_topology_policy_allow_direct_connection_;
+  atbus::bus_id_t last_connect_bus_id_;
+  const atapp_connection_handle *last_connect_handle_;
+  int32_t last_connect_result_;
 };
 
 LIBATAPP_MACRO_NAMESPACE_END

@@ -39,7 +39,7 @@ struct libatapp_c_on_msg_functor {
     ctx = &self;
     m[0] = &source;
     m[1] = &msg;
-    return (*callee_)(ctx, m, msg.data, static_cast<uint64_t>(msg.data_size), private_data_);
+    return (*callee_)(ctx, m, msg.data.data(), static_cast<uint64_t>(msg.data.size()), private_data_);
   }
 
   libatapp_c_on_msg_fn_t callee_;
@@ -540,7 +540,13 @@ LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_send_data_msg(libatapp_c_context c
     return EN_ATBUS_ERR_PARAMS;
   }
 
-  return ATAPP_CONTEXT(context)->get_bus_node()->send_data(app_id, type, buffer, sz, 0 != require_rsp);
+  atbus::node::send_data_options_t opts;
+  if (require_rsp) {
+    opts.set_flag(atbus::node::send_data_options_t::flag_type::kRequireResponse, true);
+  }
+  return ATAPP_CONTEXT(context)->get_bus_node()->send_data(
+      app_id, type,
+      gsl::span<const unsigned char>{reinterpret_cast<const unsigned char *>(buffer), static_cast<size_t>(sz)}, opts);
 }
 
 LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_send_custom_msg(libatapp_c_context context, uint64_t app_id,
@@ -550,13 +556,13 @@ LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_send_custom_msg(libatapp_c_context
     return EN_ATBUS_ERR_PARAMS;
   }
 
-  std::vector<size_t> szs;
-  szs.resize(arr_count);
+  std::vector<gsl::span<const unsigned char>> szs;
+  szs.reserve(arr_count);
   for (uint64_t i = 0; i < arr_count; ++i) {
-    szs[i] = arr_size[i];
+    szs.emplace_back(gsl::span<const unsigned char>{reinterpret_cast<const unsigned char *>(arr_buf[i]), arr_size[i]});
   }
 
-  return ATAPP_CONTEXT(context)->get_bus_node()->send_custom_cmd(app_id, arr_buf, &szs[0], arr_count);
+  return ATAPP_CONTEXT(context)->get_bus_node()->send_custom_command(app_id, szs);
 }
 
 LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_msg_get_type(libatapp_c_message msg) {
@@ -591,7 +597,7 @@ LIBATAPP_MACRO_API libatapp_c_module __cdecl libatapp_c_module_create(libatapp_c
     return ret;
   }
 
-  std::shared_ptr< ::detail::libatapp_c_on_module> res = std::make_shared< ::detail::libatapp_c_on_module>(mod_name);
+  std::shared_ptr<::detail::libatapp_c_on_module> res = std::make_shared<::detail::libatapp_c_on_module>(mod_name);
   if (!res) {
     return ret;
   }

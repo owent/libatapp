@@ -48,6 +48,8 @@ CASE_TEST(atapp_message, send_message_remote) {
   uint64_t set_sequence = 691;
   uint64_t expect_sequence = 691;
   char expect_message[] = "hello app2";
+  gsl::span<const unsigned char> expect_message_span{reinterpret_cast<const unsigned char*>(expect_message),
+                                                     static_cast<size_t>(strlen(expect_message))};
 
   int received_messge_count = 0;
   auto message_callback_fn = [expect_message, &app1, &expect_sequence, &received_messge_count](
@@ -59,7 +61,7 @@ CASE_TEST(atapp_message, send_message_remote) {
     CASE_EXPECT_EQ(223, msg.type);
     CASE_EXPECT_EQ(expect_sequence++, msg.message_sequence);
 
-    auto received_message = gsl::string_view{reinterpret_cast<const char*>(msg.data), msg.data_size};
+    auto received_message = gsl::string_view{reinterpret_cast<const char*>(msg.data.data()), msg.data.size()};
     CASE_EXPECT_EQ(expect_message, received_message);
     CASE_MSG_INFO() << "Got message: " << received_message << std::endl;
 
@@ -90,10 +92,10 @@ CASE_TEST(atapp_message, send_message_remote) {
   auto now = atfw::util::time::time_utility::sys_now();
   auto end_time = now + std::chrono::seconds(3);
 
-  CASE_EXPECT_EQ(0, app1.send_message(app2.get_app_id(), 223, expect_message, strlen(expect_message), &set_sequence));
+  CASE_EXPECT_EQ(0, app1.send_message(app2.get_app_id(), 223, expect_message_span, &set_sequence));
   ++set_sequence;
 
-  CASE_EXPECT_EQ(0, app1.send_message(app2.get_app_name(), 223, expect_message, strlen(expect_message), &set_sequence));
+  CASE_EXPECT_EQ(0, app1.send_message(app2.get_app_name(), 223, expect_message_span, &set_sequence));
   ++set_sequence;
 
   CASE_EXPECT_EQ(2, app1.mutable_endpoint(app2_discovery)->get_pending_message_count());
@@ -108,7 +110,7 @@ CASE_TEST(atapp_message, send_message_remote) {
 
   CASE_EXPECT_EQ(0, app1.mutable_endpoint(app2_discovery)->get_pending_message_count());
 
-  CASE_EXPECT_EQ(0, app1.send_message(app2_discovery, 223, expect_message, strlen(expect_message), &set_sequence));
+  CASE_EXPECT_EQ(0, app1.send_message(app2_discovery, 223, expect_message_span, &set_sequence));
   ++set_sequence;
 
   while (received_messge_count < 3 && end_time > now) {
@@ -143,6 +145,8 @@ CASE_TEST(atapp_message, send_message_loopback) {
   uint64_t set_sequence = 671;
   uint64_t expect_sequence = 671;
   char expect_message[] = "hello loopback";
+  gsl::span<const unsigned char> expect_message_span{reinterpret_cast<const unsigned char*>(expect_message),
+                                                     static_cast<size_t>(strlen(expect_message))};
 
   int received_messge_count = 0;
   app1.set_evt_on_forward_request([expect_message, &expect_sequence, &received_messge_count](
@@ -155,7 +159,7 @@ CASE_TEST(atapp_message, send_message_loopback) {
     CASE_EXPECT_EQ(321, msg.type);
     CASE_EXPECT_EQ(expect_sequence++, msg.message_sequence);
 
-    auto received_message = gsl::string_view{reinterpret_cast<const char*>(msg.data), msg.data_size};
+    auto received_message = gsl::string_view{reinterpret_cast<const char*>(msg.data.data()), msg.data.size()};
     CASE_EXPECT_EQ(expect_message, received_message);
     CASE_MSG_INFO() << "Got message: " << received_message << std::endl;
 
@@ -166,10 +170,10 @@ CASE_TEST(atapp_message, send_message_loopback) {
   auto now = atfw::util::time::time_utility::sys_now();
   auto end_time = now + std::chrono::seconds(3);
 
-  CASE_EXPECT_EQ(0, app1.send_message(app1.get_app_id(), 321, expect_message, strlen(expect_message), &set_sequence));
+  CASE_EXPECT_EQ(0, app1.send_message(app1.get_app_id(), 321, expect_message_span, &set_sequence));
   ++set_sequence;
 
-  CASE_EXPECT_EQ(0, app1.send_message(app1.get_app_name(), 321, expect_message, strlen(expect_message), &set_sequence));
+  CASE_EXPECT_EQ(0, app1.send_message(app1.get_app_name(), 321, expect_message_span, &set_sequence));
   ++set_sequence;
 
   while (received_messge_count < 2 && end_time > now) {
@@ -188,10 +192,10 @@ CASE_TEST(atapp_message, send_message_loopback) {
   now = atfw::util::time::time_utility::sys_now();
   end_time = now + std::chrono::seconds(3);
 
-  CASE_EXPECT_EQ(0, app1.send_message(self_discovery, 321, expect_message, strlen(expect_message), &set_sequence));
+  CASE_EXPECT_EQ(0, app1.send_message(self_discovery, 321, expect_message_span, &set_sequence));
   ++set_sequence;
 
-  CASE_EXPECT_EQ(0, app1.send_message(app1.get_app_name(), 321, expect_message, strlen(expect_message), &set_sequence));
+  CASE_EXPECT_EQ(0, app1.send_message(app1.get_app_name(), 321, expect_message_span, &set_sequence));
   ++set_sequence;
 
   while (received_messge_count < 4 && end_time > now) {
