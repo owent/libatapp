@@ -1,6 +1,12 @@
 // Copyright 2021 atframework
 // Created by owent
 
+#include <string/string_format.h>
+
+#if defined(ATFRAMEWORK_UTILS_ENABLE_FMTLIB) && ATFRAMEWORK_UTILS_ENABLE_FMTLIB
+#  include <fmt/chrono.h>
+#endif
+
 #include <detail/libatbus_error.h>
 
 #include <atframe/atapp.h>
@@ -60,8 +66,8 @@ struct ATFW_UTIL_SYMBOL_LOCAL atapp_connector_atbus::atbus_connection_handle_dat
   atfw::util::time::time_utility::raw_time_t lost_topology_timeout;
 
   atbus::bus_id_t current_bus_id;
-  atbus::bus_id_t upstream_bus_id;
-  std::unordered_set<atbus::bus_id_t> downstream_bus_id;
+  atbus::bus_id_t proxy_bus_id;
+  std::unordered_set<atbus::bus_id_t> proxy_for_bus_id;
 
   jiffies_timer_watcher_t timer_handle;
   atfw::util::time::time_utility::raw_time_t pending_timer_timeout;
@@ -298,7 +304,7 @@ LIBATAPP_MACRO_API void atapp_connector_atbus::remove_topology_peer(atbus::bus_i
 }
 
 LIBATAPP_MACRO_API void atapp_connector_atbus::update_topology_peer(atbus::bus_id_t target_bus_id,
-                                                                    atbus::bus_id_t upstream_bus_id,
+                                                                    atbus::bus_id_t proxy_bus_id,
                                                                     atbus::topology_data::ptr_t data) {
   // 拓扑关系刷新
   handle_map_t::iterator iter = handles_.find(target_bus_id);
@@ -319,32 +325,42 @@ LIBATAPP_MACRO_API void atapp_connector_atbus::update_topology_peer(atbus::bus_i
   }
 
   // 如果拓扑信息未变化，那么数据链路也没变化，直接返回即可
-  if (handle->upstream_bus_id == upstream_bus_id) {
+  if (handle->proxy_bus_id == proxy_bus_id) {
     // 如果在等待服务发现信息，且之前因为缺失拓扑数据而放弃了，那么要立即发起重连
+    FWLOGDEBUG("atbus node {:#x} on update topology for {:#x} (new upstream: {:#x}) and try to reconnect",
+               get_owner()->get_app_id(), target_bus_id, proxy_bus_id);
     try_direct_reconnect(handle);
     return;
   }
+  FWLOGDEBUG("atbus node {:#x} on update topology for {:#x} (new upstream: {:#x})", get_owner()->get_app_id(),
+             target_bus_id, proxy_bus_id);
 
   // 解绑旧的上游连接
   do {
-    if (handle->upstream_bus_id == 0) {
+    if (handle->proxy_bus_id == 0) {
       break;
     }
-    handle_map_t::iterator upstream_iter = handles_.find(handle->upstream_bus_id);
+    handle_map_t::iterator upstream_iter = handles_.find(handle->proxy_bus_id);
     if (upstream_iter == handles_.end()) {
       // inconsistent state
       FWLOGERROR("inconsistent state when update_topology_peer for target bus id {:#x}, upstream bus id {:#x}",
-                 target_bus_id, handle->upstream_bus_id);
+                 target_bus_id, handle->proxy_bus_id);
       break;
     }
     if (!upstream_iter->second) {
       remove_connection_handle(upstream_iter);
       // inconsistent state
       FWLOGERROR("inconsistent state when update_topology_peer for target bus id {:#x}, upstream bus id {:#x}",
-                 target_bus_id, handle->upstream_bus_id);
+                 target_bus_id, handle->proxy_bus_id);
       break;
     }
-    unbind_connection_handle_upstream(*handle, *upstream_iter->second);
+    unbind_connection_handle_proxy(*handle, *upstream_iter->second);
+
+    // 如果是自己的直连上游变化，有些邻居/远方节点是通过直接上游转发的，也需要断开重置
+    if (target_bus_id == get_owner()->get_app_id()) {
+      upstream_iter = handles_.find(handle->proxy_bus_id);
+      remove_connection_handle(upstream_iter);
+    }
   } while (false);
 
   // 有直连atbus::endpoint, 则直接使用,不需要发起重连
@@ -359,15 +375,17 @@ LIBATAPP_MACRO_API void atapp_connector_atbus::update_topology_peer(atbus::bus_i
     if (iter == handles_.end()) {
       return;
     }
+    FWLOGINFO("atbus node {:#x} remove connection handle for {:#x} due to no need to keep it any more",
+              get_owner()->get_app_id(), target_bus_id);
     remove_connection_handle(iter);
     return;
   }
 
   // 先走一次更新上游的快速绑定
-  if (upstream_bus_id != 0) {
-    handle_map_t::iterator upstream_iter = handles_.find(upstream_bus_id);
+  if (proxy_bus_id != 0) {
+    handle_map_t::iterator upstream_iter = handles_.find(proxy_bus_id);
     if (upstream_iter != handles_.end() && upstream_iter->second) {
-      bind_connection_handle_upstream(*handle, *upstream_iter->second);
+      bind_connection_handle_proxy(*handle, *upstream_iter->second);
 
       if (check_flag(upstream_iter->second->flags, atbus_connection_handle_flags_t::kReady)) {
         set_handle_ready(handle);
@@ -401,12 +419,14 @@ LIBATAPP_MACRO_API void atapp_connector_atbus::update_topology_peer(atbus::bus_i
     if (iter == handles_.end()) {
       return;
     }
-    setup_reconnect_timer(iter, std::chrono::system_clock::from_time_t(0));
+    if (iter->second && iter->second->reconnect_next_timepoint <= get_owner()->get_sys_now()) {
+      setup_reconnect_timer(iter, std::chrono::system_clock::from_time_t(0));
+    }
   }
 }
 
-atapp_connector_atbus::atbus_connection_handle_ptr_t atapp_connector_atbus::create_connection_handle(
-    atbus::bus_id_t bus_id, const atapp_connection_handle::ptr_t &handle) {
+atfw::util::nostd::nonnull<atapp_connector_atbus::atbus_connection_handle_ptr_t>
+atapp_connector_atbus::create_connection_handle(atbus::bus_id_t bus_id, const atapp_connection_handle::ptr_t &handle) {
   auto data = atfw::util::memory::make_strong_rc<atapp_connector_atbus::atbus_connection_handle_data>();
   data->app_handle = handle;
   data->flags = static_cast<uint32_t>(atbus_connection_handle_flags_t::kNone);
@@ -414,15 +434,46 @@ atapp_connector_atbus::atbus_connection_handle_ptr_t atapp_connector_atbus::crea
   data->reconnect_next_timepoint = std::chrono::system_clock::from_time_t(0);
   data->lost_topology_timeout = std::chrono::system_clock::from_time_t(0);
   data->current_bus_id = bus_id;
-  data->upstream_bus_id = 0;
+  data->proxy_bus_id = 0;
 
   data->pending_timer_timeout = std::chrono::system_clock::from_time_t(0);
   return data;
 }
 
+atfw::util::nostd::nonnull<atapp_connector_atbus::atbus_connection_handle_ptr_t>
+atapp_connector_atbus::mutable_connection_handle(atbus::bus_id_t bus_id, const atapp_connection_handle::ptr_t &handle) {
+  auto iter = handles_.find(bus_id);
+  if (iter != handles_.end() && iter->second) {
+    if (handle && iter->second->app_handle != handle) {
+      iter->second->app_handle = handle;
+    }
+    return iter->second;
+  }
+
+  atbus_connection_handle_ptr_t ret = create_connection_handle(bus_id, handle);
+  handles_[bus_id] = ret;
+  if (handle) {
+    handle->set_private_data_u64(bus_id);
+  }
+
+  auto node = get_owner()->get_bus_node();
+  atbus::topology_peer::ptr_t topology_peer;
+  // 如果没有拓扑信息，需要设置总超时定时器
+  if (node) {
+    auto registry = node->get_topology_registry();
+    if (registry) {
+      topology_peer = registry->get_peer(bus_id);
+    }
+  }
+  if (!topology_peer) {
+    set_handle_lost_topology(ret);
+  }
+  return ret;
+}
+
 bool atapp_connector_atbus::need_keep_handle(const atbus_connection_handle_data &handle_data) const noexcept {
   if (check_flag(handle_data.flags, atbus_connection_handle_flags_t::kActiveConnection) ||
-      !handle_data.downstream_bus_id.empty()) {
+      !handle_data.proxy_for_bus_id.empty()) {
     return true;
   }
 
@@ -467,11 +518,6 @@ int atapp_connector_atbus::on_update_endpoint(const atbus::node &n, const atbus:
 
   auto handle = iter->second;
   set_handle_ready(handle);
-
-  // 如果不再需要定时器（非丢失信息也非正在重连），则移除定时器
-  if (!need_timer(handle)) {
-    remove_timer(handle);
-  }
   return res;
 }
 
@@ -498,13 +544,17 @@ int atapp_connector_atbus::on_remove_endpoint(const atbus::node &, atbus::endpoi
 
   // 不需要重连则直接移除handle
   if (!need_keep_handle(*handle)) {
+    FWLOGINFO("atbus node {:#x} remove connection handle for {:#x} due to no need to keep it any more",
+              get_owner()->get_app_id(), ep->get_id());
     remove_connection_handle(iter);
     return res;
   }
 
   // 要设置重连定时器，上游和下游节点也要依靠定时器做超时清理
-  if (!setup_reconnect_timer(iter, std::chrono::system_clock::from_time_t(0))) {
-    return res;
+  if (handle->reconnect_next_timepoint <= get_owner()->get_sys_now()) {
+    if (!setup_reconnect_timer(iter, std::chrono::system_clock::from_time_t(0))) {
+      return res;
+    }
   }
 
   atbus::topology_relation_type topology_relation = atbus::topology_relation_type::kInvalid;
@@ -527,14 +577,40 @@ int atapp_connector_atbus::on_remove_endpoint(const atbus::node &, atbus::endpoi
       break;
     }
 
+    FWLOGDEBUG("atbus node {:#x} on remove endpoint for {:#x} and try to reconnect immediately",
+               get_owner()->get_app_id(), handle->current_bus_id);
     if (EN_ATAPP_ERR_TOPOLOGY_DENY == try_direct_reconnect(handle)) {
       // 直连不允许，移除handle
+      FWLOGWARNING("atbus node {:#x} remove connection handle for {:#x} due to topology deny",
+                   get_owner()->get_app_id(), ep->get_id());
       remove_connection_handle(iter);
       return res;
     }
   } while (false);
 
   return res;
+}
+
+void atapp_connector_atbus::on_invalid_connection(const atbus::node & /*n*/, const atbus::connection * /*conn*/,
+                                                  int /*res*/) {}
+
+void atapp_connector_atbus::on_new_connection(const atbus::node &n, const atbus::connection *conn) {
+  if (conn->is_connected() && conn->get_binding() != nullptr) {
+    on_update_endpoint(n, conn->get_binding(), 0);
+  }
+}
+
+void atapp_connector_atbus::on_close_connection(const atbus::node & /*n*/, const atbus::endpoint * /*ep*/,
+                                                const atbus::connection * /*conn*/) {}
+
+void atapp_connector_atbus::on_register(const atbus::node &n, const atbus::endpoint *ep, const atbus::connection *conn,
+                                        int status) {
+  if (ep == nullptr && conn != nullptr) {
+    ep = conn->get_binding();
+  }
+  if (ep != nullptr) {
+    on_update_endpoint(n, ep, status);
+  }
 }
 
 void atapp_connector_atbus::set_handle_lost_topology(const atbus_connection_handle_ptr_t &handle) {
@@ -546,6 +622,8 @@ void atapp_connector_atbus::set_handle_lost_topology(const atbus_connection_hand
   }
 
   set_flag(handle->flags, atbus_connection_handle_flags_t::kLostTopology, true);
+
+  FWLOGDEBUG("atbus node {:#x} got lost topology for {:#x}", get_owner()->get_app_id(), handle->current_bus_id);
 
   auto &conf = get_owner()->get_origin_configure().bus();
   std::chrono::microseconds lost_topology_timeout;
@@ -580,7 +658,7 @@ void atapp_connector_atbus::set_handle_waiting_discovery(const atbus_connection_
   }
 
   // 如果通过邻居/远方节点上游转发，也不需要等待当前服务发现重连
-  if (handle->upstream_bus_id != 0) {
+  if (handle->proxy_bus_id != 0) {
     return;
   }
 
@@ -593,6 +671,8 @@ void atapp_connector_atbus::set_handle_waiting_discovery(const atbus_connection_
     return;
   }
 
+  FWLOGINFO("atbus node {:#x} set handle waiting discovery for {:#x}", get_owner()->get_app_id(),
+            handle->current_bus_id);
   set_flag(handle->flags, atbus_connection_handle_flags_t::kWaitForDiscoveryToConnect, true);
 }
 
@@ -608,6 +688,8 @@ void atapp_connector_atbus::resume_handle_discovery(const etcd_discovery_node &d
   if (!check_flag(iter->second->flags, atbus_connection_handle_flags_t::kWaitForDiscoveryToConnect)) {
     return;
   }
+  FWLOGDEBUG("atbus node {:#x} resume handle discovery for {:#x} and try to reconnect", get_owner()->get_app_id(),
+             discovery.get_discovery_info().id());
   // 移除等待服务发现数据标记
   set_flag(iter->second->flags, atbus_connection_handle_flags_t::kWaitForDiscoveryToConnect, false);
 
@@ -625,13 +707,16 @@ void atapp_connector_atbus::set_handle_ready(const atbus_connection_handle_ptr_t
   }
   set_flag(handle->flags, atbus_connection_handle_flags_t::kReady, true);
   handle->reconnect_times = 0;
+  handle->reconnect_next_timepoint = std::chrono::system_clock::from_time_t(0);
+
+  FWLOGINFO("atbus node {:#x} set handle ready for {:#x}", get_owner()->get_app_id(), handle->current_bus_id);
 
   if (handle->app_handle != nullptr) {
     handle->app_handle->set_ready();
     auto endpoint = handle->app_handle->get_endpoint();
     if (nullptr != endpoint) {
       if (endpoint->get_pending_message_size() > 0) {
-        FWLOGINFO("bus node {:#x} add_waker for {:#x} with {} pending messages(size: {})", get_owner()->get_app_id(),
+        FWLOGINFO("atbus node {:#x} add_waker for {:#x} with {} pending messages(size: {})", get_owner()->get_app_id(),
                   endpoint->get_id(), endpoint->get_pending_message_count(), endpoint->get_pending_message_size());
         endpoint->add_waker(get_owner()->get_next_tick_time());
       }
@@ -641,7 +726,7 @@ void atapp_connector_atbus::set_handle_ready(const atbus_connection_handle_ptr_t
   // 代理节点可用时要触发被代理节点的handle.set_ready() + endpoint::add_waker
   std::unordered_set<uint64_t> invalid_downstream;
   // Copy一份ID，防止递归调用的时候修改集合
-  std::unordered_set<atbus::bus_id_t> copy_downstream_bus_id = handle->downstream_bus_id;
+  std::unordered_set<atbus::bus_id_t> copy_downstream_bus_id = handle->proxy_for_bus_id;
   for (auto downstream_handle_id : copy_downstream_bus_id) {
     auto iter = handles_.find(downstream_handle_id);
     if (iter == handles_.end()) {
@@ -652,7 +737,12 @@ void atapp_connector_atbus::set_handle_ready(const atbus_connection_handle_ptr_t
   }
 
   for (auto id : invalid_downstream) {
-    handle->downstream_bus_id.erase(id);
+    handle->proxy_for_bus_id.erase(id);
+  }
+
+  // 如果不再需要定时器（非丢失信息也非正在重连），则移除定时器
+  if (!need_timer(handle)) {
+    remove_timer(handle);
   }
 }
 
@@ -666,13 +756,15 @@ void atapp_connector_atbus::set_handle_unready(const atbus_connection_handle_ptr
   }
   set_flag(handle->flags, atbus_connection_handle_flags_t::kReady, false);
 
+  FWLOGINFO("atbus node {:#x} set handle unready for {:#x}", get_owner()->get_app_id(), handle->current_bus_id);
+
   if (handle->app_handle) {
     handle->app_handle->set_unready();
   }
 
   // 代理节点重连期间，被代理下游节点的 handle.set_unready()
   std::unordered_set<uint64_t> invalid_downstream;
-  std::unordered_set<atbus::bus_id_t> copy_downstream_bus_id = handle->downstream_bus_id;
+  std::unordered_set<atbus::bus_id_t> copy_downstream_bus_id = handle->proxy_for_bus_id;
   // Copy一份ID，防止递归调用的时候修改集合
   for (auto downstream_handle_id : copy_downstream_bus_id) {
     auto iter = handles_.find(downstream_handle_id);
@@ -684,7 +776,7 @@ void atapp_connector_atbus::set_handle_unready(const atbus_connection_handle_ptr
   }
 
   for (auto id : invalid_downstream) {
-    handle->downstream_bus_id.erase(id);
+    handle->proxy_for_bus_id.erase(id);
   }
 }
 
@@ -725,6 +817,8 @@ void atapp_connector_atbus::update_timer(const atbus_connection_handle_ptr_t &ha
   atfw::util::memory::weak_rc_ptr<atbus_connection_handle_data> weak_handle(handle);
   atfw::util::memory::weak_rc_ptr<atapp_connector_atbus> weak_self(shared_from_this());
 
+  FWLOGDEBUG("atbus node {:#x} set timer for connection handle of bus id {:#x} timeout at {:%F %T}",
+             get_owner()->get_app_id(), handle->current_bus_id, timeout);
   get_owner()->add_custom_timer(
       timeout,
       [weak_handle, weak_self](time_t /*tick_time*/, const jiffies_timer_t::timer_t &) {
@@ -756,6 +850,8 @@ void atapp_connector_atbus::update_timer(const atbus_connection_handle_ptr_t &ha
         // 处理丢失拓扑后的重连超时则直接移除
         if (check_flag(h->flags, atbus_connection_handle_flags_t::kLostTopology)) {
           if (sys_now >= h->lost_topology_timeout) {
+            FWLOGWARNING("atbus node {:#x} remove connection handle to bus id {:#x} for lost topology timeout",
+                         self->get_owner()->get_app_id(), h->current_bus_id);
             self->remove_connection_handle(iter);
             return;
           } else {
@@ -768,6 +864,18 @@ void atapp_connector_atbus::update_timer(const atbus_connection_handle_ptr_t &ha
           if (next_timer_timeout != std::chrono::system_clock::from_time_t(0)) {
             self->update_timer(h, next_timer_timeout);
           }
+          return;
+        }
+
+        // 重连时间未到则继续等待
+        bool need_reconnect = iter->second->reconnect_next_timepoint <= sys_now;
+        if (!need_reconnect) {
+          if (next_timer_timeout == std::chrono::system_clock::from_time_t(0) ||
+              next_timer_timeout > iter->second->reconnect_next_timepoint) {
+            next_timer_timeout = iter->second->reconnect_next_timepoint;
+          }
+
+          self->update_timer(h, next_timer_timeout);
           return;
         }
 
@@ -788,6 +896,9 @@ void atapp_connector_atbus::remove_timer(const atbus_connection_handle_ptr_t &ha
     return;
   }
 
+  FWLOGDEBUG("atbus node {:#x} remove timer for connection handle of bus id {:#x} timeout at {:%F %T}",
+             get_owner()->get_app_id(), handle->current_bus_id, handle->pending_timer_timeout);
+
   handle->pending_timer_timeout = std::chrono::system_clock::from_time_t(0);
   get_owner()->remove_custom_timer(handle->timer_handle);
 }
@@ -803,17 +914,11 @@ bool atapp_connector_atbus::setup_reconnect_timer(handle_map_t::iterator iter,
     return false;
   }
 
-  // atbus直连可用，不需要重连和移除（作为代理，可能没atapp_endpoint）
-  if (check_atbus_endpoint_available(get_owner()->get_bus_node(), iter->second->current_bus_id)) {
-    if (previous_timeout != std::chrono::system_clock::from_time_t(0)) {
-      update_timer(iter->second, previous_timeout);
-    }
-    return true;
-  }
-
   // 重连次数超出限制，直接移除
   auto &conf = get_owner()->get_origin_configure().bus();
   if (conf.reconnect_max_try_times() > 0 && iter->second->reconnect_times >= conf.reconnect_max_try_times()) {
+    FWLOGWARNING("atbus node {:#x} reconnect to bus id {:#x} exceeded max try times {}, remove connection handle",
+                 get_owner()->get_app_id(), iter->first, conf.reconnect_max_try_times());
     remove_connection_handle(iter);
     return false;
   }
@@ -838,11 +943,12 @@ bool atapp_connector_atbus::setup_reconnect_timer(handle_map_t::iterator iter,
     --calc_interval;
   }
   auto sys_now = get_owner()->get_sys_now();
-  if (previous_timeout == std::chrono::system_clock::from_time_t(0) ||
-      sys_now + reconnect_cur_interval < previous_timeout) {
-    previous_timeout =
-        sys_now + std::chrono::duration_cast<std::chrono::system_clock::duration>(reconnect_cur_interval);
+  std::chrono::system_clock::time_point reconnect_run_timeout =
+      sys_now + std::chrono::duration_cast<std::chrono::system_clock::duration>(reconnect_cur_interval);
+  if (previous_timeout == std::chrono::system_clock::from_time_t(0) || reconnect_run_timeout < previous_timeout) {
+    previous_timeout = reconnect_run_timeout;
   }
+  iter->second->reconnect_next_timepoint = reconnect_run_timeout;
 
   update_timer(iter->second, previous_timeout);
   return true;
@@ -881,8 +987,8 @@ int32_t atapp_connector_atbus::try_direct_reconnect(const atbus_connection_handl
   }
 
   // 如果通过邻居/远方节点上游转发，也不需要等待当前服务发现重连
-  if (handle->upstream_bus_id != 0) {
-    return;
+  if (handle->proxy_bus_id != 0) {
+    return EN_ATAPP_ERR_SUCCESS;
   }
 
   // 如果正在等待服务发现数据，则先不用发起连接，等待数据
@@ -892,7 +998,9 @@ int32_t atapp_connector_atbus::try_direct_reconnect(const atbus_connection_handl
 
   auto discovery = get_owner()->get_discovery_node_by_id(handle->current_bus_id);
   if (!discovery) {
-    set_flag(handle->flags, atbus_connection_handle_flags_t::kWaitForDiscoveryToConnect, false);
+    FWLOGINFO("atbus node {:#x} set handle waiting discovery for {:#x}", get_owner()->get_app_id(),
+              handle->current_bus_id);
+    set_flag(handle->flags, atbus_connection_handle_flags_t::kWaitForDiscoveryToConnect, true);
     return EN_ATAPP_ERR_DISCOVERY_NOT_FOUND;
   }
 
@@ -939,7 +1047,15 @@ int32_t atapp_connector_atbus::try_connect_to(const etcd_discovery_node &discove
     }
   }
 
-  // TODO: 按拓扑关系 - 直连上游（间接上游）
+  // 按拓扑关系 - 直连上游（间接上游）
+  if (relation == atbus::topology_relation_type::kImmediateUpstream ||
+      relation == atbus::topology_relation_type::kTransitiveUpstream) {
+    ret = on_start_connect_to_upstream_peer(discovery, addr, handle, topology_registry, next_hop_try_peer);
+    if (ret == EN_ATAPP_ERR_SUCCESS || ret != EN_ATAPP_ERR_TRY_NEXT) {
+      return ret;
+    }
+  }
+
   // 按拓扑关系 - 直连下游/间接下游
   if (relation == atbus::topology_relation_type::kImmediateDownstream ||
       relation == atbus::topology_relation_type::kTransitiveDownstream) {
@@ -953,23 +1069,8 @@ int32_t atapp_connector_atbus::try_connect_to(const etcd_discovery_node &discove
     return EN_ATAPP_ERR_NO_AVAILABLE_ADDRESS;
   }
 
-  // TODO: 按拓扑关系 - 直接上游转发
-
-  // TODO: 是否需要等待新连接
-
-  // need connect atbus only if the node is parent or immediate family
-  if (relation == atbus::topology_relation_type::kImmediateDownstream ||
-      relation == atbus::topology_relation_type::kTransitiveDownstream) {
-    if (handle) {
-      handles_[atbus_id] = handle;
-      handle->set_private_data_u64(atbus_id);
-
-      if (atbus_id == get_owner()->get_app_id() || node->is_endpoint_available(atbus_id)) {
-        set_handle_ready(handle);
-      }
-    }
-    return EN_ATAPP_ERR_SUCCESS;
-  }
+  // 按拓扑关系 - 直接上游转发
+  return on_start_connect_to_proxy_by_upstream(discovery, addr, handle, topology_registry);
 }
 
 int32_t atapp_connector_atbus::on_start_connect_to_connected_endpoint(const etcd_discovery_node &discovery,
@@ -987,28 +1088,24 @@ int32_t atapp_connector_atbus::on_start_connect_to_connected_endpoint(const etcd
 
   // 自己总是允许
   if (node->get_id() == atbus_id) {
-    if (handle) {
-      handles_[atbus_id] = handle;
-      handle->set_private_data_u64(atbus_id);
-      set_handle_ready(handle);
-    }
+    auto conn_handle = mutable_connection_handle(atbus_id, handle);
+    FWLOGDEBUG("atbus node {:#x} connect to {:#x} and set handle ready, because it's self", get_owner()->get_app_id(),
+               atbus_id);
+    set_handle_ready(conn_handle);
     return EN_ATAPP_ERR_SUCCESS;
   }
 
   // 直接上游总是允许
   if (node->get_upstream_endpoint() && node->get_upstream_endpoint()->get_id() == atbus_id) {
-    const atbus::endpoint *ep = node->get_upstream_endpoint();
-    if (handle) {
-      handles_[atbus_id] = handle;
-      handle->set_private_data_u64(atbus_id);
-
-      const atbus::endpoint *self_ep = node->get_self_endpoint();
-      // 如果数据通道已经建立，则直接设为就绪。否则等待数据通道建立完成后再发送数据
-      if (self_ep->get_ctrl_connection(ep) != nullptr && self_ep->get_data_connection(ep, false) != nullptr) {
-        set_handle_ready(handle);
-      } else {
-        set_handle_unready(handle);
-      }
+    auto conn_handle = mutable_connection_handle(atbus_id, handle);
+    if (check_atbus_endpoint_available(node, atbus_id)) {
+      FWLOGDEBUG("atbus node {:#x} connect to {:#x} and set handle ready, because it's direct upstream",
+                 get_owner()->get_app_id(), atbus_id);
+      set_handle_ready(conn_handle);
+    } else {
+      FWLOGDEBUG("atbus node {:#x} connect to {:#x} and set handle unready, because it's direct upstream",
+                 get_owner()->get_app_id(), atbus_id);
+      set_handle_unready(conn_handle);
     }
     return EN_ATAPP_ERR_SUCCESS;
   }
@@ -1016,15 +1113,15 @@ int32_t atapp_connector_atbus::on_start_connect_to_connected_endpoint(const etcd
   // 优先使用已有直连
   const atbus::endpoint *ep = node->get_endpoint(atbus_id);
   if (ep != nullptr) {
-    handles_[atbus_id] = handle;
-    handle->set_private_data_u64(atbus_id);
-
-    const atbus::endpoint *self_ep = node->get_self_endpoint();
-    // 如果数据通道已经建立，则直接设为就绪。否则等待数据通道建立完成后再发送数据
-    if (self_ep->get_ctrl_connection(ep) != nullptr && self_ep->get_data_connection(ep, false) != nullptr) {
-      set_handle_ready(handle);
+    auto conn_handle = mutable_connection_handle(atbus_id, handle);
+    if (check_atbus_endpoint_available(node, atbus_id)) {
+      FWLOGDEBUG("atbus node {:#x} connect to {:#x} and set handle ready, because it's direct endpoint",
+                 get_owner()->get_app_id(), atbus_id);
+      set_handle_ready(conn_handle);
     } else {
-      set_handle_unready(handle);
+      FWLOGDEBUG("atbus node {:#x} connect to {:#x} and set handle unready, because it's direct endpoint",
+                 get_owner()->get_app_id(), atbus_id);
+      set_handle_unready(conn_handle);
     }
     return EN_ATAPP_ERR_SUCCESS;
   }
@@ -1041,7 +1138,7 @@ int32_t atapp_connector_atbus::on_start_connect_to_same_or_other_upstream_peer(
     return EN_ATAPP_ERR_SETUP_ATBUS;
   }
 
-  uint64_t atbus_id = discovery.get_discovery_info().id();
+  const uint64_t atbus_id = discovery.get_discovery_info().id();
   if (0 == atbus_id) {
     return EN_ATBUS_ERR_ATNODE_INVALID_ID;
   }
@@ -1071,26 +1168,62 @@ int32_t atapp_connector_atbus::on_start_connect_to_same_or_other_upstream_peer(
       break;
     }
 
-    // 如果代理上游已经连接成功则直接使用
-    const atbus::endpoint *ep = node->get_endpoint(atbus_id);
-    if (ep != nullptr) {
-      handles_[atbus_id] = handle;
-      handle->set_private_data_u64(atbus_id);
+    // 如果代理上游已经连接成功或者已经正在连接则直接使用
+    if (nullptr != node->get_endpoint(proxy_peer->get_bus_id())) {
+      auto proxy_conn_handle = mutable_connection_handle(proxy_peer->get_bus_id(), nullptr);
+      auto self_conn_handle = mutable_connection_handle(atbus_id, handle);
 
-      const atbus::endpoint *self_ep = node->get_self_endpoint();
-      // 如果数据通道已经建立，则直接设为就绪。否则等待数据通道建立完成后再发送数据
-      if (self_ep->get_ctrl_connection(ep) != nullptr && self_ep->get_data_connection(ep, false) != nullptr) {
-        set_handle_ready(handle);
+      if (proxy_conn_handle != self_conn_handle) {
+        bind_connection_handle_proxy(*self_conn_handle, *proxy_conn_handle);
+      }
+
+      if (check_flag(proxy_conn_handle->flags, atbus_connection_handle_flags_t::kReady)) {
+        FWLOGDEBUG("atbus node {:#x} connect to {:#x} and set handle ready, because it's proxy {:#x} is ready",
+                   get_owner()->get_app_id(), atbus_id, proxy_peer->get_bus_id());
+        set_handle_ready(self_conn_handle);
       } else {
-        set_handle_unready(handle);
+        FWLOGDEBUG("atbus node {:#x} connect to {:#x} and set handle unready, because it's proxy {:#x} is unready",
+                   get_owner()->get_app_id(), atbus_id, proxy_peer->get_bus_id());
+        set_handle_unready(self_conn_handle);
+
+        if (proxy_conn_handle->reconnect_next_timepoint <= get_owner()->get_sys_now()) {
+          if (!setup_reconnect_timer(handles_.find(proxy_peer->get_bus_id()),
+                                     std::chrono::system_clock::from_time_t(0))) {
+            return EN_ATAPP_ERR_SUCCESS;
+          }
+        }
       }
       return EN_ATAPP_ERR_SUCCESS;
     }
 
-    // 查询可用的地址
+    // 查询可用的地址,服务发现数据未拉取时要等待
     etcd_discovery_node::ptr_t proxy_discovery = get_owner()->get_discovery_node_by_id(proxy_peer->get_bus_id());
     if (!proxy_discovery) {
-      continue;
+      auto proxy_conn_handle = mutable_connection_handle(proxy_peer->get_bus_id(), nullptr);
+      auto self_conn_handle = mutable_connection_handle(atbus_id, handle);
+
+      if (proxy_conn_handle != self_conn_handle) {
+        bind_connection_handle_proxy(*self_conn_handle, *proxy_conn_handle);
+      }
+      if (check_flag(proxy_conn_handle->flags, atbus_connection_handle_flags_t::kReady)) {
+        FWLOGDEBUG("atbus node {:#x} connect to {:#x} and set handle ready, because it's proxy {:#x} is ready",
+                   get_owner()->get_app_id(), atbus_id, proxy_peer->get_bus_id());
+        set_handle_ready(self_conn_handle);
+      } else {
+        FWLOGDEBUG("atbus node {:#x} connect to {:#x} and set handle unready, because it's proxy {:#x} is unready",
+                   get_owner()->get_app_id(), atbus_id, proxy_peer->get_bus_id());
+        set_handle_unready(self_conn_handle);
+
+        if (proxy_conn_handle->reconnect_next_timepoint <= get_owner()->get_sys_now()) {
+          if (!setup_reconnect_timer(handles_.find(proxy_peer->get_bus_id()),
+                                     std::chrono::system_clock::from_time_t(0))) {
+            return EN_ATAPP_ERR_SUCCESS;
+          }
+        }
+      }
+
+      set_handle_waiting_discovery(proxy_conn_handle);
+      return EN_ATAPP_ERR_SUCCESS;
     }
 
     int32_t gateway_size = proxy_discovery->get_ingress_size();
@@ -1116,12 +1249,89 @@ int32_t atapp_connector_atbus::on_start_connect_to_same_or_other_upstream_peer(
   }
 
   if (proxy_addr.address.empty() || !proxy_peer) {
+    FWLOGDEBUG("atbus node {:#x} connect to {:#x} and no proxy address or proxy peer found, try next rule",
+               get_owner()->get_app_id(), atbus_id);
     return EN_ATAPP_ERR_TRY_NEXT;
   }
 
-  // TODO: 如果在重连等待期内则直接返回成功等待连接完成
-  // TODO: 否则发起直连,设置重连定时器
-  return EN_ATAPP_ERR_TRY_NEXT;
+  auto proxy_conn_handle = mutable_connection_handle(proxy_peer->get_bus_id(), nullptr);
+  auto self_conn_handle = mutable_connection_handle(atbus_id, handle);
+
+  if (proxy_conn_handle != self_conn_handle) {
+    bind_connection_handle_proxy(*self_conn_handle, *proxy_conn_handle);
+  }
+
+  if (check_flag(proxy_conn_handle->flags, atbus_connection_handle_flags_t::kReady)) {
+    FWLOGDEBUG("atbus node {:#x} connect to {:#x} and set handle ready, because it's proxy {:#x} is ready",
+               get_owner()->get_app_id(), atbus_id, proxy_peer->get_bus_id());
+    set_handle_ready(self_conn_handle);
+    return EN_ATAPP_ERR_SUCCESS;
+  } else {
+    FWLOGDEBUG("atbus node {:#x} connect to {:#x} and set handle unready, because it's proxy {:#x} is unready",
+               get_owner()->get_app_id(), atbus_id, proxy_peer->get_bus_id());
+    set_handle_unready(self_conn_handle);
+  }
+
+  // 如果在重连等待期内则直接返回成功等待连接完成
+  if (proxy_conn_handle->reconnect_next_timepoint > get_owner()->get_sys_now()) {
+    FWLOGDEBUG("atbus node {:#x} connect to {:#x} and wait because it's proxy {:#x} is reconnecting",
+               get_owner()->get_app_id(), atbus_id, proxy_peer->get_bus_id());
+    return EN_ATAPP_ERR_SUCCESS;
+  }
+
+  // 否则发起直连,设置重连定时器
+  if (!setup_reconnect_timer(handles_.find(proxy_peer->get_bus_id()), std::chrono::system_clock::from_time_t(0))) {
+    return EN_ATAPP_ERR_SUCCESS;
+  }
+  int res = node->connect(proxy_addr.address);
+  if (res != EN_ATBUS_ERR_SUCCESS) {
+    FWLOGERROR(
+        "atbus node {:#x} connect to proxy bus id {:#x} at address {} failed with error code {}(origin bus id {:#x})",
+        get_owner()->get_app_id(), proxy_peer->get_bus_id(), proxy_addr.address, res, atbus_id);
+  } else {
+    FWLOGINFO("atbus node {:#x} connecting to proxy bus id {:#x} at address {} success(origin bus id {:#x})",
+              get_owner()->get_app_id(), proxy_peer->get_bus_id(), proxy_addr.address, atbus_id);
+  }
+  return EN_ATAPP_ERR_SUCCESS;
+}
+
+int32_t atapp_connector_atbus::on_start_connect_to_upstream_peer(
+    const etcd_discovery_node &discovery, const atbus::channel::channel_address_t *addr,
+    const atapp_connection_handle::ptr_t &handle, const atbus::topology_registry::ptr_t &topology_registry,
+    atbus::topology_peer::ptr_t next_hop_peer) {
+  if (!next_hop_peer) {
+    return EN_ATAPP_ERR_TRY_NEXT;
+  }
+
+  atbus::node::ptr_t node = get_owner()->get_bus_node();
+  if (!node) {
+    return EN_ATAPP_ERR_SETUP_ATBUS;
+  }
+
+  const uint64_t atbus_id = discovery.get_discovery_info().id();
+  if (0 == atbus_id) {
+    return EN_ATBUS_ERR_ATNODE_INVALID_ID;
+  }
+
+  auto proxy_conn_handle = mutable_connection_handle(next_hop_peer->get_bus_id(), nullptr);
+  auto self_conn_handle = mutable_connection_handle(atbus_id, handle);
+  if (atbus_id != next_hop_peer->get_bus_id()) {
+    bind_connection_handle_proxy(*self_conn_handle, *proxy_conn_handle);
+  }
+
+  if (check_atbus_endpoint_available(node, next_hop_peer->get_bus_id())) {
+    FWLOGDEBUG("atbus node {:#x} connect to {:#x} and set handle ready, because it's proxy {:#x} is ready",
+               get_owner()->get_app_id(), atbus_id, next_hop_peer->get_bus_id());
+    set_handle_ready(self_conn_handle);
+    return EN_ATAPP_ERR_SUCCESS;
+  } else {
+    FWLOGDEBUG("atbus node {:#x} connect to {:#x} and set handle ready, because it's proxy {:#x} is unready",
+               get_owner()->get_app_id(), atbus_id, next_hop_peer->get_bus_id());
+    set_handle_unready(self_conn_handle);
+  }
+
+  // 上游游节点，等待直接连接成功即可。不需要设置重连定时器
+  return EN_ATAPP_ERR_SUCCESS;
 }
 
 int32_t atapp_connector_atbus::on_start_connect_to_downstream_peer(
@@ -1132,8 +1342,75 @@ int32_t atapp_connector_atbus::on_start_connect_to_downstream_peer(
     return EN_ATAPP_ERR_TRY_NEXT;
   }
 
-  // TODO: 下游节点，等待直接下游连接成功即可
-  return EN_ATAPP_ERR_TRY_NEXT;
+  atbus::node::ptr_t node = get_owner()->get_bus_node();
+  if (!node) {
+    return EN_ATAPP_ERR_SETUP_ATBUS;
+  }
+
+  const uint64_t atbus_id = discovery.get_discovery_info().id();
+  if (0 == atbus_id) {
+    return EN_ATBUS_ERR_ATNODE_INVALID_ID;
+  }
+
+  auto proxy_conn_handle = mutable_connection_handle(next_hop_peer->get_bus_id(), nullptr);
+  auto self_conn_handle = mutable_connection_handle(atbus_id, handle);
+  if (atbus_id != next_hop_peer->get_bus_id()) {
+    bind_connection_handle_proxy(*self_conn_handle, *proxy_conn_handle);
+  }
+
+  if (check_atbus_endpoint_available(node, next_hop_peer->get_bus_id())) {
+    FWLOGDEBUG("atbus node {:#x} connect to {:#x} and set handle ready, because it's proxy {:#x} is ready",
+               get_owner()->get_app_id(), atbus_id, next_hop_peer->get_bus_id());
+    set_handle_ready(self_conn_handle);
+    return EN_ATAPP_ERR_SUCCESS;
+  } else {
+    FWLOGDEBUG("atbus node {:#x} connect to {:#x} and set handle ready, because it's proxy {:#x} is unready",
+               get_owner()->get_app_id(), atbus_id, next_hop_peer->get_bus_id());
+    set_handle_unready(self_conn_handle);
+  }
+
+  // 下游节点，等待直接下游连接成功即可。不需要设置重连定时器
+  return EN_ATAPP_ERR_SUCCESS;
+}
+
+int32_t atapp_connector_atbus::on_start_connect_to_proxy_by_upstream(
+    const etcd_discovery_node &discovery, const atbus::channel::channel_address_t *addr,
+    const atapp_connection_handle::ptr_t &handle, const atbus::topology_registry::ptr_t &topology_registry) {
+  atbus::node::ptr_t node = get_owner()->get_bus_node();
+  if (!node) {
+    return EN_ATAPP_ERR_SETUP_ATBUS;
+  }
+
+  const uint64_t atbus_id = discovery.get_discovery_info().id();
+  if (0 == atbus_id) {
+    return EN_ATBUS_ERR_ATNODE_INVALID_ID;
+  }
+
+  const uint64_t upstream_atbus_id = node->get_upstream_endpoint() ? node->get_upstream_endpoint()->get_id() : 0;
+  if (upstream_atbus_id == 0) {
+    FWLOGERROR("atbus node {:#x} connect to {:#x} failed because no upstream", get_owner()->get_app_id(), atbus_id);
+    return EN_ATAPP_ERR_NO_AVAILABLE_ADDRESS;
+  }
+
+  auto proxy_conn_handle = mutable_connection_handle(upstream_atbus_id, nullptr);
+  auto self_conn_handle = mutable_connection_handle(atbus_id, handle);
+  if (atbus_id != upstream_atbus_id) {
+    bind_connection_handle_proxy(*self_conn_handle, *proxy_conn_handle);
+  }
+
+  if (check_atbus_endpoint_available(node, upstream_atbus_id)) {
+    FWLOGDEBUG("atbus node {:#x} connect to {:#x} and set handle ready, because it's proxy {:#x} is ready",
+               get_owner()->get_app_id(), atbus_id, upstream_atbus_id);
+    set_handle_ready(self_conn_handle);
+    return EN_ATAPP_ERR_SUCCESS;
+  } else {
+    FWLOGDEBUG("atbus node {:#x} connect to {:#x} and set handle ready, because it's proxy {:#x} is unready",
+               get_owner()->get_app_id(), atbus_id, upstream_atbus_id);
+    set_handle_unready(self_conn_handle);
+  }
+
+  // 上游游节点，等待直接连接成功即可。不需要设置重连定时器
+  return EN_ATAPP_ERR_SUCCESS;
 }
 
 void atapp_connector_atbus::remove_connection_handle(handle_map_t::iterator iter) {
@@ -1150,70 +1427,88 @@ void atapp_connector_atbus::remove_connection_handle(handle_map_t::iterator iter
   }
 
   // 移除代理关系的上游关系
-  if (handle_data->upstream_bus_id != 0) {
-    auto upstream_iter = handles_.find(handle_data->upstream_bus_id);
+  if (handle_data->proxy_bus_id != 0) {
+    auto upstream_iter = handles_.find(handle_data->proxy_bus_id);
     if (upstream_iter != handles_.end() && upstream_iter->second) {
-      unbind_connection_handle_upstream(*handle_data, *upstream_iter->second);
+      unbind_connection_handle_proxy(*handle_data, *upstream_iter->second);
     }
   }
 
   // 移除代理关系的下游handle
-  std::unordered_set<atbus::bus_id_t> copy_downstream_bus_id = handle_data->downstream_bus_id;
-  for (auto downstream_bus_id : copy_downstream_bus_id) {
-    auto downstream_iter = handles_.find(downstream_bus_id);
+  std::unordered_set<atbus::bus_id_t> copy_downstream_bus_id = handle_data->proxy_for_bus_id;
+  for (auto proxy_for_bus_id : copy_downstream_bus_id) {
+    auto downstream_iter = handles_.find(proxy_for_bus_id);
     if (downstream_iter != handles_.end() && downstream_iter->second) {
       atbus_connection_handle_ptr_t downstream_handle = downstream_iter->second;
-      if (downstream_handle->upstream_bus_id != handle_data->current_bus_id) {
+      if (downstream_handle->proxy_bus_id != handle_data->current_bus_id) {
         continue;
       }
-      unbind_connection_handle_upstream(*downstream_handle, *handle_data);
+      unbind_connection_handle_proxy(*downstream_handle, *handle_data);
 
       on_close_connection(*downstream_handle->app_handle);
     }
   }
 }
 
-void atapp_connector_atbus::bind_connection_handle_upstream(atbus_connection_handle_data &downstream,
-                                                            atbus_connection_handle_data &upstream) {
-  if (downstream.upstream_bus_id == upstream.current_bus_id) {
+void atapp_connector_atbus::bind_connection_handle_proxy(atbus_connection_handle_data &target,
+                                                         atbus_connection_handle_data &proxy) {
+  if (target.proxy_bus_id == proxy.current_bus_id) {
+    return;
+  }
+  // 自己不能绑定自己为自己的代理
+  if (target.proxy_bus_id == target.current_bus_id) {
     return;
   }
 
-  if (downstream.upstream_bus_id != 0) {
-    auto iter = handles_.find(downstream.upstream_bus_id);
+  if (target.proxy_bus_id != 0) {
+    auto iter = handles_.find(target.proxy_bus_id);
     if (iter != handles_.end() && iter->second) {
-      unbind_connection_handle_upstream(downstream, *iter->second);
+      unbind_connection_handle_proxy(target, *iter->second);
     }
   }
 
-  downstream.upstream_bus_id = upstream.current_bus_id;
-  upstream.downstream_bus_id.insert(downstream.current_bus_id);
+  target.proxy_bus_id = proxy.current_bus_id;
+  proxy.proxy_for_bus_id.insert(target.current_bus_id);
 
-  FWLOGINFO("atbus bind upstream {:#x} --> {:#x}", downstream.current_bus_id, upstream.current_bus_id);
+  FWLOGINFO("atbus bind upstream {:#x} --> {:#x}", target.current_bus_id, proxy.current_bus_id);
 }
 
-void atapp_connector_atbus::unbind_connection_handle_upstream(atbus_connection_handle_data &downstream,
-                                                              atbus_connection_handle_data &upstream) {
-  if (downstream.upstream_bus_id == upstream.current_bus_id) {
-    downstream.upstream_bus_id = 0;
-    FWLOGINFO("atbus unbind upstream {:#x} --x--> {:#x}", downstream.current_bus_id, upstream.current_bus_id);
+void atapp_connector_atbus::unbind_connection_handle_proxy(atbus_connection_handle_data &target,
+                                                           atbus_connection_handle_data &proxy) {
+  if (target.proxy_bus_id == proxy.current_bus_id) {
+    target.proxy_bus_id = 0;
+    FWLOGINFO("atbus unbind upstream {:#x} --x--> {:#x}", target.current_bus_id, proxy.current_bus_id);
   }
 
-  upstream.downstream_bus_id.erase(downstream.current_bus_id);
+  proxy.proxy_for_bus_id.erase(target.current_bus_id);
 
   // 如果非直连且下游清空了，那么可以直接 disconnect
-  if (upstream.downstream_bus_id.empty() &&
-      !check_flag(upstream.flags, atbus_connection_handle_flags_t::kActiveConnection)) {
-    atbus::node::ptr_t node = get_owner()->get_bus_node();
-    if (node) {
-      const atbus::endpoint *ep = node->get_endpoint(upstream.current_bus_id);
-      if (ep != nullptr) {
-        FWLOGINFO("bus node {:#x} disconnect from {:#x} due to no downstream and passive connection", node->get_id(),
-                  upstream.current_bus_id);
-        node->disconnect(upstream.current_bus_id);
-      }
+  do {
+    if (!proxy.proxy_for_bus_id.empty()) {
+      break;
     }
-  }
+
+    if (check_flag(proxy.flags, atbus_connection_handle_flags_t::kActiveConnection)) {
+      break;
+    }
+
+    atbus::node::ptr_t node = get_owner()->get_bus_node();
+    if (!node) {
+      break;
+    }
+
+    // 上游节点不能断开
+    if (node->get_upstream_endpoint() && node->get_upstream_endpoint()->get_id() == proxy.current_bus_id) {
+      break;
+    }
+
+    const atbus::endpoint *ep = node->get_endpoint(proxy.current_bus_id);
+    if (ep != nullptr) {
+      FWLOGINFO("atbus node {:#x} disconnect from {:#x} due to no downstream and passive connection", node->get_id(),
+                proxy.current_bus_id);
+      node->disconnect(proxy.current_bus_id);
+    }
+  } while (false);
 }
 
 LIBATAPP_MACRO_NAMESPACE_END

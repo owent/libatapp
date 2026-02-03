@@ -540,12 +540,11 @@ class app {
                                               jiffies_timer_handle_t{std::forward<HandleType>(fn)}, priv_data, watcher);
   }
 
-  template <class Clock, class Rep, class Period, class HandleType>
-  ATFW_UTIL_FORCEINLINE int add_custom_timer(std::chrono::time_point<Clock, std::chrono::duration<Rep, Period>> timeout,
-                                             HandleType &&fn, void *priv_data,
-                                             jiffies_timer_watcher_t *watcher = nullptr) {
+  template <class Clock, class Duration, class HandleType>
+  ATFW_UTIL_FORCEINLINE int add_custom_timer(std::chrono::time_point<Clock, Duration> timeout, HandleType &&fn,
+                                             void *priv_data, jiffies_timer_watcher_t *watcher = nullptr) {
     return add_custom_timer_with_system_clock(
-        std::chrono::time_point_cast<std::chrono::system_clock::time_point>(timeout),
+        std::chrono::time_point_cast<std::chrono::system_clock::duration, Clock, Duration>(timeout),
         jiffies_timer_handle_t{std::forward<HandleType>(fn)}, priv_data, watcher);
   }
 
