@@ -501,7 +501,7 @@ LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_is_stoping(libatapp_c_context cont
     return 0;
   }
 
-  return ATAPP_CONTEXT(context)->check_flag(atframework::atapp::app::flag_t::STOPING);
+  return ATAPP_CONTEXT(context)->check_flag(atframework::atapp::app::flag_t::type::kStoping);
 }
 
 LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_is_timeout(libatapp_c_context context) {
@@ -509,7 +509,7 @@ LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_is_timeout(libatapp_c_context cont
     return 0;
   }
 
-  return ATAPP_CONTEXT(context)->check_flag(atframework::atapp::app::flag_t::TIMEOUT);
+  return ATAPP_CONTEXT(context)->check_flag(atframework::atapp::app::flag_t::type::kTimeout);
 }
 
 LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_listen(libatapp_c_context context, const char *address) {

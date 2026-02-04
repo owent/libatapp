@@ -29,7 +29,7 @@ message atapp_configure_meta {
 }
 
 extend google.protobuf.FieldOptions {
-  atapp_configure_meta CONFIGURE = 3270;  // 自定义配置
+  atapp_configure_meta CONFIGURE = 3270; // 自定义配置
 }
 
 message atapp_configure_enumvalue_options {
@@ -38,27 +38,27 @@ message atapp_configure_enumvalue_options {
 }
 
 extend google.protobuf.EnumValueOptions {
-  atapp_configure_enumvalue_options ENUMVALUE = 3270;  // 自定义配置
+  atapp_configure_enumvalue_options ENUMVALUE = 3270; // 自定义配置
 }
 
 message atapp_area {
   // region -> district -> zone
   string region = 1;
   string district = 2;
-  uint64 zone_id = 3;  // Such as postal zone/zip code
+  uint64 zone_id = 3; // Such as postal zone/zip code
 }
 
 message atapp_gateway {
   string address = 1;
 
-  repeated string match_hosts = 11;  // match atapp_configure.hostname with "In" operator
+  repeated string match_hosts = 11; // match atapp_configure.hostname with "In" operator
 
   // Just like NetworkPolicyPeer in
   // https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/api/networking/v1/generated.proto
   // See also LabelSelector in
   // https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto
-  repeated string match_namespaces = 21;  // match atapp_metadata.namespace_name with "In" operator
-  map<string, string> match_labels = 22;  // match all labels
+  repeated string match_namespaces = 21; // match atapp_metadata.namespace_name with "In" operator
+  map<string, string> match_labels = 22; // match all labels
 }
 
 enum ATAPP_ACCESS_DATA_ALGORITHM_TYPE {
@@ -78,9 +78,9 @@ enum ATAPP_CRYPTO_ALGORITHM_TYPE {
       [(ENUMVALUE) = { alias_name: "aes-192-cbc" case_sensitive: false }];  // PKCS#7
   ATAPP_CRYPTO_ALGORITHM_AES_256_CBC = 13
       [(ENUMVALUE) = { alias_name: "aes-256-cbc" case_sensitive: false }];  // PKCS#7
-  ATAPP_CRYPTO_ALGORITHM_AES_128_GCM = 14 [(ENUMVALUE) = { alias_name: "aes-128-gcm" case_sensitive: false }];  // AEAD
-  ATAPP_CRYPTO_ALGORITHM_AES_192_GCM = 15 [(ENUMVALUE) = { alias_name: "aes-192-gcm" case_sensitive: false }];  // AEAD
-  ATAPP_CRYPTO_ALGORITHM_AES_256_GCM = 16 [(ENUMVALUE) = { alias_name: "aes-256-gcm" case_sensitive: false }];  // AEAD
+  ATAPP_CRYPTO_ALGORITHM_AES_128_GCM = 14 [(ENUMVALUE) = { alias_name: "aes-128-gcm" case_sensitive: false }]; // AEAD
+  ATAPP_CRYPTO_ALGORITHM_AES_192_GCM = 15 [(ENUMVALUE) = { alias_name: "aes-192-gcm" case_sensitive: false }]; // AEAD
+  ATAPP_CRYPTO_ALGORITHM_AES_256_GCM = 16 [(ENUMVALUE) = { alias_name: "aes-256-gcm" case_sensitive: false }]; // AEAD
 
   ATAPP_CRYPTO_ALGORITHM_CHACHA20 = 31 [(ENUMVALUE) = { alias_name: "chacha20" case_sensitive: false }];
   ATAPP_CRYPTO_ALGORITHM_CHACHA20_POLY1305_IETF = 32
@@ -189,7 +189,7 @@ message atbus_topology_label_data {
 }
 
 message atbus_topology_rule {
-  bool allow_direct_connection = 1;  // 是否允许直连(对邻居/远方节点)
+  bool allow_direct_connection = 1; // 是否允许直连(对邻居/远方节点)
   bool require_same_upstream = 11;
   bool require_same_process = 12;
   bool require_same_host = 13;
@@ -278,8 +278,8 @@ message atapp_log_sink_std {}
 
 message atapp_log_sink_syslog {
   string ident = 1;
-  repeated string options = 2;  // cons, ndelay, nowait, odelay, perror, pid
-  string facility = 3;          // auth, authpriv, cron, daemon, ftp, kern, lpr, mail,
+  repeated string options = 2; // cons, ndelay, nowait, odelay, perror, pid
+  string facility = 3; // auth, authpriv, cron, daemon, ftp, kern, lpr, mail,
                                 // news, syslog, user, uucp
 }
 
@@ -323,44 +323,44 @@ message atapp_etcd_log_extend {
 message atapp_etcd_http {
   bool debug = 1;
 
-  string user_agent = 301;       // CURLOPT_USERAGENT
-  string proxy = 302;            // CURLOPT_HTTPPROXYTUNNEL, CURLOPT_PROXY: [SCHEME]://HOST[:PORT],
+  string user_agent = 301; // CURLOPT_USERAGENT
+  string proxy = 302; // CURLOPT_HTTPPROXYTUNNEL, CURLOPT_PROXY: [SCHEME]://HOST[:PORT],
                                  // SCHEME is one of http,https,socks4,socks4a,socks5,socks5h. PORT's
                                  // default value is 1080
-  string no_proxy = 303;         // curl 7.19.4 CURLOPT_NOPROXY
-  string proxy_user_name = 304;  // curl 7.19.1 CURLOPT_PROXYUSERNAME
-  string proxy_password = 305;   // curl 7.19.1 CURLOPT_PROXYPASSWORD
+  string no_proxy = 303; // curl 7.19.4 CURLOPT_NOPROXY
+  string proxy_user_name = 304; // curl 7.19.1 CURLOPT_PROXYUSERNAME
+  string proxy_password = 305; // curl 7.19.1 CURLOPT_PROXYPASSWORD
 }
 
 message atapp_etcd_ssl {
   // @see https://curl.haxx.se/libcurl/c/curl_easy_setopt.html
-  bool enable_alpn = 1;  // CURLOPT_SSL_ENABLE_ALPN
-  bool verify_peer = 2;  // CURLOPT_SSL_VERIFYPEER, CURLOPT_SSL_VERIFYHOST,
+  bool enable_alpn = 1; // CURLOPT_SSL_ENABLE_ALPN
+  bool verify_peer = 2; // CURLOPT_SSL_VERIFYPEER, CURLOPT_SSL_VERIFYHOST,
                          // CURLOPT_SSL_VERIFYSTATUS and CURLOPT_PROXY_SSL_VERIFYPEER,
                          // CURLOPT_PROXY_SSL_VERIFYHOST
 
-  string ssl_min_version = 101;  // CURLOPT_SSLVERSION and CURLOPT_PROXY_SSLVERSION
+  string ssl_min_version = 101; // CURLOPT_SSLVERSION and CURLOPT_PROXY_SSLVERSION
 
-  string ssl_client_cert = 111;              // CURLOPT_SSLCERT
-  string ssl_client_cert_type = 112;         // CURLOPT_SSLCERTTYPE: PEM or DER
-  string ssl_client_key = 113;               // CURLOPT_SSLKEY
-  string ssl_client_key_type = 114;          // CURLOPT_SSLKEYTYPE: PEM, DER or ENG
-  string ssl_client_key_passwd = 115;        // CURLOPT_KEYPASSWD or CURLOPT_SSLCERTPASSWD
-  string ssl_ca_cert = 116;                  // CURLOPT_CAINFO
-  string ssl_client_tlsauth_username = 117;  // CURLOPT_TLSAUTH_USERNAME
-  string ssl_client_tlsauth_password = 118;  // CURLOPT_TLSAUTH_PASSWORD
+  string ssl_client_cert = 111; // CURLOPT_SSLCERT
+  string ssl_client_cert_type = 112; // CURLOPT_SSLCERTTYPE: PEM or DER
+  string ssl_client_key = 113; // CURLOPT_SSLKEY
+  string ssl_client_key_type = 114; // CURLOPT_SSLKEYTYPE: PEM, DER or ENG
+  string ssl_client_key_passwd = 115; // CURLOPT_KEYPASSWD or CURLOPT_SSLCERTPASSWD
+  string ssl_ca_cert = 116; // CURLOPT_CAINFO
+  string ssl_client_tlsauth_username = 117; // CURLOPT_TLSAUTH_USERNAME
+  string ssl_client_tlsauth_password = 118; // CURLOPT_TLSAUTH_PASSWORD
 
-  string ssl_proxy_cert = 121;              // CURLOPT_PROXY_SSLCERT
-  string ssl_proxy_cert_type = 122;         // CURLOPT_PROXY_SSLCERTTYPE: PEM or DER
-  string ssl_proxy_key = 123;               // CURLOPT_PROXY_SSLKEY
-  string ssl_proxy_key_type = 124;          // CURLOPT_PROXY_SSLKEYTYPE: PEM, DER or ENG
-  string ssl_proxy_key_passwd = 125;        // CURLOPT_PROXY_KEYPASSWD or CURLOPT_PROXY_SSLCERTPASSWD
-  string ssl_proxy_ca_cert = 126;           // CURLOPT_PROXY_CAINFO
-  string ssl_proxy_tlsauth_username = 127;  // CURLOPT_PROXY_TLSAUTH_USERNAME
-  string ssl_proxy_tlsauth_password = 128;  // CURLOPT_PROXY_TLSAUTH_PASSWORD
+  string ssl_proxy_cert = 121; // CURLOPT_PROXY_SSLCERT
+  string ssl_proxy_cert_type = 122; // CURLOPT_PROXY_SSLCERTTYPE: PEM or DER
+  string ssl_proxy_key = 123; // CURLOPT_PROXY_SSLKEY
+  string ssl_proxy_key_type = 124; // CURLOPT_PROXY_SSLKEYTYPE: PEM, DER or ENG
+  string ssl_proxy_key_passwd = 125; // CURLOPT_PROXY_KEYPASSWD or CURLOPT_PROXY_SSLCERTPASSWD
+  string ssl_proxy_ca_cert = 126; // CURLOPT_PROXY_CAINFO
+  string ssl_proxy_tlsauth_username = 127; // CURLOPT_PROXY_TLSAUTH_USERNAME
+  string ssl_proxy_tlsauth_password = 128; // CURLOPT_PROXY_TLSAUTH_PASSWORD
 
-  string ssl_cipher_list = 201;        // CURLOPT_SSL_CIPHER_LIST
-  string ssl_cipher_list_tls13 = 202;  // CURLOPT_TLS13_CIPHERS
+  string ssl_cipher_list = 201; // CURLOPT_SSL_CIPHER_LIST
+  string ssl_cipher_list_tls13 = 202; // CURLOPT_TLS13_CIPHERS
 }
 
 message atapp_etcd_cluster {
@@ -395,19 +395,6 @@ message atapp_etcd_watcher {
   google.protobuf.Duration get_request_timeout = 103 [(atapp.protocol.CONFIGURE) = { default_value: "3m" }];
   google.protobuf.Duration startup_random_delay_min = 104 [(atapp.protocol.CONFIGURE) = { default_value: "0s" }];
   google.protobuf.Duration startup_random_delay_max = 105 [(atapp.protocol.CONFIGURE) = { default_value: "0s" }];
-
-  bool by_id = 201 [(atapp.protocol.CONFIGURE) = { default_value: "false" }];   // add watcher by id
-  bool by_name = 202 [(atapp.protocol.CONFIGURE) = { default_value: "true" }];  // add watcher by name
-  repeated uint64 by_type_id = 203;                                             // add watcher by type id
-  repeated string by_type_name = 204;                                           // add watcher by type name
-  repeated string by_tag = 205;                                                 // add watcher by tag
-}
-
-message atapp_etcd_report_alive {
-  bool by_id = 1 [(atapp.protocol.CONFIGURE) = { default_value: "true" }];
-  bool by_type = 2 [(atapp.protocol.CONFIGURE) = { default_value: "true" }];
-  bool by_name = 3 [(atapp.protocol.CONFIGURE) = { default_value: "true" }];
-  repeated string by_tag = 4;
 }
 
 message atapp_etcd {
@@ -422,7 +409,6 @@ message atapp_etcd {
   atapp_etcd_request request = 9;
   atapp_etcd_init init = 10;
   atapp_etcd_watcher watcher = 11;
-  atapp_etcd_report_alive report_alive = 12;
   atapp_etcd_log_extend log = 13;
 }
 
@@ -455,11 +441,11 @@ message atapp_worker_pool {
 
 message atapp_grpc_stub_options {}
 message atapp_grpc_credentials_options {
-  bool insecure = 1;  // Using InsecureChannelCredentials
+  bool insecure = 1; // Using InsecureChannelCredentials
 
-  string pem_root_certs = 11;   // PEM content of CA certificate
-  string pem_private_key = 12;  // PEM content of private key
-  string pem_cert_chain = 13;   // PEM content of certificate
+  string pem_root_certs = 11; // PEM content of CA certificate
+  string pem_private_key = 12; // PEM content of private key
+  string pem_cert_chain = 13; // PEM content of certificate
 }
 
 message atapp_grpc {
@@ -527,12 +513,12 @@ message atapp_resource {
 
 message atapp_configure {
   // bus configure
-  string id = 101;       // maybe hex or a.b.c.d
-  string id_mask = 102;  // convert a.b.c.d -> id
+  string id = 101; // maybe hex or a.b.c.d
+  string id_mask = 102; // convert a.b.c.d -> id
   string name = 103;
   uint64 type_id = 104;
   string type_name = 105;
-  atapp_area area = 106;  // Some service is splited by area
+  atapp_area area = 106; // Some service is splited by area
   // See these document below for details:
   //   https://kubernetes.io/docs/concepts/workloads/pods/downward-api/#available-fields
   //   https://kubernetes.io/zh-cn/docs/concepts/workloads/pods/downward-api/#available-fields
@@ -580,4 +566,16 @@ message atapp_discovery {
 
   // Just like in kubernetes
   atapp_metadata metadata = 61;
+}
+
+message atapp_topology_info {
+  uint64 id = 1;
+  string name = 2;
+  string hostname = 3;
+  int32 pid = 4;
+  string identity = 7;
+  string version = 8;
+
+  uint64 upstream_id = 11;
+  atbus_topology_data data = 12;
 }

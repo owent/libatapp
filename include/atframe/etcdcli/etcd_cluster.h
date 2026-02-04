@@ -36,23 +36,21 @@ struct etcd_keepalive_deletor {
 class etcd_cluster {
  public:
   struct LIBATAPP_MACRO_API_HEAD_ONLY flag_t {
-    enum type {
-      CLOSING = 0x0001,  // closeing
-      RUNNING = 0x0002,
-      READY = 0x0004,                     // ready
-      ENABLE_LEASE = 0x0100,              // enable auto get lease
-      PREVIOUS_REQUEST_TIMEOUT = 0x0200,  // if previous request timeout, then do not reuse socket
+    enum class type : uint32_t {
+      kClosing = 0x0001,  // closeing
+      kRunning = 0x0002,
+      kReady = 0x0004,                   // ready
+      kEnableLease = 0x0100,             // enable auto get lease
+      kPreviousRequestTimeout = 0x0200,  // if previous request timeout, then do not reuse socket
     };
   };
 
   struct LIBATAPP_MACRO_API_HEAD_ONLY ssl_version_t {
-    enum type {
-      DISABLED = 0,
-      SSL3,     // default for curl version < 7.34.0
-      TLS_V10,  // TLSv1.0
-      TLS_V11,  // TLSv1.1
-      TLS_V12,  // TLSv1.2, default for curl version >= 7.34.0
-      TLS_V13,  // TLSv1.3
+    enum class type : int32_t {
+      kDisabled = 0,
+      kTlsV11,  // TLSv1.1
+      kTlsV12,  // TLSv1.2, default for curl version >= 7.34.0
+      kTlsV13,  // TLSv1.3
     };
   };
 
@@ -106,7 +104,7 @@ class etcd_cluster {
     bool auto_update_hosts;  // auto update cluster member
 
     ssl_version_t::type ssl_min_version;  // CURLOPT_SSLVERSION and CURLOPT_PROXY_SSLVERSION @see ssl_version_t,
-                                          // SSLv3/TLSv1/TLSv1.1/TLSv1.2/TLSv1.3
+                                          // TLSv1.1/TLSv1.2/TLSv1.3
     std::string user_agent;               // CURLOPT_USERAGENT
     std::string proxy;            // CURLOPT_HTTPPROXYTUNNEL, CURLOPT_PROXY: [SCHEME]://HOST[:PORT], SCHEME is one of
                                   // http,https,socks4,socks4a,socks5,socks5h. PORT's default value is 1080
@@ -162,7 +160,7 @@ class etcd_cluster {
   LIBATAPP_MACRO_API bool is_available() const;
   LIBATAPP_MACRO_API void resolve_ready() noexcept;
 
-  ATFW_UTIL_FORCEINLINE bool check_flag(uint32_t f) const { return 0 != (flags_ & f); }
+  ATFW_UTIL_FORCEINLINE bool check_flag(flag_t::type f) const { return 0 != (flags_ & static_cast<uint32_t>(f)); }
   LIBATAPP_MACRO_API void set_flag(flag_t::type f, bool v);
 
   ATFW_UTIL_FORCEINLINE const stats_t &get_stats() const { return stats_; }
@@ -193,7 +191,7 @@ class etcd_cluster {
     conf_.http_initialization_timeout = v;
   }
   ATFW_UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_http_timeout() const {
-    if (check_flag(flag_t::READY)) {
+    if (check_flag(flag_t::type::kReady)) {
       return conf_.http_request_timeout;
     } else {
       return conf_.http_initialization_timeout;
@@ -612,4 +610,3 @@ class etcd_cluster {
 #endif
 
 LIBATAPP_MACRO_NAMESPACE_END
-

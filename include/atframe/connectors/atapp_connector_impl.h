@@ -45,10 +45,10 @@ class atapp_connection_handle {
   using on_destroy_fn_type = std::function<void(atapp_connection_handle &)>;
 
   struct LIBATAPP_MACRO_API_HEAD_ONLY flags_t {
-    enum type {
-      EN_ACH_NONE = 0x00,
-      EN_ACH_CLOSING = 0x01,
-      EN_ACH_READY = 0x02,
+    enum class type : uint32_t {
+      kNone = 0x00,
+      kClosing = 0x01,
+      kReady = 0x02,
     };
   };
 
@@ -105,12 +105,12 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE atapp_connector_impl {
   using protocol_set_t = std::unordered_set<std::string>;
 
   struct address_type_t {
-    enum type {
-      EN_ACAT_NONE = 0x0000,
-      EN_ACAT_DUPLEX = 0x0001,
-      EN_ACAT_SIMPLEX = 0x0002,
-      EN_ACAT_LOCAL_HOST = 0x0004,
-      EN_ACAT_LOCAL_PROCESS = 0x0008,
+    enum class type : uint32_t {
+      kNone = 0x0000,
+      kDuplex = 0x0001,
+      kSimplex = 0x0002,
+      kLocalHost = 0x0004,
+      kLocalProcess = 0x0008,
     };
   };
 
@@ -130,9 +130,9 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE atapp_connector_impl {
 
   /**
    * @brief get address type
-   * @note address_type_t::EN_ACAT_SIMPLEX or address_type_t::EN_ACAT_DUPLEX must be set and only be set one of them
-   *       address_type_t::EN_ACAT_LOCAL_HOST should be set if address can only be connected by local machine
-   *       address_type_t::EN_ACAT_LOCAL_PROCESS should be set if address can only be connected by local process
+   * @note address_type_t::type::kSimplex or address_type_t::type::kDuplex must be set and only be set one of them
+   *       address_type_t::type::kLocalHost should be set if address can only be connected by local machine
+   *       address_type_t::type::kLocalProcess should be set if address can only be connected by local process
    * @return must be xor of address_type_t::type
    */
   virtual uint32_t get_address_type(const atbus::channel::channel_address_t &addr) const noexcept = 0;
@@ -182,7 +182,7 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE atapp_connector_impl {
                                                               gsl::span<const unsigned char> data,
                                                               const atapp::protocol::atapp_metadata *metadata);
 
-  LIBATAPP_MACRO_API virtual void on_discovery_event(etcd_discovery_action_t::type, const etcd_discovery_node::ptr_t &);
+  LIBATAPP_MACRO_API virtual void on_discovery_event(etcd_discovery_action_t, const etcd_discovery_node::ptr_t &);
 
   LIBATAPP_MACRO_API const protocol_set_t &get_support_protocols() const noexcept;
 
@@ -200,4 +200,3 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE atapp_connector_impl {
 };
 
 LIBATAPP_MACRO_NAMESPACE_END
-

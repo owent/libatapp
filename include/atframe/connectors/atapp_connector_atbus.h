@@ -52,8 +52,7 @@ class atapp_connector_atbus : public atapp_connector_impl,
                                                      uint64_t *msg_sequence, gsl::span<const unsigned char> data,
                                                      const atapp::protocol::atapp_metadata *metadata) override;
 
-  LIBATAPP_MACRO_API void on_discovery_event(etcd_discovery_action_t::type,
-                                             const etcd_discovery_node::ptr_t &) override;
+  LIBATAPP_MACRO_API void on_discovery_event(etcd_discovery_action_t, const etcd_discovery_node::ptr_t &) override;
 
   LIBATAPP_MACRO_API void remove_topology_peer(atbus::bus_id_t target_bus_id);
 
@@ -136,11 +135,9 @@ class atapp_connector_atbus : public atapp_connector_impl,
   handle_map_t handles_;
   atbus::topology_data::ptr_t atbus_topology_data_;
   atbus::topology_policy_rule atbus_topology_policy_rule_;
-  bool atbus_topology_policy_allow_direct_connection_;
   atbus::bus_id_t last_connect_bus_id_;
   const atapp_connection_handle *last_connect_handle_;
   int32_t last_connect_result_;
 };
 
 LIBATAPP_MACRO_NAMESPACE_END
-

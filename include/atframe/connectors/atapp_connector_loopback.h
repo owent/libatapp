@@ -34,8 +34,7 @@ class atapp_connector_loopback : public atapp_connector_impl {
                                                      uint64_t *msg_sequence, gsl::span<const unsigned char> data,
                                                      const atapp::protocol::atapp_metadata *metadata) override;
 
-  LIBATAPP_MACRO_API void on_discovery_event(etcd_discovery_action_t::type,
-                                             const etcd_discovery_node::ptr_t &) override;
+  LIBATAPP_MACRO_API void on_discovery_event(etcd_discovery_action_t, const etcd_discovery_node::ptr_t &) override;
 
   LIBATAPP_MACRO_API void on_receive_forward_response(atapp_connection_handle *handle, int32_t type,
                                                       uint64_t msg_sequence, int32_t error_code,
@@ -61,4 +60,3 @@ class atapp_connector_loopback : public atapp_connector_impl {
 #endif
 };
 LIBATAPP_MACRO_NAMESPACE_END
-

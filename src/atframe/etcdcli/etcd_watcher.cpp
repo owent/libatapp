@@ -288,7 +288,7 @@ int etcd_watcher::libcurl_callback_on_range_completed(atfw::util::network::http_
           response.events.push_back(event_t());
           event_t &evt = response.events.back();
 
-          evt.evt_type = etcd_watch_event::EN_WEVT_PUT;  // 查询的结果都认为是PUT
+          evt.evt_type = etcd_watch_event::kPut;  // 查询的结果都认为是PUT
           etcd_packer::unpack(evt.kv, *iter);
         }
       }
@@ -480,21 +480,21 @@ int etcd_watcher::libcurl_callback_on_watch_write(atfw::util::network::http_requ
 
         rapidjson::Document::ConstMemberIterator type = iter->FindMember("type");
         if (type == iter->MemberEnd()) {
-          evt.evt_type = etcd_watch_event::EN_WEVT_PUT;  // etcd可能不会下发默认值
+          evt.evt_type = etcd_watch_event::kPut;  // etcd可能不会下发默认值
         } else {
           if (type->value.IsString()) {
             if (0 == UTIL_STRFUNC_STRCASE_CMP("DELETE", type->value.GetString())) {
-              evt.evt_type = etcd_watch_event::EN_WEVT_DELETE;
+              evt.evt_type = etcd_watch_event::kDelete;
             } else {
-              evt.evt_type = etcd_watch_event::EN_WEVT_PUT;
+              evt.evt_type = etcd_watch_event::kPut;
             }
           } else if (type->value.IsNumber()) {
             uint64_t type_int = 0;
             etcd_packer::unpack_int(*iter, "type", type_int);
             if (0 == type_int) {
-              evt.evt_type = etcd_watch_event::EN_WEVT_PUT;
+              evt.evt_type = etcd_watch_event::kPut;
             } else {
-              evt.evt_type = etcd_watch_event::EN_WEVT_DELETE;
+              evt.evt_type = etcd_watch_event::kDelete;
             }
           } else {
             LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self->owner_, "Etcd watcher {} got unknown event type. msg: {}",
@@ -524,7 +524,7 @@ int etcd_watcher::libcurl_callback_on_watch_write(atfw::util::network::http_requ
       for (size_t i = 0; i < response.events.size(); ++i) {
         etcd_key_value *kv = &response.events[i].kv;
         const char *name;
-        if (etcd_watch_event::EN_WEVT_PUT == response.events[i].evt_type) {
+        if (etcd_watch_event::kPut == response.events[i].evt_type) {
           name = "PUT";
         } else {
           name = "DELETE";
@@ -562,4 +562,3 @@ int etcd_watcher::libcurl_callback_on_watch_write(atfw::util::network::http_requ
 }
 
 LIBATAPP_MACRO_NAMESPACE_END
-
