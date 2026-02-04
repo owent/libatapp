@@ -613,17 +613,17 @@ LIBATAPP_MACRO_API int etcd_module::reload() {
     }
     if (0 == UTIL_STRFUNC_STRNCASE_CMP(ssl_version.c_str(), "TLSv1.3", 7) ||
         0 == UTIL_STRFUNC_STRNCASE_CMP(ssl_version.c_str(), "TLSv13", 6)) {
-      etcd_ctx_.set_conf_ssl_min_version(etcd_cluster::ssl_version_t::type::kTlsV13);
+      etcd_ctx_.set_conf_ssl_min_version(etcd_cluster::ssl_version_t::kTlsV13);
     } else if (0 == UTIL_STRFUNC_STRNCASE_CMP(ssl_version.c_str(), "TLSv1.2", 7) ||
                0 == UTIL_STRFUNC_STRNCASE_CMP(ssl_version.c_str(), "TLSv12", 6)) {
-      etcd_ctx_.set_conf_ssl_min_version(etcd_cluster::ssl_version_t::type::kTlsV12);
+      etcd_ctx_.set_conf_ssl_min_version(etcd_cluster::ssl_version_t::kTlsV12);
     } else if (0 == UTIL_STRFUNC_STRNCASE_CMP(ssl_version.c_str(), "TLSv1.1", 7) ||
                0 == UTIL_STRFUNC_STRNCASE_CMP(ssl_version.c_str(), "TLSv11", 6)) {
-      etcd_ctx_.set_conf_ssl_min_version(etcd_cluster::ssl_version_t::type::kTlsV11);
+      etcd_ctx_.set_conf_ssl_min_version(etcd_cluster::ssl_version_t::kTlsV11);
     } else if (0 == UTIL_STRFUNC_STRCASE_CMP(ssl_version.c_str(), "TLSv1")) {
-      etcd_ctx_.set_conf_ssl_min_version(etcd_cluster::ssl_version_t::type::kTlsV11);
+      etcd_ctx_.set_conf_ssl_min_version(etcd_cluster::ssl_version_t::kTlsV11);
     } else {
-      etcd_ctx_.set_conf_ssl_min_version(etcd_cluster::ssl_version_t::type::kDisabled);
+      etcd_ctx_.set_conf_ssl_min_version(etcd_cluster::ssl_version_t::kDisabled);
     }
   } while (false);
 
@@ -694,7 +694,7 @@ LIBATAPP_MACRO_API int etcd_module::reload() {
 }
 
 LIBATAPP_MACRO_API int etcd_module::stop() {
-  if (!cleanup_request_ && !etcd_ctx_.check_flag(etcd_cluster::flag_t::type::kClosing)) {
+  if (!cleanup_request_ && !etcd_ctx_.check_flag(etcd_cluster::flag_t::kClosing)) {
     bool revoke_lease = true;
     if (get_app() && get_app()->is_current_upgrade_mode()) {
       revoke_lease = false;
@@ -766,7 +766,7 @@ LIBATAPP_MACRO_API int etcd_module::tick() {
       owner->stop();
       return res;
     }
-  } else if (etcd_ctx_.check_flag(etcd_cluster::flag_t::type::kClosing)) {  // Already stoped and restart etcd_ctx_
+  } else if (etcd_ctx_.check_flag(etcd_cluster::flag_t::kClosing)) {  // Already stoped and restart etcd_ctx_
     etcd_ctx_.init(curl_multi_);
     // generate keepalives
     int res = init_keepalives();
@@ -788,7 +788,7 @@ LIBATAPP_MACRO_API int etcd_module::tick() {
 
   if ((maybe_update_internal_keepalive_discovery_value_ || maybe_update_internal_keepalive_discovery_area_ ||
        maybe_update_internal_keepalive_discovery_metadata_) &&
-      etcd_ctx_.check_flag(etcd_cluster::flag_t::type::kRunning)) {
+      etcd_ctx_.check_flag(etcd_cluster::flag_t::kRunning)) {
     update_keepalive_discovery_value();
   }
 

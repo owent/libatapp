@@ -145,17 +145,17 @@ LIBATAPP_MACRO_API uint32_t
 atapp_connector_atbus::get_address_type(const atbus::channel::channel_address_t &addr) const noexcept {
   uint32_t ret = 0;
   if (atbus::channel::is_duplex_address(addr.address.c_str())) {
-    ret |= static_cast<uint32_t>(address_type_t::type::kDuplex);
+    ret |= static_cast<uint32_t>(address_type_t::kDuplex);
   } else {
-    ret |= static_cast<uint32_t>(address_type_t::type::kSimplex);
+    ret |= static_cast<uint32_t>(address_type_t::kSimplex);
   }
 
   if (atbus::channel::is_local_host_address(addr.address.c_str())) {
-    ret |= static_cast<uint32_t>(address_type_t::type::kLocalHost);
+    ret |= static_cast<uint32_t>(address_type_t::kLocalHost);
   }
 
   if (atbus::channel::is_local_process_address(addr.address.c_str())) {
-    ret |= static_cast<uint32_t>(address_type_t::type::kLocalProcess);
+    ret |= static_cast<uint32_t>(address_type_t::kLocalProcess);
   }
 
   return ret;

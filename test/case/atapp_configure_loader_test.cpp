@@ -65,8 +65,6 @@ static void check_origin_configure(atframework::atapp::app &app, atapp::protocol
   CASE_EXPECT_EQ(10, app.get_origin_configure().etcd().init().timeout().seconds());
   CASE_EXPECT_EQ(0, app.get_origin_configure().etcd().init().timeout().nanos());
   CASE_EXPECT_TRUE(app.get_origin_configure().etcd().cluster().auto_update());
-  CASE_EXPECT_FALSE(app.get_origin_configure().etcd().watcher().by_id());
-  CASE_EXPECT_TRUE(app.get_origin_configure().etcd().watcher().by_name());
 
   CASE_EXPECT_EQ(3, sub_cfg.hosts_size());
   if (3 == sub_cfg.hosts_size()) {
@@ -81,8 +79,6 @@ static void check_origin_configure(atframework::atapp::app &app, atapp::protocol
   CASE_EXPECT_EQ(10, sub_cfg.init().timeout().seconds());
   CASE_EXPECT_EQ(0, sub_cfg.init().timeout().nanos());
   CASE_EXPECT_TRUE(sub_cfg.cluster().auto_update());
-  CASE_EXPECT_FALSE(sub_cfg.watcher().by_id());
-  CASE_EXPECT_TRUE(sub_cfg.watcher().by_name());
 
   {
     auto map_kv1 = app.get_origin_configure().metadata().labels().find("deployment.environment");

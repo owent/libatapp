@@ -35,30 +35,28 @@ class Duration;
 
 LIBATAPP_MACRO_NAMESPACE_BEGIN
 
-struct LIBATAPP_MACRO_API_HEAD_ONLY rapidjson_loader_string_mode {
-  enum class type : int32_t {
-    kRaw = 0,
-    kUri,
-    kUriComponent,
-  };
+enum class rapidjson_loader_string_mode : int32_t {
+  kRaw = 0,
+  kUri,
+  kUriComponent,
 };
 
 struct LIBATAPP_MACRO_API_HEAD_ONLY rapidjson_loader_load_options {
   bool reserve_empty;
   bool convert_large_number_to_string;  // it's friendly to JSON.parse(...) in javascript
-  rapidjson_loader_string_mode::type string_mode;
+  rapidjson_loader_string_mode string_mode;
 
   inline rapidjson_loader_load_options()
       : reserve_empty(false),
         convert_large_number_to_string(false),
-        string_mode(rapidjson_loader_string_mode::type::kRaw) {}
+        string_mode(rapidjson_loader_string_mode::kRaw) {}
 };
 
 struct LIBATAPP_MACRO_API_HEAD_ONLY rapidjson_loader_dump_options {
-  rapidjson_loader_string_mode::type string_mode;
+  rapidjson_loader_string_mode string_mode;
   bool convert_number_from_string;  // it's friendly to JSON.parse(...) in javascript
   inline rapidjson_loader_dump_options()
-      : string_mode(rapidjson_loader_string_mode::type::kRaw), convert_number_from_string(true) {}
+      : string_mode(rapidjson_loader_string_mode::kRaw), convert_number_from_string(true) {}
 };
 
 LIBATAPP_MACRO_API gsl::span<unsigned char> rapidjson_loader_get_default_shared_buffer();

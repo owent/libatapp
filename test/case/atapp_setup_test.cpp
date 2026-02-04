@@ -30,7 +30,7 @@ class atapp_setup_test_timeout_module : public ::atframework::atapp::module_impl
   const char* name() const override { return "atapp_setup_test_timeout_module"; }
 
   int init() override {
-    while (!get_app()->check_flag(::atframework::atapp::app::flag_t::type::kTimeout)) {
+    while (!get_app()->check_flag(::atframework::atapp::app::flag_t::kTimeout)) {
       get_app()->run_once(0, std::chrono::seconds{1});
     }
 

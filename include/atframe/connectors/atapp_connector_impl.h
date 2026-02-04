@@ -44,12 +44,10 @@ class atapp_connection_handle {
   using weak_ptr_t = std::weak_ptr<atapp_connection_handle>;
   using on_destroy_fn_type = std::function<void(atapp_connection_handle &)>;
 
-  struct LIBATAPP_MACRO_API_HEAD_ONLY flags_t {
-    enum class type : uint32_t {
-      kNone = 0x00,
-      kClosing = 0x01,
-      kReady = 0x02,
-    };
+  enum class flags_t : uint32_t {
+    kNone = 0x00,
+    kClosing = 0x01,
+    kReady = 0x02,
   };
 
   UTIL_DESIGN_PATTERN_NOCOPYABLE(atapp_connection_handle)
@@ -104,14 +102,12 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE atapp_connector_impl {
   using handle_set_t = std::unordered_set<atapp_connection_handle *>;
   using protocol_set_t = std::unordered_set<std::string>;
 
-  struct address_type_t {
-    enum class type : uint32_t {
-      kNone = 0x0000,
-      kDuplex = 0x0001,
-      kSimplex = 0x0002,
-      kLocalHost = 0x0004,
-      kLocalProcess = 0x0008,
-    };
+  enum class address_type_t : uint32_t {
+    kNone = 0x0000,
+    kDuplex = 0x0001,
+    kSimplex = 0x0002,
+    kLocalHost = 0x0004,
+    kLocalProcess = 0x0008,
   };
 
   UTIL_DESIGN_PATTERN_NOCOPYABLE(atapp_connector_impl)
@@ -130,10 +126,10 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE atapp_connector_impl {
 
   /**
    * @brief get address type
-   * @note address_type_t::type::kSimplex or address_type_t::type::kDuplex must be set and only be set one of them
-   *       address_type_t::type::kLocalHost should be set if address can only be connected by local machine
-   *       address_type_t::type::kLocalProcess should be set if address can only be connected by local process
-   * @return must be xor of address_type_t::type
+   * @note address_type_t::kSimplex or address_type_t::kDuplex must be set and only be set one of them
+   *       address_type_t::kLocalHost should be set if address can only be connected by local machine
+   *       address_type_t::kLocalProcess should be set if address can only be connected by local process
+   * @return must be xor of address_type_t
    */
   virtual uint32_t get_address_type(const atbus::channel::channel_address_t &addr) const noexcept = 0;
 
