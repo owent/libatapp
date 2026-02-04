@@ -125,8 +125,8 @@ LIBATAPP_MACRO_API void atapp_connection_handle::close() {
   }
   // printf("====== Visit atapp_connection_handle::close %p\n", this);
 
-  flags_ |= static_cast<uint32_t>(flags_t::type::kClosing);
-  flags_ &= ~static_cast<uint32_t>(flags_t::type::kReady);
+  flags_ |= static_cast<uint32_t>(flags_t::kClosing);
+  flags_ &= ~static_cast<uint32_t>(flags_t::kReady);
 
   // Maybe recursive call, check endpiont_ first
   if (nullptr != endpiont_) {
@@ -141,7 +141,7 @@ LIBATAPP_MACRO_API void atapp_connection_handle::close() {
 }
 
 LIBATAPP_MACRO_API bool atapp_connection_handle::is_closing() const noexcept {
-  return 0 != (flags_ & static_cast<uint32_t>(flags_t::type::kClosing));
+  return 0 != (flags_ & static_cast<uint32_t>(flags_t::kClosing));
 }
 
 LIBATAPP_MACRO_API void atapp_connection_handle::set_ready() noexcept {
@@ -149,8 +149,8 @@ LIBATAPP_MACRO_API void atapp_connection_handle::set_ready() noexcept {
     return;
   }
 
-  flags_ |= static_cast<uint32_t>(flags_t::type::kReady);
-  flags_ &= ~static_cast<uint32_t>(flags_t::type::kClosing);
+  flags_ |= static_cast<uint32_t>(flags_t::kReady);
+  flags_ &= ~static_cast<uint32_t>(flags_t::kClosing);
 
   // reactive endpoint and call retry_pending_messages()
   if (nullptr != endpiont_ && nullptr != connector_) {
@@ -165,7 +165,7 @@ LIBATAPP_MACRO_API void atapp_connection_handle::set_unready() noexcept {
   if (!is_ready()) {
     return;
   }
-  flags_ &= ~static_cast<uint32_t>(flags_t::type::kReady);
+  flags_ &= ~static_cast<uint32_t>(flags_t::kReady);
 
   // 如果endpoint没有可用的connection了，需要按pending的message设置add_waker
   atapp_endpoint *ep = get_endpoint();
@@ -177,7 +177,7 @@ LIBATAPP_MACRO_API void atapp_connection_handle::set_unready() noexcept {
 }
 
 LIBATAPP_MACRO_API bool atapp_connection_handle::is_ready() const noexcept {
-  return 0 != (flags_ & static_cast<uint32_t>(flags_t::type::kReady));
+  return 0 != (flags_ & static_cast<uint32_t>(flags_t::kReady));
 }
 
 LIBATAPP_MACRO_API void atapp_connection_handle::set_on_destroy(on_destroy_fn_type fn) { on_destroy_fn_ = fn; }

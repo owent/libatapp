@@ -35,23 +35,19 @@ struct etcd_keepalive_deletor {
 
 class etcd_cluster {
  public:
-  struct LIBATAPP_MACRO_API_HEAD_ONLY flag_t {
-    enum class type : uint32_t {
-      kClosing = 0x0001,  // closeing
-      kRunning = 0x0002,
-      kReady = 0x0004,                   // ready
-      kEnableLease = 0x0100,             // enable auto get lease
-      kPreviousRequestTimeout = 0x0200,  // if previous request timeout, then do not reuse socket
-    };
+  enum class flag_t : uint32_t {
+    kClosing = 0x0001,  // closeing
+    kRunning = 0x0002,
+    kReady = 0x0004,                   // ready
+    kEnableLease = 0x0100,             // enable auto get lease
+    kPreviousRequestTimeout = 0x0200,  // if previous request timeout, then do not reuse socket
   };
 
-  struct LIBATAPP_MACRO_API_HEAD_ONLY ssl_version_t {
-    enum class type : int32_t {
-      kDisabled = 0,
-      kTlsV11,  // TLSv1.1
-      kTlsV12,  // TLSv1.2, default for curl version >= 7.34.0
-      kTlsV13,  // TLSv1.3
-    };
+  enum class ssl_version_t : int32_t {
+    kDisabled = 0,
+    kTlsV11,  // TLSv1.1
+    kTlsV12,  // TLSv1.2, default for curl version >= 7.34.0
+    kTlsV13,  // TLSv1.3
   };
 
   struct LIBATAPP_MACRO_API_HEAD_ONLY conf_t {
@@ -103,7 +99,7 @@ class etcd_cluster {
     bool http_debug_mode;    // print verbose information
     bool auto_update_hosts;  // auto update cluster member
 
-    ssl_version_t::type ssl_min_version;  // CURLOPT_SSLVERSION and CURLOPT_PROXY_SSLVERSION @see ssl_version_t,
+    ssl_version_t ssl_min_version;  // CURLOPT_SSLVERSION and CURLOPT_PROXY_SSLVERSION @see ssl_version_t,
                                           // TLSv1.1/TLSv1.2/TLSv1.3
     std::string user_agent;               // CURLOPT_USERAGENT
     std::string proxy;            // CURLOPT_HTTPPROXYTUNNEL, CURLOPT_PROXY: [SCHEME]://HOST[:PORT], SCHEME is one of
@@ -160,8 +156,8 @@ class etcd_cluster {
   LIBATAPP_MACRO_API bool is_available() const;
   LIBATAPP_MACRO_API void resolve_ready() noexcept;
 
-  ATFW_UTIL_FORCEINLINE bool check_flag(flag_t::type f) const { return 0 != (flags_ & static_cast<uint32_t>(f)); }
-  LIBATAPP_MACRO_API void set_flag(flag_t::type f, bool v);
+  ATFW_UTIL_FORCEINLINE bool check_flag(flag_t f) const { return 0 != (flags_ & static_cast<uint32_t>(f)); }
+  LIBATAPP_MACRO_API void set_flag(flag_t f, bool v);
 
   ATFW_UTIL_FORCEINLINE const stats_t &get_stats() const { return stats_; }
 
@@ -191,7 +187,7 @@ class etcd_cluster {
     conf_.http_initialization_timeout = v;
   }
   ATFW_UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_http_timeout() const {
-    if (check_flag(flag_t::type::kReady)) {
+    if (check_flag(flag_t::kReady)) {
       return conf_.http_request_timeout;
     } else {
       return conf_.http_initialization_timeout;
@@ -282,8 +278,8 @@ class etcd_cluster {
   ATFW_UTIL_FORCEINLINE void set_conf_etcd_members_auto_update_hosts(bool v) { conf_.auto_update_hosts = v; }
   ATFW_UTIL_FORCEINLINE bool get_conf_etcd_members_auto_update_hosts() const { return conf_.auto_update_hosts; }
 
-  ATFW_UTIL_FORCEINLINE void set_conf_ssl_min_version(ssl_version_t::type v) { conf_.ssl_min_version = v; }
-  ATFW_UTIL_FORCEINLINE ssl_version_t::type get_conf_ssl_min_version() const { return conf_.ssl_min_version; }
+  ATFW_UTIL_FORCEINLINE void set_conf_ssl_min_version(ssl_version_t v) { conf_.ssl_min_version = v; }
+  ATFW_UTIL_FORCEINLINE ssl_version_t get_conf_ssl_min_version() const { return conf_.ssl_min_version; }
 
   ATFW_UTIL_FORCEINLINE void set_conf_user_agent(const std::string &v) { conf_.user_agent = v; }
   ATFW_UTIL_FORCEINLINE const std::string &get_conf_user_agent() const { return conf_.user_agent; }

@@ -63,20 +63,18 @@ class app {
   using address_type_t = atapp_connector_impl::address_type_t;
   using ev_loop_t = uv_loop_t;
 
-  struct LIBATAPP_MACRO_API_HEAD_ONLY flag_t {
-    enum class type : int32_t {
-      kRunning = 0,  //
-      kStoping,      //
-      kTimeout,
-      kInCallback,
-      kInitialized,
-      kInitializing,
-      kStopped,
-      kDisableAtbusFallback,
-      kInTick,
-      kDestroying,
-      kFlagMax
-    };
+  enum class flag_t : int32_t {
+    kRunning = 0,  //
+    kStoping,      //
+    kTimeout,
+    kInCallback,
+    kInitialized,
+    kInitializing,
+    kStopped,
+    kDisableAtbusFallback,
+    kInTick,
+    kDestroying,
+    kFlagMax
   };
 
   struct message_t {
@@ -103,27 +101,25 @@ class app {
 
   class flag_guard_t {
    public:
-    LIBATAPP_MACRO_API flag_guard_t(app &owner, flag_t::type f);
+    LIBATAPP_MACRO_API flag_guard_t(app &owner, flag_t f);
     LIBATAPP_MACRO_API ~flag_guard_t();
 
    private:
     flag_guard_t(const flag_guard_t &);
 
     app *owner_;
-    flag_t::type flag_;
+    flag_t flag_;
   };
   friend class flag_guard_t;
 
-  struct LIBATAPP_MACRO_API_HEAD_ONLY mode_t {
-    enum class type : int32_t {
-      kCustom = 0,  // custom command
-      kStart,       // start server
-      kStop,        // send a stop command
-      kReload,      // send a reload command
-      kInfo,        // show information and exit
-      kHelp,        // show help and exit
-      kModeMax
-    };
+  enum class mode_t : int32_t {
+    kCustom = 0,  // custom command
+    kStart,       // start server
+    kStop,        // send a stop command
+    kReload,      // send a reload command
+    kInfo,        // show information and exit
+    kHelp,        // show help and exit
+    kModeMax
   };
 
   struct LIBATAPP_MACRO_API_HEAD_ONLY custom_command_sender_t {
@@ -231,7 +227,7 @@ class app {
   LIBATAPP_MACRO_API app_id_t convert_app_id_by_string(const char *id_in) const noexcept;
   LIBATAPP_MACRO_API std::string convert_app_id_to_string(app_id_t id_in, bool hex = false) const noexcept;
 
-  LIBATAPP_MACRO_API bool check_flag(flag_t::type f) const noexcept;
+  LIBATAPP_MACRO_API bool check_flag(flag_t f) const noexcept;
 
   /**
    * @brief add a new module
@@ -565,7 +561,7 @@ class app {
  private:
   static void ev_stop_timeout(uv_timer_t *handle);
 
-  bool set_flag(flag_t::type f, bool v);
+  bool set_flag(flag_t f, bool v);
 
   int apply_configure();
 
@@ -731,7 +727,7 @@ class app {
   ev_loop_t *ev_loop_;
   atbus::node::ptr_t bus_node_;
   std::atomic<uint64_t> flags_;
-  mode_t::type mode_;
+  mode_t mode_;
   tick_timer_t tick_timer_;
   std::chrono::milliseconds tick_clock_granularity_;
   jiffies_timer_t custom_timer_controller_;

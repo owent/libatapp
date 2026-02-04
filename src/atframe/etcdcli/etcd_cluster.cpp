@@ -219,7 +219,7 @@ LIBATAPP_MACRO_API etcd_cluster::etcd_cluster()
   conf_.http_debug_mode = false;
   conf_.auto_update_hosts = true;
 
-  conf_.ssl_min_version = ssl_version_t::type::kDisabled;
+  conf_.ssl_min_version = ssl_version_t::kDisabled;
   conf_.user_agent.clear();
   conf_.proxy.clear();
   conf_.no_proxy.clear();
@@ -256,12 +256,12 @@ LIBATAPP_MACRO_API void etcd_cluster::init(const atfw::util::network::http_reque
   random_generator_.init_seed(
       static_cast<atfw::util::random::mt19937::result_type>(atfw::util::time::time_utility::get_now()));
 
-  set_flag(flag_t::type::kClosing, false);
+  set_flag(flag_t::kClosing, false);
 }
 
 LIBATAPP_MACRO_API atfw::util::network::http_request::ptr_t etcd_cluster::close(bool wait, bool revoke_lease) {
-  set_flag(flag_t::type::kClosing, true);
-  set_flag(flag_t::type::kRunning, false);
+  set_flag(flag_t::kClosing, true);
+  set_flag(flag_t::kRunning, false);
 
   if (rpc_keepalive_) {
     rpc_keepalive_->set_on_complete(nullptr);
@@ -358,7 +358,7 @@ LIBATAPP_MACRO_API void etcd_cluster::reset() {
   conf_.http_debug_mode = false;
   conf_.auto_update_hosts = true;
 
-  conf_.ssl_min_version = ssl_version_t::type::kDisabled;
+  conf_.ssl_min_version = ssl_version_t::kDisabled;
   conf_.user_agent.clear();
   conf_.proxy.clear();
   conf_.no_proxy.clear();
@@ -390,7 +390,7 @@ LIBATAPP_MACRO_API int etcd_cluster::tick() {
     return ret;
   }
 
-  if (check_flag(flag_t::type::kClosing)) {
+  if (check_flag(flag_t::kClosing)) {
     return 0;
   }
 
@@ -419,7 +419,7 @@ LIBATAPP_MACRO_API int etcd_cluster::tick() {
   }
 
   // keepalive lease
-  if (check_flag(flag_t::type::kEnableLease)) {
+  if (check_flag(flag_t::kEnableLease)) {
     if (0 == get_lease()) {
       ret += create_request_lease_grant() ? 1 : 0;
 
@@ -428,15 +428,15 @@ LIBATAPP_MACRO_API int etcd_cluster::tick() {
     } else if (app::get_sys_now() > conf_.keepalive_next_update_time) {
       ret += create_request_lease_keepalive() ? 1 : 0;
     }
-  } else if (!check_flag(flag_t::type::kRunning)) {
-    set_flag(flag_t::type::kRunning, true);
+  } else if (!check_flag(flag_t::kRunning)) {
+    set_flag(flag_t::kRunning, true);
   }
 
   // run pending
   retry_pending_actions();
 
   // resolve ready flag
-  if (!check_flag(flag_t::type::kReady) && check_flag(flag_t::type::kRunning)) {
+  if (!check_flag(flag_t::kReady) && check_flag(flag_t::kRunning)) {
     resolve_ready();
   }
 
@@ -448,7 +448,7 @@ LIBATAPP_MACRO_API bool etcd_cluster::is_available() const {
     return false;
   }
 
-  if (check_flag(flag_t::type::kClosing)) {
+  if (check_flag(flag_t::kClosing)) {
     return false;
   }
 
@@ -462,7 +462,7 @@ LIBATAPP_MACRO_API bool etcd_cluster::is_available() const {
 }
 
 LIBATAPP_MACRO_API void etcd_cluster::resolve_ready() noexcept {
-  if (check_flag(flag_t::type::kReady) || !check_flag(flag_t::type::kRunning)) {
+  if (check_flag(flag_t::kReady) || !check_flag(flag_t::kRunning)) {
     return;
   }
 
@@ -478,11 +478,11 @@ LIBATAPP_MACRO_API void etcd_cluster::resolve_ready() noexcept {
   }
 
   if (ready) {
-    set_flag(flag_t::type::kReady, true);
+    set_flag(flag_t::kReady, true);
   }
 }
 
-LIBATAPP_MACRO_API void etcd_cluster::set_flag(flag_t::type f, bool v) {
+LIBATAPP_MACRO_API void etcd_cluster::set_flag(flag_t f, bool v) {
   const uint32_t f_value = static_cast<uint32_t>(f);
   assert(0 == (f_value & (f_value - 1)));
   if (v == check_flag(f)) {
@@ -496,7 +496,7 @@ LIBATAPP_MACRO_API void etcd_cluster::set_flag(flag_t::type f, bool v) {
   }
 
   switch (f) {
-    case flag_t::type::kEnableLease: {
+    case flag_t::kEnableLease: {
       if (v) {
         create_request_lease_grant();
       } else if (rpc_keepalive_) {
@@ -506,7 +506,7 @@ LIBATAPP_MACRO_API void etcd_cluster::set_flag(flag_t::type f, bool v) {
       }
       break;
     }
-    case flag_t::type::kRunning: {
+    case flag_t::kRunning: {
       if (v) {
         for (on_event_up_down_handle_set_t::iterator iter = event_on_up_callbacks_.begin();
              iter != event_on_up_callbacks_.end(); ++iter) {
@@ -524,7 +524,7 @@ LIBATAPP_MACRO_API void etcd_cluster::set_flag(flag_t::type f, bool v) {
       }
       break;
     }
-    case flag_t::type::kReady: {
+    case flag_t::kReady: {
       if (v && logger_) {
         logger_->set_level(runtime_log_level_);
       }
@@ -544,7 +544,7 @@ LIBATAPP_MACRO_API void etcd_cluster::set_logger(const atfw::util::log::log_wrap
     runtime_log_level_ = logger->get_level();
   }
 
-  if (logger_ && !check_flag(flag_t::type::kReady)) {
+  if (logger_ && !check_flag(flag_t::kReady)) {
     logger_->set_level(startup_log_level_);
   }
 }
@@ -583,7 +583,7 @@ LIBATAPP_MACRO_API bool etcd_cluster::add_keepalive(const std::shared_ptr<etcd_k
     return false;
   }
 
-  if (check_flag(flag_t::type::kClosing)) {
+  if (check_flag(flag_t::kClosing)) {
     return false;
   }
 
@@ -595,7 +595,7 @@ LIBATAPP_MACRO_API bool etcd_cluster::add_keepalive(const std::shared_ptr<etcd_k
     return false;
   }
 
-  set_flag(flag_t::type::kEnableLease, true);
+  set_flag(flag_t::kEnableLease, true);
   keepalive_actors_.push_back(keepalive);
 
   etcd_keepalive_deletor_map_t::iterator iter = keepalive_deletors_.find(keepalive->get_path());
@@ -606,7 +606,7 @@ LIBATAPP_MACRO_API bool etcd_cluster::add_keepalive(const std::shared_ptr<etcd_k
   }
 
   // auto active if cluster is running
-  if (check_flag(flag_t::type::kRunning) && 0 != get_lease()) {
+  if (check_flag(flag_t::kRunning) && 0 != get_lease()) {
     keepalive->active();
   }
   return true;
@@ -617,7 +617,7 @@ LIBATAPP_MACRO_API bool etcd_cluster::add_retry_keepalive(const std::shared_ptr<
     return false;
   }
 
-  if (check_flag(flag_t::type::kClosing)) {
+  if (check_flag(flag_t::kClosing)) {
     return false;
   }
 
@@ -630,7 +630,7 @@ LIBATAPP_MACRO_API bool etcd_cluster::add_retry_keepalive(const std::shared_ptr<
     return false;
   }
 
-  set_flag(flag_t::type::kEnableLease, true);
+  set_flag(flag_t::kEnableLease, true);
   keepalive_retry_actors_.push_back(keepalive);
   return true;
 }
@@ -695,7 +695,7 @@ LIBATAPP_MACRO_API bool etcd_cluster::add_watcher(const std::shared_ptr<etcd_wat
     return false;
   }
 
-  if (check_flag(flag_t::type::kClosing)) {
+  if (check_flag(flag_t::kClosing)) {
     return false;
   }
 
@@ -944,7 +944,7 @@ bool etcd_cluster::create_request_auth_authenticate() {
     return false;
   }
 
-  if (check_flag(flag_t::type::kClosing)) {
+  if (check_flag(flag_t::kClosing)) {
     return false;
   }
 
@@ -1091,7 +1091,7 @@ bool etcd_cluster::create_request_auth_user_get() {
     return false;
   }
 
-  if (check_flag(flag_t::type::kClosing)) {
+  if (check_flag(flag_t::kClosing)) {
     return false;
   }
 
@@ -1275,7 +1275,7 @@ bool etcd_cluster::retry_request_member_update(const std::string &bad_url) {
   }
 
   std::chrono::system_clock::duration retry_interval = conf_.etcd_members_retry_interval;
-  if (!check_flag(flag_t::type::kRunning) &&
+  if (!check_flag(flag_t::kRunning) &&
       conf_.etcd_members_init_retry_interval > std::chrono::system_clock::duration::zero()) {
     retry_interval = conf_.etcd_members_init_retry_interval;
   } else if (retry_interval <= std::chrono::system_clock::duration::zero()) {
@@ -1298,7 +1298,7 @@ bool etcd_cluster::create_request_member_update() {
     return false;
   }
 
-  if (check_flag(flag_t::type::kClosing)) {
+  if (check_flag(flag_t::kClosing)) {
     return false;
   }
 
@@ -1462,7 +1462,7 @@ bool etcd_cluster::create_request_lease_grant() {
     return false;
   }
 
-  if (check_flag(flag_t::type::kClosing) || !check_flag(flag_t::type::kEnableLease)) {
+  if (check_flag(flag_t::kClosing) || !check_flag(flag_t::kEnableLease)) {
     return false;
   }
 
@@ -1476,7 +1476,7 @@ bool etcd_cluster::create_request_lease_grant() {
   }
 
   time_t request_timeout_ms = get_http_timeout_ms();
-  if (check_flag(flag_t::type::kRunning) && conf_.keepalive_interval > std::chrono::system_clock::duration::zero()) {
+  if (check_flag(flag_t::kRunning) && conf_.keepalive_interval > std::chrono::system_clock::duration::zero()) {
     conf_.keepalive_next_update_time = app::get_sys_now() + conf_.keepalive_interval;
     if (request_timeout_ms > std::chrono::duration_cast<std::chrono::milliseconds>(conf_.keepalive_interval).count()) {
       request_timeout_ms =
@@ -1546,7 +1546,7 @@ bool etcd_cluster::create_request_lease_keepalive() {
     return false;
   }
 
-  if (check_flag(flag_t::type::kClosing) || !check_flag(flag_t::type::kEnableLease)) {
+  if (check_flag(flag_t::kClosing) || !check_flag(flag_t::kEnableLease)) {
     return false;
   }
 
@@ -1693,8 +1693,8 @@ int etcd_cluster::libcurl_callback_on_lease_keepalive(atfw::util::network::http_
     }
 
     self->add_stats_success_request();
-    if (!self->check_flag(flag_t::type::kRunning) && !self->check_flag(flag_t::type::kClosing)) {
-      self->set_flag(flag_t::type::kRunning, true);
+    if (!self->check_flag(flag_t::kRunning) && !self->check_flag(flag_t::kClosing)) {
+      self->set_flag(flag_t::kRunning, true);
     }
 
     // 这里会触发重试失败的keepalive
@@ -1729,7 +1729,7 @@ atfw::util::network::http_request::ptr_t etcd_cluster::create_request_lease_revo
 
 LIBATAPP_MACRO_API atfw::util::network::http_request::ptr_t etcd_cluster::create_request_kv_get(
     const std::string &key, const std::string &range_end, int64_t limit, int64_t revision) {
-  if (!curl_multi_ || conf_.path_node.empty() || check_flag(flag_t::type::kClosing)) {
+  if (!curl_multi_ || conf_.path_node.empty() || check_flag(flag_t::kClosing)) {
     return atfw::util::network::http_request::ptr_t();
   }
 
@@ -1757,7 +1757,7 @@ LIBATAPP_MACRO_API atfw::util::network::http_request::ptr_t etcd_cluster::create
 LIBATAPP_MACRO_API atfw::util::network::http_request::ptr_t etcd_cluster::create_request_kv_set(
     const std::string &key, const std::string &value, bool assign_lease, bool prev_kv, bool ignore_value,
     bool ignore_lease) {
-  if (!curl_multi_ || conf_.path_node.empty() || check_flag(flag_t::type::kClosing)) {
+  if (!curl_multi_ || conf_.path_node.empty() || check_flag(flag_t::kClosing)) {
     return atfw::util::network::http_request::ptr_t();
   }
 
@@ -1794,7 +1794,7 @@ LIBATAPP_MACRO_API atfw::util::network::http_request::ptr_t etcd_cluster::create
 
 LIBATAPP_MACRO_API atfw::util::network::http_request::ptr_t etcd_cluster::create_request_kv_del(
     const std::string &key, const std::string &range_end, bool prev_kv) {
-  if (!curl_multi_ || conf_.path_node.empty() || check_flag(flag_t::type::kClosing)) {
+  if (!curl_multi_ || conf_.path_node.empty() || check_flag(flag_t::kClosing)) {
     return atfw::util::network::http_request::ptr_t();
   }
 
@@ -1820,7 +1820,7 @@ LIBATAPP_MACRO_API atfw::util::network::http_request::ptr_t etcd_cluster::create
 
 LIBATAPP_MACRO_API atfw::util::network::http_request::ptr_t etcd_cluster::create_request_watch(
     const std::string &key, const std::string &range_end, int64_t start_revision, bool prev_kv, bool progress_notify) {
-  if (!curl_multi_ || conf_.path_node.empty() || check_flag(flag_t::type::kClosing)) {
+  if (!curl_multi_ || conf_.path_node.empty() || check_flag(flag_t::kClosing)) {
     return atfw::util::network::http_request::ptr_t();
   }
 
@@ -1865,7 +1865,7 @@ LIBATAPP_MACRO_API etcd_cluster::on_event_up_down_handle_t etcd_cluster::add_on_
     return event_on_up_callbacks_.end();
   }
 
-  if (trigger_if_running && check_flag(flag_t::type::kRunning)) {
+  if (trigger_if_running && check_flag(flag_t::kRunning)) {
     fn(*this);
   }
 
@@ -1891,7 +1891,7 @@ LIBATAPP_MACRO_API etcd_cluster::on_event_up_down_handle_t etcd_cluster::add_on_
     return event_on_down_callbacks_.end();
   }
 
-  if (trigger_if_not_running && !check_flag(flag_t::type::kRunning)) {
+  if (trigger_if_not_running && !check_flag(flag_t::kRunning)) {
     fn(*this);
   }
 
@@ -2015,7 +2015,7 @@ void etcd_cluster::check_socket_error_code(int socket_code) {
   }
 
   if (CURLE_OPERATION_TIMEDOUT == socket_code) {
-    set_flag(flag_t::type::kPreviousRequestTimeout, true);
+    set_flag(flag_t::kPreviousRequestTimeout, true);
   }
 }
 
@@ -2064,12 +2064,12 @@ LIBATAPP_MACRO_API void etcd_cluster::setup_http_request(atfw::util::network::ht
   } else {
     req->set_user_agent(conf_.user_agent);
   }
-  if (check_flag(flag_t::type::kPreviousRequestTimeout)) {
+  if (check_flag(flag_t::kPreviousRequestTimeout)) {
     // Just enable connection reuse for all but watch request
     // But if we got any timeout request, the socket may unstable, we should create another socket to handle this new
     // request.
     req->set_opt_reuse_connection(false);
-    set_flag(flag_t::type::kPreviousRequestTimeout, false);
+    set_flag(flag_t::kPreviousRequestTimeout, false);
   }
 #if LIBCURL_VERSION_NUM >= 0x075500
   req->set_opt_string(CURLOPT_PROTOCOLS_STR, "http,https");
@@ -2082,25 +2082,25 @@ LIBATAPP_MACRO_API void etcd_cluster::setup_http_request(atfw::util::network::ht
   }
 
   // Setup ssl
-  if (ssl_version_t::type::kDisabled != conf_.ssl_min_version) {
+  if (ssl_version_t::kDisabled != conf_.ssl_min_version) {
 #if LIBCURL_VERSION_NUM >= 0x072400
     req->set_opt_bool(CURLOPT_SSL_ENABLE_ALPN, conf_.ssl_enable_alpn);
 #endif
     switch (conf_.ssl_min_version) {
 #if LIBCURL_VERSION_NUM >= 0x073400
-      case ssl_version_t::type::kTlsV13:
+      case ssl_version_t::kTlsV13:
         req->set_opt_long(CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_3);
         req->set_opt_long(CURLOPT_PROXY_SSLVERSION, CURL_SSLVERSION_TLSv1_3);
         break;
 #endif
 #if LIBCURL_VERSION_NUM >= 0x072200
-      case ssl_version_t::type::kTlsV12:
+      case ssl_version_t::kTlsV12:
         req->set_opt_long(CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
 #  if LIBCURL_VERSION_NUM >= 0x073400
         req->set_opt_long(CURLOPT_PROXY_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
 #  endif
         break;
-      case ssl_version_t::type::kTlsV11:
+      case ssl_version_t::kTlsV11:
         req->set_opt_long(CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_1);
 #  if LIBCURL_VERSION_NUM >= 0x073400
         req->set_opt_long(CURLOPT_PROXY_SSLVERSION, CURL_SSLVERSION_TLSv1_1);
@@ -2108,7 +2108,7 @@ LIBATAPP_MACRO_API void etcd_cluster::setup_http_request(atfw::util::network::ht
         break;
       default:
 #  if LIBCURL_VERSION_NUM >= 0x072200
-        conf_.ssl_min_version = ssl_version_t::type::kTlsV12;
+        conf_.ssl_min_version = ssl_version_t::kTlsV12;
         req->set_opt_long(CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
 #    if LIBCURL_VERSION_NUM >= 0x073400
         req->set_opt_long(CURLOPT_PROXY_SSLVERSION, CURL_SSLVERSION_TLSv1_2);

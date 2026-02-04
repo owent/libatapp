@@ -27,9 +27,9 @@ LIBATAPP_MACRO_API const char *atapp_connector_loopback::name() noexcept { retur
 LIBATAPP_MACRO_API uint32_t
 atapp_connector_loopback::get_address_type(const atbus::channel::channel_address_t &) const noexcept {
   uint32_t ret = 0;
-  ret |= static_cast<uint32_t>(address_type_t::type::kDuplex);
-  ret |= static_cast<uint32_t>(address_type_t::type::kLocalHost);
-  ret |= static_cast<uint32_t>(address_type_t::type::kLocalProcess);
+  ret |= static_cast<uint32_t>(address_type_t::kDuplex);
+  ret |= static_cast<uint32_t>(address_type_t::kLocalHost);
+  ret |= static_cast<uint32_t>(address_type_t::kLocalProcess);
 
   return ret;
 }
