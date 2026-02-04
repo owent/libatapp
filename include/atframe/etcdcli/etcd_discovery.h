@@ -26,14 +26,13 @@
 #include <vector>
 
 #include "atframe/atapp_conf.h"
+#include "atframe/etcdcli/etcd_def.h"
 
 LIBATAPP_MACRO_NAMESPACE_BEGIN
-struct LIBATAPP_MACRO_API_HEAD_ONLY etcd_discovery_action_t {
-  enum type {
-    EN_NAT_UNKNOWN = 0,
-    EN_NAT_PUT,
-    EN_NAT_DELETE,
-  };
+enum class etcd_discovery_action_t : int32_t {
+  kUnknown = 0,
+  kPut,
+  kDelete,
 };
 
 class etcd_discovery_node {
@@ -41,33 +40,7 @@ class etcd_discovery_node {
   using on_destroy_fn_type = std::function<void(etcd_discovery_node &)>;
   using ptr_t = atfw::util::memory::strong_rc_ptr<etcd_discovery_node>;
 
-  struct LIBATAPP_MACRO_API_SYMBOL_VISIBLE node_version {
-    int64_t create_revision;
-    // Causion: modify_revision of multiple key may be same when they are modifiedx in one transaction of etcd
-    // @see https://etcd.io/docs/v3.5/learning/api_guarantees/#revision
-    int64_t modify_revision;
-    int64_t version;
-
-    ATFW_UTIL_FORCEINLINE node_version() : create_revision(0), modify_revision(0), version(0) {}
-    ATFW_UTIL_FORCEINLINE node_version(const node_version &other)
-        : create_revision(other.create_revision), modify_revision(other.modify_revision), version(other.version) {}
-    ATFW_UTIL_FORCEINLINE node_version(node_version &&other)
-        : create_revision(other.create_revision), modify_revision(other.modify_revision), version(other.version) {}
-
-    ATFW_UTIL_FORCEINLINE node_version &operator=(const node_version &other) {
-      create_revision = other.create_revision;
-      modify_revision = other.modify_revision;
-      version = other.version;
-      return *this;
-    }
-
-    ATFW_UTIL_FORCEINLINE node_version &operator=(node_version &&other) {
-      create_revision = other.create_revision;
-      modify_revision = other.modify_revision;
-      version = other.version;
-      return *this;
-    }
-  };
+  using node_version = etcd_data_version;
 
   UTIL_DESIGN_PATTERN_NOCOPYABLE(etcd_discovery_node)
   UTIL_DESIGN_PATTERN_NOMOVABLE(etcd_discovery_node)
@@ -257,4 +230,3 @@ class etcd_discovery_set {
   mutable std::unordered_map<metadata_type, index_cache_type, metadata_hash_type, metadata_equal_type> metadata_index_;
 };
 LIBATAPP_MACRO_NAMESPACE_END
-

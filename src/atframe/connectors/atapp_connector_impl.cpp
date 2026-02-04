@@ -125,8 +125,8 @@ LIBATAPP_MACRO_API void atapp_connection_handle::close() {
   }
   // printf("====== Visit atapp_connection_handle::close %p\n", this);
 
-  flags_ |= flags_t::EN_ACH_CLOSING;
-  flags_ &= ~static_cast<uint32_t>(flags_t::EN_ACH_READY);
+  flags_ |= static_cast<uint32_t>(flags_t::type::kClosing);
+  flags_ &= ~static_cast<uint32_t>(flags_t::type::kReady);
 
   // Maybe recursive call, check endpiont_ first
   if (nullptr != endpiont_) {
@@ -141,7 +141,7 @@ LIBATAPP_MACRO_API void atapp_connection_handle::close() {
 }
 
 LIBATAPP_MACRO_API bool atapp_connection_handle::is_closing() const noexcept {
-  return 0 != (flags_ & flags_t::EN_ACH_CLOSING);
+  return 0 != (flags_ & static_cast<uint32_t>(flags_t::type::kClosing));
 }
 
 LIBATAPP_MACRO_API void atapp_connection_handle::set_ready() noexcept {
@@ -149,8 +149,8 @@ LIBATAPP_MACRO_API void atapp_connection_handle::set_ready() noexcept {
     return;
   }
 
-  flags_ |= flags_t::EN_ACH_READY;
-  flags_ &= ~static_cast<uint32_t>(flags_t::EN_ACH_CLOSING);
+  flags_ |= static_cast<uint32_t>(flags_t::type::kReady);
+  flags_ &= ~static_cast<uint32_t>(flags_t::type::kClosing);
 
   // reactive endpoint and call retry_pending_messages()
   if (nullptr != endpiont_ && nullptr != connector_) {
@@ -165,7 +165,7 @@ LIBATAPP_MACRO_API void atapp_connection_handle::set_unready() noexcept {
   if (!is_ready()) {
     return;
   }
-  flags_ &= ~static_cast<uint32_t>(flags_t::EN_ACH_READY);
+  flags_ &= ~static_cast<uint32_t>(flags_t::type::kReady);
 
   // 如果endpoint没有可用的connection了，需要按pending的message设置add_waker
   atapp_endpoint *ep = get_endpoint();
@@ -177,7 +177,7 @@ LIBATAPP_MACRO_API void atapp_connection_handle::set_unready() noexcept {
 }
 
 LIBATAPP_MACRO_API bool atapp_connection_handle::is_ready() const noexcept {
-  return 0 != (flags_ & flags_t::EN_ACH_READY);
+  return 0 != (flags_ & static_cast<uint32_t>(flags_t::type::kReady));
 }
 
 LIBATAPP_MACRO_API void atapp_connection_handle::set_on_destroy(on_destroy_fn_type fn) { on_destroy_fn_ = fn; }
@@ -278,7 +278,7 @@ LIBATAPP_MACRO_API void atapp_connector_impl::on_receive_forward_response(
   get_owner()->trigger_event_on_forward_response(sender, msg, error_code);
 }
 
-LIBATAPP_MACRO_API void atapp_connector_impl::on_discovery_event(etcd_discovery_action_t::type,
+LIBATAPP_MACRO_API void atapp_connector_impl::on_discovery_event(etcd_discovery_action_t,
                                                                  const etcd_discovery_node::ptr_t &) {}
 
 LIBATAPP_MACRO_API const atapp_connector_impl::protocol_set_t &atapp_connector_impl::get_support_protocols()
@@ -286,4 +286,3 @@ LIBATAPP_MACRO_API const atapp_connector_impl::protocol_set_t &atapp_connector_i
   return support_protocols_;
 }
 LIBATAPP_MACRO_NAMESPACE_END
-

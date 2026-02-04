@@ -75,11 +75,7 @@ struct ATFW_UTIL_SYMBOL_LOCAL atapp_connector_atbus::atbus_connection_handle_dat
 };
 
 LIBATAPP_MACRO_API atapp_connector_atbus::atapp_connector_atbus(app &owner)
-    : atapp_connector_impl(owner),
-      atbus_topology_policy_allow_direct_connection_(false),
-      last_connect_bus_id_(0),
-      last_connect_handle_(nullptr),
-      last_connect_result_(0) {
+    : atapp_connector_impl(owner), last_connect_bus_id_(0), last_connect_handle_(nullptr), last_connect_result_(0) {
   register_protocol("mem");
   register_protocol("shm");
   register_protocol("unix");
@@ -143,24 +139,23 @@ LIBATAPP_MACRO_API void atapp_connector_atbus::reload() noexcept {
       values.insert(v);
     }
   }
-  atbus_topology_policy_allow_direct_connection_ = topology_rule_conf.allow_direct_connection();
 }
 
 LIBATAPP_MACRO_API uint32_t
 atapp_connector_atbus::get_address_type(const atbus::channel::channel_address_t &addr) const noexcept {
   uint32_t ret = 0;
   if (atbus::channel::is_duplex_address(addr.address.c_str())) {
-    ret |= address_type_t::EN_ACAT_DUPLEX;
+    ret |= static_cast<uint32_t>(address_type_t::type::kDuplex);
   } else {
-    ret |= address_type_t::EN_ACAT_SIMPLEX;
+    ret |= static_cast<uint32_t>(address_type_t::type::kSimplex);
   }
 
   if (atbus::channel::is_local_host_address(addr.address.c_str())) {
-    ret |= address_type_t::EN_ACAT_LOCAL_HOST;
+    ret |= static_cast<uint32_t>(address_type_t::type::kLocalHost);
   }
 
   if (atbus::channel::is_local_process_address(addr.address.c_str())) {
-    ret |= address_type_t::EN_ACAT_LOCAL_PROCESS;
+    ret |= static_cast<uint32_t>(address_type_t::type::kLocalProcess);
   }
 
   return ret;
@@ -290,14 +285,14 @@ LIBATAPP_MACRO_API void atapp_connector_atbus::on_receive_forward_response(
   get_owner()->trigger_event_on_forward_response(sender, msg, error_code);
 }
 
-LIBATAPP_MACRO_API void atapp_connector_atbus::on_discovery_event(etcd_discovery_action_t::type action,
+LIBATAPP_MACRO_API void atapp_connector_atbus::on_discovery_event(etcd_discovery_action_t action,
                                                                   const etcd_discovery_node::ptr_t &discovery) {
   // clear connect result cache
   last_connect_bus_id_ = 0;
   last_connect_handle_ = nullptr;
 
   // 服务发现信息上线，且该节点正在等待连接，则发起连接
-  if (action == etcd_discovery_action_t::EN_NAT_PUT && discovery) {
+  if (action == etcd_discovery_action_t::kPut && discovery) {
     resume_handle_discovery(*discovery);
   } else if (discovery) {
     auto iter = handles_.find(discovery->get_discovery_info().id());
@@ -1065,14 +1060,26 @@ int32_t atapp_connector_atbus::try_connect_to(const etcd_discovery_node &discove
 
   // 只有[邻居/远方节点]允许主动直连
   const atbus::topology_registry::ptr_t &topology_registry = node->get_topology_registry();
-  if ((relation == atbus::topology_relation_type::kOtherUpstreamPeer ||
-       relation == atbus::topology_relation_type::kSameUpstreamPeer) &&
-      atbus_topology_policy_allow_direct_connection_) {
+  do {
+    if (relation != atbus::topology_relation_type::kOtherUpstreamPeer &&
+        relation != atbus::topology_relation_type::kSameUpstreamPeer) {
+      break;
+    }
+
+    auto &topology_rule_conf = get_owner()->get_origin_configure().bus().topology().rule();
+    if (!topology_rule_conf.allow_direct_connection()) {
+      break;
+    }
+
+    if (topology_rule_conf.require_same_upstream() && relation != atbus::topology_relation_type::kSameUpstreamPeer) {
+      break;
+    }
+
     ret = on_start_connect_to_same_or_other_upstream_peer(discovery, addr, handle, topology_registry, allow_proxy);
     if (ret == EN_ATAPP_ERR_SUCCESS || ret != EN_ATAPP_ERR_TRY_NEXT) {
       return ret;
     }
-  }
+  } while (false);
 
   // 按拓扑关系 - 直连上游（间接上游）
   if (relation == atbus::topology_relation_type::kImmediateUpstream ||
@@ -1539,4 +1546,3 @@ void atapp_connector_atbus::unbind_connection_handle_proxy(atbus_connection_hand
 }
 
 LIBATAPP_MACRO_NAMESPACE_END
-

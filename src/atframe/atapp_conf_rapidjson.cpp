@@ -91,12 +91,12 @@ static gsl::span<unsigned char> rapidjson_loader_get_shared_buffer() {
 static void load_field_string_filter(const std::string &input, rapidjson::Value &output, rapidjson::Document &doc,
                                      const rapidjson_loader_load_options &options) {
   switch (options.string_mode) {
-    case rapidjson_loader_string_mode::URI: {
+    case rapidjson_loader_string_mode::type::kUri: {
       std::string strv = atfw::util::uri::encode_uri(input.c_str(), input.size());
       output.SetString(strv.c_str(), static_cast<rapidjson::SizeType>(strv.size()), doc.GetAllocator());
       break;
     }
-    case rapidjson_loader_string_mode::URI_COMPONENT: {
+    case rapidjson_loader_string_mode::type::kUriComponent: {
       std::string strv = atfw::util::uri::encode_uri_component(input.c_str(), input.size());
       output.SetString(strv.c_str(), static_cast<rapidjson::SizeType>(strv.size()), doc.GetAllocator());
       break;
@@ -545,9 +545,9 @@ static std::string dump_pick_field_string_filter(const rapidjson::Value &val,
   }
 
   switch (options.string_mode) {
-    case rapidjson_loader_string_mode::URI:
+    case rapidjson_loader_string_mode::type::kUri:
       return atfw::util::uri::decode_uri(val.GetString(), val.GetStringLength());
-    case rapidjson_loader_string_mode::URI_COMPONENT:
+    case rapidjson_loader_string_mode::type::kUriComponent:
       return atfw::util::uri::decode_uri_component(val.GetString(), val.GetStringLength());
     default:
       return std::string(val.GetString(), val.GetStringLength());
@@ -991,4 +991,3 @@ LIBATAPP_MACRO_API void rapidjson_loader_load_from(rapidjson::Value &dst, rapidj
   }
 }
 LIBATAPP_MACRO_NAMESPACE_END
-

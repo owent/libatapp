@@ -64,18 +64,18 @@ class app {
   using ev_loop_t = uv_loop_t;
 
   struct LIBATAPP_MACRO_API_HEAD_ONLY flag_t {
-    enum type {
-      RUNNING = 0,  //
-      STOPING,      //
-      TIMEOUT,
-      IN_CALLBACK,
-      INITIALIZED,
-      INITIALIZING,
-      STOPPED,
-      DISABLE_ATBUS_FALLBACK,
-      IN_TICK,
-      DESTROYING,
-      FLAG_MAX
+    enum class type : int32_t {
+      kRunning = 0,  //
+      kStoping,      //
+      kTimeout,
+      kInCallback,
+      kInitialized,
+      kInitializing,
+      kStopped,
+      kDisableAtbusFallback,
+      kInTick,
+      kDestroying,
+      kFlagMax
     };
   };
 
@@ -115,14 +115,14 @@ class app {
   friend class flag_guard_t;
 
   struct LIBATAPP_MACRO_API_HEAD_ONLY mode_t {
-    enum type {
-      CUSTOM = 0,  // custom command
-      START,       // start server
-      STOP,        // send a stop command
-      RELOAD,      // send a reload command
-      INFO,        // show information and exit
-      HELP,        // show help and exit
-      MODE_MAX
+    enum class type : int32_t {
+      kCustom = 0,  // custom command
+      kStart,       // start server
+      kStop,        // send a stop command
+      kReload,      // send a reload command
+      kInfo,        // show information and exit
+      kHelp,        // show help and exit
+      kModeMax
     };
   };
 
@@ -383,6 +383,8 @@ class app {
   LIBATAPP_MACRO_API const atapp::protocol::atapp_area &get_area() const noexcept;
   LIBATAPP_MACRO_API atapp::protocol::atapp_area &mutable_area();
   LIBATAPP_MACRO_API atfw::util::time::time_utility::raw_duration_t get_configure_message_timeout() const noexcept;
+
+  LIBATAPP_MACRO_API void pack(atapp::protocol::atapp_topology_info &out) const;
 
   LIBATAPP_MACRO_API void pack(atapp::protocol::atapp_discovery &out) const;
 
@@ -701,8 +703,10 @@ class app {
   LIBATAPP_MACRO_API int trigger_event_on_forward_request(const message_sender_t &source, const message_t &msg);
   LIBATAPP_MACRO_API int trigger_event_on_forward_response(const message_sender_t &source, const message_t &msg,
                                                            int32_t error_code);
-  LIBATAPP_MACRO_API void trigger_event_on_discovery_event(etcd_discovery_action_t::type,
-                                                           const etcd_discovery_node::ptr_t &);
+  LIBATAPP_MACRO_API void trigger_event_on_discovery_event(etcd_discovery_action_t, const etcd_discovery_node::ptr_t &);
+  LIBATAPP_MACRO_API void trigger_event_on_topology_event(
+      etcd_watch_event, const atfw::util::memory::strong_rc_ptr<atapp::protocol::atapp_topology_info> &,
+      const etcd_data_version &);
 
  private:
   static app *last_instance_;
@@ -713,13 +717,13 @@ class app {
   std::vector<std::string> last_command_;
   int setup_result_;
 
-  enum internal_options_t {
+  enum class internal_options_t : int32_t {
     // POSIX: _POSIX_SIGQUEUE_MAX on most platform is 32
     // RLIMIT_SIGPENDING on most linux distributions is 11
     // We use 32 here
-    MAX_SIGNAL_COUNT = 32,
+    kMaxSignalCount = 32,
   };
-  int pending_signals_[MAX_SIGNAL_COUNT];
+  int pending_signals_[static_cast<size_t>(internal_options_t::kMaxSignalCount)];
 
   app_conf conf_;
   mutable std::string build_version_;
@@ -785,4 +789,3 @@ class app {
 };
 
 LIBATAPP_MACRO_NAMESPACE_END
-

@@ -25,7 +25,7 @@ class etcd_cluster;
 class etcd_watcher {
  public:
   struct LIBATAPP_MACRO_API_HEAD_ONLY event_t {
-    etcd_watch_event::type evt_type;
+    etcd_watch_event evt_type;
     etcd_key_value kv;
     etcd_key_value prev_kv;
   };
@@ -154,4 +154,3 @@ class etcd_watcher {
   watch_event_fn_t evt_handle_;
 };
 LIBATAPP_MACRO_NAMESPACE_END
-

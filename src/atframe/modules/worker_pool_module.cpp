@@ -133,7 +133,7 @@ class UTIL_SYMBOL_LOCAL worker_pool_module::worker : public std::enable_shared_f
   std::chrono::system_clock::duration collect_scaling_up_cpu_time() noexcept {
     auto current_value = cpu_time_busy_us_.load(std::memory_order_acquire);
     auto before_value = cpu_time_collect_scaling_up_us_.exchange(current_value, std::memory_order_acq_rel);
-    if UTIL_LIKELY_CONDITION (current_value > before_value) {
+    if ATFW_UTIL_LIKELY_CONDITION (current_value > before_value) {
       return std::chrono::duration_cast<std::chrono::system_clock::duration>(
           std::chrono::microseconds(current_value - before_value));
     }
@@ -144,7 +144,7 @@ class UTIL_SYMBOL_LOCAL worker_pool_module::worker : public std::enable_shared_f
   std::chrono::system_clock::duration collect_scaling_down_cpu_time() noexcept {
     auto current_value = cpu_time_busy_us_.load(std::memory_order_acquire);
     auto before_value = cpu_time_collect_scaling_down_us_.exchange(current_value, std::memory_order_acq_rel);
-    if UTIL_LIKELY_CONDITION (current_value > before_value) {
+    if ATFW_UTIL_LIKELY_CONDITION (current_value > before_value) {
       return std::chrono::duration_cast<std::chrono::system_clock::duration>(
           std::chrono::microseconds(current_value - before_value));
     }
@@ -1509,4 +1509,3 @@ void worker_pool_module::rebalance_jobs() {
 }
 
 LIBATAPP_MACRO_NAMESPACE_END
-

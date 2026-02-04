@@ -27,9 +27,9 @@ LIBATAPP_MACRO_API const char *atapp_connector_loopback::name() noexcept { retur
 LIBATAPP_MACRO_API uint32_t
 atapp_connector_loopback::get_address_type(const atbus::channel::channel_address_t &) const noexcept {
   uint32_t ret = 0;
-  ret |= address_type_t::EN_ACAT_DUPLEX;
-  ret |= address_type_t::EN_ACAT_LOCAL_HOST;
-  ret |= address_type_t::EN_ACAT_LOCAL_PROCESS;
+  ret |= static_cast<uint32_t>(address_type_t::type::kDuplex);
+  ret |= static_cast<uint32_t>(address_type_t::type::kLocalHost);
+  ret |= static_cast<uint32_t>(address_type_t::type::kLocalProcess);
 
   return ret;
 }
@@ -145,7 +145,7 @@ LIBATAPP_MACRO_API void atapp_connector_loopback::on_receive_forward_response(
   get_owner()->trigger_event_on_forward_response(sender, msg, error_code);
 }
 
-LIBATAPP_MACRO_API void atapp_connector_loopback::on_discovery_event(etcd_discovery_action_t::type,
+LIBATAPP_MACRO_API void atapp_connector_loopback::on_discovery_event(etcd_discovery_action_t,
                                                                      const etcd_discovery_node::ptr_t &) {}
 
 LIBATAPP_MACRO_API int32_t atapp_connector_loopback::process(
@@ -213,4 +213,3 @@ LIBATAPP_MACRO_API int32_t atapp_connector_loopback::process(
 }
 
 LIBATAPP_MACRO_NAMESPACE_END
-

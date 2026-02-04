@@ -31,32 +31,34 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 LIBATAPP_MACRO_NAMESPACE_BEGIN
 class etcd_module : public ::atframework::atapp::module_impl {
  public:
+  // ============ 服务发现数据和事件相关定义 ============
   using node_action_t = etcd_discovery_action_t;
 
   struct LIBATAPP_MACRO_API_HEAD_ONLY node_info_t {
     atapp::protocol::atapp_discovery node_discovery;
-    node_action_t::type action;
+    node_action_t action;
   };
 
   struct LIBATAPP_MACRO_API_HEAD_ONLY node_list_t {
     std::list<node_info_t> nodes;
   };
 
-  struct LIBATAPP_MACRO_API_HEAD_ONLY watcher_sender_list_t {
+  struct LIBATAPP_MACRO_API_HEAD_ONLY discovery_watcher_sender_list_t {
     std::reference_wrapper<etcd_module> atapp_module;
     std::reference_wrapper<const ::atframework::atapp::etcd_response_header> etcd_header;
     std::reference_wrapper<const ::atframework::atapp::etcd_watcher::response_t> etcd_body;
     std::reference_wrapper<const ::atframework::atapp::etcd_watcher::event_t> event;
     std::reference_wrapper<const node_info_t> node;
 
-    inline watcher_sender_list_t(etcd_module &m, const ::atframework::atapp::etcd_response_header &h,
-                                 const ::atframework::atapp::etcd_watcher::response_t &b,
-                                 const ::atframework::atapp::etcd_watcher::event_t &e, const node_info_t &n)
+    inline discovery_watcher_sender_list_t(etcd_module &m, const ::atframework::atapp::etcd_response_header &h,
+                                           const ::atframework::atapp::etcd_watcher::response_t &b,
+                                           const ::atframework::atapp::etcd_watcher::event_t &e, const node_info_t &n)
         : atapp_module(std::ref(m)),
           etcd_header(std::cref(h)),
           etcd_body(std::cref(b)),
@@ -64,34 +66,57 @@ class etcd_module : public ::atframework::atapp::module_impl {
           node(std::cref(n)) {}
   };
 
-  struct LIBATAPP_MACRO_API_HEAD_ONLY watcher_sender_one_t {
+  using discovery_watcher_list_callback_t = std::function<void(discovery_watcher_sender_list_t &)>;
+
+  using discovery_snapshot_event_callback_t = std::function<void(const etcd_module &)>;
+  using discovery_snapshot_event_callback_list_t = std::list<discovery_snapshot_event_callback_t>;
+  using discovery_snapshot_event_callback_handle_t = discovery_snapshot_event_callback_list_t::iterator;
+
+  using node_event_callback_t = std::function<void(node_action_t, const etcd_discovery_node::ptr_t &)>;
+  using node_event_callback_list_t = std::list<node_event_callback_t>;
+  using node_event_callback_handle_t = node_event_callback_list_t::iterator;
+
+  // ============ 拓扑数据和事件相关定义 ============
+  using topology_action_t = etcd_watch_event;
+  using atapp_topology_info_ptr_t = atfw::util::memory::strong_rc_ptr<atapp::protocol::atapp_topology_info>;
+
+  struct LIBATAPP_MACRO_API_HEAD_ONLY topology_storage_t {
+    atapp_topology_info_ptr_t info;
+    etcd_data_version version;
+  };
+
+  struct LIBATAPP_MACRO_API_HEAD_ONLY topology_info_t {
+    topology_storage_t storage;
+    topology_action_t action;
+  };
+
+  struct LIBATAPP_MACRO_API_HEAD_ONLY topology_list_t {
+    std::list<topology_info_t> topologies;
+  };
+
+  struct LIBATAPP_MACRO_API_HEAD_ONLY topology_watcher_sender_list_t {
     std::reference_wrapper<etcd_module> atapp_module;
     std::reference_wrapper<const ::atframework::atapp::etcd_response_header> etcd_header;
     std::reference_wrapper<const ::atframework::atapp::etcd_watcher::response_t> etcd_body;
     std::reference_wrapper<const ::atframework::atapp::etcd_watcher::event_t> event;
-    std::reference_wrapper<node_info_t> node;
+    std::reference_wrapper<const topology_info_t> topology;
 
-    inline watcher_sender_one_t(etcd_module &m, const ::atframework::atapp::etcd_response_header &h,
-                                const ::atframework::atapp::etcd_watcher::response_t &b,
-                                const ::atframework::atapp::etcd_watcher::event_t &e, node_info_t &n)
+    inline topology_watcher_sender_list_t(etcd_module &m, const ::atframework::atapp::etcd_response_header &h,
+                                          const ::atframework::atapp::etcd_watcher::response_t &b,
+                                          const ::atframework::atapp::etcd_watcher::event_t &e,
+                                          const topology_info_t &n)
         : atapp_module(std::ref(m)),
           etcd_header(std::cref(h)),
           etcd_body(std::cref(b)),
           event(std::cref(e)),
-          node(std::ref(n)) {}
+          topology(std::cref(n)) {}
   };
 
-  using watcher_list_callback_t = std::function<void(watcher_sender_list_t &)>;
-  using watcher_one_callback_t = std::function<void(watcher_sender_one_t &)>;
+  using topology_watcher_list_callback_t = std::function<void(topology_watcher_sender_list_t &)>;
 
-  using snapshot_event_callback_t = std::function<void(const etcd_module &)>;
-  using snapshot_event_callback_list_t = std::list<snapshot_event_callback_t>;
-  using snapshot_event_callback_handle_t = snapshot_event_callback_list_t::iterator;
-
-  using node_event_callback_t = std::function<void(node_action_t::type, const etcd_discovery_node::ptr_t &)>;
-  using node_event_callback_list_t = std::list<node_event_callback_t>;
-  using node_event_callback_handle_t = node_event_callback_list_t::iterator;
-  using atapp_discovery_ptr_t = std::shared_ptr<atapp::protocol::atapp_discovery>;
+  using topology_snapshot_event_callback_t = std::function<void(const etcd_module &)>;
+  using topology_snapshot_event_callback_list_t = std::list<topology_snapshot_event_callback_t>;
+  using topology_snapshot_event_callback_handle_t = topology_snapshot_event_callback_list_t::iterator;
 
  public:
   LIBATAPP_MACRO_API etcd_module();
@@ -103,7 +128,8 @@ class etcd_module : public ::atframework::atapp::module_impl {
   LIBATAPP_MACRO_API int init() override;
 
  private:
-  void update_keepalive_value();
+  void update_keepalive_topology_value();
+  void update_keepalive_discovery_value();
   int init_keepalives();
   int init_watchers();
 
@@ -124,37 +150,32 @@ class etcd_module : public ::atframework::atapp::module_impl {
   LIBATAPP_MACRO_API bool is_etcd_enabled() const;
   LIBATAPP_MACRO_API void enable_etcd();
   LIBATAPP_MACRO_API void disable_etcd();
-  LIBATAPP_MACRO_API void set_maybe_update_keepalive_value();
-  LIBATAPP_MACRO_API void set_maybe_update_keepalive_area();
-  LIBATAPP_MACRO_API void set_maybe_update_keepalive_metadata();
+  LIBATAPP_MACRO_API void set_maybe_update_keepalive_topology_value();
+  LIBATAPP_MACRO_API void set_maybe_update_keepalive_discovery_value();
+  LIBATAPP_MACRO_API void set_maybe_update_keepalive_discovery_area();
+  LIBATAPP_MACRO_API void set_maybe_update_keepalive_discovery_metadata();
 
   LIBATAPP_MACRO_API const atfw::util::network::http_request::curl_m_bind_ptr_t &get_shared_curl_multi_context() const;
 
-  LIBATAPP_MACRO_API std::string get_by_id_path() const;
-  LIBATAPP_MACRO_API std::string get_by_type_id_path() const;
-  LIBATAPP_MACRO_API std::string get_by_type_name_path() const;
-  LIBATAPP_MACRO_API std::string get_by_name_path() const;
-  LIBATAPP_MACRO_API std::string get_by_tag_path(const std::string &tag_name) const;
+  LIBATAPP_MACRO_API std::string get_discovery_by_id_path() const;
+  LIBATAPP_MACRO_API std::string get_discovery_by_name_path() const;
+  LIBATAPP_MACRO_API std::string get_topology_path() const;
 
-  LIBATAPP_MACRO_API std::string get_by_id_watcher_path() const;
-  LIBATAPP_MACRO_API std::string get_by_type_id_watcher_path(uint64_t type_id) const;
-  LIBATAPP_MACRO_API std::string get_by_type_name_watcher_path(const std::string &type_name) const;
-  LIBATAPP_MACRO_API std::string get_by_name_watcher_path() const;
-  LIBATAPP_MACRO_API std::string get_by_tag_watcher_path(const std::string &tag_name) const;
+  LIBATAPP_MACRO_API std::string get_discovery_by_id_watcher_path() const;
+  LIBATAPP_MACRO_API std::string get_discovery_by_name_watcher_path() const;
+  LIBATAPP_MACRO_API std::string get_topology_watcher_path() const;
 
-  LIBATAPP_MACRO_API int add_watcher_by_id(watcher_list_callback_t fn);
-  LIBATAPP_MACRO_API int add_watcher_by_type_id(uint64_t type_id, watcher_one_callback_t fn);
-  LIBATAPP_MACRO_API int add_watcher_by_type_name(const std::string &type_name, watcher_one_callback_t fn);
-  LIBATAPP_MACRO_API int add_watcher_by_name(watcher_list_callback_t fn);
-  LIBATAPP_MACRO_API int add_watcher_by_tag(const std::string &tag_name, watcher_one_callback_t fn);
-
-  LIBATAPP_MACRO_API atapp::etcd_watcher::ptr_t add_watcher_by_custom_path(const std::string &custom_path,
-                                                                           watcher_one_callback_t fn);
+  LIBATAPP_MACRO_API int add_discovery_watcher_by_id(discovery_watcher_list_callback_t fn);
+  LIBATAPP_MACRO_API int add_discovery_watcher_by_name(discovery_watcher_list_callback_t fn);
+  LIBATAPP_MACRO_API int add_topology_watcher(topology_watcher_list_callback_t fn);
 
   LIBATAPP_MACRO_API const ::atframework::atapp::etcd_cluster &get_raw_etcd_ctx() const;
   LIBATAPP_MACRO_API ::atframework::atapp::etcd_cluster &get_raw_etcd_ctx();
 
-  LIBATAPP_MACRO_API const ::atframework::atapp::etcd_response_header &get_last_etcd_event_header() const;
+  LIBATAPP_MACRO_API const ::atframework::atapp::etcd_response_header &get_last_etcd_event_topology_header()
+      const noexcept;
+  LIBATAPP_MACRO_API const ::atframework::atapp::etcd_response_header &get_last_etcd_event_discovery_header()
+      const noexcept;
 
   LIBATAPP_MACRO_API const atapp::protocol::atapp_etcd &get_configure() const;
   LIBATAPP_MACRO_API const std::string &get_configure_path() const;
@@ -166,53 +187,45 @@ class etcd_module : public ::atframework::atapp::module_impl {
   LIBATAPP_MACRO_API node_event_callback_handle_t add_on_node_discovery_event(node_event_callback_t fn);
   LIBATAPP_MACRO_API void remove_on_node_event(node_event_callback_handle_t &handle);
 
-  LIBATAPP_MACRO_API etcd_discovery_set &get_global_discovery();
-  LIBATAPP_MACRO_API const etcd_discovery_set &get_global_discovery() const;
+  LIBATAPP_MACRO_API etcd_discovery_set &get_global_discovery() noexcept;
+  LIBATAPP_MACRO_API const etcd_discovery_set &get_global_discovery() const noexcept;
 
-  LIBATAPP_MACRO_API bool has_snapshot() const;
+  LIBATAPP_MACRO_API const std::unordered_map<uint64_t, topology_storage_t> &get_topology_info_set() const noexcept;
 
-  LIBATAPP_MACRO_API snapshot_event_callback_handle_t add_on_load_snapshot(snapshot_event_callback_t fn);
-  LIBATAPP_MACRO_API void remove_on_load_snapshot(snapshot_event_callback_handle_t &handle);
-  LIBATAPP_MACRO_API snapshot_event_callback_handle_t add_on_snapshot_loaded(snapshot_event_callback_t fn);
-  LIBATAPP_MACRO_API void remove_on_snapshot_loaded(snapshot_event_callback_handle_t &handle);
+  LIBATAPP_MACRO_API bool has_discovery_snapshot() const noexcept;
+
+  LIBATAPP_MACRO_API discovery_snapshot_event_callback_handle_t
+  add_on_load_discovery_snapshot(discovery_snapshot_event_callback_t fn);
+  LIBATAPP_MACRO_API void remove_on_load_discovery_snapshot(discovery_snapshot_event_callback_handle_t &handle);
+  LIBATAPP_MACRO_API discovery_snapshot_event_callback_handle_t
+  add_on_discovery_snapshot_loaded(discovery_snapshot_event_callback_t fn);
+  LIBATAPP_MACRO_API void remove_on_discovery_snapshot_loaded(discovery_snapshot_event_callback_handle_t &handle);
+
+  LIBATAPP_MACRO_API bool has_topology_snapshot() const noexcept;
+
+  LIBATAPP_MACRO_API topology_snapshot_event_callback_handle_t
+  add_on_load_topology_snapshot(topology_snapshot_event_callback_t fn);
+  LIBATAPP_MACRO_API void remove_on_load_topology_snapshot(topology_snapshot_event_callback_handle_t &handle);
+  LIBATAPP_MACRO_API topology_snapshot_event_callback_handle_t
+  add_on_topology_snapshot_loaded(topology_snapshot_event_callback_t fn);
+  LIBATAPP_MACRO_API void remove_on_topology_snapshot_loaded(topology_snapshot_event_callback_handle_t &handle);
 
  private:
   static bool unpack(node_info_t &out, const std::string &path, const std::string &json, bool reset_data);
-  static void pack(const node_info_t &out, std::string &json);
+  static void pack(const node_info_t &src, std::string &json);
+  static bool unpack(topology_info_t &out, const std::string &path, const std::string &json, bool reset_data);
+  static void pack(const atapp::protocol::atapp_topology_info &src, std::string &json);
 
   static int http_callback_on_etcd_closed(atfw::util::network::http_request &req);
 
-  struct watcher_callback_list_wrapper_t {
-    etcd_module *mod;
-    std::list<watcher_list_callback_t> *callbacks;
-    int64_t snapshot_index;
-    bool has_insert_snapshot_index;
+  struct topology_watcher_callback_list_wrapper_t;
+  struct discovery_watcher_callback_list_wrapper_t;
 
-    watcher_callback_list_wrapper_t(etcd_module &m, std::list<watcher_list_callback_t> &cbks, int64_t index);
-    ~watcher_callback_list_wrapper_t();
-    void operator()(const ::atframework::atapp::etcd_response_header &header,
-                    const ::atframework::atapp::etcd_watcher::response_t &evt_data);
-  };
+  bool update_internal_watcher_event(node_info_t &node, const etcd_discovery_node::node_version &version);
+  bool update_internal_watcher_event(topology_info_t &topology_info);
+  void reset_internal_watchers_and_keepalives();
 
-  struct watcher_callback_one_wrapper_t {
-    etcd_module *mod;
-    watcher_one_callback_t callback;
-    int64_t snapshot_index;
-    bool has_insert_snapshot_index;
-
-    watcher_callback_one_wrapper_t(etcd_module &m, watcher_one_callback_t cbk, int64_t index);
-    ~watcher_callback_one_wrapper_t();
-    void operator()(const ::atframework::atapp::etcd_response_header &header,
-                    const ::atframework::atapp::etcd_watcher::response_t &evt_data);
-  };
-
-  bool update_inner_watcher_event(node_info_t &node, const etcd_discovery_node::node_version &version);
-  void reset_inner_watchers_and_keepalives();
-
-  struct watcher_internal_access_t {
-    static void cleanup_old_nodes(etcd_module &mod, etcd_discovery_set::node_by_name_type &old_names,
-                                  etcd_discovery_set::node_by_id_type &old_ids);
-  };
+  struct watcher_internal_access_t;
 
  private:
   std::string conf_path_cache_;
@@ -220,34 +233,49 @@ class etcd_module : public ::atframework::atapp::module_impl {
   atfw::util::network::http_request::curl_m_bind_ptr_t curl_multi_;
   atfw::util::network::http_request::ptr_t cleanup_request_;
   bool etcd_ctx_enabled_;
-  bool maybe_update_internal_keepalive_value_;
-  bool maybe_update_internal_keepalive_area_;
-  bool maybe_update_internal_keepalive_metadata_;
+  bool maybe_update_internal_keepalive_topology_value_;
+  bool maybe_update_internal_keepalive_discovery_value_;
+  bool maybe_update_internal_keepalive_discovery_area_;
+  bool maybe_update_internal_keepalive_discovery_metadata_;
+  atapp_topology_info_ptr_t last_submmited_topology_data_;
   atapp::protocol::atapp_area last_submmited_discovery_data_area_;
   atapp::protocol::atapp_metadata last_submmited_discovery_data_metadata_;
   atfw::util::time::time_utility::raw_time_t tick_next_timepoint_;
   std::chrono::system_clock::duration tick_interval_;
   atapp::etcd_cluster etcd_ctx_;
-  ::atframework::atapp::etcd_response_header last_etcd_event_header_;
+  ::atframework::atapp::etcd_response_header last_etcd_event_topology_header_;
+  ::atframework::atapp::etcd_response_header last_etcd_event_discovery_header_;
 
-  std::list<etcd_keepalive::ptr_t> inner_keepalive_actors_;
-  std::string inner_keepalive_value_;
+  std::list<etcd_keepalive::ptr_t> internal_topology_keepalive_actors_;
+  std::list<etcd_keepalive::ptr_t> internal_discovery_keepalive_actors_;
+  std::string internal_keepalive_topology_value_;
+  std::string internal_keepalive_discovery_value_;
 
-  snapshot_event_callback_list_t on_load_snapshot_callbacks_;
-  snapshot_event_callback_list_t on_snapshot_loaded_callbacks_;
-  std::set<int64_t> watcher_snapshot_index_;
-  int64_t watcher_snapshot_index_allocator_;
+  discovery_snapshot_event_callback_list_t discovery_on_load_snapshot_callbacks_;
+  discovery_snapshot_event_callback_list_t discovery_on_snapshot_loaded_callbacks_;
+  std::set<int64_t> discovery_watcher_snapshot_index_;
+  int64_t discovery_watcher_snapshot_index_allocator_;
 
-  mutable std::recursive_mutex watcher_callback_lock_;
-  std::list<watcher_list_callback_t> watcher_by_id_callbacks_;
-  std::list<watcher_list_callback_t> watcher_by_name_callbacks_;
+  mutable std::recursive_mutex discovery_watcher_callback_lock_;
+  std::list<discovery_watcher_list_callback_t> discovery_watcher_by_id_callbacks_;
+  std::list<discovery_watcher_list_callback_t> discovery_watcher_by_name_callbacks_;
 
-  etcd_watcher::ptr_t inner_watcher_by_name_;
-  etcd_watcher::ptr_t inner_watcher_by_id_;
+  topology_snapshot_event_callback_list_t topology_on_load_snapshot_callbacks_;
+  topology_snapshot_event_callback_list_t topology_on_snapshot_loaded_callbacks_;
+  std::set<int64_t> topology_watcher_snapshot_index_;
+  int64_t topology_watcher_snapshot_index_allocator_;
+
+  mutable std::recursive_mutex topology_watcher_callback_lock_;
+  std::list<topology_watcher_list_callback_t> topology_watcher_callbacks_;
+
+  etcd_watcher::ptr_t internal_topology_watcher_;
+  etcd_watcher::ptr_t internal_discovery_watcher_by_name_;
+  etcd_watcher::ptr_t internal_discovery_watcher_by_id_;
+
   etcd_discovery_set global_discovery_;
+  std::unordered_map<uint64_t, topology_storage_t> internal_topology_info_set_;
 
   mutable std::recursive_mutex node_event_lock_;
   node_event_callback_list_t node_event_callbacks_;
 };
 LIBATAPP_MACRO_NAMESPACE_END
-

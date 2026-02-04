@@ -96,7 +96,7 @@ LIBATAPP_MACRO_API void etcd_keepalive::set_value(const std::string &str) {
     value_ = str;
     rpc_.is_value_changed = true;
 
-    if (owner_->check_flag(etcd_cluster::flag_t::RUNNING) && 0 != owner_->get_lease()) {
+    if (owner_->check_flag(etcd_cluster::flag_t::type::kRunning) && 0 != owner_->get_lease()) {
       active();
     }
   }
@@ -302,4 +302,3 @@ int etcd_keepalive::libcurl_callback_on_set_data(atfw::util::network::http_reque
   return 0;
 }
 LIBATAPP_MACRO_NAMESPACE_END
-
