@@ -25,8 +25,7 @@ ATBUS_MACRO_NAMESPACE_END
 
 LIBATAPP_MACRO_NAMESPACE_BEGIN
 
-class atapp_connector_atbus : public atapp_connector_impl,
-                              public atfw::util::memory::enable_shared_rc_from_this<atapp_connector_atbus> {
+class atapp_connector_atbus : public atapp_connector_impl, public std::enable_shared_from_this<atapp_connector_atbus> {
   UTIL_DESIGN_PATTERN_NOCOPYABLE(atapp_connector_atbus)
   UTIL_DESIGN_PATTERN_NOMOVABLE(atapp_connector_atbus)
 
@@ -41,8 +40,6 @@ class atapp_connector_atbus : public atapp_connector_impl,
   LIBATAPP_MACRO_API const char *name() noexcept override;
   LIBATAPP_MACRO_API void reload() noexcept;
   LIBATAPP_MACRO_API uint32_t get_address_type(const atbus::channel::channel_address_t &addr) const noexcept override;
-  LIBATAPP_MACRO_API bool check_address_connectable(const atbus::channel::channel_address_t &addr,
-                                                    const etcd_discovery_node &discovery) const noexcept override;
   LIBATAPP_MACRO_API int32_t on_start_listen(const atbus::channel::channel_address_t &addr) override;
   LIBATAPP_MACRO_API int32_t on_start_connect(const etcd_discovery_node &discovery, atapp_endpoint &endpoint,
                                               const atbus::channel::channel_address_t &addr,
@@ -53,6 +50,9 @@ class atapp_connector_atbus : public atapp_connector_impl,
                                                      const atapp::protocol::atapp_metadata *metadata) override;
 
   LIBATAPP_MACRO_API void on_discovery_event(etcd_discovery_action_t, const etcd_discovery_node::ptr_t &) override;
+
+  LIBATAPP_MACRO_API bool check_address_connectable(const atbus::channel::channel_address_t &addr,
+                                                    const etcd_discovery_node &discovery) const noexcept;
 
   LIBATAPP_MACRO_API void remove_topology_peer(atbus::bus_id_t target_bus_id);
 
@@ -67,7 +67,7 @@ class atapp_connector_atbus : public atapp_connector_impl,
  private:
   friend class app;
   atfw::util::nostd::nonnull<atbus_connection_handle_ptr_t> create_connection_handle(
-      atbus::bus_id_t bus_id, const atapp_connection_handle::ptr_t &handle);
+      atbus::bus_id_t bus_id, atbus::bus_id_t topology_upstream_bus_id, const atapp_connection_handle::ptr_t &handle);
   atfw::util::nostd::nonnull<atbus_connection_handle_ptr_t> mutable_connection_handle(
       atbus::bus_id_t bus_id, const atapp_connection_handle::ptr_t &handle);
 
@@ -103,6 +103,7 @@ class atapp_connector_atbus : public atapp_connector_impl,
                                                  const atapp_connection_handle::ptr_t &handle);
 
   int32_t on_start_connect_to_same_or_other_upstream_peer(const etcd_discovery_node &discovery,
+                                                          atbus::topology_relation_type relation,
                                                           const atbus::channel::channel_address_t *addr,
                                                           const atapp_connection_handle::ptr_t &handle,
                                                           const atbus::topology_registry::ptr_t &topology_registry,

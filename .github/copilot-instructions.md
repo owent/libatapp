@@ -263,6 +263,14 @@ FWLOGERROR("Error message: {}", value);
 FWLOGFATAL("Fatal message: {}", value);
 ```
 
+## Code Formatting
+
+This project uses **clang-format** for code formatting. The `.clang-format` file is located at the project root.
+
+- Style: Based on Google style
+- Column limit: 120
+- Run formatting: `clang-format -i <file>`
+
 ## Coding Conventions
 
 1. **Namespace**: `atframework::atapp`

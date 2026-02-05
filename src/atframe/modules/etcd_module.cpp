@@ -467,8 +467,22 @@ void etcd_module::update_keepalive_discovery_value() {
 }
 
 int etcd_module::init_keepalives() {
-  update_keepalive_discovery_value();
+  // 先刷新topology数据，后刷新discovery数据，以保证策略路由变化时已获取到最新的topology信息
   update_keepalive_topology_value();
+  update_keepalive_discovery_value();
+
+  // topology
+  {
+    atapp::etcd_keepalive::ptr_t actor = add_keepalive_actor(internal_keepalive_topology_value_, get_topology_path());
+    if (!actor) {
+      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(etcd_ctx_, "create etcd_keepalive for topology index failed.");
+      return -1;
+    }
+
+    internal_topology_keepalive_actors_.push_back(actor);
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(etcd_ctx_, "create etcd_keepalive {} for topology index {} success",
+                                         reinterpret_cast<const void *>(actor.get()), get_topology_path());
+  }
 
   // by_id
   {
@@ -496,19 +510,6 @@ int etcd_module::init_keepalives() {
     internal_discovery_keepalive_actors_.push_back(actor);
     LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(etcd_ctx_, "create etcd_keepalive {} for by_name index {} success",
                                          reinterpret_cast<const void *>(actor.get()), get_discovery_by_name_path());
-  }
-
-  // topology
-  {
-    atapp::etcd_keepalive::ptr_t actor = add_keepalive_actor(internal_keepalive_topology_value_, get_topology_path());
-    if (!actor) {
-      LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(etcd_ctx_, "create etcd_keepalive for topology index failed.");
-      return -1;
-    }
-
-    internal_topology_keepalive_actors_.push_back(actor);
-    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(etcd_ctx_, "create etcd_keepalive {} for topology index {} success",
-                                         reinterpret_cast<const void *>(actor.get()), get_topology_path());
   }
 
   return 0;
