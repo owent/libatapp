@@ -134,13 +134,6 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE atapp_connector_impl {
   virtual uint32_t get_address_type(const atbus::channel::channel_address_t &addr) const noexcept = 0;
 
   /**
-   * @brief check address connectable
-   * @return true if this address can be connected by this connector
-   */
-  virtual bool check_address_connectable(const atbus::channel::channel_address_t &addr,
-                                         const etcd_discovery_node &discovery) const noexcept = 0;
-
-  /**
    * @brief if this connector is allowed to connect to loopback endpoint
    * @note false for default
    * @return true if this connector

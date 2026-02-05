@@ -8,11 +8,14 @@ atapp:
 
   bus:
     listen: "ipv4://127.0.0.1:21536"
-    subnets: "0/0"
     proxy: ""
     backlog: 256
     access_token_max_number: 5
     overwrite_listen_path: false
+    topology:
+      rule:
+        allow_direct_connection: true
+        require_same_upstream: false
     first_idle_timeout: 10s
     ping_interval: 60s
     retry_interval: 3s
@@ -56,4 +59,3 @@ atapp:
             level:
               min: fatal
               max: debug
-

@@ -1524,13 +1524,9 @@ LIBATAPP_MACRO_API app::app_id_t app::get_type_id() const noexcept {
 
 LIBATAPP_MACRO_API const std::string &app::get_hash_code() const noexcept { return conf_.hash_code; }
 
-LIBATAPP_MACRO_API void app::enable_fallback_to_atbus_connector() {
-  set_flag(flag_t::kDisableAtbusFallback, false);
-}
+LIBATAPP_MACRO_API void app::enable_fallback_to_atbus_connector() { set_flag(flag_t::kDisableAtbusFallback, false); }
 
-LIBATAPP_MACRO_API void app::disable_fallback_to_atbus_connector() {
-  set_flag(flag_t::kDisableAtbusFallback, true);
-}
+LIBATAPP_MACRO_API void app::disable_fallback_to_atbus_connector() { set_flag(flag_t::kDisableAtbusFallback, true); }
 
 LIBATAPP_MACRO_API bool app::is_fallback_to_atbus_connector_enabled() const noexcept {
   return !check_flag(flag_t::kDisableAtbusFallback);
@@ -2537,11 +2533,6 @@ LIBATAPP_MACRO_API atapp_endpoint::ptr_t app::mutable_endpoint(const etcd_discov
           continue;
         }
 
-        // Skip if this address can not be connected by this node
-        if (!connector_protocol->check_address_connectable(addr, *discovery)) {
-          continue;
-        }
-
         int res = connector_protocol->on_start_connect(*discovery, *ret, addr, handle);
         if (0 == res && handle.use_count() > 1) {
           atapp_connector_bind_helper::bind(*handle, *connector_protocol);
@@ -2984,8 +2975,7 @@ void app::run_ev_loop(int run_mode) {
       }
 
       // stop atbus after all module closed
-      if (check_flag(flag_t::kStopped) && bus_node_ &&
-          ::atbus::node::state_t::kCreated != bus_node_->get_state() &&
+      if (check_flag(flag_t::kStopped) && bus_node_ && ::atbus::node::state_t::kCreated != bus_node_->get_state() &&
           !bus_node_->check_flag(::atbus::node::flag_t::kShutdown)) {
         bus_node_->shutdown(EN_ATBUS_ERR_SUCCESS);
       }

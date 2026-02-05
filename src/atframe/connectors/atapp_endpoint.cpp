@@ -176,6 +176,10 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::push_forward_message(int32_t type, ui
 
     int32_t ret = connector->on_send_forward_request(handle, type, &msg_sequence, data, metadata);
     if (0 != ret) {
+      // 连接错误直接走重试流程
+      if (EN_ATBUS_ERR_ATNODE_NO_CONNECTION == ret || EN_ATBUS_ERR_ATNODE_INVALID_ID == ret) {
+        break;
+      }
       trigger_on_receive_forward_response(connector, handle, type, msg_sequence, ret, data, metadata);
     }
 
@@ -423,4 +427,3 @@ void atapp_endpoint::trigger_on_receive_forward_response(atapp_connector_impl *c
 }
 
 LIBATAPP_MACRO_NAMESPACE_END
-

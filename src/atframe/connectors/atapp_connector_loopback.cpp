@@ -34,11 +34,6 @@ atapp_connector_loopback::get_address_type(const atbus::channel::channel_address
   return ret;
 }
 
-LIBATAPP_MACRO_API bool atapp_connector_loopback::check_address_connectable(
-    const atbus::channel::channel_address_t &, const etcd_discovery_node &) const noexcept {
-  return true;
-}
-
 LIBATAPP_MACRO_API int32_t atapp_connector_loopback::on_start_listen(const atbus::channel::channel_address_t &) {
   return EN_ATAPP_ERR_SUCCESS;
 }
