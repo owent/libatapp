@@ -2,6 +2,8 @@
 //
 // Created by owent
 
+#include "atframe/connectors/atapp_connector_atbus.h"
+
 #include <string/string_format.h>
 #include "detail/libatbus_config.h"
 
@@ -13,7 +15,7 @@
 
 #include <atframe/atapp.h>
 #include <atframe/atapp_common_types.h>
-#include <atframe/connectors/atapp_connector_atbus.h>
+#include <atframe/modules/etcd_module.h>
 
 LIBATAPP_MACRO_NAMESPACE_BEGIN
 
@@ -125,7 +127,10 @@ LIBATAPP_MACRO_API void atapp_connector_atbus::reload() noexcept {
       atbus_topology_data_->labels[label.first] = label.second;
     }
 
-    // TODO(owent): etcd update topology data to notify other nodes
+    // etcd update topology data to notify other nodes
+    if (get_owner()->get_etcd_module()) {
+      get_owner()->get_etcd_module()->set_maybe_update_keepalive_topology_value();
+    }
   }
 
   // checking atbus_topology_data changes

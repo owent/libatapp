@@ -307,6 +307,13 @@ static void apply_atbus_configure(atbus::node::conf_t &to, const protocol::atbus
     to.compression_allow_algorithms.push_back(convert_atbus_configure(from.compression().algorithm(i)));
   }
   to.compression_level = convert_atbus_configure(from.compression().level());
+
+  // topology labels
+  to.topology_labels.clear();
+  to.topology_labels.reserve(static_cast<size_t>(from.topology().data().label_size()));
+  for (const auto &label_kv : from.topology().data().label()) {
+    to.topology_labels[label_kv.first] = label_kv.second;
+  }
 }
 
 #if !defined(NDEBUG)
@@ -1114,8 +1121,13 @@ LIBATAPP_MACRO_API int app::reload() {
     return EN_ATAPP_ERR_LOAD_CONFIGURE_FILE;
   }
 
-  // apply ini configure
+  // apply configure
   apply_configure();
+
+  // prereload
+  for (module_ptr_t &mod : modules_) {
+    mod->prereload(conf_);
+  }
 
   // Check configure
   if (0 == get_app_id() && get_app_name().empty()) {
