@@ -23,7 +23,7 @@ class atapp_connector_loopback : public atapp_connector_impl {
  public:
   LIBATAPP_MACRO_API atapp_connector_loopback(app &owner);
   LIBATAPP_MACRO_API virtual ~atapp_connector_loopback();
-  LIBATAPP_MACRO_API const char *name() noexcept override;
+  LIBATAPP_MACRO_API gsl::string_view name() const noexcept override;
   LIBATAPP_MACRO_API uint32_t get_address_type(const atbus::channel::channel_address_t &addr) const noexcept override;
   LIBATAPP_MACRO_API int32_t on_start_listen(const atbus::channel::channel_address_t &addr) override;
   LIBATAPP_MACRO_API int32_t on_start_connect(const etcd_discovery_node &discovery, atapp_endpoint &endpoint,

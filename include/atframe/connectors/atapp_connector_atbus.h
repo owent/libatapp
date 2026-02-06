@@ -35,7 +35,7 @@ class atapp_connector_atbus : public atapp_connector_impl, public std::enable_sh
  public:
   LIBATAPP_MACRO_API atapp_connector_atbus(app &owner);
   LIBATAPP_MACRO_API virtual ~atapp_connector_atbus();
-  LIBATAPP_MACRO_API const char *name() noexcept override;
+  LIBATAPP_MACRO_API gsl::string_view name() const noexcept override;
   LIBATAPP_MACRO_API void reload() noexcept;
   LIBATAPP_MACRO_API uint32_t get_address_type(const atbus::channel::channel_address_t &addr) const noexcept override;
   LIBATAPP_MACRO_API int32_t on_start_listen(const atbus::channel::channel_address_t &addr) override;
@@ -94,36 +94,28 @@ class atapp_connector_atbus : public atapp_connector_impl, public std::enable_sh
 
   int32_t try_direct_reconnect(const atbus_connection_handle_ptr_t &handle);
 
-  int32_t try_connect_to(const etcd_discovery_node &discovery, const atbus::channel::channel_address_t *addr,
-                         const atapp_connection_handle::ptr_t &handle, bool allow_proxy);
+  int32_t try_connect_to(const etcd_discovery_node &discovery, const atapp_connection_handle::ptr_t &handle,
+                         bool allow_proxy);
 
   int32_t on_start_connect_to_connected_endpoint(const etcd_discovery_node &discovery,
-                                                 const atbus::channel::channel_address_t *addr,
                                                  const atapp_connection_handle::ptr_t &handle);
 
   int32_t on_start_connect_to_same_or_other_upstream_peer(const etcd_discovery_node &discovery,
                                                           atbus::topology_relation_type relation,
-                                                          const atbus::channel::channel_address_t *addr,
                                                           const atapp_connection_handle::ptr_t &handle,
                                                           const atbus::topology_registry::ptr_t &topology_registry,
                                                           bool allow_proxy);
 
   int32_t on_start_connect_to_upstream_peer(const etcd_discovery_node &discovery,
-                                            const atbus::channel::channel_address_t *addr,
                                             const atapp_connection_handle::ptr_t &handle,
-                                            const atbus::topology_registry::ptr_t &topology_registry,
                                             const atbus::topology_peer::ptr_t &next_hop_peer);
 
   int32_t on_start_connect_to_downstream_peer(const etcd_discovery_node &discovery,
-                                              const atbus::channel::channel_address_t *addr,
                                               const atapp_connection_handle::ptr_t &handle,
-                                              const atbus::topology_registry::ptr_t &topology_registry,
                                               const atbus::topology_peer::ptr_t &next_hop_peer);
 
   int32_t on_start_connect_to_proxy_by_upstream(const etcd_discovery_node &discovery,
-                                                const atbus::channel::channel_address_t *addr,
-                                                const atapp_connection_handle::ptr_t &handle,
-                                                const atbus::topology_registry::ptr_t &topology_registry);
+                                                const atapp_connection_handle::ptr_t &handle);
 
   void remove_connection_handle(const handle_map_t::iterator &iter);
 

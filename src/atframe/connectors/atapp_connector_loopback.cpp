@@ -22,7 +22,9 @@ LIBATAPP_MACRO_API atapp_connector_loopback::atapp_connector_loopback(app &owner
 
 LIBATAPP_MACRO_API atapp_connector_loopback::~atapp_connector_loopback() { cleanup(); }
 
-LIBATAPP_MACRO_API const char *atapp_connector_loopback::name() noexcept { return "atapp::connector.loopback"; }
+LIBATAPP_MACRO_API gsl::string_view atapp_connector_loopback::name() const noexcept {
+  return "atapp::connector.loopback";
+}
 
 LIBATAPP_MACRO_API uint32_t
 atapp_connector_loopback::get_address_type(const atbus::channel::channel_address_t &) const noexcept {
