@@ -11,6 +11,7 @@
 #include <design_pattern/noncopyable.h>
 
 #include <common/demangle.h>
+#include <gsl/select-gsl.h>
 
 #include <detail/buffer.h>
 #include <detail/libatbus_channel_export.h>
@@ -120,7 +121,7 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE atapp_connector_impl {
 
  public:
   LIBATAPP_MACRO_API virtual ~atapp_connector_impl();
-  LIBATAPP_MACRO_API virtual const char *name() noexcept;
+  LIBATAPP_MACRO_API virtual gsl::string_view name() const noexcept;
 
   /**
    * @brief get address type

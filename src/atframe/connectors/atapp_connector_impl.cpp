@@ -198,7 +198,7 @@ LIBATAPP_MACRO_API atapp_connector_impl::atapp_connector_impl(app &owner) : owne
 
 LIBATAPP_MACRO_API atapp_connector_impl::~atapp_connector_impl() { is_destroying_ = true; }
 
-LIBATAPP_MACRO_API const char *atapp_connector_impl::name() noexcept {
+LIBATAPP_MACRO_API gsl::string_view atapp_connector_impl::name() const noexcept {
   if (auto_demangled_name_) {
     return auto_demangled_name_->get();
   }
