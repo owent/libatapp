@@ -1,4 +1,5 @@
-// Copyright 2024 atframework
+// Copyright 2026 atframework
+//
 // Created by owent
 
 #pragma once
@@ -45,7 +46,7 @@ class worker_pool_module : public ::atframework::atapp::module_impl {
   LIBATAPP_MACRO_API int tick(std::chrono::system_clock::time_point now);
 
   template <class ClockType, class DurationType>
-  UTIL_FORCEINLINE int tick(std::chrono::time_point<ClockType, DurationType> now) {
+  ATFW_UTIL_FORCEINLINE int tick(std::chrono::time_point<ClockType, DurationType> now) {
     return tick(std::chrono::time_point_cast<std::chrono::system_clock::time_point>(now));
   }
 
@@ -131,3 +132,4 @@ class worker_pool_module : public ::atframework::atapp::module_impl {
   std::shared_ptr<scaling_statistics> scaling_statistics_;
 };
 LIBATAPP_MACRO_NAMESPACE_END
+

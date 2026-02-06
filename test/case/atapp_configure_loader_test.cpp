@@ -1,4 +1,4 @@
-// Copyright 2022 atframework
+// Copyright 2026 atframework
 
 #include <atframe/atapp.h>
 
@@ -39,7 +39,7 @@ static void check_origin_configure(atframework::atapp::app &app, atapp::protocol
   CASE_EXPECT_EQ(3, app.get_origin_configure().bus().retry_interval().seconds());
   CASE_EXPECT_EQ(3, app.get_origin_configure().bus().fault_tolerant());
   CASE_EXPECT_EQ(262144, app.get_origin_configure().bus().message_size());
-  CASE_EXPECT_EQ(8388608, app.get_origin_configure().bus().recv_buffer_size());
+  CASE_EXPECT_EQ(8388608, app.get_origin_configure().bus().receive_buffer_size());
   CASE_EXPECT_EQ(2097152, app.get_origin_configure().bus().send_buffer_size());
   CASE_EXPECT_EQ(0, app.get_origin_configure().bus().send_buffer_number());
   CASE_EXPECT_EQ(1000, app.get_origin_configure().bus().loop_times());
@@ -65,8 +65,6 @@ static void check_origin_configure(atframework::atapp::app &app, atapp::protocol
   CASE_EXPECT_EQ(10, app.get_origin_configure().etcd().init().timeout().seconds());
   CASE_EXPECT_EQ(0, app.get_origin_configure().etcd().init().timeout().nanos());
   CASE_EXPECT_TRUE(app.get_origin_configure().etcd().cluster().auto_update());
-  CASE_EXPECT_FALSE(app.get_origin_configure().etcd().watcher().by_id());
-  CASE_EXPECT_TRUE(app.get_origin_configure().etcd().watcher().by_name());
 
   CASE_EXPECT_EQ(3, sub_cfg.hosts_size());
   if (3 == sub_cfg.hosts_size()) {
@@ -81,8 +79,6 @@ static void check_origin_configure(atframework::atapp::app &app, atapp::protocol
   CASE_EXPECT_EQ(10, sub_cfg.init().timeout().seconds());
   CASE_EXPECT_EQ(0, sub_cfg.init().timeout().nanos());
   CASE_EXPECT_TRUE(sub_cfg.cluster().auto_update());
-  CASE_EXPECT_FALSE(sub_cfg.watcher().by_id());
-  CASE_EXPECT_TRUE(sub_cfg.watcher().by_name());
 
   {
     auto map_kv1 = app.get_origin_configure().metadata().labels().find("deployment.environment");
@@ -347,3 +343,4 @@ CASE_TEST_EVENT_ON_EXIT(unit_test_event_on_exit_close_libuv) {
   }
   uv_loop_close(uv_default_loop());
 }
+

@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Create by owent
 
 #include "atframe/etcdcli/etcd_keepalive.h"
@@ -13,7 +14,6 @@
 #include <log/log_wrapper.h>
 
 #include <atframe/etcdcli/etcd_cluster.h>
-#include <atframe/etcdcli/etcd_keepalive.h>
 
 #ifdef GetObject
 #  undef GetObject
@@ -88,14 +88,14 @@ LIBATAPP_MACRO_API void etcd_keepalive::set_checker(const std::string &checked_s
   checker_.fn = default_checker_t(checked_str);
 }
 
-LIBATAPP_MACRO_API void etcd_keepalive::set_checker(checker_fn_t fn) { checker_.fn = fn; }
+LIBATAPP_MACRO_API void etcd_keepalive::set_checker(checker_fn_t fn) { checker_.fn = std::move(fn); }
 
 LIBATAPP_MACRO_API void etcd_keepalive::set_value(const std::string &str) {
   if (value_ != str) {
     value_ = str;
     rpc_.is_value_changed = true;
 
-    if (owner_->check_flag(etcd_cluster::flag_t::RUNNING) && 0 != owner_->get_lease()) {
+    if (owner_->check_flag(etcd_cluster::flag_t::kRunning) && 0 != owner_->get_lease()) {
       active();
     }
   }

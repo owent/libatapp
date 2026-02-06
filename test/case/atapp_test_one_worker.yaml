@@ -1,3 +1,4 @@
+# Copyright 2026 atframework
 atapp:
   id: 0x00000010
   id_mask: 8.8.8.8
@@ -17,7 +18,7 @@ atapp:
     retry_interval: 3s
     fault_tolerant: 3
     message_size: 64KB
-    recv_buffer_size: 1MB
+    receive_buffer_size: 1MB
     send_buffer_size: 1MB
     send_buffer_number: 0
   timer:
@@ -68,3 +69,4 @@ atapp:
             level:
               min: fatal
               max: debug
+

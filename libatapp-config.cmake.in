@@ -31,7 +31,7 @@ The following :prop_tgt:`IMPORTED` targets are also defined:
   The libatapp library of C binding
 
 ============================================================================
-Copyright 2020 OWenT.
+Copyright 2026 OWenT.
 Distributed under the OSI-approved BSD License (the "License");
 see accompanying file Copyright.txt for details.
 This software is distributed WITHOUT ANY WARRANTY; without even the
@@ -75,3 +75,4 @@ if(${CMAKE_FIND_PACKAGE_NAME}_FOUND)
 endif()
 
 # check_required_components(${CMAKE_FIND_PACKAGE_NAME})
+

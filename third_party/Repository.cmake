@@ -1,3 +1,4 @@
+# Copyright 2026 atframework
 project_third_party_include_port("compression/import.cmake")
 project_third_party_include_port("algorithm/tbb.cmake")
 project_third_party_include_port("libuv/libuv.cmake")
@@ -36,3 +37,4 @@ if(NOT TARGET Microsoft.GSL::GSL
     project_third_party_include_port("gsl/gsl-lite.cmake")
   endif()
 endif()
+
