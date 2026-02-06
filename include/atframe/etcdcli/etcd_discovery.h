@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include <gsl/select-gsl.h>
-
 #include <config/atframe_utils_build_feature.h>
 #include <config/compiler_features.h>
 
@@ -17,7 +15,6 @@
 #include <memory/rc_ptr.h>
 #include <random/random_generator.h>
 
-#include <memory>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
@@ -25,7 +22,7 @@
 #include <utility>
 #include <vector>
 
-#include "atframe/atapp_conf.h"
+#include "atframe/atapp_conf.h"  // IWYU pragma: keep
 #include "atframe/etcdcli/etcd_def.h"
 
 LIBATAPP_MACRO_NAMESPACE_BEGIN
@@ -118,7 +115,7 @@ class etcd_discovery_set {
     etcd_discovery_node::ptr_t node;
     std::pair<uint64_t, uint64_t> hash_code;
 
-    inline node_hash_type() noexcept : node(), hash_code(0, 0) {}
+    inline node_hash_type() noexcept : hash_code(0, 0) {}
 
     template <class NodeType, class CodeType>
     inline node_hash_type(NodeType &&n, CodeType &&hc) noexcept
@@ -186,7 +183,9 @@ class etcd_discovery_set {
   LIBATAPP_MACRO_API_HEAD_ONLY etcd_discovery_node::ptr_t get_node_by_consistent_hash(
       TKEY &&key, const metadata_type *metadata = nullptr) const {
     return get_node_by_consistent_hash(
-        static_cast<typename std::conditional<std::is_unsigned<TKEY>::value, uint64_t, int64_t>::type>(key), metadata);
+        static_cast<typename std::conditional<std::is_unsigned<TKEY>::value, uint64_t, int64_t>::type>(
+            std::forward<TKEY>(key)),
+        metadata);
   }
 
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_random(const metadata_type *metadata = nullptr) const;
@@ -205,14 +204,14 @@ class etcd_discovery_set {
   LIBATAPP_MACRO_API void remove_node(const std::string &name);
 
  private:
-  typedef struct {
+  using index_cache_type = struct {
     std::vector<node_hash_type> normal_hashing_ring;
     std::vector<node_hash_type> compact_hashing_ring;
     std::vector<etcd_discovery_node::ptr_t> round_robin_cache;
     size_t round_robin_index;
 
     std::unordered_set<const etcd_discovery_node *> reference_cache;
-  } index_cache_type;
+  };
 
   void rebuild_cache(index_cache_type &cache_set, const metadata_type *rule) const;
   void rebuild_compact_cache(index_cache_type &cache_set, const metadata_type *rule) const;
