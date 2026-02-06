@@ -31,6 +31,8 @@ LIBATAPP_MACRO_API int module_impl::setup(app_conf &) { return 0; }
 
 LIBATAPP_MACRO_API void module_impl::ready() {}
 
+LIBATAPP_MACRO_API void module_impl::prereload(app_conf &) {}
+
 LIBATAPP_MACRO_API int module_impl::reload() { return 0; }
 
 LIBATAPP_MACRO_API int module_impl::setup_log() { return 0; }

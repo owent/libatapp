@@ -64,6 +64,14 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE module_impl {
   LIBATAPP_MACRO_API virtual void ready();
 
   /**
+   * @brief This callback is called after configure files are reloaded and before reload
+   * @note Changing the origin configure is allowed here(even app id and name).
+   *       This callback will always be called no matter it is enabled or not, so it can be used to update configure for
+   *       other module and patch configure before init.
+   */
+  LIBATAPP_MACRO_API virtual void prereload(app_conf &conf);
+
+  /**
    * @brief This callback is called after configure is reloaded
    * @note This function will be called before init when startup
    * @return error code or 0, return error code on startup will stop atapp to run
@@ -188,4 +196,3 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE module_impl {
   friend class app;
 };
 LIBATAPP_MACRO_NAMESPACE_END
-
