@@ -42,18 +42,16 @@
 #include <std/thread.h>
 #include <string/tquerystring.h>
 
-#include <assert.h>
+#include <cassert>
 
 #if defined(ATFRAMEWORK_UTILS_THREAD_TLS_USE_PTHREAD) && ATFRAMEWORK_UTILS_THREAD_TLS_USE_PTHREAD
 #  include <pthread.h>
 #endif
 
-#include <memory>
-#include <numeric>
 #include <vector>
 
 LIBATAPP_MACRO_NAMESPACE_BEGIN
-namespace detail {
+namespace {
 #if defined(ATFRAMEWORK_UTILS_THREAD_TLS_USE_PTHREAD) && ATFRAMEWORK_UTILS_THREAD_TLS_USE_PTHREAD
 static pthread_once_t gt_rapidjson_loader_get_shared_buffer_tls_once = PTHREAD_ONCE_INIT;
 static pthread_key_t gt_rapidjson_loader_get_shared_buffer_tls_key;
@@ -264,6 +262,7 @@ static rapidjson::Value load_field_item_to_map_string(const ::google::protobuf::
   return ret;
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 static void load_field_item(rapidjson::Value &parent, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &src,
                             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds, rapidjson::Document &doc,
                             const rapidjson_loader_load_options &options) {
@@ -787,7 +786,7 @@ static void dump_field_item(const rapidjson::Value &src, ATBUS_MACRO_PROTOBUF_NA
     dump_pick_field(val, dst, fds, options);
   }
 }
-}  // namespace detail
+}  // namespace
 
 LIBATAPP_MACRO_API std::string rapidjson_loader_stringify(const rapidjson::Document &doc, size_t more_reserve_size) {
 #if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
@@ -849,7 +848,7 @@ LIBATAPP_MACRO_API const char *rapidjson_loader_get_type_name(rapidjson::Type t)
 }
 
 LIBATAPP_MACRO_API gsl::span<unsigned char> rapidjson_loader_get_default_shared_buffer() {
-  return detail::rapidjson_loader_get_shared_buffer();
+  return rapidjson_loader_get_shared_buffer();
 }
 
 LIBATAPP_MACRO_API std::string rapidjson_loader_stringify(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &src,
@@ -966,7 +965,7 @@ LIBATAPP_MACRO_API void rapidjson_loader_dump_to(const rapidjson::Value &src,
   }
 
   for (int i = 0; i < desc->field_count(); ++i) {
-    detail::dump_field_item(src, dst, desc->field(i), options);
+    dump_field_item(src, dst, desc->field(i), options);
   }
 }
 
@@ -980,13 +979,13 @@ LIBATAPP_MACRO_API void rapidjson_loader_load_from(rapidjson::Value &dst, rapidj
     }
 
     for (int i = 0; i < desc->field_count(); ++i) {
-      detail::load_field_item(dst, src, desc->field(i), doc, options);
+      load_field_item(dst, src, desc->field(i), doc, options);
     }
   } else {
     std::vector<const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *> fields_with_data;
     src.GetReflection()->ListFields(src, &fields_with_data);
     for (size_t i = 0; i < fields_with_data.size(); ++i) {
-      detail::load_field_item(dst, src, fields_with_data[i], doc, options);
+      load_field_item(dst, src, fields_with_data[i], doc, options);
     }
   }
 }

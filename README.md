@@ -27,6 +27,40 @@
 
 + [cmake](https://cmake.org/download/) 3.24.0 以上
 
+## Clangd 配置参考（基于当前 .vscode/settings.json）
+
+本仓库默认使用 `build_jobs_cmake_tools` 作为编译数据库目录（由 CMake 生成 `compile_commands.json`）。建议保持与当前设置一致：
+
+**.clangd（可选）**
+
+```yaml
+CompileFlags:
+    CompilationDatabase: build_jobs_cmake_tools
+
+Index:
+    Background: Build
+
+Diagnostics:
+    UnusedIncludes: Strict
+```
+
+**VS Code settings（当前仓库默认）**
+
+```json
+{
+    "C_Cpp.intelliSenseEngine": "disabled",
+    "clangd.enable": true,
+    "clangd.arguments": [
+        "--compile-commands-dir=${workspaceFolder}/build_jobs_cmake_tools",
+        "--background-index",
+        "--clang-tidy",
+        "--completion-style=detailed",
+        "--header-insertion=iwyu",
+        "-j=8"
+    ]
+}
+```
+
 ## GET START
 
 ### 最小化服务器

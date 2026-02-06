@@ -14,6 +14,7 @@
 
 #include <network/http_request.h>
 
+#include <atbus_topology.h>
 #include <detail/libatbus_config.h>
 
 #include <atomic>
@@ -346,7 +347,7 @@ class app {
    * dump default value
    */
   LIBATAPP_MACRO_API void parse_log_configures_into(atapp::protocol::atapp_log &dst,
-                                                    std::vector<gsl::string_view> configure_prefix_paths,
+                                                    const std::vector<gsl::string_view> &configure_prefix_paths,
                                                     gsl::string_view load_environemnt_prefix = "",
                                                     configure_key_set *existed_keys = nullptr) const noexcept;
 
@@ -389,6 +390,13 @@ class app {
   LIBATAPP_MACRO_API std::shared_ptr<::atframework::atapp::worker_pool_module> get_worker_pool_module() const noexcept;
 
   LIBATAPP_MACRO_API const etcd_discovery_set &get_global_discovery() const noexcept;
+
+  LIBATAPP_MACRO_API atbus::topology_peer::ptr_t get_topology_peer(atbus::bus_id_t id) const noexcept;
+
+  LIBATAPP_MACRO_API const atbus::topology_registry::ptr_t &get_topology_registry() const noexcept;
+
+  LIBATAPP_MACRO_API atbus::topology_relation_type get_topology_relation(
+      atbus::bus_id_t id, atbus::topology_peer::ptr_t *next_hop_peer) const noexcept;
 
   LIBATAPP_MACRO_API uint32_t get_address_type(const std::string &addr) const noexcept;
 
@@ -673,7 +681,7 @@ class app {
 
   void app_evt_on_finally();
 
-  LIBATAPP_MACRO_API void add_connector_inner(std::shared_ptr<atapp_connector_impl> connector);
+  LIBATAPP_MACRO_API void add_connector_inner(const std::shared_ptr<atapp_connector_impl> &connector);
 
   /** this function should always not be used outside atapp.cpp **/
   static void _app_setup_signal_handle(int signo);

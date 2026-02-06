@@ -94,7 +94,7 @@ LIBATAPP_MACRO_NAMESPACE_BEGIN
 #define ETCD_API_V3_LEASE_KEEPALIVE "/v3/lease/keepalive"
 #define ETCD_API_V3_LEASE_REVOKE "/v3/kv/lease/revoke"
 
-namespace details {
+namespace {
 static const std::string &get_default_user_agent() {
   static std::string ret;
   if (!ret.empty()) {
@@ -187,10 +187,11 @@ EXPLICIT_UNUSED_ATTR static int etcd_cluster_verbose_callback(atfw::util::networ
 
   return 0;
 }
-}  // namespace details
+}  // namespace
 
 LIBATAPP_MACRO_API etcd_cluster::etcd_cluster()
     : flags_(0),
+      stats_{},
       startup_log_level_(atfw::util::log::log_formatter::level_t::LOG_LW_DISABLED),
       runtime_log_level_(atfw::util::log::log_formatter::level_t::LOG_LW_DISABLED) {
   conf_.authorization_next_update_time = std::chrono::system_clock::from_time_t(0);
@@ -425,7 +426,8 @@ LIBATAPP_MACRO_API int etcd_cluster::tick() {
 
       // run actions after lease granted
       return ret;
-    } else if (app::get_sys_now() > conf_.keepalive_next_update_time) {
+    }
+    if (app::get_sys_now() > conf_.keepalive_next_update_time) {
       ret += create_request_lease_keepalive() ? 1 : 0;
     }
   } else if (!check_flag(flag_t::kRunning)) {
@@ -635,7 +637,7 @@ LIBATAPP_MACRO_API bool etcd_cluster::add_retry_keepalive(const std::shared_ptr<
   return true;
 }
 
-LIBATAPP_MACRO_API bool etcd_cluster::remove_keepalive(std::shared_ptr<etcd_keepalive> keepalive) {
+LIBATAPP_MACRO_API bool etcd_cluster::remove_keepalive(const std::shared_ptr<etcd_keepalive> &keepalive) {
   if (!keepalive) {
     return false;
   }
@@ -711,7 +713,7 @@ LIBATAPP_MACRO_API bool etcd_cluster::add_watcher(const std::shared_ptr<etcd_wat
   return true;
 }
 
-LIBATAPP_MACRO_API bool etcd_cluster::remove_watcher(std::shared_ptr<etcd_watcher> watcher) {
+LIBATAPP_MACRO_API bool etcd_cluster::remove_watcher(const std::shared_ptr<etcd_watcher> &watcher) {
   if (!watcher) {
     return false;
   }
@@ -994,7 +996,7 @@ bool etcd_cluster::create_request_auth_authenticate() {
       atfw::util::log::log_wrapper::ptr_t logger = logger_;
       req->set_on_verbose(
           [logger](atfw::util::network::http_request &self_req, curl_infotype type, char *data, size_t size) {
-            return details::etcd_cluster_verbose_callback(self_req, type, data, size, logger);
+            return etcd_cluster_verbose_callback(self_req, type, data, size, logger);
           });
     }
     int res = req->start(atfw::util::network::http_request::method_t::EN_MT_POST, false);
@@ -1139,7 +1141,7 @@ bool etcd_cluster::create_request_auth_user_get() {
       atfw::util::log::log_wrapper::ptr_t logger = logger_;
       req->set_on_verbose(
           [logger](atfw::util::network::http_request &self_req, curl_infotype type, char *data, size_t size) {
-            return details::etcd_cluster_verbose_callback(self_req, type, data, size, logger);
+            return etcd_cluster_verbose_callback(self_req, type, data, size, logger);
           });
     }
     int res = req->start(atfw::util::network::http_request::method_t::EN_MT_POST, false);
@@ -1326,7 +1328,7 @@ bool etcd_cluster::create_request_member_update() {
     return false;
   }
 
-  std::string *selected_host;
+  std::string *selected_host = nullptr;
   if (!conf_.hosts.empty()) {
     selected_host = &conf_.hosts[random_generator_.random_between<size_t>(0, conf_.hosts.size())];
   } else {
@@ -1514,7 +1516,7 @@ bool etcd_cluster::create_request_lease_grant() {
       atfw::util::log::log_wrapper::ptr_t logger = logger_;
       req->set_on_verbose(
           [logger](atfw::util::network::http_request &self_req, curl_infotype type, char *data, size_t size) {
-            return details::etcd_cluster_verbose_callback(self_req, type, data, size, logger);
+            return etcd_cluster_verbose_callback(self_req, type, data, size, logger);
           });
     }
     int res = req->start(atfw::util::network::http_request::method_t::EN_MT_POST, false);
@@ -1859,8 +1861,8 @@ LIBATAPP_MACRO_API atfw::util::network::http_request::ptr_t etcd_cluster::create
   return ret;
 }
 
-LIBATAPP_MACRO_API etcd_cluster::on_event_up_down_handle_t etcd_cluster::add_on_event_up(on_event_up_down_fn_t fn,
-                                                                                         bool trigger_if_running) {
+LIBATAPP_MACRO_API etcd_cluster::on_event_up_down_handle_t etcd_cluster::add_on_event_up(
+    const on_event_up_down_fn_t &fn, bool trigger_if_running) {
   if (!fn) {
     return event_on_up_callbacks_.end();
   }
@@ -1886,7 +1888,7 @@ LIBATAPP_MACRO_API void etcd_cluster::reset_on_event_up_handle(on_event_up_down_
 }
 
 LIBATAPP_MACRO_API etcd_cluster::on_event_up_down_handle_t etcd_cluster::add_on_event_down(
-    on_event_up_down_fn_t fn, bool trigger_if_not_running) {
+    const on_event_up_down_fn_t &fn, bool trigger_if_not_running) {
   if (!fn) {
     return event_on_down_callbacks_.end();
   }
@@ -2060,7 +2062,7 @@ LIBATAPP_MACRO_API void etcd_cluster::setup_http_request(atfw::util::network::ht
   req->set_opt_http_content_decoding(true);
   req->set_opt_timeout(timeout);
   if (conf_.user_agent.empty()) {
-    req->set_user_agent(details::get_default_user_agent());
+    req->set_user_agent(get_default_user_agent());
   } else {
     req->set_user_agent(conf_.user_agent);
   }
@@ -2100,45 +2102,48 @@ LIBATAPP_MACRO_API void etcd_cluster::setup_http_request(atfw::util::network::ht
         req->set_opt_long(CURLOPT_PROXY_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
 #  endif
         break;
+#endif
       case ssl_version_t::kTlsV11:
         req->set_opt_long(CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_1);
-#  if LIBCURL_VERSION_NUM >= 0x073400
+#if LIBCURL_VERSION_NUM >= 0x073400
         req->set_opt_long(CURLOPT_PROXY_SSLVERSION, CURL_SSLVERSION_TLSv1_1);
-#  endif
+#endif
         break;
       default:
-#  if LIBCURL_VERSION_NUM >= 0x072200
+#if LIBCURL_VERSION_NUM >= 0x072200
         conf_.ssl_min_version = ssl_version_t::kTlsV12;
         req->set_opt_long(CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
-#    if LIBCURL_VERSION_NUM >= 0x073400
+#  if LIBCURL_VERSION_NUM >= 0x073400
         req->set_opt_long(CURLOPT_PROXY_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
-#    endif
 #  endif
+#else
+        conf_.ssl_min_version = ssl_version_t::kTlsV11;
+        req->set_opt_long(CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_1);
 #endif
         break;
     }
 
     if (!conf_.proxy.empty()) {
-      req->set_opt_string(CURLOPT_PROXY, &conf_.proxy[0]);
-      if (0 == UTIL_STRFUNC_STRNCASE_CMP("http:", &conf_.proxy[0], 5) ||
-          0 == UTIL_STRFUNC_STRNCASE_CMP("https:", &conf_.proxy[0], 6)) {
+      req->set_opt_string(CURLOPT_PROXY, conf_.proxy.data());
+      if (0 == UTIL_STRFUNC_STRNCASE_CMP("http:", conf_.proxy.data(), 5) ||
+          0 == UTIL_STRFUNC_STRNCASE_CMP("https:", conf_.proxy.data(), 6)) {
         req->set_opt_bool(CURLOPT_HTTPPROXYTUNNEL, true);
       }
     }
 
 #if LIBCURL_VERSION_NUM >= 0x071304
     if (!conf_.no_proxy.empty()) {
-      req->set_opt_string(CURLOPT_NOPROXY, &conf_.no_proxy[0]);
+      req->set_opt_string(CURLOPT_NOPROXY, conf_.no_proxy.data());
     }
 #endif
 
 #if LIBCURL_VERSION_NUM >= 0x071301
     if (!conf_.proxy_user_name.empty()) {
-      req->set_opt_string(CURLOPT_PROXYUSERNAME, &conf_.proxy_user_name[0]);
+      req->set_opt_string(CURLOPT_PROXYUSERNAME, conf_.proxy_user_name.data());
     }
 
     if (!conf_.proxy_password.empty()) {
-      req->set_opt_string(CURLOPT_PROXYPASSWORD, &conf_.proxy_password[0]);
+      req->set_opt_string(CURLOPT_PROXYPASSWORD, conf_.proxy_password.data());
     }
 #endif
 
@@ -2147,38 +2152,38 @@ LIBATAPP_MACRO_API void etcd_cluster::setup_http_request(atfw::util::network::ht
     req->set_opt_bool(CURLOPT_SSL_ENABLE_ALPN, conf_.ssl_enable_alpn);
 #endif
     if (!conf_.ssl_client_cert.empty()) {
-      req->set_opt_string(CURLOPT_SSLCERT, &conf_.ssl_client_cert[0]);
+      req->set_opt_string(CURLOPT_SSLCERT, conf_.ssl_client_cert.data());
     }
 #if LIBCURL_VERSION_NUM >= 0x070903
     if (!conf_.ssl_client_cert_type.empty()) {
-      req->set_opt_string(CURLOPT_SSLCERTTYPE, &conf_.ssl_client_cert_type[0]);
+      req->set_opt_string(CURLOPT_SSLCERTTYPE, conf_.ssl_client_cert_type.data());
     }
 #endif
     if (!conf_.ssl_client_key.empty()) {
-      req->set_opt_string(CURLOPT_SSLKEY, &conf_.ssl_client_key[0]);
+      req->set_opt_string(CURLOPT_SSLKEY, conf_.ssl_client_key.data());
     }
     if (!conf_.ssl_client_key_type.empty()) {
-      req->set_opt_string(CURLOPT_SSLKEYTYPE, &conf_.ssl_client_key_type[0]);
+      req->set_opt_string(CURLOPT_SSLKEYTYPE, conf_.ssl_client_key_type.data());
     }
 #if LIBCURL_VERSION_NUM >= 0x071004
     if (!conf_.ssl_client_key_passwd.empty()) {
-      req->set_opt_string(CURLOPT_SSLKEYPASSWD, &conf_.ssl_client_key_passwd[0]);
+      req->set_opt_string(CURLOPT_SSLKEYPASSWD, conf_.ssl_client_key_passwd.data());
     }
 #elif LIBCURL_VERSION_NUM >= 0x070902
     if (!conf_.ssl_client_key_passwd.empty()) {
-      req->set_opt_string(CURLOPT_SSLCERTPASSWD, &conf_.ssl_client_key_passwd[0]);
+      req->set_opt_string(CURLOPT_SSLCERTPASSWD, conf_.ssl_client_key_passwd.data());
     }
 #endif
     if (!conf_.ssl_ca_cert.empty()) {
-      req->set_opt_string(CURLOPT_CAINFO, &conf_.ssl_ca_cert[0]);
+      req->set_opt_string(CURLOPT_CAINFO, conf_.ssl_ca_cert.data());
     }
 
 #if LIBCURL_VERSION_NUM >= 0x071504
     if (!conf_.ssl_client_tlsauth_username.empty()) {
       req->set_opt_string(CURLOPT_TLSAUTH_TYPE,
                           "SRP");  // @see https://curl.haxx.se/libcurl/c/CURLOPT_TLSAUTH_TYPE.html
-      req->set_opt_string(CURLOPT_TLSAUTH_USERNAME, &conf_.ssl_client_tlsauth_username[0]);
-      req->set_opt_string(CURLOPT_TLSAUTH_PASSWORD, &conf_.ssl_client_tlsauth_password[0]);
+      req->set_opt_string(CURLOPT_TLSAUTH_USERNAME, conf_.ssl_client_tlsauth_username.data());
+      req->set_opt_string(CURLOPT_TLSAUTH_PASSWORD, conf_.ssl_client_tlsauth_password.data());
     }
 #endif
     // proxy cert and key
@@ -2189,44 +2194,44 @@ LIBATAPP_MACRO_API void etcd_cluster::setup_http_request(atfw::util::network::ht
 
 #if LIBCURL_VERSION_NUM >= 0x073400
     if (!conf_.ssl_proxy_cert.empty()) {
-      req->set_opt_string(CURLOPT_PROXY_SSLCERT, &conf_.ssl_proxy_cert[0]);
+      req->set_opt_string(CURLOPT_PROXY_SSLCERT, conf_.ssl_proxy_cert.data());
     }
 
     if (!conf_.ssl_proxy_cert_type.empty()) {
-      req->set_opt_string(CURLOPT_PROXY_SSLCERTTYPE, &conf_.ssl_proxy_cert_type[0]);
+      req->set_opt_string(CURLOPT_PROXY_SSLCERTTYPE, conf_.ssl_proxy_cert_type.data());
     }
 
     if (!conf_.ssl_proxy_key.empty()) {
-      req->set_opt_string(CURLOPT_PROXY_SSLKEY, &conf_.ssl_proxy_key[0]);
+      req->set_opt_string(CURLOPT_PROXY_SSLKEY, conf_.ssl_proxy_key.data());
     }
 
     if (!conf_.ssl_proxy_key_type.empty()) {
-      req->set_opt_string(CURLOPT_PROXY_SSLKEYTYPE, &conf_.ssl_proxy_key_type[0]);
+      req->set_opt_string(CURLOPT_PROXY_SSLKEYTYPE, conf_.ssl_proxy_key_type.data());
     }
 
     if (!conf_.ssl_proxy_key_passwd.empty()) {
-      req->set_opt_string(CURLOPT_PROXY_KEYPASSWD, &conf_.ssl_proxy_key_passwd[0]);
+      req->set_opt_string(CURLOPT_PROXY_KEYPASSWD, conf_.ssl_proxy_key_passwd.data());
     }
 
     if (!conf_.ssl_proxy_ca_cert.empty()) {
-      req->set_opt_string(CURLOPT_PROXY_CAINFO, &conf_.ssl_proxy_ca_cert[0]);
+      req->set_opt_string(CURLOPT_PROXY_CAINFO, conf_.ssl_proxy_ca_cert.data());
     }
 
     if (!conf_.ssl_proxy_tlsauth_username.empty()) {
       req->set_opt_string(CURLOPT_PROXY_TLSAUTH_TYPE,
                           "SRP");  // @see https://curl.haxx.se/libcurl/c/CURLOPT_PROXY_TLSAUTH_TYPE.html
-      req->set_opt_string(CURLOPT_PROXY_TLSAUTH_USERNAME, &conf_.ssl_proxy_tlsauth_username[0]);
-      req->set_opt_string(CURLOPT_PROXY_TLSAUTH_PASSWORD, &conf_.ssl_proxy_tlsauth_password[0]);
+      req->set_opt_string(CURLOPT_PROXY_TLSAUTH_USERNAME, conf_.ssl_proxy_tlsauth_username.data());
+      req->set_opt_string(CURLOPT_PROXY_TLSAUTH_PASSWORD, conf_.ssl_proxy_tlsauth_password.data());
     }
 #endif
     // ssl cipher
     if (!conf_.ssl_cipher_list.empty()) {
-      req->set_opt_string(CURLOPT_SSL_CIPHER_LIST, &conf_.ssl_cipher_list[0]);
+      req->set_opt_string(CURLOPT_SSL_CIPHER_LIST, conf_.ssl_cipher_list.data());
     }
 
 #if LIBCURL_VERSION_NUM >= 0x073d00
     if (!conf_.ssl_cipher_list_tls13.empty()) {
-      req->set_opt_string(CURLOPT_TLS13_CIPHERS, &conf_.ssl_cipher_list_tls13[0]);
+      req->set_opt_string(CURLOPT_TLS13_CIPHERS, conf_.ssl_cipher_list_tls13.data());
     }
 #endif
   }
@@ -2235,7 +2240,7 @@ LIBATAPP_MACRO_API void etcd_cluster::setup_http_request(atfw::util::network::ht
     atfw::util::log::log_wrapper::ptr_t logger = logger_;
     req->set_on_verbose(
         [logger](atfw::util::network::http_request &self_req, curl_infotype type, char *data, size_t size) {
-          return details::etcd_cluster_verbose_callback(self_req, type, data, size, logger);
+          return etcd_cluster_verbose_callback(self_req, type, data, size, logger);
         });
   }
 
