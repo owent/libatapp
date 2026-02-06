@@ -5,14 +5,9 @@
 #include <config/atframe_utils_build_feature.h>
 #include <time/time_utility.h>
 
-#include <signal.h>
 #include <chrono>
-#include <iostream>
-#include <typeinfo>
 
 #include "atframe/atapp.h"
-
-#include "cli/shell_font.h"
 
 #ifdef min
 #  undef min
@@ -54,12 +49,12 @@ LIBATAPP_MACRO_API const char *module_impl::name() const {
   }
 
 #if defined(LIBATFRAME_UTILS_ENABLE_RTTI) && LIBATFRAME_UTILS_ENABLE_RTTI
-  auto_demangled_name_.reset(new atfw::util::scoped_demangled_name(typeid(*this).name()));
+  auto_demangled_name_ = std::make_unique<atfw::util::scoped_demangled_name>(typeid(*this).name());
   if (auto_demangled_name_) {
     return auto_demangled_name_->get();
-  } else {
-    return "atapp::module demangle symbol failed";
   }
+
+  return "atapp::module demangle symbol failed";
 #else
   return "atapp::module RTTI Unavailable";
 #endif
@@ -123,11 +118,11 @@ LIBATAPP_MACRO_API bool module_impl::check_suspend_stop() {
   }
 
   if (suspended_stop_.stop_suspend_timeout == std::chrono::system_clock::time_point::min()) {
-    suspended_stop_.stop_suspend_timeout = owner_->get_sys_now();
+    suspended_stop_.stop_suspend_timeout = app::get_sys_now();
     suspended_stop_.stop_suspend_timeout += suspended_stop_.stop_suspend_duration;
   }
 
-  if (owner_->get_sys_now() >= suspended_stop_.stop_suspend_timeout) {
+  if (app::get_sys_now() >= suspended_stop_.stop_suspend_timeout) {
     suspended_stop_.stop_suspend_callback = std::function<bool()>();
     return false;
   }
@@ -141,4 +136,3 @@ LIBATAPP_MACRO_API bool module_impl::check_suspend_stop() {
 }
 
 LIBATAPP_MACRO_NAMESPACE_END
-

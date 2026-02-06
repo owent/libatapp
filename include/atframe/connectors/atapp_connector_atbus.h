@@ -10,11 +10,9 @@
 #include <atbus_topology.h>
 #include <detail/libatbus_config.h>
 
-#include <stdint.h>
-#include <list>
+#include <cstdint>
 #include <memory>
 #include <unordered_map>
-#include <vector>
 
 #include "atframe/connectors/atapp_connector_impl.h"
 
@@ -51,13 +49,13 @@ class atapp_connector_atbus : public atapp_connector_impl, public std::enable_sh
 
   LIBATAPP_MACRO_API void on_discovery_event(etcd_discovery_action_t, const etcd_discovery_node::ptr_t &) override;
 
-  LIBATAPP_MACRO_API bool check_address_connectable(const atbus::channel::channel_address_t &addr,
-                                                    const etcd_discovery_node &discovery) const noexcept;
+  static LIBATAPP_MACRO_API bool check_address_connectable(const atbus::channel::channel_address_t &addr,
+                                                           const etcd_discovery_node &discovery) noexcept;
 
   LIBATAPP_MACRO_API void remove_topology_peer(atbus::bus_id_t target_bus_id);
 
   LIBATAPP_MACRO_API void update_topology_peer(atbus::bus_id_t target_bus_id, atbus::bus_id_t upstream_bus_id,
-                                               atbus::topology_data::ptr_t data);
+                                               const atbus::topology_data::ptr_t &data);
 
   using atapp_connector_impl::on_receive_forward_response;
   LIBATAPP_MACRO_API void on_receive_forward_response(uint64_t app_id, int32_t type, uint64_t msg_sequence,
@@ -66,12 +64,12 @@ class atapp_connector_atbus : public atapp_connector_impl, public std::enable_sh
 
  private:
   friend class app;
-  atfw::util::nostd::nonnull<atbus_connection_handle_ptr_t> create_connection_handle(
+  static atfw::util::nostd::nonnull<atbus_connection_handle_ptr_t> create_connection_handle(
       atbus::bus_id_t bus_id, atbus::bus_id_t topology_upstream_bus_id, const atapp_connection_handle::ptr_t &handle);
   atfw::util::nostd::nonnull<atbus_connection_handle_ptr_t> mutable_connection_handle(
       atbus::bus_id_t bus_id, const atapp_connection_handle::ptr_t &handle);
 
-  bool need_keep_handle(const atbus_connection_handle_data &handle_data) const noexcept;
+  static bool need_keep_handle(const atbus_connection_handle_data &handle_data) noexcept;
 
   int on_update_endpoint(const atbus::node &n, const atbus::endpoint *ep, int res);
   int on_add_endpoint(const atbus::node &n, atbus::endpoint *ep, int res);
@@ -91,7 +89,8 @@ class atapp_connector_atbus : public atapp_connector_impl, public std::enable_sh
   void update_timer(const atbus_connection_handle_ptr_t &handle, atfw::util::time::time_utility::raw_time_t timeout);
   void remove_timer(const atbus_connection_handle_ptr_t &handle);
 
-  bool setup_reconnect_timer(handle_map_t::iterator iter, std::chrono::system_clock::time_point previous_timeout);
+  bool setup_reconnect_timer(const handle_map_t::iterator &iter,
+                             std::chrono::system_clock::time_point previous_timeout);
 
   int32_t try_direct_reconnect(const atbus_connection_handle_ptr_t &handle);
 
@@ -113,20 +112,20 @@ class atapp_connector_atbus : public atapp_connector_impl, public std::enable_sh
                                             const atbus::channel::channel_address_t *addr,
                                             const atapp_connection_handle::ptr_t &handle,
                                             const atbus::topology_registry::ptr_t &topology_registry,
-                                            atbus::topology_peer::ptr_t next_hop_peer);
+                                            const atbus::topology_peer::ptr_t &next_hop_peer);
 
   int32_t on_start_connect_to_downstream_peer(const etcd_discovery_node &discovery,
                                               const atbus::channel::channel_address_t *addr,
                                               const atapp_connection_handle::ptr_t &handle,
                                               const atbus::topology_registry::ptr_t &topology_registry,
-                                              atbus::topology_peer::ptr_t next_hop_peer);
+                                              const atbus::topology_peer::ptr_t &next_hop_peer);
 
   int32_t on_start_connect_to_proxy_by_upstream(const etcd_discovery_node &discovery,
                                                 const atbus::channel::channel_address_t *addr,
                                                 const atapp_connection_handle::ptr_t &handle,
                                                 const atbus::topology_registry::ptr_t &topology_registry);
 
-  void remove_connection_handle(handle_map_t::iterator iter);
+  void remove_connection_handle(const handle_map_t::iterator &iter);
 
   void bind_connection_handle_proxy(atbus_connection_handle_data &target, atbus_connection_handle_data &proxy);
 

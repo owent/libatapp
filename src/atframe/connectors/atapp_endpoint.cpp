@@ -31,7 +31,7 @@ LIBATAPP_MACRO_API atapp_endpoint::atapp_endpoint(app &owner, construct_helper_t
   nearest_waker_ = std::chrono::system_clock::from_time_t(0);
 
   gc_timepoint_ = owner.get_last_tick_time();
-  auto &endpoint_gc_timeout = owner.get_origin_configure().timer().endpoint_gc_timeout();
+  const auto &endpoint_gc_timeout = owner.get_origin_configure().timer().endpoint_gc_timeout();
   if (endpoint_gc_timeout.seconds() < 0) {
     gc_timepoint_ += std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::seconds(60));
   } else {
@@ -70,7 +70,7 @@ void atapp_endpoint::reset() {
   handles.swap(refer_connections_);
 
   for (handle_set_t::const_iterator iter = handles.begin(); iter != handles.end(); ++iter) {
-    if (*iter) {
+    if (*iter != nullptr) {
       atapp_endpoint_bind_helper::unbind(**iter, *this);
     }
   }
@@ -96,7 +96,7 @@ LIBATAPP_MACRO_API void atapp_endpoint::remove_connection_handle(atapp_connectio
 
 LIBATAPP_MACRO_API atapp_connection_handle *atapp_endpoint::get_ready_connection_handle() const noexcept {
   for (handle_set_t::const_iterator iter = refer_connections_.begin(); iter != refer_connections_.end(); ++iter) {
-    if (*iter && (*iter)->is_ready()) {
+    if (*iter != nullptr && (*iter)->is_ready()) {
       return *iter;
     }
   }
@@ -225,7 +225,7 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::push_forward_message(int32_t type, ui
   msg.data.resize(data.size());
   msg.expired_timepoint = owner_->get_last_tick_time();
   msg.expired_timepoint += owner_->get_configure_message_timeout();
-  memcpy(&msg.data[0], data.data(), data.size());
+  memcpy(msg.data.data(), data.data(), data.size());
   if (nullptr != metadata) {
     msg.metadata.reset(new atapp::protocol::atapp_metadata());
     if (msg.metadata) {

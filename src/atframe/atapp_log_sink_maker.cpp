@@ -8,17 +8,20 @@
 
 #include <iostream>
 
-#include "cli/shell_font.h"
-#include "common/string_oprs.h"
-#include "log/log_sink_file_backend.h"
-#include "log/log_sink_syslog_backend.h"
-
-#if defined(LOG_SINK_ENABLE_SYSLOG_SUPPORT) && LOG_SINK_ENABLE_SYSLOG_SUPPORT
+#if defined(ATFRAMEWORK_UTILS_LOG_SINK_ENABLE_SYSLOG_SUPPORT) && ATFRAMEWORK_UTILS_LOG_SINK_ENABLE_SYSLOG_SUPPORT
 #  include <syslog.h>
 #endif
 
+#include "cli/shell_font.h"
+#include "common/string_oprs.h"
+#include "log/log_sink_file_backend.h"
+
+#if defined(ATFRAMEWORK_UTILS_LOG_SINK_ENABLE_SYSLOG_SUPPORT) && ATFRAMEWORK_UTILS_LOG_SINK_ENABLE_SYSLOG_SUPPORT
+#  include "log/log_sink_syslog_backend.h"
+#endif
+
 LIBATAPP_MACRO_NAMESPACE_BEGIN
-namespace detail {
+namespace {
 static atfw::util::log::log_wrapper::log_handler_t _log_sink_file(
     atfw::util::log::log_wrapper& /*logger*/, int32_t /*index*/,
     const ::atframework::atapp::protocol::atapp_log& /*log_cfg*/,
@@ -44,8 +47,7 @@ static atfw::util::log::log_wrapper::log_handler_t _log_sink_file(
   file_sink.set_max_file_size(max_file_size);
   file_sink.set_rotate_size(rotate_size);
 
-  file_sink.set_auto_flush(
-      atfw::util::log::log_formatter::get_level_by_name(sink_cfg.log_backend_file().auto_flush().c_str()));
+  file_sink.set_auto_flush(atfw::util::log::log_formatter::get_level_by_name(sink_cfg.log_backend_file().auto_flush()));
   file_sink.set_flush_interval(static_cast<time_t>(sink_cfg.log_backend_file().flush_interval().seconds()));
   file_sink.set_writing_alias_pattern(sink_cfg.log_backend_file().writing_alias());
 
@@ -55,17 +57,17 @@ static atfw::util::log::log_wrapper::log_handler_t _log_sink_file(
 static void _log_sink_stdout_handle(const atfw::util::log::log_wrapper::caller_info_t& caller, const char* content,
                                     size_t content_size) {
   if (caller.level_id <= atfw::util::log::log_formatter::level_t::LOG_LW_NOTICE) {
-    std::cout.write(content, content_size);
-    std::cout << std::endl;
+    std::cout.write(content, static_cast<std::streamsize>(content_size));
+    std::cout << '\n';
   } else if (caller.level_id == atfw::util::log::log_formatter::level_t::LOG_LW_INFO) {
     atfw::util::cli::shell_stream ss(std::cout);
-    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_GREEN << content << std::endl;
+    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_GREEN << content << '\n';
   } else if (caller.level_id == atfw::util::log::log_formatter::level_t::LOG_LW_WARNING) {
     atfw::util::cli::shell_stream ss(std::cout);
-    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW << content << std::endl;
+    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW << content << '\n';
   } else {
     atfw::util::cli::shell_stream ss(std::cout);
-    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << content << std::endl;
+    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << content << '\n';
   }
 }
 
@@ -80,17 +82,17 @@ static atfw::util::log::log_wrapper::log_handler_t _log_sink_stdout(
 static void _log_sink_stderr_handle(const atfw::util::log::log_wrapper::caller_info_t& caller, const char* content,
                                     size_t content_size) {
   if (caller.level_id <= atfw::util::log::log_formatter::level_t::LOG_LW_NOTICE) {
-    std::cerr.write(content, content_size);
-    std::cerr << std::endl;
+    std::cerr.write(content, static_cast<std::streamsize>(content_size));
+    std::cerr << '\n';
   } else if (caller.level_id == atfw::util::log::log_formatter::level_t::LOG_LW_INFO) {
     atfw::util::cli::shell_stream ss(std::cerr);
-    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_GREEN << content << std::endl;
+    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_GREEN << content << '\n';
   } else if (caller.level_id == atfw::util::log::log_formatter::level_t::LOG_LW_WARNING) {
     atfw::util::cli::shell_stream ss(std::cerr);
-    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW << content << std::endl;
+    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW << content << '\n';
   } else {
     atfw::util::cli::shell_stream ss(std::cerr);
-    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << content << std::endl;
+    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << content << '\n';
   }
 }
 
@@ -172,7 +174,7 @@ static atfw::util::log::log_wrapper::log_handler_t _log_sink_syslog(
 #endif
 }
 
-}  // namespace detail
+}  // namespace
 
 log_sink_maker::log_sink_maker() {}
 
@@ -180,19 +182,18 @@ log_sink_maker::~log_sink_maker() {}
 
 LIBATAPP_MACRO_API gsl::string_view log_sink_maker::get_file_sink_name() { return "file"; }
 
-LIBATAPP_MACRO_API log_sink_maker::log_reg_t log_sink_maker::get_file_sink_reg() { return detail::_log_sink_file; }
+LIBATAPP_MACRO_API log_sink_maker::log_reg_t log_sink_maker::get_file_sink_reg() { return _log_sink_file; }
 
 LIBATAPP_MACRO_API gsl::string_view log_sink_maker::get_stdout_sink_name() { return "stdout"; }
 
-LIBATAPP_MACRO_API log_sink_maker::log_reg_t log_sink_maker::get_stdout_sink_reg() { return detail::_log_sink_stdout; }
+LIBATAPP_MACRO_API log_sink_maker::log_reg_t log_sink_maker::get_stdout_sink_reg() { return _log_sink_stdout; }
 
 LIBATAPP_MACRO_API gsl::string_view log_sink_maker::get_stderr_sink_name() { return "stderr"; }
 
-LIBATAPP_MACRO_API log_sink_maker::log_reg_t log_sink_maker::get_stderr_sink_reg() { return detail::_log_sink_stderr; }
+LIBATAPP_MACRO_API log_sink_maker::log_reg_t log_sink_maker::get_stderr_sink_reg() { return _log_sink_stderr; }
 
 LIBATAPP_MACRO_API gsl::string_view log_sink_maker::get_syslog_sink_name() { return "syslog"; }
 
-LIBATAPP_MACRO_API log_sink_maker::log_reg_t log_sink_maker::get_syslog_sink_reg() { return detail::_log_sink_syslog; }
+LIBATAPP_MACRO_API log_sink_maker::log_reg_t log_sink_maker::get_syslog_sink_reg() { return _log_sink_syslog; }
 
 LIBATAPP_MACRO_NAMESPACE_END
-

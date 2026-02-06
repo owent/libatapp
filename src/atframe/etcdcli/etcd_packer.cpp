@@ -5,8 +5,6 @@
 #include <cstring>
 #include <sstream>
 
-#include "libatbus.h"
-
 #include <algorithm/base64.h>
 #include <common/string_oprs.h>
 
@@ -220,13 +218,13 @@ LIBATAPP_MACRO_API void etcd_packer::pack_key_range(rapidjson::Value &json_val, 
       if (static_cast<unsigned char>(c) == 0xff) {
         range_end.pop_back();
       } else {
-        range_end[range_end.size() - 1] = c + 1;
+        range_end[range_end.size() - 1] = static_cast<char>(c + 1);
         need_plus = false;
       }
     }
 
     if (range_end.empty() && need_plus && !key.empty()) {
-      range_end = "\0";
+      range_end = "\0";  // NOLINT(bugprone-string-literal-with-embedded-nul)
     }
   }
 
@@ -381,4 +379,3 @@ LIBATAPP_MACRO_API void etcd_packer::unpack_bool(const rapidjson::Value &json_va
 LIBATAPP_MACRO_NAMESPACE_END
 
 #include <config/compiler/migrate_suffix.h>
-

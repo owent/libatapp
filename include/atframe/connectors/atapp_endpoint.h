@@ -31,9 +31,9 @@ class atapp_connector_impl;
 
 struct atapp_endpoint_bind_helper {
   // This API is used by inner system and will not be exported, do not call it directly
-  static LIBATAPP_MACRO_API_SYMBOL_HIDDEN void unbind(atapp_connection_handle &handle, atapp_endpoint &connect);
+  static LIBATAPP_MACRO_API_SYMBOL_HIDDEN void unbind(atapp_connection_handle &handle, atapp_endpoint &endpoint);
   // This API is used by inner system and will not be exported, do not call it directly
-  static LIBATAPP_MACRO_API_SYMBOL_HIDDEN void bind(atapp_connection_handle &handle, atapp_endpoint &connect);
+  static LIBATAPP_MACRO_API_SYMBOL_HIDDEN void bind(atapp_connection_handle &handle, atapp_endpoint &endpoint);
 };
 
 class atapp_endpoint {
@@ -124,4 +124,3 @@ class atapp_endpoint {
   friend struct atapp_endpoint_bind_helper;
 };
 LIBATAPP_MACRO_NAMESPACE_END
-

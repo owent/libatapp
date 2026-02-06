@@ -93,7 +93,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_loopback::on_send_forward_request(
   msg.type = type;
   msg.message_sequence = nullptr == sequence ? 0 : *sequence;
   msg.data.resize(data.size());
-  memcpy(&msg.data[0], data.data(), data.size());
+  memcpy(msg.data.data(), data.data(), data.size());
   if (nullptr != metadata) {
     msg.metadata.reset(new atapp::protocol::atapp_metadata());
     if (msg.metadata) {
@@ -111,7 +111,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_loopback::on_send_forward_request(
 LIBATAPP_MACRO_API void atapp_connector_loopback::on_receive_forward_response(
     atapp_connection_handle *handle, int32_t type, uint64_t msg_sequence, int32_t error_code,
     gsl::span<const unsigned char> data, const atapp::protocol::atapp_metadata *metadata) {
-  auto owner = get_owner();
+  auto *owner = get_owner();
   if (nullptr == owner) {
     return;
   }
@@ -146,7 +146,7 @@ LIBATAPP_MACRO_API void atapp_connector_loopback::on_discovery_event(etcd_discov
 LIBATAPP_MACRO_API int32_t atapp_connector_loopback::process(
     const atfw::util::time::time_utility::raw_time_t &max_end_timepoint, int32_t max_loop_messages) {
   int32_t ret = 0;
-  auto owner = get_owner();
+  auto *owner = get_owner();
   if (nullptr == owner) {
     return ret;
   }
@@ -199,7 +199,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_loopback::process(
       pending_message_.pop_front();
     }
 
-    if (get_owner()->get_sys_now() >= max_end_timepoint) {
+    if (app::get_sys_now() >= max_end_timepoint) {
       break;
     }
   }

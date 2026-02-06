@@ -15,12 +15,10 @@
 #include <detail/buffer.h>
 #include <detail/libatbus_channel_export.h>
 
-#include <list>
 #include <memory>
 #include <string>
 #include <unordered_set>
 
-#include "atframe/atapp_common_types.h"
 #include "atframe/atapp_config.h"
 #include "atframe/etcdcli/etcd_discovery.h"
 

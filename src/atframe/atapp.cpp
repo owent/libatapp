@@ -11,6 +11,7 @@
 
 #include <algorithm/crypto_cipher.h>
 #include <algorithm/murmur_hash.h>
+#include "memory/rc_ptr.h"
 
 #if defined(ATFRAMEWORK_UTILS_CRYPTO_USE_OPENSSL) || defined(ATFRAMEWORK_UTILS_CRYPTO_USE_LIBRESSL) || \
     defined(ATFRAMEWORK_UTILS_CRYPTO_USE_BORINGSSL)
@@ -98,7 +99,7 @@ static std::pair<uint64_t, const char *> make_size_showup(uint64_t sz) {
 
 ATFW_UTIL_FORCEINLINE static uint64_t chrono_to_libuv_duration(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &in,
                                                                uint64_t default_value) {
-  uint64_t ret = static_cast<uint64_t>(in.seconds() * 1000 + in.nanos() / 1000000);
+  uint64_t ret = static_cast<uint64_t>((in.seconds() * 1000) + (in.nanos() / 1000000));
   if (ret <= 0) {
     ret = default_value;
   }
@@ -317,12 +318,17 @@ static std::chrono::system_clock::duration &atapp_get_sys_now_offset() {
 
 }  // namespace
 
-LIBATAPP_MACRO_API app::message_t::message_t() : type(0), message_sequence(0), data(), metadata(nullptr) {}
+LIBATAPP_MACRO_API app::message_t::message_t() : type(0), message_sequence(0), metadata(nullptr) {}
 LIBATAPP_MACRO_API app::message_t::~message_t() {}
 
-LIBATAPP_MACRO_API app::message_t::message_t(const message_t &other) { (*this) = other; }
+LIBATAPP_MACRO_API app::message_t::message_t(const message_t &other) : type(0), message_sequence(0), metadata(nullptr) {
+  (*this) = other;
+}
 
 LIBATAPP_MACRO_API app::message_t &app::message_t::operator=(const message_t &other) {
+  if (this == &other) {
+    return *this;
+  }
   type = other.type;
   message_sequence = other.message_sequence;
   data = other.data;
@@ -333,9 +339,14 @@ LIBATAPP_MACRO_API app::message_t &app::message_t::operator=(const message_t &ot
 LIBATAPP_MACRO_API app::message_sender_t::message_sender_t() : id(0), remote(nullptr) {}
 LIBATAPP_MACRO_API app::message_sender_t::~message_sender_t() {}
 
-LIBATAPP_MACRO_API app::message_sender_t::message_sender_t(const message_sender_t &other) { (*this) = other; }
+LIBATAPP_MACRO_API app::message_sender_t::message_sender_t(const message_sender_t &other) : id(0), remote(nullptr) {
+  (*this) = other;
+}
 
 LIBATAPP_MACRO_API app::message_sender_t &app::message_sender_t::operator=(const message_sender_t &other) {
+  if (this == &other) {
+    return *this;
+  }
   id = other.id;
   name = other.name;
   remote = other.remote;
@@ -361,6 +372,7 @@ LIBATAPP_MACRO_API app::flag_guard_t::~flag_guard_t() {
 
 LIBATAPP_MACRO_API app::app()
     : setup_result_(0),
+      pending_signals_{},
       ev_loop_(nullptr),
       flags_(0),
       mode_(mode_t::kCustom),
@@ -380,7 +392,6 @@ LIBATAPP_MACRO_API app::app()
 
   last_instance_ = this;
 
-  memset(pending_signals_, 0, sizeof(pending_signals_));
   conf_.id = 0;
   conf_.execute_path = nullptr;
   conf_.upgrade_mode = false;
@@ -915,6 +926,7 @@ LIBATAPP_MACRO_API bool app::is_closing() const noexcept { return check_flag(fla
 
 LIBATAPP_MACRO_API bool app::is_closed() const noexcept { return check_flag(flag_t::kStopped); }
 
+namespace {
 static bool guess_configure_file_is_yaml(const std::string &file_path) {
   std::fstream file;
   file.open(file_path.c_str(), std::ios::in | std::ios::binary);
@@ -969,7 +981,7 @@ static bool reload_all_configure_files(app::yaml_conf_map_t &yaml_map, atfw::uti
                                        std::unordered_set<std::string> &loaded_files,
                                        std::list<std::string> &pending_load_files) {
   bool ret = true;
-  size_t conf_external_loaded_index;
+  size_t conf_external_loaded_index = 0;
 
   while (!pending_load_files.empty()) {
     std::string file_rule = pending_load_files.front();
@@ -1065,9 +1077,8 @@ static bool reload_all_configure_files(app::yaml_conf_map_t &yaml_map, atfw::uti
         FWLOGERROR("load configure file {} failed", file_rule);
         ret = false;
         continue;
-      } else {
-        FWLOGINFO("load configure file {} success", file_rule);
       }
+      FWLOGINFO("load configure file {} success", file_rule);
 
       // external files
       atfw::util::config::ini_value &external_paths = conf_loader.get_node("atapp.config.external");
@@ -1079,6 +1090,7 @@ static bool reload_all_configure_files(app::yaml_conf_map_t &yaml_map, atfw::uti
 
   return ret;
 }
+}  // namespace
 
 LIBATAPP_MACRO_API int app::reload() {
   atbus::adapter::loop_t *old_loop = conf_.bus_conf.ev_loop;
@@ -1137,7 +1149,7 @@ LIBATAPP_MACRO_API int app::reload() {
         continue;
       }
 
-      auto logger = WLOG_GETCAT(log_index);
+      auto *logger = WLOG_GETCAT(log_index);
       if (nullptr == logger) {
         continue;
       }
@@ -1216,7 +1228,7 @@ LIBATAPP_MACRO_API int app::tick() {
   }
   flag_guard_t in_tick_guard(*this, flag_t::kInTick);
 
-  int32_t active_count;
+  int32_t active_count = 0;
   atfw::util::time::time_utility::update();
   // record start time point
   atfw::util::time::time_utility::raw_time_t start_tp = get_sys_now();
@@ -1227,7 +1239,7 @@ LIBATAPP_MACRO_API int app::tick() {
   do {
     tick_timer_.last_tick_timepoint = get_sys_now();
     active_count = 0;
-    int res;
+    int res = 0;
     // step 1. proc available modules
     for (module_ptr_t &mod : modules_) {
       if (mod->is_enabled() && mod->is_actived()) {
@@ -1395,9 +1407,9 @@ LIBATAPP_MACRO_API void app::add_module(module_ptr_t app_module) {
 
   assert(nullptr == app_module->owner_);
   if (nullptr == app_module->owner_) {
-    modules_.push_back(app_module);
-    app_module->owner_ = this;
-    app_module->on_bind();
+    modules_.push_back(std::move(app_module));
+    modules_.back()->owner_ = this;
+    modules_.back()->on_bind();
   }
 }
 
@@ -1438,9 +1450,9 @@ LIBATAPP_MACRO_API const std::string &app::get_build_version() const noexcept {
   if (build_version_.empty()) {
     std::stringstream ss;
     if (get_app_version().empty()) {
-      ss << "1.0.0.0 - based on libatapp " << LIBATAPP_VERSION << std::endl;
+      ss << "1.0.0.0 - based on libatapp " << LIBATAPP_VERSION << '\n';
     } else {
-      ss << get_app_version() << " - based on libatapp " << LIBATAPP_VERSION << std::endl;
+      ss << get_app_version() << " - based on libatapp " << LIBATAPP_VERSION << '\n';
     }
 
     const size_t key_padding = 20;
@@ -1450,7 +1462,7 @@ LIBATAPP_MACRO_API const std::string &app::get_build_version() const noexcept {
 #  ifdef __TIME__
     ss << " " << __TIME__;
 #  endif
-    ss << std::endl;
+    ss << '\n';
 #endif
 
 #if defined(PROJECT_SCM_VERSION) || defined(PROJECT_SCM_NAME) || defined(PROJECT_SCM_BRANCH)
@@ -1477,7 +1489,7 @@ LIBATAPP_MACRO_API const std::string &app::get_build_version() const noexcept {
 #  ifdef _MSVC_LANG
     ss << " with standard " << _MSVC_LANG;
 #  endif
-    ss << std::endl;
+    ss << '\n';
 
 #elif defined(__clang__) || defined(__GNUC__) || defined(__GNUG__)
     ss << std::setw(key_padding) << "Build Compiler: ";
@@ -1501,7 +1513,7 @@ LIBATAPP_MACRO_API const std::string &app::get_build_version() const noexcept {
 #  if defined(__cplusplus) && __cplusplus > 1
     ss << " C++ standard " << __cplusplus;
 #  endif
-    ss << std::endl;
+    ss << '\n';
 #endif
 
     build_version_ = ss.str();
@@ -1598,7 +1610,7 @@ LIBATAPP_MACRO_API void app::parse_configures_into(ATBUS_MACRO_PROTOBUF_NAMESPAC
 }
 
 LIBATAPP_MACRO_API void app::parse_log_configures_into(atapp::protocol::atapp_log &dst,
-                                                       std::vector<gsl::string_view> configure_prefix_paths,
+                                                       const std::vector<gsl::string_view> &configure_prefix_paths,
                                                        gsl::string_view load_environemnt_prefix,
                                                        configure_key_set *existed_keys) const noexcept {
   dst.Clear();
@@ -1728,7 +1740,7 @@ LIBATAPP_MACRO_API void app::set_metadata_label(gsl::string_view key, gsl::strin
     return;
   }
 
-  auto labels = conf_.metadata.mutable_labels();
+  auto *labels = conf_.metadata.mutable_labels();
   if (nullptr == labels) {
     return;
   }
@@ -1845,7 +1857,7 @@ LIBATAPP_MACRO_API void app::pack(atapp::protocol::atapp_discovery &out) const {
   if (bus_node_) {
     out.mutable_listen()->Reserve(static_cast<int>(bus_node_->get_listen_list().size()));
     // std::list<std::string>
-    for (auto &addr : bus_node_->get_listen_list()) {
+    for (const auto &addr : bus_node_->get_listen_list()) {
       out.add_listen(addr.address);
     }
     out.set_atbus_protocol_version(bus_node_->get_protocol_version());
@@ -1877,11 +1889,42 @@ LIBATAPP_MACRO_API const etcd_discovery_set &app::get_global_discovery() const n
   return internal_empty_discovery_set_;
 }
 
+LIBATAPP_MACRO_API atbus::topology_peer::ptr_t app::get_topology_peer(atbus::bus_id_t id) const noexcept {
+  const atbus::topology_registry::ptr_t &registry = get_topology_registry();
+  if (registry) {
+    return registry->get_peer(id);
+  }
+
+  return nullptr;
+}
+
+LIBATAPP_MACRO_API const atbus::topology_registry::ptr_t &app::get_topology_registry() const noexcept {
+  if (bus_node_ && bus_node_->get_topology_registry()) {
+    return bus_node_->get_topology_registry();
+  }
+
+  static atbus::topology_registry::ptr_t empty_registry;
+  return empty_registry;
+}
+
+LIBATAPP_MACRO_API atbus::topology_relation_type app::get_topology_relation(
+    atbus::bus_id_t id, atbus::topology_peer::ptr_t *next_hop_peer) const noexcept {
+  if (bus_node_) {
+    return bus_node_->get_topology_relation(id, next_hop_peer);
+  }
+
+  if (nullptr != next_hop_peer) {
+    *next_hop_peer = nullptr;
+  }
+
+  return atbus::topology_relation_type::kInvalid;
+}
+
 LIBATAPP_MACRO_API uint32_t app::get_address_type(const std::string &address) const noexcept {
   uint32_t ret = static_cast<uint32_t>(address_type_t::kNone);
 
   atbus::channel::channel_address_t addr;
-  atbus::channel::make_address(address.c_str(), addr);
+  atbus::channel::make_address(address, addr);
   std::transform(addr.scheme.begin(), addr.scheme.end(), addr.scheme.begin(), ::atfw::util::string::tolower<char>);
 
   connector_protocol_map_t::mapped_type connector_protocol = nullptr;
@@ -1957,7 +2000,7 @@ LIBATAPP_MACRO_API uint64_t app::consume_tick_timer_compensation() noexcept {
 
 LIBATAPP_MACRO_API int32_t app::listen(const std::string &address) {
   atbus::channel::channel_address_t addr;
-  atbus::channel::make_address(address.c_str(), addr);
+  atbus::channel::make_address(address, addr);
   std::transform(addr.scheme.begin(), addr.scheme.end(), addr.scheme.begin(), ::atfw::util::string::tolower<char>);
 
   connector_protocol_map_t::mapped_type connector_protocol = nullptr;
@@ -1994,7 +2037,7 @@ LIBATAPP_MACRO_API int32_t app::send_message(uint64_t target_node_id, int32_t ty
       break;
     }
 
-    int32_t ret;
+    int32_t ret = 0;
     if (nullptr != msg_sequence) {
       ret = cache->push_forward_message(type, *msg_sequence, data, metadata);
     } else {
@@ -2055,7 +2098,7 @@ LIBATAPP_MACRO_API int32_t app::send_message(const std::string &target_node_name
       break;
     }
 
-    int32_t ret;
+    int32_t ret = 0;
     if (nullptr != msg_sequence) {
       ret = cache->push_forward_message(type, *msg_sequence, data, metadata);
     } else {
@@ -2094,7 +2137,7 @@ LIBATAPP_MACRO_API int32_t app::send_message(const etcd_discovery_node::ptr_t &t
     return EN_ATBUS_ERR_ATNODE_NOT_FOUND;
   }
 
-  int32_t ret;
+  int32_t ret = 0;
   if (nullptr != msg_sequence) {
     ret = cache->push_forward_message(type, *msg_sequence, data, metadata);
   } else {
@@ -2252,26 +2295,28 @@ LIBATAPP_MACRO_API bool app::add_log_sink_maker(gsl::string_view name, log_sink_
     return false;
   }
 
-  log_reg_[key] = fn;
+  log_reg_[key] = std::move(fn);
   return true;
 }
 
 LIBATAPP_MACRO_API void app::set_evt_on_forward_request(callback_fn_on_forward_request_t fn) {
-  evt_on_forward_request_ = fn;
+  evt_on_forward_request_ = std::move(fn);
 }
 LIBATAPP_MACRO_API void app::set_evt_on_forward_response(callback_fn_on_forward_response_t fn) {
-  evt_on_forward_response_ = fn;
+  evt_on_forward_response_ = std::move(fn);
 }
-LIBATAPP_MACRO_API void app::set_evt_on_app_connected(callback_fn_on_connected_t fn) { evt_on_app_connected_ = fn; }
+LIBATAPP_MACRO_API void app::set_evt_on_app_connected(callback_fn_on_connected_t fn) {
+  evt_on_app_connected_ = std::move(fn);
+}
 
 LIBATAPP_MACRO_API void app::set_evt_on_app_disconnected(callback_fn_on_disconnected_t fn) {
-  evt_on_app_disconnected_ = fn;
+  evt_on_app_disconnected_ = std::move(fn);
 }
 LIBATAPP_MACRO_API void app::set_evt_on_all_module_inited(callback_fn_on_all_module_inited_t fn) {
-  evt_on_all_module_inited_ = fn;
+  evt_on_all_module_inited_ = std::move(fn);
 }
 LIBATAPP_MACRO_API void app::set_evt_on_all_module_cleaned(callback_fn_on_all_module_cleaned_t fn) {
-  evt_on_all_module_cleaned_ = fn;
+  evt_on_all_module_cleaned_ = std::move(fn);
 }
 LIBATAPP_MACRO_API app::callback_fn_on_finally_handle app::add_evt_on_finally(callback_fn_on_finally_t fn) {
   if (!fn) {
@@ -2483,7 +2528,7 @@ LIBATAPP_MACRO_API atapp_endpoint::ptr_t app::mutable_endpoint(const etcd_discov
     // Check loopback
     if (handle.use_count() == 1 && loopback_connector_ && is_loopback) {
       atbus::channel::channel_address_t addr;
-      atbus::channel::make_address("loopback://", get_app_name().c_str(), 0, addr);
+      atbus::channel::make_address("loopback://", get_app_name(), 0, addr);
       int res = loopback_connector_->on_start_connect(*discovery, *ret, addr, handle);
       if (0 == res && handle.use_count() > 1) {
         atapp_connector_bind_helper::bind(*handle, *loopback_connector_);
@@ -2506,7 +2551,7 @@ LIBATAPP_MACRO_API atapp_endpoint::ptr_t app::mutable_endpoint(const etcd_discov
                      gateway.address());
           continue;
         }
-        atbus::channel::make_address(gateway.address().c_str(), addr);
+        atbus::channel::make_address(gateway.address(), addr);
         std::transform(addr.scheme.begin(), addr.scheme.end(), addr.scheme.begin(),
                        ::atfw::util::string::tolower<char>);
 
@@ -2541,10 +2586,9 @@ LIBATAPP_MACRO_API atapp_endpoint::ptr_t app::mutable_endpoint(const etcd_discov
           FWLOGINFO("connect address {} of atapp endpoint {}({}) success and use handle {}", ret->get_id(),
                     ret->get_name(), addr.address, reinterpret_cast<const void *>(handle.get()));
           break;
-        } else {
-          FWLOGINFO("skip address {} of atapp endpoint {}({}) with handle {}, connect result {}", ret->get_id(),
-                    ret->get_name(), addr.address, reinterpret_cast<const void *>(handle.get()), res);
         }
+        FWLOGINFO("skip address {} of atapp endpoint {}({}) with handle {}, connect result {}", ret->get_id(),
+                  ret->get_name(), addr.address, reinterpret_cast<const void *>(handle.get()), res);
       }
     }
   }
@@ -2611,7 +2655,7 @@ LIBATAPP_MACRO_API bool app::match_gateway(const atapp::protocol::atapp_gateway 
 LIBATAPP_MACRO_API void app::setup_logger(atfw::util::log::log_wrapper &logger, const std::string &min_level,
                                           const atapp::protocol::atapp_log_category &log_conf) const noexcept {
   int log_level_id = atfw::util::log::log_wrapper::level_t::LOG_LW_INFO;
-  log_level_id = atfw::util::log::log_formatter::get_level_by_name(min_level.c_str());
+  log_level_id = atfw::util::log::log_formatter::get_level_by_name(min_level);
 
   // init and set prefix
   if (0 != logger.init(WLOG_LEVELID(log_level_id))) {
@@ -2630,11 +2674,11 @@ LIBATAPP_MACRO_API void app::setup_logger(atfw::util::log::log_wrapper &logger, 
     atfw::util::log::log_formatter::level_t::type stacktrace_level_max =
         atfw::util::log::log_formatter::level_t::LOG_LW_DISABLED;
     if (!log_conf.stacktrace().min().empty()) {
-      stacktrace_level_min = atfw::util::log::log_formatter::get_level_by_name(log_conf.stacktrace().min().c_str());
+      stacktrace_level_min = atfw::util::log::log_formatter::get_level_by_name(log_conf.stacktrace().min());
     }
 
     if (!log_conf.stacktrace().max().empty()) {
-      stacktrace_level_max = atfw::util::log::log_formatter::get_level_by_name(log_conf.stacktrace().max().c_str());
+      stacktrace_level_max = atfw::util::log::log_formatter::get_level_by_name(log_conf.stacktrace().max());
     }
 
     logger.set_stacktrace_level(stacktrace_level_min, stacktrace_level_max);
@@ -2650,10 +2694,10 @@ LIBATAPP_MACRO_API void app::setup_logger(atfw::util::log::log_wrapper &logger, 
     int log_handle_min = atfw::util::log::log_wrapper::level_t::LOG_LW_DEBUG,
         log_handle_max = atfw::util::log::log_wrapper::level_t::LOG_LW_FATAL;
     if (!log_sink.level().min().empty()) {
-      log_handle_min = atfw::util::log::log_formatter::get_level_by_name(log_sink.level().min().c_str());
+      log_handle_min = atfw::util::log::log_formatter::get_level_by_name(log_sink.level().min());
     }
     if (!log_sink.level().max().empty()) {
-      log_handle_max = atfw::util::log::log_formatter::get_level_by_name(log_sink.level().max().c_str());
+      log_handle_max = atfw::util::log::log_formatter::get_level_by_name(log_sink.level().max());
     }
 
     // register log sink
@@ -2699,6 +2743,7 @@ LIBATAPP_MACRO_API int app::add_custom_timer_with_system_clock(std::chrono::syst
                                             priv_data, watcher);
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 LIBATAPP_MACRO_API void app::remove_custom_timer(jiffies_timer_watcher_t &watcher) {
   auto timer_handle = watcher.lock();
   if (timer_handle) {
@@ -2827,11 +2872,11 @@ int app::apply_configure() {
   }
   if (conf_.origin.identity().empty()) {
     std::stringstream identity_stream;
-    identity_stream << atfw::util::file_system::get_abs_path(conf_.execute_path) << std::endl;
-    identity_stream << atfw::util::file_system::get_abs_path(conf_.conf_file.c_str()) << std::endl;
-    identity_stream << "id: " << conf_.id << std::endl;
-    identity_stream << "name: " << conf_.origin.name() << std::endl;
-    identity_stream << "hostname: " << conf_.origin.hostname() << std::endl;
+    identity_stream << atfw::util::file_system::get_abs_path(conf_.execute_path) << '\n';
+    identity_stream << atfw::util::file_system::get_abs_path(conf_.conf_file.c_str()) << '\n';
+    identity_stream << "id: " << conf_.id << '\n';
+    identity_stream << "name: " << conf_.origin.name() << '\n';
+    identity_stream << "hostname: " << conf_.origin.hostname() << '\n';
     std::string identity_buffer = identity_stream.str();
     conf_.origin.set_identity(atfw::util::hash::sha::hash_to_hex(atfw::util::hash::sha::EN_ALGORITHM_SHA256,
                                                                  identity_buffer.c_str(), identity_buffer.size()));
@@ -3191,7 +3236,7 @@ static void setup_load_category_from_environment(
 
     std::string cat_index_key = atfw::util::log::format("{}_INDEX", cat_prefix);
     std::string cat_index_val = atfw::util::file_system::getenv(cat_index_key.c_str());
-    int32_t cat_index;
+    int32_t cat_index = 0;
     if (cat_index_val.empty()) {
       cat_index = cat_default_index;
     } else {
@@ -3408,7 +3453,7 @@ static void setup_load_category(
 void app::parse_ini_log_categories_into(atapp::protocol::atapp_log &dst, const std::vector<gsl::string_view> &path,
                                         configure_key_set *dump_existed_set) const noexcept {
   const atfw::util::config::ini_value *log_root_node = nullptr;
-  for (auto &key : path) {
+  for (const auto &key : path) {
     if (nullptr == log_root_node) {
       auto iter = cfg_loader_.get_root_node().get_children().find(static_cast<std::string>(key));
       if (iter == cfg_loader_.get_root_node().get_children().end()) {
@@ -3593,7 +3638,7 @@ void app::parse_yaml_log_categories_into(atapp::protocol::atapp_log &dst, const 
           }
         }
 #if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
-      } catch (...) {
+      } catch (...) {  // NOLINT(bugprone-empty-catch)
         // Ignore error
       }
 #endif
@@ -3671,7 +3716,7 @@ LIBATAPP_MACRO_API void app::trigger_event_on_topology_event(
         topology_data_ptr = atfw::util::memory::make_strong_rc<atbus::topology_data>();
         topology_data_ptr->pid = topology_info->pid();
         topology_data_ptr->hostname = topology_info->hostname();
-        for (auto &kv : topology_info->data().label()) {
+        for (const auto &kv : topology_info->data().label()) {
           topology_data_ptr->labels.emplace(kv.first, kv.second);
         }
       }
@@ -3825,7 +3870,7 @@ int app::setup_log() {
   parse_log_configures_into(conf_.log, std::vector<gsl::string_view>{"atapp", "log"}, "ATAPP_LOG");
   for (int i = 0; i < conf_.log.category_size() && i < atfw::util::log::log_wrapper::categorize_t::MAX; ++i) {
     int32_t log_index = conf_.log.category(i).index();
-    auto logger = WLOG_GETCAT(log_index);
+    auto *logger = WLOG_GETCAT(log_index);
     if (nullptr == logger) {
       FWLOGERROR("Internal log index {} is invalid, please use {} to create custom logger", log_index,
                  "atfw::util::log::log_wrapper::create_user_logger(...)");
@@ -3877,7 +3922,7 @@ int app::setup_atbus() {
       continue;
     }
 
-    auto logger = WLOG_GETCAT(log_index);
+    auto *logger = WLOG_GETCAT(log_index);
     if (nullptr == logger) {
       continue;
     }
@@ -3942,8 +3987,8 @@ int app::setup_atbus() {
             conf_.origin.bus().listen(i));
         atfw::util::cli::shell_stream ss(std::cerr);
         ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED
-             << "Using global shared memory require SeCreateGlobalPrivilege, try to run as Administrator." << std::endl
-             << "We will ignore " << conf_.origin.bus().listen(i) << " this time." << std::endl;
+             << "Using global shared memory require SeCreateGlobalPrivilege, try to run as Administrator." << '\n'
+             << "We will ignore " << conf_.origin.bus().listen(i) << " this time." << '\n';
 
         // res = 0; // Value stored to 'res' is never read
       } else {
@@ -3951,7 +3996,7 @@ int app::setup_atbus() {
         FWLOGERROR("bus node listen {} failed. res: {}", conf_.origin.bus().listen(i), res);
         if (EN_ATBUS_ERR_PIPE_ADDR_TOO_LONG == res) {
           atbus::channel::channel_address_t address;
-          atbus::channel::make_address(conf_.origin.bus().listen(i).c_str(), address);
+          atbus::channel::make_address(conf_.origin.bus().listen(i), address);
           std::string abs_path = atfw::util::file_system::get_abs_path(address.host.c_str());
           FWLOGERROR("listen pipe socket {}, but the length ({}) exceed the limit {}", abs_path, abs_path.size(),
                      atbus::channel::io_stream_get_max_unix_socket_length());
@@ -4012,6 +4057,7 @@ void app::close_timer(timer_ptr_t &t) {
   }
 }
 
+namespace {
 static void _app_tick_timer_handle(uv_timer_t *handle) {
   if (nullptr != handle && nullptr != handle->data) {
     std::chrono::system_clock::time_point start_timer = std::chrono::system_clock::now();
@@ -4040,6 +4086,7 @@ static void _app_tick_timer_handle(uv_timer_t *handle) {
     uv_timer_start(handle, _app_tick_timer_handle, 256, 0);
   }
 }
+}  // namespace
 
 int app::setup_tick_timer() {
   close_timer(tick_timer_.tick_timer);
@@ -4105,19 +4152,18 @@ bool app::write_pidfile(int pid) {
     if (!pid_file.is_open()) {
       atfw::util::cli::shell_stream ss(std::cerr);
       ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "open and write pid file " << conf_.pid_file
-           << " failed" << std::endl;
+           << " failed" << '\n';
       FWLOGERROR("open and write pid file {} failed", conf_.pid_file);
       // Failed and skip running
       return false;
-    } else {
-      // Write 0 when start failed
-      if (pid < 0) {
-        pid_file << 0;
-      } else {
-        pid_file << pid;
-      }
-      pid_file.close();
     }
+    // Write 0 when start failed
+    if (pid < 0) {
+      pid_file << 0;
+    } else {
+      pid_file << pid;
+    }
+    pid_file.close();
   }
 
   return true;
@@ -4131,25 +4177,23 @@ bool app::cleanup_pidfile() {
     if (!pid_file.is_open()) {
       atfw::util::cli::shell_stream ss(std::cerr);
       ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "try to remove pid file " << conf_.pid_file
-           << " failed" << std::endl;
+           << " failed" << '\n';
 
       // failed and skip running
       return false;
-    } else {
-      int pid = 0;
-      pid_file >> pid;
-      pid_file.close();
-
-      if (pid != atbus::node::get_pid()) {
-        atfw::util::cli::shell_stream ss(std::cerr);
-        ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW << "skip remove pid file " << conf_.pid_file
-             << ". because it has pid " << pid << ", but our pid is " << atbus::node::get_pid() << std::endl;
-
-        return false;
-      } else {
-        return atfw::util::file_system::remove(conf_.pid_file.c_str());
-      }
     }
+    int pid = 0;
+    pid_file >> pid;
+    pid_file.close();
+
+    if (pid != atbus::node::get_pid()) {
+      atfw::util::cli::shell_stream ss(std::cerr);
+      ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW << "skip remove pid file " << conf_.pid_file
+           << ". because it has pid " << pid << ", but our pid is " << atbus::node::get_pid() << '\n';
+
+      return false;
+    }
+    return atfw::util::file_system::remove(conf_.pid_file.c_str());
   }
 
   return true;
@@ -4157,16 +4201,13 @@ bool app::cleanup_pidfile() {
 
 std::string app::get_startup_error_file_path() const {
   if (conf_.start_error_file.empty()) {
-    std::string start_error_file;
     auto last_dot = conf_.pid_file.find_last_of('.');
     if (last_dot != std::string::npos) {
       return conf_.pid_file.substr(0, last_dot) + ".startup-error";
-    } else {
-      return conf_.pid_file + ".startup-error";
     }
-  } else {
-    return conf_.start_error_file;
+    return conf_.pid_file + ".startup-error";
   }
+  return conf_.start_error_file;
 }
 
 bool app::write_startup_error_file(int error_code) {
@@ -4180,14 +4221,13 @@ bool app::write_startup_error_file(int error_code) {
   if (!startup_error_file.is_open()) {
     atfw::util::cli::shell_stream ss(std::cerr);
     ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "open and write startup error file "
-         << start_error_file << " failed" << std::endl;
+         << start_error_file << " failed" << '\n';
     FWLOGERROR("open and write startup error file{} failed", start_error_file);
     // Failed and skip running
     return false;
-  } else {
-    startup_error_file << error_code;
-    startup_error_file.close();
   }
+  startup_error_file << error_code;
+  startup_error_file.close();
 
   return true;
 }
@@ -4210,13 +4250,13 @@ void app::print_help() {
 
   shls() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW
          << atfw::util::cli::shell_font_style::SHELL_FONT_SPEC_BOLD << "Usage: " << conf_.execute_path
-         << " <options> <command> [command paraters...]" << std::endl;
-  shls() << get_option_manager()->get_help_msg() << std::endl << std::endl;
+         << " <options> <command> [command paraters...]" << '\n';
+  shls() << get_option_manager()->get_help_msg() << '\n' << '\n';
 
   if (!(get_command_manager()->empty() && get_command_manager()->children_empty())) {
     shls() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW
-           << atfw::util::cli::shell_font_style::SHELL_FONT_SPEC_BOLD << "Custom command help:" << std::endl;
-    shls() << get_command_manager()->get_help_msg() << std::endl;
+           << atfw::util::cli::shell_font_style::SHELL_FONT_SPEC_BOLD << "Custom command help:" << '\n';
+    shls() << get_command_manager()->get_help_msg() << '\n';
   }
 }
 
@@ -4270,7 +4310,7 @@ bool app::match_gateway_labels(const atapp::protocol::atapp_gateway &checked) co
 }
 
 LIBATAPP_MACRO_API app::custom_command_sender_t app::get_custom_command_sender(atfw::util::cli::callback_param params) {
-  custom_command_sender_t ret;
+  custom_command_sender_t ret{};
   ret.self = nullptr;
   ret.response = nullptr;
   if (nullptr != params.get_ext_param()) {
@@ -4308,7 +4348,6 @@ LIBATAPP_MACRO_API void app::split_ids_by_string(const char *in, std::vector<app
     out.push_back(::atfw::util::string::to_int<app_id_t>(in));
 
     for (; nullptr != in && *in && '.' != *in; ++in) {
-      continue;
     }
     // skip dot and ready to next segment
     if (nullptr != in && *in && '.' == *in) {
@@ -4412,7 +4451,7 @@ int app::prog_option_handler_set_id(atfw::util::cli::callback_param params) {
     conf_.id_cmd = params[0]->to_string();
   } else {
     atfw::util::cli::shell_stream ss(std::cerr);
-    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "-id require 1 parameter" << std::endl;
+    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "-id require 1 parameter" << '\n';
   }
 
   return 0;
@@ -4424,7 +4463,7 @@ int app::prog_option_handler_set_id_mask(atfw::util::cli::callback_param params)
     split_ids_by_string(params[0]->to_string(), conf_.id_mask);
   } else {
     atfw::util::cli::shell_stream ss(std::cerr);
-    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "-id-mask require 1 parameter" << std::endl;
+    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "-id-mask require 1 parameter" << '\n';
   }
 
   return 0;
@@ -4436,7 +4475,7 @@ int app::prog_option_handler_set_conf_file(atfw::util::cli::callback_param param
   } else {
     atfw::util::cli::shell_stream ss(std::cerr);
     ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "-c, --conf, --config require 1 parameter"
-         << std::endl;
+         << '\n';
   }
 
   return 0;
@@ -4447,7 +4486,7 @@ int app::prog_option_handler_set_pid(atfw::util::cli::callback_param params) {
     conf_.pid_file = params[0]->to_cpp_string();
   } else {
     atfw::util::cli::shell_stream ss(std::cerr);
-    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "-p, --pid require 1 parameter" << std::endl;
+    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "-p, --pid require 1 parameter" << '\n';
   }
 
   return 0;
@@ -4471,7 +4510,7 @@ int app::prog_option_handler_set_startup_error_file(atfw::util::cli::callback_pa
   } else {
     atfw::util::cli::shell_stream ss(std::cerr);
     ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "--startup-error-file require 1 parameter"
-         << std::endl;
+         << '\n';
   }
 
   return 0;
@@ -4511,7 +4550,7 @@ int app::prog_option_handler_run(atfw::util::cli::callback_param params) {
   if (0 == params.get_params_number()) {
     mode_ = mode_t::kInfo;
     atfw::util::cli::shell_stream ss(std::cerr);
-    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "run must follow a command" << std::endl;
+    ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "run must follow a command" << '\n';
   }
   return 0;
 }
@@ -4591,6 +4630,7 @@ void app::setup_option(int argc, const char *argv[], void *priv_data) {
   opt_mgr->start(argc - 1, &argv[1], false, priv_data);
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 int app::app::command_handler_start(atfw::util::cli::callback_param /*params*/) {
   // add_custom_command_rsp(params, "success");
   // do nothing
@@ -4691,6 +4731,7 @@ int app::command_handler_reload(atfw::util::cli::callback_param params) {
   return ret;
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 int app::command_handler_invalid(atfw::util::cli::callback_param params) {
   char msg[256] = {0};
   std::stringstream args;
@@ -4786,7 +4827,7 @@ int app::command_handler_list_discovery(atfw::util::cli::callback_param params) 
 
 int app::bus_evt_callback_on_forward_request(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
                                              const atbus::message &msg, gsl::span<const unsigned char> buffer) {
-  auto head = msg.get_head();
+  const auto *head = msg.get_head();
   app_id_t source_bus_id = head == nullptr ? 0 : head->source_bus_id();
   if (atbus::message_body_type::kDataTransformReq != msg.get_body_type() || 0 == source_bus_id) {
     FWLOGERROR("receive a message from unknown source {} or invalid body case", source_bus_id);
@@ -4830,7 +4871,7 @@ int app::bus_evt_callback_on_forward_response(const atbus::node &, const atbus::
     return EN_ATAPP_ERR_SEND_FAILED;
   }
 
-  auto head = m->get_head();
+  const auto *head = m->get_head();
   if (nullptr == head) {
     FWLOGERROR("app {:#x} receive a message without message head", get_app_id());
     return EN_ATBUS_ERR_BAD_DATA;
@@ -4847,7 +4888,7 @@ int app::bus_evt_callback_on_forward_response(const atbus::node &, const atbus::
     return EN_ATBUS_ERR_BAD_DATA;
   }
 
-  auto &transform_rsp = m->body().data_transform_rsp();
+  const auto &transform_rsp = m->body().data_transform_rsp();
   if (atbus_connector_) {
     atbus_connector_->on_receive_forward_response(
         transform_rsp.from(), head->type(), head->sequence(), head->result_code(),
@@ -4876,6 +4917,7 @@ int app::bus_evt_callback_on_forward_response(const atbus::node &, const atbus::
   return 0;
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 int app::bus_evt_callback_on_error(const atbus::node &n, const atbus::endpoint *ep, const atbus::connection *conn,
                                    int status, ATBUS_ERROR_TYPE errcode) {
   // meet eof or reset by peer is not a error
@@ -4921,6 +4963,7 @@ int app::bus_evt_callback_on_error(const atbus::node &n, const atbus::endpoint *
   return 0;
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 int app::bus_evt_callback_on_info_log(const atbus::node &n, const atbus::endpoint *ep, const atbus::connection *conn,
                                       const char *msg) {
   FWLOGINFO("bus node {:#x} endpoint {:#x}({}) connection {}({}) message: {}", n.get_id(),
@@ -4963,6 +5006,7 @@ int app::bus_evt_callback_on_shutdown(const atbus::node &n, int reason) {
   return stop();
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 int app::bus_evt_callback_on_available(const atbus::node &n, int res) {
   FWLOGINFO("bus node {:#x} initialze done, res: {}", n.get_id(), res);
   return res;
@@ -5028,7 +5072,7 @@ int app::bus_evt_callback_on_custom_command_request(const atbus::node &n, const 
   FWLOGINFO("app {}({:#x}) receive a command:{}", get_app_name(), get_app_id(), ss_log.str());
 
   atfw::util::cli::cmd_option_ci::ptr_type cmd_mgr = get_command_manager();
-  custom_command_sender_t sender;
+  custom_command_sender_t sender{};
   sender.self = this;
   sender.response = &rsp;
   cmd_mgr->start(args_str, true, &sender);
@@ -5140,7 +5184,7 @@ int app::bus_evt_callback_on_custom_command_response(const atbus::node &, const 
   atfw::util::cli::shell_stream ss(std::cout);
   for (size_t i = 0; i < args.size(); ++i) {
     std::string text(reinterpret_cast<const char *>(args[i].data()), args[i].size());
-    ss() << "Custom Command: (" << LOG_WRAPPER_FWAPI_FORMAT("{:#x}", src_id) << "): " << text << std::endl;
+    ss() << "Custom Command: (" << LOG_WRAPPER_FWAPI_FORMAT("{:#x}", src_id) << "): " << text << '\n';
   }
 
   return 0;
@@ -5156,7 +5200,7 @@ void app::app_evt_on_finally() {
   }
 }
 
-LIBATAPP_MACRO_API void app::add_connector_inner(std::shared_ptr<atapp_connector_impl> connector) {
+LIBATAPP_MACRO_API void app::add_connector_inner(const std::shared_ptr<atapp_connector_impl> &connector) {
   if (!connector || check_flag(flag_t::kDestroying)) {
     return;
   }
@@ -5215,7 +5259,7 @@ int app::send_last_command(ev_loop_t *ev_loop) {
 
   for (int i = 0; i < conf_.origin.bus().listen_size(); ++i) {
     atbus::channel::channel_address_t parsed_addr;
-    make_address(conf_.origin.bus().listen(i).c_str(), parsed_addr);
+    make_address(conf_.origin.bus().listen(i), parsed_addr);
     int parsed_level = 0;
     if (0 == UTIL_STRFUNC_STRNCASE_CMP("shm", parsed_addr.scheme.c_str(), 3)) {
       parsed_level = 5;
@@ -5248,7 +5292,7 @@ int app::send_last_command(ev_loop_t *ev_loop) {
     return EN_ATAPP_ERR_NO_AVAILABLE_ADDRESS;
   }
 
-  if (!ev_loop_) {
+  if (ev_loop_ == nullptr) {
     ev_loop_ = uv_default_loop();
   }
   conf_.bus_conf.ev_loop = ev_loop_;
@@ -5286,19 +5330,19 @@ int app::send_last_command(ev_loop_t *ev_loop) {
   if (is_sync_channel) {
     // preallocate endpoint when using shared memory channel, because this channel can not be connected without endpoint
     atbus::endpoint::ptr_t new_ep =
-        atbus::endpoint::create(bus_node_.get(), conf_.id, bus_node_->get_pid(), bus_node_->get_hostname());
+        atbus::endpoint::create(bus_node_.get(), conf_.id, atbus::node::get_pid(), atbus::node::get_hostname());
     ret = bus_node_->add_endpoint(new_ep);
     if (ret < 0) {
       FWLOGERROR("connect to {} failed. ret: {}", use_addr.address, ret);
       return ret;
     }
 
-    ret = bus_node_->connect(use_addr.address.c_str(), new_ep.get());
+    ret = bus_node_->connect(use_addr.address, new_ep.get());
     if (ret >= 0) {
       ep = new_ep.get();
     }
   } else {
-    ret = bus_node_->connect(use_addr.address.c_str());
+    ret = bus_node_->connect(use_addr.address);
   }
 
   if (ret < 0) {

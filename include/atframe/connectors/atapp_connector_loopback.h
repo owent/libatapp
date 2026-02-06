@@ -4,7 +4,9 @@
 
 #pragma once
 
-#include <stdint.h>
+#include <time/time_utility.h>
+
+#include <cstdint>
 #include <list>
 #include <memory>
 #include <unordered_map>

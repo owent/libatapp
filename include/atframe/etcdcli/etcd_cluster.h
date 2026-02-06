@@ -373,9 +373,9 @@ class etcd_cluster {
   // ================== apis for sub-services ==================
   LIBATAPP_MACRO_API bool add_keepalive(const std::shared_ptr<etcd_keepalive> &keepalive);
   LIBATAPP_MACRO_API bool add_retry_keepalive(const std::shared_ptr<etcd_keepalive> &keepalive);
-  LIBATAPP_MACRO_API bool remove_keepalive(std::shared_ptr<etcd_keepalive> keepalive);
+  LIBATAPP_MACRO_API bool remove_keepalive(const std::shared_ptr<etcd_keepalive> &keepalive);
   LIBATAPP_MACRO_API bool add_watcher(const std::shared_ptr<etcd_watcher> &watcher);
-  LIBATAPP_MACRO_API bool remove_watcher(std::shared_ptr<etcd_watcher> watcher);
+  LIBATAPP_MACRO_API bool remove_watcher(const std::shared_ptr<etcd_watcher> &watcher);
 
   // ================== apis of create request for key-value operation ==================
  public:
@@ -451,12 +451,12 @@ class etcd_cluster {
 
   ATFW_UTIL_FORCEINLINE int64_t get_lease() const { return conf_.lease; }
 
-  LIBATAPP_MACRO_API on_event_up_down_handle_t add_on_event_up(on_event_up_down_fn_t fn,
+  LIBATAPP_MACRO_API on_event_up_down_handle_t add_on_event_up(const on_event_up_down_fn_t &fn,
                                                                bool trigger_if_running = false);
   LIBATAPP_MACRO_API void remove_on_event_up(on_event_up_down_handle_t &handle);
   LIBATAPP_MACRO_API void reset_on_event_up_handle(on_event_up_down_handle_t &handle);
 
-  LIBATAPP_MACRO_API on_event_up_down_handle_t add_on_event_down(on_event_up_down_fn_t fn,
+  LIBATAPP_MACRO_API on_event_up_down_handle_t add_on_event_down(const on_event_up_down_fn_t &fn,
                                                                  bool trigger_if_not_running = false);
   LIBATAPP_MACRO_API void remove_on_event_down(on_event_up_down_handle_t &handle);
   LIBATAPP_MACRO_API void reset_on_event_down_handle(on_event_up_down_handle_t &handle);

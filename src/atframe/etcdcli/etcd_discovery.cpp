@@ -109,16 +109,16 @@ static void consistent_hash_combine(gsl::span<const unsigned char> buf, std::pai
 }
 
 static gsl::span<const unsigned char> consistent_hash_to_span(const std::string &hash_code) {
-  return gsl::span<const unsigned char>(reinterpret_cast<const unsigned char *>(hash_code.data()), hash_code.size());
+  return gsl::make_span(reinterpret_cast<const unsigned char *>(hash_code.data()), hash_code.size());
 }
 
 static gsl::span<const unsigned char> consistent_hash_to_span(gsl::string_view hash_code) {
-  return gsl::span<const unsigned char>(reinterpret_cast<const unsigned char *>(hash_code.data()), hash_code.size());
+  return gsl::make_span(reinterpret_cast<const unsigned char *>(hash_code.data()), hash_code.size());
 }
 
 template <class T, class = atfw::util::nostd::enable_if_t<std::is_scalar<T>::value>>
 static gsl::span<const unsigned char> consistent_hash_to_span(const T &d) {
-  return gsl::span<const unsigned char>(reinterpret_cast<const unsigned char *>(&d), sizeof(d));
+  return gsl::make_span(reinterpret_cast<const unsigned char *>(&d), sizeof(d));
 }
 
 static bool consistent_hash_compare_find(const etcd_discovery_set::node_hash_type &l,
@@ -131,8 +131,8 @@ static bool round_robin_compare_index(const etcd_discovery_node::ptr_t &l, const
     return reinterpret_cast<uintptr_t>(l.get()) < reinterpret_cast<uintptr_t>(r.get());
   }
 
-  auto &ldi = l->get_discovery_info();
-  auto &rdi = r->get_discovery_info();
+  const auto &ldi = l->get_discovery_info();
+  const auto &rdi = r->get_discovery_info();
   if (ldi.runtime().stateful_pod_index() != rdi.runtime().stateful_pod_index()) {
     return ldi.runtime().stateful_pod_index() < rdi.runtime().stateful_pod_index();
   }
@@ -177,6 +177,7 @@ static void sort_string_map(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Map<std::st
             });
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
 struct lower_upper_bound_pred_t {
   uint64_t id;
   gsl::string_view name;
@@ -311,7 +312,7 @@ LIBATAPP_MACRO_API void etcd_discovery_node::copy_key_to(atapp::protocol::atapp_
   output.set_hostname(node_info_.hostname());
 }
 
-LIBATAPP_MACRO_API void etcd_discovery_node::set_on_destroy(on_destroy_fn_type fn) { on_destroy_fn_ = fn; }
+LIBATAPP_MACRO_API void etcd_discovery_node::set_on_destroy(on_destroy_fn_type fn) { on_destroy_fn_ = std::move(fn); }
 
 LIBATAPP_MACRO_API const etcd_discovery_node::on_destroy_fn_type &etcd_discovery_node::get_on_destroy() const {
   return on_destroy_fn_;
@@ -512,7 +513,7 @@ LIBATAPP_MACRO_API bool etcd_discovery_set::metadata_equal_type::filter(const me
     return false;
   }
 
-  for (auto &label : rule.labels()) {
+  for (const auto &label : rule.labels()) {
     if (label.second.empty()) {
       continue;
     }
@@ -583,8 +584,8 @@ LIBATAPP_MACRO_API size_t etcd_discovery_set::lower_bound_node_hash_by_consisten
       0 != (static_cast<uint8_t>(search_mode_internal_flag::kCompact) & static_cast<uint8_t>(searchmode));
   bool unique_node = 0 != (static_cast<uint8_t>(search_mode_internal_flag::kUnique) & static_cast<uint8_t>(searchmode));
 
-  const std::vector<node_hash_type> *select_hash_ring;
-  size_t max_output_size;
+  const std::vector<node_hash_type> *select_hash_ring = nullptr;
+  size_t max_output_size = 0;
   std::unordered_set<etcd_discovery_node *> unique_cache;
 
   // 紧凑模式使用紧凑集合，可以减少对比开销
@@ -1115,7 +1116,7 @@ etcd_discovery_set::index_cache_type *etcd_discovery_set::get_index_cache(
 
 etcd_discovery_set::index_cache_type *etcd_discovery_set::mutable_index_cache(
     const etcd_discovery_set::metadata_type *metadata) const {
-  auto ret = get_index_cache(metadata);
+  auto *ret = get_index_cache(metadata);
   if (nullptr != ret) {
     return ret;
   }
@@ -1125,4 +1126,3 @@ etcd_discovery_set::index_cache_type *etcd_discovery_set::mutable_index_cache(
 }
 
 LIBATAPP_MACRO_NAMESPACE_END
-

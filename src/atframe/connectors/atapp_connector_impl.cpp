@@ -7,6 +7,7 @@
 #include <common/string_oprs.h>
 
 #include <algorithm>
+#include <new>
 
 #include "atframe/atapp.h"
 #include "atframe/connectors/atapp_endpoint.h"
@@ -53,7 +54,7 @@ LIBATAPP_MACRO_API_SYMBOL_HIDDEN void atapp_endpoint_bind_helper::unbind(atapp_c
   if (endpoint.refer_connections_.erase(&handle) > 0) {
     if (endpoint.refer_connections_.empty()) {
       endpoint.gc_timepoint_ = endpoint.owner_->get_next_tick_time();
-      auto &endpoint_gc_timeout = endpoint.owner_->get_origin_configure().timer().endpoint_gc_timeout();
+      const auto &endpoint_gc_timeout = endpoint.owner_->get_origin_configure().timer().endpoint_gc_timeout();
 
       if (endpoint_gc_timeout.seconds() < 0) {
         endpoint.gc_timepoint_ +=
@@ -180,7 +181,9 @@ LIBATAPP_MACRO_API bool atapp_connection_handle::is_ready() const noexcept {
   return 0 != (flags_ & static_cast<uint32_t>(flags_t::kReady));
 }
 
-LIBATAPP_MACRO_API void atapp_connection_handle::set_on_destroy(on_destroy_fn_type fn) { on_destroy_fn_ = fn; }
+LIBATAPP_MACRO_API void atapp_connection_handle::set_on_destroy(on_destroy_fn_type fn) {
+  on_destroy_fn_ = std::move(fn);
+}
 
 LIBATAPP_MACRO_API const atapp_connection_handle::on_destroy_fn_type &atapp_connection_handle::get_on_destroy() const {
   return on_destroy_fn_;
@@ -201,12 +204,11 @@ LIBATAPP_MACRO_API const char *atapp_connector_impl::name() noexcept {
   }
 
 #if defined(LIBATFRAME_UTILS_ENABLE_RTTI) && LIBATFRAME_UTILS_ENABLE_RTTI
-  auto_demangled_name_.reset(new atfw::util::scoped_demangled_name(typeid(*this).name()));
+  auto_demangled_name_.reset(new (std::nothrow) atfw::util::scoped_demangled_name(typeid(*this).name()));
   if (auto_demangled_name_) {
     return auto_demangled_name_->get();
-  } else {
-    return "atapp::connector demangle symbol failed";
   }
+  return "atapp::connector demangle symbol failed";
 #else
   return "atapp::connector RTTI Unavailable";
 #endif
@@ -224,7 +226,7 @@ LIBATAPP_MACRO_API void atapp_connector_impl::cleanup() {
     handles.swap(handles_);
 
     for (handle_set_t::const_iterator iter = handles.begin(); iter != handles.end(); ++iter) {
-      if (*iter) {
+      if (*iter != nullptr) {
         atapp_connector_bind_helper::unbind(**iter, *this);
       }
     }
