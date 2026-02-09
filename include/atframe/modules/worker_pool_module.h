@@ -58,13 +58,13 @@ class worker_pool_module : public ::atframework::atapp::module_impl {
   LIBATAPP_MACRO_API int spawn(worker_job_action_type action, worker_context* selected_context = nullptr);
 
   // thread-safe
-  LIBATAPP_MACRO_API int spawn(worker_job_action_pointer action, worker_context* selected_context = nullptr);
+  LIBATAPP_MACRO_API int spawn(const worker_job_action_pointer &action, worker_context* selected_context = nullptr);
 
   // thread-safe
   LIBATAPP_MACRO_API int spawn(worker_job_action_type action, const worker_context& context);
 
   // thread-safe
-  LIBATAPP_MACRO_API int spawn(worker_job_action_pointer action, const worker_context& context);
+  LIBATAPP_MACRO_API int spawn(const worker_job_action_pointer &action, const worker_context& context);
 
   // thread-safe
   LIBATAPP_MACRO_API worker_tick_action_handle_type add_tick_callback(worker_tick_action_type action,
