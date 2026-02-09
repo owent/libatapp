@@ -165,9 +165,9 @@ class etcd_module : public ::atframework::atapp::module_impl {
   LIBATAPP_MACRO_API std::string get_discovery_by_name_watcher_path() const;
   LIBATAPP_MACRO_API std::string get_topology_watcher_path() const;
 
-  LIBATAPP_MACRO_API int add_discovery_watcher_by_id(discovery_watcher_list_callback_t fn);
-  LIBATAPP_MACRO_API int add_discovery_watcher_by_name(discovery_watcher_list_callback_t fn);
-  LIBATAPP_MACRO_API int add_topology_watcher(topology_watcher_list_callback_t fn);
+  LIBATAPP_MACRO_API int add_discovery_watcher_by_id(const discovery_watcher_list_callback_t &fn);
+  LIBATAPP_MACRO_API int add_discovery_watcher_by_name(const discovery_watcher_list_callback_t &fn);
+  LIBATAPP_MACRO_API int add_topology_watcher(const topology_watcher_list_callback_t &fn);
 
   LIBATAPP_MACRO_API const ::atframework::atapp::etcd_cluster &get_raw_etcd_ctx() const;
   LIBATAPP_MACRO_API ::atframework::atapp::etcd_cluster &get_raw_etcd_ctx();
@@ -184,7 +184,7 @@ class etcd_module : public ::atframework::atapp::module_impl {
 
   LIBATAPP_MACRO_API bool remove_keepalive_actor(const atapp::etcd_keepalive::ptr_t &keepalive);
 
-  LIBATAPP_MACRO_API node_event_callback_handle_t add_on_node_discovery_event(node_event_callback_t fn);
+  LIBATAPP_MACRO_API node_event_callback_handle_t add_on_node_discovery_event(const node_event_callback_t &fn);
   LIBATAPP_MACRO_API void remove_on_node_event(node_event_callback_handle_t &handle);
 
   LIBATAPP_MACRO_API etcd_discovery_set &get_global_discovery() noexcept;
@@ -195,19 +195,19 @@ class etcd_module : public ::atframework::atapp::module_impl {
   LIBATAPP_MACRO_API bool has_discovery_snapshot() const noexcept;
 
   LIBATAPP_MACRO_API discovery_snapshot_event_callback_handle_t
-  add_on_load_discovery_snapshot(discovery_snapshot_event_callback_t fn);
+  add_on_load_discovery_snapshot(const discovery_snapshot_event_callback_t &fn);
   LIBATAPP_MACRO_API void remove_on_load_discovery_snapshot(discovery_snapshot_event_callback_handle_t &handle);
   LIBATAPP_MACRO_API discovery_snapshot_event_callback_handle_t
-  add_on_discovery_snapshot_loaded(discovery_snapshot_event_callback_t fn);
+  add_on_discovery_snapshot_loaded(const discovery_snapshot_event_callback_t &fn);
   LIBATAPP_MACRO_API void remove_on_discovery_snapshot_loaded(discovery_snapshot_event_callback_handle_t &handle);
 
   LIBATAPP_MACRO_API bool has_topology_snapshot() const noexcept;
 
   LIBATAPP_MACRO_API topology_snapshot_event_callback_handle_t
-  add_on_load_topology_snapshot(topology_snapshot_event_callback_t fn);
+  add_on_load_topology_snapshot(const topology_snapshot_event_callback_t &fn);
   LIBATAPP_MACRO_API void remove_on_load_topology_snapshot(topology_snapshot_event_callback_handle_t &handle);
   LIBATAPP_MACRO_API topology_snapshot_event_callback_handle_t
-  add_on_topology_snapshot_loaded(topology_snapshot_event_callback_t fn);
+  add_on_topology_snapshot_loaded(const topology_snapshot_event_callback_t &fn);
   LIBATAPP_MACRO_API void remove_on_topology_snapshot_loaded(topology_snapshot_event_callback_handle_t &handle);
 
  private:

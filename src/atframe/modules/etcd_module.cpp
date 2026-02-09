@@ -25,10 +25,8 @@
 
 #include <algorithm>
 #include <memory>
-#include <sstream>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -49,7 +47,7 @@ static std::chrono::system_clock::duration convert_to_chrono(const ATBUS_MACRO_P
 }
 
 struct ATFW_UTIL_SYMBOL_LOCAL init_timer_data_type {
-  etcd_cluster *cluster;
+  etcd_cluster *cluster = nullptr;
   std::chrono::system_clock::time_point timeout;
 };
 
@@ -118,7 +116,7 @@ static bool atapp_topology_equal(const atapp::protocol::atapp_topology_info &l,
     return false;
   }
 
-  for (auto &kv : l.data().label()) {
+  for (const auto &kv : l.data().label()) {
     auto it = r.data().label().find(kv.first);
     if (it == r.data().label().end()) {
       return false;
@@ -170,7 +168,7 @@ struct ATFW_UTIL_SYMBOL_LOCAL etcd_module::topology_watcher_callback_list_wrappe
                                            int64_t index);
   ~topology_watcher_callback_list_wrapper_t();
   void operator()(const ::atframework::atapp::etcd_response_header &header,
-                  const ::atframework::atapp::etcd_watcher::response_t &evt_data);
+                  const ::atframework::atapp::etcd_watcher::response_t &body);
 };
 
 struct ATFW_UTIL_SYMBOL_LOCAL etcd_module::discovery_watcher_callback_list_wrapper_t {
@@ -183,7 +181,7 @@ struct ATFW_UTIL_SYMBOL_LOCAL etcd_module::discovery_watcher_callback_list_wrapp
                                             int64_t index);
   ~discovery_watcher_callback_list_wrapper_t();
   void operator()(const ::atframework::atapp::etcd_response_header &header,
-                  const ::atframework::atapp::etcd_watcher::response_t &evt_data);
+                  const ::atframework::atapp::etcd_watcher::response_t &body);
 };
 
 struct ATFW_UTIL_SYMBOL_LOCAL etcd_module::watcher_internal_access_t {
@@ -198,10 +196,12 @@ LIBATAPP_MACRO_API etcd_module::etcd_module()
       maybe_update_internal_keepalive_discovery_value_(true),
       maybe_update_internal_keepalive_discovery_area_(false),
       maybe_update_internal_keepalive_discovery_metadata_(false),
+      tick_interval_(std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::milliseconds(128))),
+      last_etcd_event_topology_header_{},
+      last_etcd_event_discovery_header_{},
       discovery_watcher_snapshot_index_allocator_(0),
       topology_watcher_snapshot_index_allocator_(0) {
-  tick_next_timepoint_ = get_app()->get_sys_now();
-  tick_interval_ = std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::milliseconds(128));
+  tick_next_timepoint_ = app::get_sys_now();
 
   last_etcd_event_topology_header_.cluster_id = 0;
   last_etcd_event_topology_header_.member_id = 0;
@@ -233,6 +233,7 @@ LIBATAPP_MACRO_API void etcd_module::reset() {
   }
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 LIBATAPP_MACRO_API int etcd_module::init() {
   // init curl
   int res = curl_global_init(CURL_GLOBAL_ALL);
@@ -302,7 +303,7 @@ LIBATAPP_MACRO_API int etcd_module::init() {
 
     size_t run_count = 0;
     // Check keepalives
-    for (auto keepalive_actor_list : keepalive_actors) {
+    for (auto *keepalive_actor_list : keepalive_actors) {
       for (std::list<etcd_keepalive::ptr_t>::iterator iter = keepalive_actor_list->begin();
            iter != keepalive_actor_list->end(); ++iter) {
         if ((*iter)->is_check_run()) {
@@ -327,7 +328,7 @@ LIBATAPP_MACRO_API int etcd_module::init() {
     uv_run(get_app()->get_bus_node()->get_evloop(), UV_RUN_ONCE);
 
     // 任意重试次数过多则失败退出
-    for (auto keepalive_actor_list : keepalive_actors) {
+    for (auto *keepalive_actor_list : keepalive_actors) {
       for (std::list<etcd_keepalive::ptr_t>::iterator iter = keepalive_actor_list->begin();
            iter != keepalive_actor_list->end(); ++iter) {
         if ((*iter)->get_check_times() >= ETCD_MODULE_STARTUP_RETRY_TIMES ||
@@ -352,7 +353,7 @@ LIBATAPP_MACRO_API int etcd_module::init() {
 
   if (std::chrono::system_clock::now() > tick_timer_data.timeout) {
     is_failed = true;
-    for (auto keepalive_actor_list : keepalive_actors) {
+    for (auto *keepalive_actor_list : keepalive_actors) {
       for (std::list<etcd_keepalive::ptr_t>::iterator iter = keepalive_actor_list->begin();
            iter != keepalive_actor_list->end(); ++iter) {
         size_t retry_times = (*iter)->get_check_times();
@@ -377,7 +378,7 @@ LIBATAPP_MACRO_API int etcd_module::init() {
   // close timer for timeout
   uv_timer_stop(&tick_timer);
   uv_close(reinterpret_cast<uv_handle_t *>(&tick_timer), init_timer_closed_callback);
-  while (tick_timer.data) {
+  while (tick_timer.data != nullptr) {
     uv_run(get_app()->get_bus_node()->get_evloop(), UV_RUN_ONCE);
   }
 
@@ -543,9 +544,9 @@ LIBATAPP_MACRO_API int etcd_module::reload() {
       break;
     }
 
-    startup_level = atfw::util::log::log_formatter::get_level_by_name(conf.log().startup_level().c_str());
+    startup_level = atfw::util::log::log_formatter::get_level_by_name(conf.log().startup_level());
     if (startup_level <= atfw::util::log::log_formatter::level_t::LOG_LW_DISABLED &&
-        atfw::util::log::log_formatter::get_level_by_name(etcd_log_conf.level().c_str()) <=
+        atfw::util::log::log_formatter::get_level_by_name(etcd_log_conf.level()) <=
             atfw::util::log::log_formatter::level_t::LOG_LW_DISABLED) {
       break;
     }
@@ -554,7 +555,7 @@ LIBATAPP_MACRO_API int etcd_module::reload() {
     if (!logger) {
       break;
     }
-    logger->init(atfw::util::log::log_formatter::get_level_by_name(etcd_log_conf.level().c_str()));
+    logger->init(atfw::util::log::log_formatter::get_level_by_name(etcd_log_conf.level()));
     get_app()->setup_logger(*logger, etcd_log_conf.level(), etcd_log_conf.category(0));
   } while (false);
   etcd_ctx_.set_logger(logger, startup_level);
@@ -697,7 +698,7 @@ LIBATAPP_MACRO_API int etcd_module::reload() {
 LIBATAPP_MACRO_API int etcd_module::stop() {
   if (!cleanup_request_ && !etcd_ctx_.check_flag(etcd_cluster::flag_t::kClosing)) {
     bool revoke_lease = true;
-    if (get_app() && get_app()->is_current_upgrade_mode()) {
+    if (get_app() != nullptr && get_app()->is_current_upgrade_mode()) {
       revoke_lease = false;
     }
 
@@ -868,7 +869,7 @@ LIBATAPP_MACRO_API std::string etcd_module::get_topology_watcher_path() const {
   return LOG_WRAPPER_FWAPI_FORMAT("{}{}", get_configure_path(), ETCD_MODULE_TOPOLOGY_DIR);
 }
 
-LIBATAPP_MACRO_API int etcd_module::add_discovery_watcher_by_id(discovery_watcher_list_callback_t fn) {
+LIBATAPP_MACRO_API int etcd_module::add_discovery_watcher_by_id(const discovery_watcher_list_callback_t &fn) {
   std::lock_guard<std::recursive_mutex> lock_guard{discovery_watcher_callback_lock_};
 
   if (!internal_discovery_watcher_by_id_) {
@@ -903,7 +904,7 @@ LIBATAPP_MACRO_API int etcd_module::add_discovery_watcher_by_id(discovery_watche
   return 0;
 }
 
-LIBATAPP_MACRO_API int etcd_module::add_discovery_watcher_by_name(discovery_watcher_list_callback_t fn) {
+LIBATAPP_MACRO_API int etcd_module::add_discovery_watcher_by_name(const discovery_watcher_list_callback_t &fn) {
   std::lock_guard<std::recursive_mutex> lock_guard{discovery_watcher_callback_lock_};
   if (!internal_discovery_watcher_by_name_) {
     // generate watch data
@@ -938,7 +939,7 @@ LIBATAPP_MACRO_API int etcd_module::add_discovery_watcher_by_name(discovery_watc
   return 0;
 }
 
-LIBATAPP_MACRO_API int etcd_module::add_topology_watcher(topology_watcher_list_callback_t fn) {
+LIBATAPP_MACRO_API int etcd_module::add_topology_watcher(const topology_watcher_list_callback_t &fn) {
   std::lock_guard<std::recursive_mutex> lock_guard{topology_watcher_callback_lock_};
   if (!internal_topology_watcher_) {
     // generate watch data
@@ -1045,7 +1046,7 @@ LIBATAPP_MACRO_API bool etcd_module::remove_keepalive_actor(const atapp::etcd_ke
   std::list<etcd_keepalive::ptr_t> *keepalive_actors[] = {&internal_discovery_keepalive_actors_,
                                                           &internal_topology_keepalive_actors_};
 
-  for (auto keepalive_actor_list : keepalive_actors) {
+  for (auto *keepalive_actor_list : keepalive_actors) {
     std::list<etcd_keepalive::ptr_t>::iterator internal_iter =
         std::find(keepalive_actor_list->begin(), keepalive_actor_list->end(), keepalive);
     if (internal_iter != keepalive_actor_list->end()) {
@@ -1057,7 +1058,7 @@ LIBATAPP_MACRO_API bool etcd_module::remove_keepalive_actor(const atapp::etcd_ke
 }
 
 LIBATAPP_MACRO_API etcd_module::node_event_callback_handle_t etcd_module::add_on_node_discovery_event(
-    node_event_callback_t fn) {
+    const node_event_callback_t &fn) {
   std::lock_guard<std::recursive_mutex> lock_guard{node_event_lock_};
   if (!fn) {
     return node_event_callbacks_.end();
@@ -1092,7 +1093,7 @@ LIBATAPP_MACRO_API bool etcd_module::has_discovery_snapshot() const noexcept {
 }
 
 LIBATAPP_MACRO_API etcd_module::discovery_snapshot_event_callback_handle_t etcd_module::add_on_load_discovery_snapshot(
-    discovery_snapshot_event_callback_t fn) {
+    const discovery_snapshot_event_callback_t &fn) {
   if (!fn) {
     return discovery_on_load_snapshot_callbacks_.end();
   }
@@ -1111,7 +1112,7 @@ LIBATAPP_MACRO_API void etcd_module::remove_on_load_discovery_snapshot(
 }
 
 LIBATAPP_MACRO_API etcd_module::discovery_snapshot_event_callback_handle_t
-etcd_module::add_on_discovery_snapshot_loaded(discovery_snapshot_event_callback_t fn) {
+etcd_module::add_on_discovery_snapshot_loaded(const discovery_snapshot_event_callback_t &fn) {
   if (!fn) {
     return discovery_on_snapshot_loaded_callbacks_.end();
   }
@@ -1134,7 +1135,7 @@ LIBATAPP_MACRO_API bool etcd_module::has_topology_snapshot() const noexcept {
 }
 
 LIBATAPP_MACRO_API etcd_module::topology_snapshot_event_callback_handle_t etcd_module::add_on_load_topology_snapshot(
-    topology_snapshot_event_callback_t fn) {
+    const topology_snapshot_event_callback_t &fn) {
   if (!fn) {
     return topology_on_load_snapshot_callbacks_.end();
   }
@@ -1153,7 +1154,7 @@ LIBATAPP_MACRO_API void etcd_module::remove_on_load_topology_snapshot(
 }
 
 LIBATAPP_MACRO_API etcd_module::topology_snapshot_event_callback_handle_t etcd_module::add_on_topology_snapshot_loaded(
-    topology_snapshot_event_callback_t fn) {
+    const topology_snapshot_event_callback_t &fn) {
   if (!fn) {
     return topology_on_snapshot_loaded_callbacks_.end();
   }
@@ -1295,11 +1296,12 @@ int etcd_module::http_callback_on_etcd_closed(atfw::util::network::http_request 
   return 0;
 }
 
+namespace {
 static void _collect_old_nodes(etcd_module &mod, etcd_discovery_set::node_by_name_type &old_names,
                                etcd_discovery_set::node_by_id_type &old_ids) {
   old_ids.reserve(mod.get_global_discovery().get_sorted_nodes().size());
   old_names.reserve(mod.get_global_discovery().get_sorted_nodes().size());
-  for (auto &node : mod.get_global_discovery().get_sorted_nodes()) {
+  for (const auto &node : mod.get_global_discovery().get_sorted_nodes()) {
     if (!node) {
       continue;
     }
@@ -1321,6 +1323,7 @@ static void _remove_old_node_index(const atapp::protocol::atapp_discovery &node_
     old_names.erase(node_discovery.name());
   }
 }
+}  // namespace
 
 void etcd_module::watcher_internal_access_t::cleanup_old_nodes(etcd_module &mod,
                                                                etcd_discovery_set::node_by_name_type &old_names,
@@ -1340,6 +1343,7 @@ void etcd_module::watcher_internal_access_t::cleanup_old_nodes(etcd_module &mod,
   }
 }
 
+namespace {
 static void _collect_old_topology_peers(etcd_module &mod,
                                         std::unordered_map<uint64_t, etcd_module::topology_storage_t> &old_ids) {
   old_ids.reserve(mod.get_topology_info_set().size());
@@ -1352,6 +1356,7 @@ static void _remove_old_topology_peer_index(const atapp::protocol::atapp_topolog
     old_ids.erase(topology_info.id());
   }
 }
+}  // namespace
 
 void etcd_module::watcher_internal_access_t::cleanup_old_topology_peers(
     etcd_module &mod, std::unordered_map<uint64_t, etcd_module::topology_storage_t> &old_ids) {

@@ -385,9 +385,10 @@ class app {
 
   LIBATAPP_MACRO_API void pack(atapp::protocol::atapp_discovery &out) const;
 
-  LIBATAPP_MACRO_API std::shared_ptr<::atframework::atapp::etcd_module> get_etcd_module() const noexcept;
+  LIBATAPP_MACRO_API const std::shared_ptr<::atframework::atapp::etcd_module> &get_etcd_module() const noexcept;
 
-  LIBATAPP_MACRO_API std::shared_ptr<::atframework::atapp::worker_pool_module> get_worker_pool_module() const noexcept;
+  LIBATAPP_MACRO_API const std::shared_ptr<::atframework::atapp::worker_pool_module> &get_worker_pool_module()
+      const noexcept;
 
   LIBATAPP_MACRO_API const etcd_discovery_set &get_global_discovery() const noexcept;
 
@@ -589,7 +590,7 @@ class app {
 
   int setup_atbus();
 
-  void close_timer(timer_ptr_t &t);
+  static void close_timer(timer_ptr_t &t);
 
   int setup_tick_timer();
 
@@ -607,7 +608,7 @@ class app {
 
   void print_help();
 
-  bool match_gateway_hosts(const atapp::protocol::atapp_gateway &checked) const noexcept;
+  static bool match_gateway_hosts(const atapp::protocol::atapp_gateway &checked) noexcept;
   bool match_gateway_namespace(const atapp::protocol::atapp_gateway &checked) const noexcept;
   bool match_gateway_labels(const atapp::protocol::atapp_gateway &checked) const noexcept;
 
@@ -694,8 +695,9 @@ class app {
 
   atapp_endpoint::ptr_t auto_mutable_self_endpoint();
 
-  void parse_environment_log_categories_into(atapp::protocol::atapp_log &dst, gsl::string_view load_environemnt_prefix,
-                                             configure_key_set *dump_existed_set) const noexcept;
+  static void parse_environment_log_categories_into(atapp::protocol::atapp_log &dst,
+                                                    gsl::string_view load_environemnt_prefix,
+                                                    configure_key_set *dump_existed_set) noexcept;
 
   void parse_ini_log_categories_into(atapp::protocol::atapp_log &dst, const std::vector<gsl::string_view> &path,
                                      configure_key_set *dump_existed_set) const noexcept;

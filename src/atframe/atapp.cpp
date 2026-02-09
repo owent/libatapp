@@ -116,25 +116,23 @@ ATFW_UTIL_FORCEINLINE static uint64_t chrono_to_libuv_duration(std::chrono::syst
   return static_cast<uint64_t>(ret);
 }
 
+static void atapp_global_init_impl() {
+  uv_loop_t loop;
+  // Call uv_loop_init() to initialize the global data.
+  uv_loop_init(&loop);
+  uv_loop_configure(&loop, UV_METRICS_IDLE_TIME);
+  uv_loop_close(&loop);
+}
+
+static void atapp_global_init_once() {
 #if defined(ATFRAMEWORK_UTILS_THREAD_TLS_USE_PTHREAD) && ATFRAMEWORK_UTILS_THREAD_TLS_USE_PTHREAD
-static pthread_once_t gt_atapp_global_init_once = PTHREAD_ONCE_INIT;
-static void atapp_global_init_once() {
-  uv_loop_t loop;
-  // Call uv_loop_init() to initialize the global data.
-  uv_loop_init(&loop);
-  uv_loop_configure(&loop, UV_METRICS_IDLE_TIME);
-  uv_loop_close(&loop);
-}
+  static pthread_once_t gt_atapp_global_init_flag = PTHREAD_ONCE_INIT;
+  (void)pthread_once(&gt_atapp_global_init_flag, atapp_global_init_impl);
 #elif __cplusplus >= 201103L
-static std::once_flag gt_atapp_global_init_once;
-static void atapp_global_init_once() {
-  uv_loop_t loop;
-  // Call uv_loop_init() to initialize the global data.
-  uv_loop_init(&loop);
-  uv_loop_configure(&loop, UV_METRICS_IDLE_TIME);
-  uv_loop_close(&loop);
-}
+  static std::once_flag gt_atapp_global_init_flag;
+  std::call_once(gt_atapp_global_init_flag, atapp_global_init_impl);
 #endif
+}
 
 static std::chrono::milliseconds get_default_system_clock_granularity() {
 // This interval will be rounded up to the system clock granularity, which is 1 / (getconf CLK_TCK) on Linux.
@@ -441,11 +439,7 @@ LIBATAPP_MACRO_API app::app()
   internal_module_etcd_ = std::make_shared<atapp::etcd_module>();
   add_module(internal_module_etcd_);
 
-#if defined(ATFRAMEWORK_UTILS_THREAD_TLS_USE_PTHREAD) && ATFRAMEWORK_UTILS_THREAD_TLS_USE_PTHREAD
-  (void)pthread_once(&gt_atapp_global_init_once, atapp_global_init_once);
-#elif __cplusplus >= 201103L
-  std::call_once(gt_atapp_global_init_once, atapp_global_init_once);
-#endif
+  atapp_global_init_once();
 }
 
 LIBATAPP_MACRO_API app::~app() {
@@ -1884,11 +1878,11 @@ LIBATAPP_MACRO_API void app::pack(atapp::protocol::atapp_discovery &out) const {
   }
 }
 
-LIBATAPP_MACRO_API std::shared_ptr<::atframework::atapp::etcd_module> app::get_etcd_module() const noexcept {
+LIBATAPP_MACRO_API const std::shared_ptr<::atframework::atapp::etcd_module> &app::get_etcd_module() const noexcept {
   return internal_module_etcd_;
 }
 
-LIBATAPP_MACRO_API std::shared_ptr<::atframework::atapp::worker_pool_module> app::get_worker_pool_module()
+LIBATAPP_MACRO_API const std::shared_ptr<::atframework::atapp::worker_pool_module> &app::get_worker_pool_module()
     const noexcept {
   return internal_module_worker_pool_;
 }
@@ -3319,7 +3313,7 @@ static void setup_load_category_from_environment(
 
 void app::parse_environment_log_categories_into(atapp::protocol::atapp_log &dst,
                                                 gsl::string_view load_environemnt_prefix,
-                                                configure_key_set *dump_existed_set) const noexcept {
+                                                configure_key_set *dump_existed_set) noexcept {
   std::string env_level_name;
   env_level_name.reserve(load_environemnt_prefix.size() + 6);
   env_level_name = static_cast<std::string>(load_environemnt_prefix);
@@ -3809,17 +3803,22 @@ void app::setup_startup_log() {
   ::atframework::atapp::protocol::atapp_log_category std_cat_cfg;
   ::atframework::atapp::protocol::atapp_log_sink std_sink_cfg;
 
+  const auto stdout_sink_name = log_sink_maker::get_stdout_sink_name();
+  const auto stderr_sink_name = log_sink_maker::get_stderr_sink_name();
+  const auto syslog_sink_name = log_sink_maker::get_syslog_sink_name();
+
   for (std::list<std::string>::iterator iter = conf_.startup_log.begin(); iter != conf_.startup_log.end(); ++iter) {
-    if ((*iter).empty() || 0 == UTIL_STRFUNC_STRNCASE_CMP(log_sink_maker::get_stdout_sink_name().data(),
-                                                          (*iter).c_str(), (*iter).size())) {
+    if ((*iter).empty() || ((*iter).size() == stdout_sink_name.size() &&
+                            0 == UTIL_STRFUNC_STRNCASE_CMP(stdout_sink_name.data(), (*iter).c_str(),
+                                                           stdout_sink_name.size()))) {
       wrapper.add_sink(log_sink_maker::get_stdout_sink_reg()(
           wrapper, atfw::util::log::log_wrapper::categorize_t::DEFAULT, std_log_cfg, std_cat_cfg, std_sink_cfg));
-    } else if (0 == UTIL_STRFUNC_STRNCASE_CMP(log_sink_maker::get_stderr_sink_name().data(), (*iter).c_str(),
-                                              (*iter).size())) {
+    } else if ((*iter).size() == stderr_sink_name.size() &&
+               0 == UTIL_STRFUNC_STRNCASE_CMP(stderr_sink_name.data(), (*iter).c_str(), stderr_sink_name.size())) {
       wrapper.add_sink(log_sink_maker::get_stderr_sink_reg()(
           wrapper, atfw::util::log::log_wrapper::categorize_t::DEFAULT, std_log_cfg, std_cat_cfg, std_sink_cfg));
-    } else if (0 == UTIL_STRFUNC_STRNCASE_CMP(log_sink_maker::get_syslog_sink_name().data(), (*iter).c_str(),
-                                              (*iter).size())) {
+    } else if ((*iter).size() == syslog_sink_name.size() &&
+               0 == UTIL_STRFUNC_STRNCASE_CMP(syslog_sink_name.data(), (*iter).c_str(), syslog_sink_name.size())) {
       atfw::util::log::log_sink_file_backend file_sink(*iter);
       file_sink.set_rotate_size(100 * 1024 * 1024);  // Max 100 MB
       file_sink.set_flush_interval(1);
@@ -4272,7 +4271,7 @@ void app::print_help() {
   }
 }
 
-bool app::match_gateway_hosts(const atapp::protocol::atapp_gateway &checked) const noexcept {
+bool app::match_gateway_hosts(const atapp::protocol::atapp_gateway &checked) noexcept {
   bool has_matched_value = false;
   bool has_valid_conf = false;
   for (int i = 0; !has_matched_value && i < checked.match_hosts_size(); ++i) {

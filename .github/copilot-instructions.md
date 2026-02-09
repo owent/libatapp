@@ -281,6 +281,12 @@ This project uses **clang-format** for code formatting. The `.clang-format` file
    - Functions: `snake_case`
    - Types: `*_t` suffix for typedefs
 5. **Smart pointers**: Use `std::shared_ptr` for modules and app components
+6. **Anonymous namespace + static**: In `.cpp` files, file-local functions should be placed inside an anonymous namespace **and** keep the `static` keyword. Do **not** remove `static` when moving a function into an anonymous namespace.
+   ```cpp
+   namespace {
+   static void my_helper() { /* ... */ }
+   }  // namespace
+   ```
 
 ## Compiler Support
 
