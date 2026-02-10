@@ -235,6 +235,7 @@ Configuration is defined in `atapp_conf.proto` and can be loaded from:
 
 - YAML files (`.yaml`)
 - JSON files
+- INI files (`.conf`)
 - Environment variables
 - Command-line arguments
 
@@ -249,6 +250,13 @@ bus:
 log:
   level: info
 ```
+
+### Expression Expansion in Configuration
+
+Protobuf fields annotated with `enable_expression: true` in the `atapp_configure_meta` extension
+support **environment-variable expression expansion** at config-load time.
+
+See `.github/skills/configure-expression.md` for the full syntax reference and how-to guide.
 
 ## Logging
 

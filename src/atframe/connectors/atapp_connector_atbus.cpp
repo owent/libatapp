@@ -87,6 +87,7 @@ LIBATAPP_MACRO_API atapp_connector_atbus::atapp_connector_atbus(app &owner)
   register_protocol("pipe");
   register_protocol("ipv4");
   register_protocol("ipv6");
+  register_protocol("atcp");
   register_protocol("dns");
 
   atbus_topology_data_ = atfw::util::memory::make_strong_rc<atbus::topology_data>();

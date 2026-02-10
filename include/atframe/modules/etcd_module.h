@@ -25,14 +25,11 @@
 #include <atframe/etcdcli/etcd_keepalive.h>
 #include <atframe/etcdcli/etcd_watcher.h>
 
-#include <ctime>
 #include <list>
-#include <memory>
 #include <mutex>
 #include <set>
 #include <string>
 #include <unordered_map>
-#include <vector>
 
 LIBATAPP_MACRO_NAMESPACE_BEGIN
 class etcd_module : public ::atframework::atapp::module_impl {
@@ -118,6 +115,11 @@ class etcd_module : public ::atframework::atapp::module_impl {
   using topology_snapshot_event_callback_list_t = std::list<topology_snapshot_event_callback_t>;
   using topology_snapshot_event_callback_handle_t = topology_snapshot_event_callback_list_t::iterator;
 
+  using topology_info_event_callback_t =
+      std::function<void(topology_action_t, const atapp_topology_info_ptr_t &, const etcd_data_version &)>;
+  using topology_info_event_callback_list_t = std::list<topology_info_event_callback_t>;
+  using topology_info_event_callback_handle_t = topology_info_event_callback_list_t::iterator;
+
  public:
   LIBATAPP_MACRO_API etcd_module();
   LIBATAPP_MACRO_API virtual ~etcd_module();
@@ -186,6 +188,10 @@ class etcd_module : public ::atframework::atapp::module_impl {
 
   LIBATAPP_MACRO_API node_event_callback_handle_t add_on_node_discovery_event(const node_event_callback_t &fn);
   LIBATAPP_MACRO_API void remove_on_node_event(node_event_callback_handle_t &handle);
+
+  LIBATAPP_MACRO_API topology_info_event_callback_handle_t
+  add_on_topology_info_event(const topology_info_event_callback_t &fn);
+  LIBATAPP_MACRO_API void remove_on_topology_info_event(topology_info_event_callback_handle_t &handle);
 
   LIBATAPP_MACRO_API etcd_discovery_set &get_global_discovery() noexcept;
   LIBATAPP_MACRO_API const etcd_discovery_set &get_global_discovery() const noexcept;
@@ -277,5 +283,8 @@ class etcd_module : public ::atframework::atapp::module_impl {
 
   mutable std::recursive_mutex node_event_lock_;
   node_event_callback_list_t node_event_callbacks_;
+
+  mutable std::recursive_mutex topology_info_event_lock_;
+  topology_info_event_callback_list_t topology_info_event_callbacks_;
 };
 LIBATAPP_MACRO_NAMESPACE_END

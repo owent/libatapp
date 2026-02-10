@@ -174,10 +174,10 @@ int main(int argc, char *argv[]) {
       ->set_help_msg("transfer    <target bus id> <message> [type=0]              send a message to another atapp");
   cmgr->bind_cmd("listen", app_command_handler_listen(app))
       ->set_help_msg(
-          "listen      <listen address>                                address(for example: ipv6//:::23456)");
+          "listen      <listen address>                                address(for example: atcp//:::23456)");
   cmgr->bind_cmd("connect", app_command_handler_connect(app))
       ->set_help_msg(
-          "connect     <connect address>                               address(for example: ipv4://127.0.0.1:23456)");
+          "connect     <connect address>                               address(for example: atcp://127.0.0.1:23456)");
 
   // setup options
   atfw::util::cli::cmd_option::ptr_type opt_mgr = app.get_option_manager();

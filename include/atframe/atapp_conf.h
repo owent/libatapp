@@ -171,5 +171,22 @@ LIBATAPP_MACRO_API void default_loader_dump_to(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID
 
 LIBATAPP_MACRO_API bool protobuf_equal(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &l,
                                        const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &r);
+
+/**
+ * @brief Expand environment variable expressions in a string.
+ *
+ * Supported expression syntax:
+ *   - $VARIABLE_NAME : replaced by the value of the environment variable (POSIX names: [A-Za-z0-9_])
+ *   - ${VARIABLE_NAME} : braced reference, supports any characters including '.', '-', '/' (k8s labels)
+ *   - ${VARIABLE:-default} : if VARIABLE is unset or empty, use default
+ *   - ${VARIABLE:+word} : if VARIABLE is set and non-empty, use word; otherwise empty string
+ *   - \$ : literal dollar sign (escape)
+ *   - Nested expressions: ${OUTER_${INNER}}, ${VAR:-${OTHER:-fallback}}
+ *
+ * @param input The input string potentially containing expressions.
+ * @return The expanded string with all expressions resolved.
+ */
+LIBATAPP_MACRO_API std::string expand_environment_expression(gsl::string_view input);
+
 LIBATAPP_MACRO_NAMESPACE_END
 
