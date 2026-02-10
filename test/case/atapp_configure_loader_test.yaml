@@ -12,7 +12,7 @@ atapp:
       deployment.region: cn
 
   bus:
-    listen: "ipv6://:::21437"
+    listen: "atcp://:::21437"
     proxy: ""
     backlog: 256
     access_token_max_number: 5

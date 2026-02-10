@@ -30,6 +30,14 @@
 #include <utility>
 #include <vector>
 
+#if defined(max)
+#  undef max
+#endif
+
+#if defined(min)
+#  undef min
+#endif
+
 #define ETCD_MODULE_STARTUP_RETRY_TIMES 5
 #define ETCD_MODULE_BY_ID_DIR "by_id"
 #define ETCD_MODULE_BY_NAME_DIR "by_name"
@@ -1077,6 +1085,26 @@ LIBATAPP_MACRO_API void etcd_module::remove_on_node_event(node_event_callback_ha
   handle = node_event_callbacks_.end();
 }
 
+LIBATAPP_MACRO_API etcd_module::topology_info_event_callback_handle_t etcd_module::add_on_topology_info_event(
+    const topology_info_event_callback_t &fn) {
+  std::lock_guard<std::recursive_mutex> lock_guard{topology_info_event_lock_};
+  if (!fn) {
+    return topology_info_event_callbacks_.end();
+  }
+
+  return topology_info_event_callbacks_.insert(topology_info_event_callbacks_.end(), fn);
+}
+
+LIBATAPP_MACRO_API void etcd_module::remove_on_topology_info_event(topology_info_event_callback_handle_t &handle) {
+  std::lock_guard<std::recursive_mutex> lock_guard{topology_info_event_lock_};
+  if (handle == topology_info_event_callbacks_.end()) {
+    return;
+  }
+
+  topology_info_event_callbacks_.erase(handle);
+  handle = topology_info_event_callbacks_.end();
+}
+
 LIBATAPP_MACRO_API etcd_discovery_set &etcd_module::get_global_discovery() noexcept { return global_discovery_; }
 
 LIBATAPP_MACRO_API const etcd_discovery_set &etcd_module::get_global_discovery() const noexcept {
@@ -1743,7 +1771,15 @@ bool etcd_module::update_internal_watcher_event(topology_info_t &topology_info) 
 
   app *owner = get_app();
   if (owner != nullptr) {
+    std::lock_guard<std::recursive_mutex> lock_guard{topology_info_event_lock_};
     owner->trigger_event_on_topology_event(topology_info.action, info_ptr, topology_info.storage.version);
+
+    for (topology_info_event_callback_list_t::iterator iter = topology_info_event_callbacks_.begin();
+         iter != topology_info_event_callbacks_.end(); ++iter) {
+      if (*iter) {
+        (*iter)(topology_info.action, info_ptr, topology_info.storage.version);
+      }
+    }
   }
   return true;
 }

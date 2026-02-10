@@ -3808,9 +3808,9 @@ void app::setup_startup_log() {
   const auto syslog_sink_name = log_sink_maker::get_syslog_sink_name();
 
   for (std::list<std::string>::iterator iter = conf_.startup_log.begin(); iter != conf_.startup_log.end(); ++iter) {
-    if ((*iter).empty() || ((*iter).size() == stdout_sink_name.size() &&
-                            0 == UTIL_STRFUNC_STRNCASE_CMP(stdout_sink_name.data(), (*iter).c_str(),
-                                                           stdout_sink_name.size()))) {
+    if ((*iter).empty() ||
+        ((*iter).size() == stdout_sink_name.size() &&
+         0 == UTIL_STRFUNC_STRNCASE_CMP(stdout_sink_name.data(), (*iter).c_str(), stdout_sink_name.size()))) {
       wrapper.add_sink(log_sink_maker::get_stdout_sink_reg()(
           wrapper, atfw::util::log::log_wrapper::categorize_t::DEFAULT, std_log_cfg, std_cat_cfg, std_sink_cfg));
     } else if ((*iter).size() == stderr_sink_name.size() &&
@@ -5277,7 +5277,8 @@ int app::send_last_command(ev_loop_t *ev_loop) {
       is_sync_channel = true;
     } else if (0 == UTIL_STRFUNC_STRNCASE_CMP("unix", parsed_addr.scheme.c_str(), 4)) {
       parsed_level = 4;
-    } else if (0 == UTIL_STRFUNC_STRNCASE_CMP("ipv6", parsed_addr.scheme.c_str(), 4)) {
+    } else if (0 == UTIL_STRFUNC_STRNCASE_CMP("atcp", parsed_addr.scheme.c_str(), 4) ||
+               0 == UTIL_STRFUNC_STRNCASE_CMP("ipv6", parsed_addr.scheme.c_str(), 4)) {
       parsed_level = 3;
     } else if (0 == UTIL_STRFUNC_STRNCASE_CMP("ipv4", parsed_addr.scheme.c_str(), 4)) {
       parsed_level = 2;

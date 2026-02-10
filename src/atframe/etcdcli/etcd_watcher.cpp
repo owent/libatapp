@@ -16,6 +16,7 @@
 
 #include <atframe/atapp.h>
 
+#include <ios>
 #include <memory>
 
 #ifdef GetObject
@@ -93,7 +94,7 @@ void etcd_watcher::process() {
         int pid = atbus::node::get_pid();
         memcpy(&buffer[0], &pid, sizeof(pid));
         time_t now_usec =
-            atfw::util::time::time_utility::get_sys_now() * 1000000 + atfw::util::time::time_utility::get_now_usec();
+            (atfw::util::time::time_utility::get_sys_now() * 1000000) + atfw::util::time::time_utility::get_now_usec();
         memcpy(&buffer[sizeof(pid)], &now_usec, sizeof(now_usec));
 
         uint32_t seed = atfw::util::hash::murmur_hash3_x86_32(buffer, sizeof(buffer), LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
@@ -185,8 +186,6 @@ void etcd_watcher::process() {
     FWLOGINFO("Etcd watcher {} start watch request to {} from revision {} success.",
               reinterpret_cast<const void *>(this), rpc_.rpc_opr_->get_url(), rpc_.last_revision + 1);
   }
-
-  return;
 }
 
 int etcd_watcher::libcurl_callback_on_range_completed(atfw::util::network::http_request &req) {
@@ -242,7 +241,7 @@ int etcd_watcher::libcurl_callback_on_range_completed(atfw::util::network::http_
   }
 
   // unpack header
-  etcd_response_header header;
+  etcd_response_header header{};
   {
     header.revision = 0;
     rapidjson::Document::ConstMemberIterator res = doc.FindMember("header");
@@ -409,7 +408,7 @@ int etcd_watcher::libcurl_callback_on_watch_write(atfw::util::network::http_requ
       }
 
       if (rpc_data_brackets <= 0) {
-        self->rpc_data_stream_.write(inbuf, i + 1);
+        self->rpc_data_stream_.write(inbuf, static_cast<std::streamsize>(i) + 1);
         inbuf += i + 1;
         inbufsz -= i + 1;
         need_process = true;
@@ -418,7 +417,7 @@ int etcd_watcher::libcurl_callback_on_watch_write(atfw::util::network::http_requ
     }
 
     if (!need_process) {
-      self->rpc_data_stream_.write(inbuf, inbufsz);
+      self->rpc_data_stream_.write(inbuf, static_cast<std::streamsize>(inbufsz));
       self->rpc_data_brackets_ = rpc_data_brackets;
       break;
     }
@@ -448,7 +447,7 @@ int etcd_watcher::libcurl_callback_on_watch_write(atfw::util::network::http_requ
 
     // unpack header
     int64_t previous_revision = self->rpc_.last_revision;
-    etcd_response_header header;
+    etcd_response_header header{};
     {
       rapidjson::Document::ConstMemberIterator res = result->FindMember("header");
       if (res != result->MemberEnd()) {
@@ -523,7 +522,7 @@ int etcd_watcher::libcurl_callback_on_watch_write(atfw::util::network::http_requ
           response.created ? "Yes" : "No", response.canceled ? "Yes" : "No", response.events.size());
       for (size_t i = 0; i < response.events.size(); ++i) {
         etcd_key_value *kv = &response.events[i].kv;
-        const char *name;
+        const char *name = nullptr;
         if (etcd_watch_event::kPut == response.events[i].evt_type) {
           name = "PUT";
         } else {
