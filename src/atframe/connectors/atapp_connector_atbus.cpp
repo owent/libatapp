@@ -490,6 +490,10 @@ LIBATAPP_MACRO_API void atapp_connector_atbus::update_topology_peer(atbus::bus_i
   }
 }
 
+LIBATAPP_MACRO_API const atbus::topology_policy_rule &atapp_connector_atbus::get_topology_policy_rule() const noexcept {
+  return atbus_topology_policy_rule_;
+}
+
 atfw::util::nostd::nonnull<atapp_connector_atbus::atbus_connection_handle_ptr_t>
 atapp_connector_atbus::create_connection_handle(atbus::bus_id_t bus_id, atbus::bus_id_t topology_upstream_bus_id,
                                                 const atapp_connection_handle::ptr_t &handle) {

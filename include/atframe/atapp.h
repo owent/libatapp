@@ -292,6 +292,14 @@ class app {
 
   ATFW_UTIL_FORCEINLINE const atbus::node::ptr_t &get_bus_node() const noexcept { return bus_node_; }
 
+  ATFW_UTIL_FORCEINLINE const std::shared_ptr<atapp_connector_atbus> &get_atbus_connector() const noexcept {
+    return atbus_connector_;
+  }
+
+  ATFW_UTIL_FORCEINLINE const std::shared_ptr<atapp_connector_loopback> &get_loopback_connector() const noexcept {
+    return loopback_connector_;
+  }
+
   LIBATAPP_MACRO_API void enable_fallback_to_atbus_connector();
   LIBATAPP_MACRO_API void disable_fallback_to_atbus_connector();
   LIBATAPP_MACRO_API bool is_fallback_to_atbus_connector_enabled() const noexcept;
@@ -398,6 +406,8 @@ class app {
 
   LIBATAPP_MACRO_API atbus::topology_relation_type get_topology_relation(
       atbus::bus_id_t id, atbus::topology_peer::ptr_t *next_hop_peer) const noexcept;
+
+  LIBATAPP_MACRO_API const atbus::topology_policy_rule &get_topology_policy_rule() const noexcept;
 
   LIBATAPP_MACRO_API uint32_t get_address_type(const std::string &addr) const noexcept;
 

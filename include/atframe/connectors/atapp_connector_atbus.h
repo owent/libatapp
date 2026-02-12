@@ -57,6 +57,8 @@ class atapp_connector_atbus : public atapp_connector_impl, public std::enable_sh
   LIBATAPP_MACRO_API void update_topology_peer(atbus::bus_id_t target_bus_id, atbus::bus_id_t upstream_bus_id,
                                                const atbus::topology_data::ptr_t &data);
 
+  LIBATAPP_MACRO_API const atbus::topology_policy_rule &get_topology_policy_rule() const noexcept;
+
   using atapp_connector_impl::on_receive_forward_response;
   LIBATAPP_MACRO_API void on_receive_forward_response(uint64_t app_id, int32_t type, uint64_t msg_sequence,
                                                       int32_t error_code, gsl::span<const unsigned char> data,
