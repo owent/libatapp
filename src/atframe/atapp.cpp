@@ -1848,7 +1848,6 @@ LIBATAPP_MACRO_API void app::pack(atapp::protocol::atapp_discovery &out) const {
     out.mutable_area()->CopyFrom(conf_.origin.area());
   }
   out.set_version(get_app_version());
-  // out.set_custom_data(get_conf_custom_data());
   out.mutable_gateways()->Reserve(conf_.origin.bus().gateways().size());
   for (int i = 0; i < conf_.origin.bus().gateways().size(); ++i) {
     atapp::protocol::atapp_gateway *gateway = out.add_gateways();
@@ -1924,6 +1923,15 @@ LIBATAPP_MACRO_API atbus::topology_relation_type app::get_topology_relation(
   }
 
   return atbus::topology_relation_type::kInvalid;
+}
+
+LIBATAPP_MACRO_API const atbus::topology_policy_rule &app::get_topology_policy_rule() const noexcept {
+  if (atbus_connector_) {
+    return atbus_connector_->get_topology_policy_rule();
+  }
+
+  static atbus::topology_policy_rule empty_rule;
+  return empty_rule;
 }
 
 LIBATAPP_MACRO_API uint32_t app::get_address_type(const std::string &address) const noexcept {
