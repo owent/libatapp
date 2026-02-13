@@ -4,8 +4,6 @@
 
 #include "atframe/atapp.h"
 
-#include <std/static_assert.h>
-
 #include <libatbus.h>
 #include <libatbus_protocol.h>
 

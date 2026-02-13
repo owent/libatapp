@@ -230,6 +230,10 @@ static const std::vector<etcd_discovery_node::ptr_t> &get_empty_discovery_set() 
 }
 
 static bool is_empty(const etcd_discovery_set::metadata_type &metadata) noexcept {
+  if (&metadata == &etcd_discovery_set::metadata_type::default_instance()) {
+    return true;
+  }
+
   return metadata.api_version().empty() && metadata.kind().empty() && metadata.group().empty() &&
          metadata.namespace_name().empty() && metadata.name().empty() && metadata.uid().empty() &&
          metadata.service_subset().empty() && 0 == metadata.labels_size();
