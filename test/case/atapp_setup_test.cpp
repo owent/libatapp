@@ -1,4 +1,4 @@
-// Copyright 2022 atframework
+// Copyright 2026 atframework
 
 #include <atframe/atapp.h>
 #include <atframe/atapp_module_impl.h>
@@ -30,7 +30,7 @@ class atapp_setup_test_timeout_module : public ::atframework::atapp::module_impl
   const char* name() const override { return "atapp_setup_test_timeout_module"; }
 
   int init() override {
-    while (!get_app()->check_flag(::atframework::atapp::app::flag_t::TIMEOUT)) {
+    while (!get_app()->check_flag(::atframework::atapp::app::flag_t::kTimeout)) {
       get_app()->run_once(0, std::chrono::seconds{1});
     }
 
@@ -61,3 +61,4 @@ CASE_TEST(atapp_setup, timeout) {
   auto after = atfw::util::time::time_utility::sys_now();
   CASE_EXPECT_LE(std::chrono::duration_cast<std::chrono::seconds>(after - before).count(), 3);
 }
+

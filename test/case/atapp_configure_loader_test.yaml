@@ -1,3 +1,4 @@
+# Copyright 2026 atframework
 atapp:
   id: 0x00001234
   id_mask: 8.8.8.8
@@ -11,8 +12,7 @@ atapp:
       deployment.region: cn
 
   bus:
-    listen: "ipv6://:::21437"
-    subnets: "0/16"
+    listen: "atcp://:::21437"
     proxy: ""
     backlog: 256
     access_token_max_number: 5
@@ -22,9 +22,40 @@ atapp:
     retry_interval: 3s
     fault_tolerant: 3
     message_size: 256KB
-    recv_buffer_size: 8MB
+    receive_buffer_size: 8MB
     send_buffer_size: 2MB
     send_buffer_number: 0
+    topology:
+      rule:
+        allow_direct_connection: true
+        require_same_upstream: true
+        require_same_process: false
+        require_same_host: true
+        match_label:
+          region:
+            value:
+              - cn
+              - us
+          env:
+            value:
+              - test
+      data:
+        label:
+          region: cn
+          env: test
+    crypto:
+      key_exchange_type: 1
+      key_refresh_interval: 5s
+      algorithm:
+        - aes-128-gcm
+        - 32
+        - ATAPP_CRYPTO_ALGORITHM_XCHACHA20_POLY1305_IETF
+    compression:
+      algorithm:
+        - zstd
+        - 200
+        - ATAPP_COMPRESSION_ALGORITHM_ZLIB
+      level: ATAPP_COMPRESSION_LEVEL_FAST
   timer:
     tick_interval: 32ms
     stop_timeout: 10s

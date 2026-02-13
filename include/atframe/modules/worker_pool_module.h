@@ -1,4 +1,5 @@
-// Copyright 2024 atframework
+// Copyright 2026 atframework
+//
 // Created by owent
 
 #pragma once
@@ -12,11 +13,7 @@
 #include <atframe/modules/worker_context.h>
 
 #include <chrono>
-#include <cstdint>
-#include <functional>
 #include <memory>
-#include <mutex>
-#include <thread>
 
 LIBATAPP_MACRO_NAMESPACE_BEGIN
 
@@ -45,7 +42,7 @@ class worker_pool_module : public ::atframework::atapp::module_impl {
   LIBATAPP_MACRO_API int tick(std::chrono::system_clock::time_point now);
 
   template <class ClockType, class DurationType>
-  UTIL_FORCEINLINE int tick(std::chrono::time_point<ClockType, DurationType> now) {
+  ATFW_UTIL_FORCEINLINE int tick(std::chrono::time_point<ClockType, DurationType> now) {
     return tick(std::chrono::time_point_cast<std::chrono::system_clock::time_point>(now));
   }
 
@@ -57,13 +54,13 @@ class worker_pool_module : public ::atframework::atapp::module_impl {
   LIBATAPP_MACRO_API int spawn(worker_job_action_type action, worker_context* selected_context = nullptr);
 
   // thread-safe
-  LIBATAPP_MACRO_API int spawn(worker_job_action_pointer action, worker_context* selected_context = nullptr);
+  LIBATAPP_MACRO_API int spawn(const worker_job_action_pointer& action, worker_context* selected_context = nullptr);
 
   // thread-safe
   LIBATAPP_MACRO_API int spawn(worker_job_action_type action, const worker_context& context);
 
   // thread-safe
-  LIBATAPP_MACRO_API int spawn(worker_job_action_pointer action, const worker_context& context);
+  LIBATAPP_MACRO_API int spawn(const worker_job_action_pointer& action, const worker_context& context);
 
   // thread-safe
   LIBATAPP_MACRO_API worker_tick_action_handle_type add_tick_callback(worker_tick_action_type action,

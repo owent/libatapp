@@ -1,4 +1,6 @@
 
+// Copyright 2026 atframework
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -44,10 +46,12 @@ class atappctl_module : public atapp::module_impl {
   int tick() override { return 0; }
 };
 
-static int app_handle_on_msg(atframework::atapp::app &, const atframework::atapp::app::message_sender_t &source,
-                             const atframework::atapp::app::message_t &msg) {
+static int app_handle_on_message(atframework::atapp::app &, const atframework::atapp::app::message_sender_t &source,
+                                 const atframework::atapp::app::message_t &msg) {
   std::string data;
-  data.assign(reinterpret_cast<const char *>(msg.data), msg.data_size);
+  if (!msg.data.empty()) {
+    data.assign(reinterpret_cast<const char *>(msg.data.data()), msg.data.size());
+  }
   FWLOGINFO("receive a message(from {:#x}, type={}) {}", source.id, msg.type, data);
   return 0;
 }
@@ -87,7 +91,7 @@ int main(int argc, char *argv[]) {
   app.add_module(std::make_shared<atappctl_module>());
 
   // setup handle
-  app.set_evt_on_forward_request(app_handle_on_msg);
+  app.set_evt_on_forward_request(app_handle_on_message);
   app.set_evt_on_forward_response(app_handle_on_response);
   app.set_evt_on_app_connected(app_handle_on_connected);
   app.set_evt_on_app_disconnected(app_handle_on_disconnected);
@@ -100,3 +104,4 @@ int main(int argc, char *argv[]) {
 
   return ret;
 }
+

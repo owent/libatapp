@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent
 
 #if defined(_WIN32)
@@ -35,8 +36,10 @@
 
 #include <algorithm>
 #include <limits>
-#include <sstream>
+#include <mutex>
+#include <string>
 #include <unordered_map>
+#include <vector>
 
 #if defined(GetMessage)
 #  undef GetMessage
@@ -52,6 +55,11 @@
 
 LIBATAPP_MACRO_NAMESPACE_BEGIN
 namespace {
+
+// Forward declarations for expression expansion functions (defined later in this namespace).
+static std::string expand_expression_impl(gsl::string_view input, size_t depth);
+static bool field_has_enable_expression(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds);
+
 static const char *skip_space(const char *begin, const char *end) {
   while (nullptr != begin && begin < end && *begin) {
     if (::atfw::util::string::is_space(*begin)) {
@@ -334,6 +342,86 @@ static void pick_const_data(gsl::string_view value, ATBUS_MACRO_PROTOBUF_NAMESPA
   timepoint.set_seconds(res);
 }
 
+struct ATFW_UTIL_SYMBOL_LOCAL enum_alias_mapping_t {
+  std::unordered_map<std::string, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::EnumValueDescriptor *> origin;
+  std::unordered_map<std::string, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::EnumValueDescriptor *> no_case;
+};
+
+static const enum_alias_mapping_t *get_enum_value_alias_mapping(
+    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::EnumDescriptor *desc) {
+  if (desc == nullptr) {
+    return nullptr;
+  }
+
+  static std::mutex g_enum_alias_mutex;
+  std::lock_guard<std::mutex> lg(g_enum_alias_mutex);
+  static std::unordered_map<std::string, atfw::util::memory::strong_rc_ptr<enum_alias_mapping_t>> g_enum_alias_mappings;
+
+  std::string full_name = std::string{desc->full_name()};
+  auto it = g_enum_alias_mappings.find(full_name);
+  if (it != g_enum_alias_mappings.end()) {
+    return it->second.get();
+  }
+
+  atfw::util::memory::strong_rc_ptr<enum_alias_mapping_t> res =
+      atfw::util::memory::make_strong_rc<enum_alias_mapping_t>();
+  g_enum_alias_mappings[full_name] = res;
+
+  for (int i = 0; i < desc->value_count(); ++i) {
+    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::EnumValueDescriptor *value_desc = desc->value(i);
+    if (value_desc == nullptr) {
+      continue;
+    }
+
+    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::EnumValueOptions &options = value_desc->options();
+    if (!options.HasExtension(protocol::ENUMVALUE)) {
+      continue;
+    }
+
+    const protocol::atapp_configure_enumvalue_options &ext = options.GetExtension(protocol::ENUMVALUE);
+    for (int j = 0; j < ext.alias_name_size(); ++j) {
+      if (ext.alias_name(j).empty()) {
+        continue;
+      }
+
+      res->origin[std::string{ext.alias_name(j)}] = value_desc;
+      if (!ext.case_sensitive()) {
+        std::string lower_alias = std::string{ext.alias_name(j)};
+        std::transform(lower_alias.begin(), lower_alias.end(), lower_alias.begin(),
+                       ::atfw::util::string::tolower<char>);
+        res->no_case[lower_alias] = value_desc;
+      }
+    }
+  }
+
+  return res.get();
+}
+
+static const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::EnumValueDescriptor *pick_enum_value_from_alias(
+    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::EnumDescriptor *desc, gsl::string_view input) {
+  const enum_alias_mapping_t *mapping = get_enum_value_alias_mapping(desc);
+  if (mapping == nullptr) {
+    return nullptr;
+  }
+
+  auto it = mapping->origin.find(static_cast<std::string>(input));
+  if (it != mapping->origin.end()) {
+    return it->second;
+  }
+
+  if (!mapping->no_case.empty()) {
+    std::string lower_input = static_cast<std::string>(input);
+    std::transform(lower_input.begin(), lower_input.end(), lower_input.begin(), ::atfw::util::string::tolower<char>);
+    it = mapping->no_case.find(lower_input);
+
+    if (it != mapping->no_case.end()) {
+      return it->second;
+    }
+  }
+
+  return nullptr;
+}
+
 static inline void dump_pick_field_min(bool &out) { out = false; }
 
 static inline void dump_pick_field_min(std::string &) {}
@@ -584,10 +672,23 @@ dump_pick_enum_field_with_extensions(gsl::string_view val_str,
     return std::pair<const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::EnumValueDescriptor *, bool>(ret, is_default);
   }
 
+  // Expand expression if enable_expression is set
+  // expanded_val must outlive val_str since val_str may point into it.
+  std::string expanded_val;
+  if (!val_str.empty() && field_has_enable_expression(fds)) {
+    expanded_val = expand_expression_impl(val_str, 0);
+    val_str = expanded_val;
+  }
+
   if (val_str.empty()) {
     if (fds->options().HasExtension(atapp::protocol::CONFIGURE)) {
       const atapp::protocol::atapp_configure_meta &meta = fds->options().GetExtension(atapp::protocol::CONFIGURE);
-      val_str = meta.default_value();
+      // Reuse expanded_val to hold the default value — it must outlive val_str.
+      expanded_val = meta.default_value();
+      if (!expanded_val.empty() && meta.enable_expression()) {
+        expanded_val = expand_expression_impl(expanded_val, 0);
+      }
+      val_str = expanded_val;
     }
 
     is_default = true;
@@ -600,28 +701,13 @@ dump_pick_enum_field_with_extensions(gsl::string_view val_str,
       ret = fds->enum_type()->FindValueByName(static_cast<std::string>(val_str));
     }
     if (ret == nullptr) {
-      for (int i = 0; i < fds->enum_type()->value_count(); ++i) {
-        const auto &enum_value_options = fds->enum_type()->value(i)->options();
-        if (enum_value_options.HasExtension(atapp::protocol::ENUMVALUE)) {
-          const auto &enumvalue_options = enum_value_options.GetExtension(atapp::protocol::ENUMVALUE);
-          if (!enumvalue_options.alias_name().empty()) {
-            if (enumvalue_options.case_sensitive() && gsl::string_view(enumvalue_options.alias_name()) == val_str) {
-              ret = fds->enum_type()->value(i);
-              break;
-            }
-
-            if (!enumvalue_options.case_sensitive() &&
-                0 == UTIL_STRFUNC_STRNCASE_CMP(val_str.data(), enumvalue_options.alias_name().c_str(),
-                                               enumvalue_options.alias_name().size())) {
-              ret = fds->enum_type()->value(i);
-              break;
-            }
-          }
-        }
-      }
+      ret = pick_enum_value_from_alias(fds->enum_type(), val_str);
     }
-  } else {
+  }
+
+  if (ret == nullptr) {
     ret = fds->enum_type()->FindValueByNumber(0);
+    is_default = true;
   }
 
   return {ret, is_default};
@@ -793,6 +879,218 @@ static bool dump_field_with_value(const std::pair<ATBUS_MACRO_PROTOBUF_NAMESPACE
   return dump_field_with_message_delegate(value, dst, fds, dump_existed_set, existed_set_prefix);
 }
 
+// ============================================================================
+// Expression expansion for environment variables.
+//
+// Supported syntax:
+//   $VARIABLE_NAME        — simple variable reference (POSIX: alphanumeric + underscore only)
+//   ${VARIABLE_NAME}      — braced variable reference (any chars, incl. '.', '-', '/' for k8s labels)
+//   ${VAR:-default}       — default value if VAR is unset/empty
+//   ${VAR:+word}          — alternate value if VAR is set and non-empty
+//   \$                    — literal dollar sign (escape)
+//   Nesting is supported: ${OUTER_${INNER}}, ${VAR:-${OTHER:-fallback}}
+//
+// The implementation uses a recursive-descent parser that handles nested
+// braces by counting depth.  A maximum recursion depth guard prevents
+// infinite loops from malformed input.
+// ============================================================================
+
+// Maximum recursion depth to prevent stack overflow from deeply nested or
+// malicious expressions.
+static constexpr size_t kMaxExpressionRecursionDepth = 32;
+
+// Check if character is valid for a bare (unbraced) variable name per POSIX: [A-Za-z0-9_]
+// The braced form ${VAR} supports any characters (including '.', '-', '/', etc. for k8s labels)
+// because its content is delimited by matching braces, not by character class.
+static inline bool is_variable_name_char(char c) {
+  return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_';
+}
+
+// Find the matching closing brace '}' for a '${' expression, respecting nesting.
+// Returns the index of the closing '}' relative to the start of the search,
+// or std::string::npos if not found.
+static size_t find_matching_close_brace(gsl::string_view input) {
+  size_t depth = 1;
+  size_t i = 0;
+  while (i < input.size() && depth > 0) {
+    if (input[i] == '\\' && i + 1 < input.size()) {
+      // Skip escaped character
+      i += 2;
+      continue;
+    }
+    if (input[i] == '$' && i + 1 < input.size() && input[i + 1] == '{') {
+      ++depth;
+      i += 2;
+      continue;
+    }
+    if (input[i] == '}') {
+      --depth;
+      if (depth == 0) {
+        return i;
+      }
+    }
+    ++i;
+  }
+  return std::string::npos;
+}
+
+// Find the operator (':' followed by '-' or '+') at the top-level (not inside
+// nested braces).  Returns the index of the ':' character, or std::string::npos.
+static size_t find_top_level_operator(gsl::string_view content) {
+  size_t depth = 0;
+  for (size_t i = 0; i < content.size(); ++i) {
+    if (content[i] == '\\' && i + 1 < content.size()) {
+      ++i;  // skip escaped char
+      continue;
+    }
+    if (content[i] == '$' && i + 1 < content.size() && content[i + 1] == '{') {
+      ++depth;
+      ++i;
+      continue;
+    }
+    if (content[i] == '}') {
+      if (depth > 0) {
+        --depth;
+      }
+      continue;
+    }
+    if (depth == 0 && content[i] == ':' && i + 1 < content.size()) {
+      if (content[i + 1] == '-' || content[i + 1] == '+') {
+        return i;
+      }
+    }
+  }
+  return std::string::npos;
+}
+
+// Core recursive expansion of environment variable expressions.
+static std::string expand_expression_impl(gsl::string_view input, size_t depth) {
+  if (depth > kMaxExpressionRecursionDepth) {
+    // Guard against excessive nesting — return input as-is.
+    return static_cast<std::string>(input);
+  }
+
+  std::string result;
+  result.reserve(input.size());
+
+  size_t i = 0;
+  while (i < input.size()) {
+    char c = input[i];
+
+    // Handle escape: \$ → literal '$'
+    if (c == '\\' && i + 1 < input.size() && input[i + 1] == '$') {
+      result.push_back('$');
+      i += 2;
+      continue;
+    }
+
+    // Handle $ — start of variable reference
+    if (c == '$') {
+      if (i + 1 >= input.size()) {
+        // Trailing '$' — keep it literally
+        result.push_back('$');
+        ++i;
+        continue;
+      }
+
+      if (input[i + 1] == '{') {
+        // Braced expression: ${...}
+        gsl::string_view remaining(input.data() + i + 2, input.size() - i - 2);
+        size_t close_pos = find_matching_close_brace(remaining);
+        if (close_pos == std::string::npos) {
+          // No matching '}' — treat as literal text
+          result.push_back('$');
+          result.push_back('{');
+          i += 2;
+          continue;
+        }
+
+        // The content between ${ and }
+        // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage)
+        gsl::string_view content(remaining.data(), close_pos);
+
+        // Look for top-level operator (:- or :+) first, then expand parts independently.
+        size_t op_pos = find_top_level_operator(content);
+
+        if (op_pos != std::string::npos) {
+          char op_char = content[op_pos + 1];  // '-' or '+'
+          // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage)
+          gsl::string_view var_part(content.data(), op_pos);
+          gsl::string_view arg_part(content.data() + op_pos + 2, content.size() - op_pos - 2);
+
+          // Expand the variable name part (may contain nested expressions)
+          std::string var_name = expand_expression_impl(var_part, depth + 1);
+
+          // Look up the environment variable
+          std::string env_val = atfw::util::file_system::getenv(var_name.c_str());
+
+          if (op_char == '-') {
+            // ${VAR:-default}: use default if VAR is unset or empty
+            if (env_val.empty()) {
+              result += expand_expression_impl(arg_part, depth + 1);
+            } else {
+              result += env_val;
+            }
+          } else {
+            // op_char == '+'
+            // ${VAR:+word}: use word if VAR is set and non-empty
+            if (!env_val.empty()) {
+              result += expand_expression_impl(arg_part, depth + 1);
+            }
+            // else: VAR is empty, result gets nothing appended
+          }
+        } else {
+          // No operator — pure variable reference, possibly with nested expressions
+          std::string var_name = expand_expression_impl(content, depth + 1);
+          std::string env_val = atfw::util::file_system::getenv(var_name.c_str());
+          result += env_val;
+        }
+
+        // Advance past the closing '}'
+        i += 2 + close_pos + 1;
+        continue;
+      }
+
+      // Bare variable: $VAR_NAME
+      if (is_variable_name_char(input[i + 1])) {
+        size_t name_start = i + 1;
+        size_t name_end = name_start;
+        while (name_end < input.size() && is_variable_name_char(input[name_end])) {
+          ++name_end;
+        }
+
+        std::string var_name(input.data() + name_start, name_end - name_start);
+        std::string env_val = atfw::util::file_system::getenv(var_name.c_str());
+        result += env_val;
+        i = name_end;
+        continue;
+      }
+
+      // '$' followed by non-variable character — keep literally
+      result.push_back('$');
+      ++i;
+      continue;
+    }
+
+    // Ordinary character
+    result.push_back(c);
+    ++i;
+  }
+
+  return result;
+}
+
+// Check if a field descriptor has enable_expression set in its CONFIGURE extension.
+static bool field_has_enable_expression(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds) {
+  if (nullptr == fds) {
+    return false;
+  }
+  if (!fds->options().HasExtension(atapp::protocol::CONFIGURE)) {
+    return false;
+  }
+  return fds->options().GetExtension(atapp::protocol::CONFIGURE).enable_expression();
+}
+
 template <class TRET>
 static std::pair<TRET, bool> dump_pick_field_with_extensions(
     gsl::string_view val_str, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *fds) {
@@ -800,10 +1098,21 @@ static std::pair<TRET, bool> dump_pick_field_with_extensions(
   bool is_default = false;
   dump_pick_field_min(min_value);
   dump_pick_field_max(max_value);
+
+  // Expand expression if enable_expression is set
+  std::string expanded_val;
+  if (!val_str.empty() && field_has_enable_expression(fds)) {
+    expanded_val = expand_expression_impl(val_str, 0);
+    val_str = gsl::string_view(expanded_val.data(), expanded_val.size());
+  }
+
   if (val_str.empty()) {
     if (fds->options().HasExtension(atapp::protocol::CONFIGURE)) {
       const atapp::protocol::atapp_configure_meta &meta = fds->options().GetExtension(atapp::protocol::CONFIGURE);
-      const std::string &default_str = meta.default_value();
+      std::string default_str = meta.default_value();
+      if (!default_str.empty() && meta.enable_expression()) {
+        default_str = expand_expression_impl(default_str, 0);
+      }
       dump_pick_field_from_str(value, default_str, meta.size_mode());
     } else {
       dump_pick_field_from_str(value, std::string(), false);
@@ -1064,8 +1373,8 @@ static bool dump_pick_field(const atfw::util::config::ini_value &val, ATBUS_MACR
         auto value = dump_pick_field_with_extensions<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration>(val, fds, index);
         ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
         break;
-      } else if (fds->message_type()->full_name() ==
-                 ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp::descriptor()->full_name()) {
+      }
+      if (fds->message_type()->full_name() == ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp::descriptor()->full_name()) {
         auto value = dump_pick_field_with_extensions<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp>(val, fds, index);
         ret = dump_field_with_value(value, dst, fds, dump_existed_set, existed_set_prefix);
         break;
@@ -1083,6 +1392,9 @@ static bool dump_pick_field(const atfw::util::config::ini_value &val, ATBUS_MACR
 
         atfw::util::config::ini_value::node_type::const_iterator iter = val.get_children().begin();
 
+        // Check if the map field itself has enable_expression
+        bool map_enable_expression = field_has_enable_expression(fds);
+
         for (; iter != val.get_children().end(); ++iter) {
           if (!iter->second) {
             continue;
@@ -1096,12 +1408,33 @@ static bool dump_pick_field(const atfw::util::config::ini_value &val, ATBUS_MACR
           std::string submsg_map_existed_set_key =
               atfw::util::log::format("{}{}.{}.", existed_set_prefix, fds->name(), idx);
 
+          // Expand map key if enable_expression is set on the map field
+          gsl::string_view map_key_str = iter->first;
+          std::string expanded_map_key;
+          if (map_enable_expression) {
+            expanded_map_key = expand_expression_impl(map_key_str, 0);
+            map_key_str = gsl::string_view(expanded_map_key.data(), expanded_map_key.size());
+          }
+
           bool has_data = false;
-          if (dump_pick_map_key_field(iter->first, *submsg, key_fds, dump_existed_set, submsg_map_existed_set_key)) {
+          if (dump_pick_map_key_field(map_key_str, *submsg, key_fds, dump_existed_set, submsg_map_existed_set_key)) {
             has_data = true;
           }
-          if (dump_pick_field(*iter->second, *submsg, value_fds, 0, dump_existed_set, submsg_map_existed_set_key)) {
-            has_data = true;
+
+          // For map values: if enable_expression is set on the map field and value is a string type,
+          // expand expressions in the value
+          if (map_enable_expression &&
+              value_fds->cpp_type() == ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_STRING) {
+            std::string map_val_str = iter->second->as_cpp_string();
+            std::string expanded_map_val = expand_expression_impl(map_val_str, 0);
+            auto value_pair = std::pair<std::string, bool>(std::move(expanded_map_val), false);
+            if (dump_field_with_value(value_pair, *submsg, value_fds, dump_existed_set, submsg_map_existed_set_key)) {
+              has_data = true;
+            }
+          } else {
+            if (dump_pick_field(*iter->second, *submsg, value_fds, 0, dump_existed_set, submsg_map_existed_set_key)) {
+              has_data = true;
+            }
           }
 
           if (has_data) {
@@ -1186,8 +1519,8 @@ static bool dump_field_item(const atfw::util::config::ini_value &src, ATBUS_MACR
 
   // 同层级展开
   if (!fds->is_repeated() && fds->options().HasExtension(atfw::atapp::protocol::CONFIGURE)) {
-    auto &opt_ext = fds->options().GetExtension(atfw::atapp::protocol::CONFIGURE);
-    auto &field_match = opt_ext.field_match();
+    const auto &opt_ext = fds->options().GetExtension(atfw::atapp::protocol::CONFIGURE);
+    const auto &field_match = opt_ext.field_match();
     if (!field_match.field_name().empty() && !field_match.field_value().empty()) {
       atfw::util::config::ini_value::node_type::const_iterator field_value_iter =
           src.get_children().find(field_match.field_name());
@@ -1222,16 +1555,16 @@ static bool dump_field_item(const atfw::util::config::ini_value &src, ATBUS_MACR
 
   if (fds->is_repeated() && fds->cpp_type() != ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_MESSAGE) {
     size_t arrsz = child_iter->second->size();
-    int ret = false;
+    bool ret = false;
     for (size_t i = 0; i < arrsz; ++i) {
       if (dump_pick_field(*child_iter->second, dst, fds, i, dump_existed_set, existed_set_prefix)) {
         ret = true;
       }
     }
     return ret;
-  } else {
-    return dump_pick_field(*child_iter->second, dst, fds, 0, dump_existed_set, existed_set_prefix);
   }
+
+  return dump_pick_field(*child_iter->second, dst, fds, 0, dump_existed_set, existed_set_prefix);
 }
 
 template <class TRET>
@@ -1244,17 +1577,27 @@ static std::pair<TRET, bool> dump_pick_field_with_extensions(
   if (!val.IsScalar() || val.Scalar().empty()) {
     if (fds->options().HasExtension(atapp::protocol::CONFIGURE)) {
       const atapp::protocol::atapp_configure_meta &meta = fds->options().GetExtension(atapp::protocol::CONFIGURE);
-      const std::string &default_str = meta.default_value();
+      std::string default_str = meta.default_value();
+      if (!default_str.empty() && meta.enable_expression()) {
+        default_str = expand_expression_impl(default_str, 0);
+      }
       dump_pick_field_from_str(value, default_str, meta.size_mode());
     } else {
       dump_pick_field_from_str(value, std::string(), false);
     }
   } else {
+    // Expand expression if enable_expression is set
+    std::string expanded_scalar;
+    gsl::string_view scalar_view(val.Scalar().data(), val.Scalar().size());
+    if (field_has_enable_expression(fds)) {
+      expanded_scalar = expand_expression_impl(scalar_view, 0);
+      scalar_view = gsl::string_view(expanded_scalar.data(), expanded_scalar.size());
+    }
     if (fds->options().HasExtension(atapp::protocol::CONFIGURE)) {
       const atapp::protocol::atapp_configure_meta &meta = fds->options().GetExtension(atapp::protocol::CONFIGURE);
-      dump_pick_field_from_str(value, val.Scalar(), meta.size_mode());
+      dump_pick_field_from_str(value, scalar_view, meta.size_mode());
     } else {
-      dump_pick_field_from_str(value, val.Scalar(), false);
+      dump_pick_field_from_str(value, scalar_view, false);
     }
   }
   if (fds->options().HasExtension(atapp::protocol::CONFIGURE)) {
@@ -1361,6 +1704,8 @@ static bool dump_pick_field(const YAML::Node &val, ATBUS_MACRO_PROTOBUF_NAMESPAC
             }
 
             YAML::Node::const_iterator iter = val.begin();
+            // Check if the map field itself has enable_expression
+            bool map_enable_expression = field_has_enable_expression(fds);
             for (; iter != val.end(); ++iter) {
               int index = dst.GetReflection()->FieldSize(dst, fds);
               submsg = dst.GetReflection()->AddMessage(&dst, fds);
@@ -1371,11 +1716,34 @@ static bool dump_pick_field(const YAML::Node &val, ATBUS_MACRO_PROTOBUF_NAMESPAC
               std::string submsg_map_existed_set_key =
                   atfw::util::log::format("{}{}.{}.", existed_set_prefix, fds->name(), index);
               bool has_data = false;
-              if (dump_pick_field(iter->first, *submsg, key_fds, dump_existed_set, submsg_map_existed_set_key)) {
-                has_data = true;
+
+              if (map_enable_expression && iter->first.IsScalar()) {
+                // Expand map key expression
+                std::string expanded_key = expand_expression_impl(iter->first.Scalar(), 0);
+                YAML::Node expanded_key_node(expanded_key);
+                if (dump_pick_field(expanded_key_node, *submsg, key_fds, dump_existed_set,
+                                    submsg_map_existed_set_key)) {
+                  has_data = true;
+                }
+              } else {
+                if (dump_pick_field(iter->first, *submsg, key_fds, dump_existed_set, submsg_map_existed_set_key)) {
+                  has_data = true;
+                }
               }
-              if (dump_pick_field(iter->second, *submsg, value_fds, dump_existed_set, submsg_map_existed_set_key)) {
-                has_data = true;
+
+              if (map_enable_expression && iter->second.IsScalar() &&
+                  value_fds->cpp_type() != ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor::CPPTYPE_MESSAGE) {
+                // Expand map value expression
+                std::string expanded_val = expand_expression_impl(iter->second.Scalar(), 0);
+                YAML::Node expanded_val_node(expanded_val);
+                if (dump_pick_field(expanded_val_node, *submsg, value_fds, dump_existed_set,
+                                    submsg_map_existed_set_key)) {
+                  has_data = true;
+                }
+              } else {
+                if (dump_pick_field(iter->second, *submsg, value_fds, dump_existed_set, submsg_map_existed_set_key)) {
+                  has_data = true;
+                }
               }
 
               if (has_data) {
@@ -1467,15 +1835,15 @@ static bool dump_field_item(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPAC
     return false;
   }
 
-  int ret = false;
+  bool ret = false;
 #if defined(LIBATFRAME_UTILS_ENABLE_EXCEPTION) && LIBATFRAME_UTILS_ENABLE_EXCEPTION
   try {
 #endif
 
     // 同层级展开
     if (!fds->is_repeated() && fds->options().HasExtension(atfw::atapp::protocol::CONFIGURE)) {
-      auto &opt_ext = fds->options().GetExtension(atfw::atapp::protocol::CONFIGURE);
-      auto &field_match = opt_ext.field_match();
+      const auto &opt_ext = fds->options().GetExtension(atfw::atapp::protocol::CONFIGURE);
+      const auto &field_match = opt_ext.field_match();
       if (!field_match.field_name().empty() && !field_match.field_value().empty()) {
         const YAML::Node field_value_node = src[field_match.field_name()];
         if (!field_value_node.IsScalar()) {
@@ -1616,7 +1984,7 @@ static bool dump_environment_pick_field(const std::string &key, ATBUS_MACRO_PROT
         break;
       }
 
-      ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *submsg;
+      ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *submsg = nullptr;
       if (fds->is_repeated()) {
         int index = dst.GetReflection()->FieldSize(dst, fds);
         submsg = dst.GetReflection()->AddMessage(&dst, fds);
@@ -1714,8 +2082,8 @@ static bool dump_environment_field_item(gsl::string_view prefix, ATBUS_MACRO_PRO
 
   // 同层级展开
   if (!fds->is_repeated() && fds->options().HasExtension(atfw::atapp::protocol::CONFIGURE)) {
-    auto &opt_ext = fds->options().GetExtension(atfw::atapp::protocol::CONFIGURE);
-    auto &field_match = opt_ext.field_match();
+    const auto &opt_ext = fds->options().GetExtension(atfw::atapp::protocol::CONFIGURE);
+    const auto &field_match = opt_ext.field_match();
     if (!field_match.field_name().empty() && !field_match.field_value().empty()) {
       std::string env_key_prefix;
       env_key_prefix.reserve(prefix.size() + 1 + fds->name().size());
@@ -1766,9 +2134,9 @@ static bool dump_environment_field_item(gsl::string_view prefix, ATBUS_MACRO_PRO
       return dump_environment_pick_field(env_key_prefix, dst, fds, dump_existed_set, existed_set_prefix);
     }
     return true;
-  } else {
-    return dump_environment_pick_field(env_key_prefix, dst, fds, dump_existed_set, existed_set_prefix);
   }
+
+  return dump_environment_pick_field(env_key_prefix, dst, fds, dump_existed_set, existed_set_prefix);
 }
 
 static bool dump_message_item(const YAML::Node &src, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
@@ -1821,6 +2189,10 @@ static bool dump_environment_message_item(gsl::string_view prefix, ATBUS_MACRO_P
 }
 
 }  // namespace
+
+LIBATAPP_MACRO_API std::string expand_environment_expression(gsl::string_view input) {
+  return expand_expression_impl(input, 0);
+}
 
 LIBATAPP_MACRO_API void parse_timepoint(gsl::string_view in, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp &out) {
   pick_const_data(in, out);
@@ -2067,7 +2439,7 @@ LIBATAPP_MACRO_API bool environment_loader_dump_to(gsl::string_view prefix,
 LIBATAPP_MACRO_API void default_loader_dump_to(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
                                                const configure_key_set &existed_set) {
   for (int i = 0; i < dst.GetDescriptor()->field_count(); ++i) {
-    auto *fds = dst.GetDescriptor()->field(i);
+    const auto *fds = dst.GetDescriptor()->field(i);
     if (fds == nullptr) {
       continue;
     }
@@ -2088,19 +2460,19 @@ static bool protobuf_equal_inner_map_bool(const ATBUS_MACRO_PROTOBUF_NAMESPACE_I
                                           const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *field_fds,
                                           const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *key_fds,
                                           const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *value_fds) {
-  auto lreflect = l.GetReflection();
-  auto rreflect = r.GetReflection();
+  const auto *lreflect = l.GetReflection();
+  const auto *rreflect = r.GetReflection();
   int field_size = lreflect->FieldSize(l, field_fds);
   std::unordered_map<bool, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *> lmap;
   lmap.reserve(static_cast<size_t>(field_size));
   for (int i = 0; i < field_size; ++i) {
-    auto lvalue = &lreflect->GetRepeatedMessage(l, field_fds, i);
+    const auto *lvalue = &lreflect->GetRepeatedMessage(l, field_fds, i);
     auto lkey = lvalue->GetReflection()->GetRepeatedBool(*lvalue, key_fds, i);
     lmap[lkey] = lvalue;
   }
 
   for (int i = 0; i < field_size; ++i) {
-    auto rvalue = &rreflect->GetRepeatedMessage(r, field_fds, i);
+    const auto *rvalue = &rreflect->GetRepeatedMessage(r, field_fds, i);
     auto rkey = rvalue->GetReflection()->GetRepeatedBool(*rvalue, key_fds, i);
     auto iter = lmap.find(rkey);
     if (iter == lmap.end()) {
@@ -2121,19 +2493,19 @@ static bool protobuf_equal_inner_map_int32(const ATBUS_MACRO_PROTOBUF_NAMESPACE_
                                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *field_fds,
                                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *key_fds,
                                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *value_fds) {
-  auto lreflect = l.GetReflection();
-  auto rreflect = r.GetReflection();
+  const auto *lreflect = l.GetReflection();
+  const auto *rreflect = r.GetReflection();
   int field_size = lreflect->FieldSize(l, field_fds);
   std::unordered_map<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::int32, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *> lmap;
   lmap.reserve(static_cast<size_t>(field_size));
   for (int i = 0; i < field_size; ++i) {
-    auto lvalue = &lreflect->GetRepeatedMessage(l, field_fds, i);
+    const auto *lvalue = &lreflect->GetRepeatedMessage(l, field_fds, i);
     auto lkey = lvalue->GetReflection()->GetRepeatedInt32(*lvalue, key_fds, i);
     lmap[lkey] = lvalue;
   }
 
   for (int i = 0; i < field_size; ++i) {
-    auto rvalue = &rreflect->GetRepeatedMessage(r, field_fds, i);
+    const auto *rvalue = &rreflect->GetRepeatedMessage(r, field_fds, i);
     auto rkey = rvalue->GetReflection()->GetRepeatedInt32(*rvalue, key_fds, i);
     auto iter = lmap.find(rkey);
     if (iter == lmap.end()) {
@@ -2154,20 +2526,20 @@ static bool protobuf_equal_inner_map_uint32(const ATBUS_MACRO_PROTOBUF_NAMESPACE
                                             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *field_fds,
                                             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *key_fds,
                                             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *value_fds) {
-  auto lreflect = l.GetReflection();
-  auto rreflect = r.GetReflection();
+  const auto *lreflect = l.GetReflection();
+  const auto *rreflect = r.GetReflection();
   int field_size = lreflect->FieldSize(l, field_fds);
   std::unordered_map<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::uint32, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *>
       lmap;
   lmap.reserve(static_cast<size_t>(field_size));
   for (int i = 0; i < field_size; ++i) {
-    auto lvalue = &lreflect->GetRepeatedMessage(l, field_fds, i);
+    const auto *lvalue = &lreflect->GetRepeatedMessage(l, field_fds, i);
     auto lkey = lvalue->GetReflection()->GetRepeatedUInt32(*lvalue, key_fds, i);
     lmap[lkey] = lvalue;
   }
 
   for (int i = 0; i < field_size; ++i) {
-    auto rvalue = &rreflect->GetRepeatedMessage(r, field_fds, i);
+    const auto *rvalue = &rreflect->GetRepeatedMessage(r, field_fds, i);
     auto rkey = rvalue->GetReflection()->GetRepeatedUInt32(*rvalue, key_fds, i);
     auto iter = lmap.find(rkey);
     if (iter == lmap.end()) {
@@ -2188,19 +2560,19 @@ static bool protobuf_equal_inner_map_int64(const ATBUS_MACRO_PROTOBUF_NAMESPACE_
                                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *field_fds,
                                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *key_fds,
                                            const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *value_fds) {
-  auto lreflect = l.GetReflection();
-  auto rreflect = r.GetReflection();
+  const auto *lreflect = l.GetReflection();
+  const auto *rreflect = r.GetReflection();
   int field_size = lreflect->FieldSize(l, field_fds);
   std::unordered_map<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::int64, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *> lmap;
   lmap.reserve(static_cast<size_t>(field_size));
   for (int i = 0; i < field_size; ++i) {
-    auto lvalue = &lreflect->GetRepeatedMessage(l, field_fds, i);
+    const auto *lvalue = &lreflect->GetRepeatedMessage(l, field_fds, i);
     auto lkey = lvalue->GetReflection()->GetRepeatedInt64(*lvalue, key_fds, i);
     lmap[lkey] = lvalue;
   }
 
   for (int i = 0; i < field_size; ++i) {
-    auto rvalue = &rreflect->GetRepeatedMessage(r, field_fds, i);
+    const auto *rvalue = &rreflect->GetRepeatedMessage(r, field_fds, i);
     auto rkey = rvalue->GetReflection()->GetRepeatedInt64(*rvalue, key_fds, i);
     auto iter = lmap.find(rkey);
     if (iter == lmap.end()) {
@@ -2221,20 +2593,20 @@ static bool protobuf_equal_inner_map_uint64(const ATBUS_MACRO_PROTOBUF_NAMESPACE
                                             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *field_fds,
                                             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *key_fds,
                                             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *value_fds) {
-  auto lreflect = l.GetReflection();
-  auto rreflect = r.GetReflection();
+  const auto *lreflect = l.GetReflection();
+  const auto *rreflect = r.GetReflection();
   int field_size = lreflect->FieldSize(l, field_fds);
   std::unordered_map<ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::uint64, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *>
       lmap;
   lmap.reserve(static_cast<size_t>(field_size));
   for (int i = 0; i < field_size; ++i) {
-    auto lvalue = &lreflect->GetRepeatedMessage(l, field_fds, i);
+    const auto *lvalue = &lreflect->GetRepeatedMessage(l, field_fds, i);
     auto lkey = lvalue->GetReflection()->GetRepeatedUInt64(*lvalue, key_fds, i);
     lmap[lkey] = lvalue;
   }
 
   for (int i = 0; i < field_size; ++i) {
-    auto rvalue = &rreflect->GetRepeatedMessage(r, field_fds, i);
+    const auto *rvalue = &rreflect->GetRepeatedMessage(r, field_fds, i);
     auto rkey = rvalue->GetReflection()->GetRepeatedUInt64(*rvalue, key_fds, i);
     auto iter = lmap.find(rkey);
     if (iter == lmap.end()) {
@@ -2255,19 +2627,19 @@ static bool protobuf_equal_inner_map_string(const ATBUS_MACRO_PROTOBUF_NAMESPACE
                                             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *field_fds,
                                             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *key_fds,
                                             const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::FieldDescriptor *value_fds) {
-  auto lreflect = l.GetReflection();
-  auto rreflect = r.GetReflection();
+  const auto *lreflect = l.GetReflection();
+  const auto *rreflect = r.GetReflection();
   int field_size = lreflect->FieldSize(l, field_fds);
   std::unordered_map<std::string, const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message *> lmap;
   lmap.reserve(static_cast<size_t>(field_size));
   for (int i = 0; i < field_size; ++i) {
-    auto lvalue = &lreflect->GetRepeatedMessage(l, field_fds, i);
+    const auto *lvalue = &lreflect->GetRepeatedMessage(l, field_fds, i);
     auto lkey = lvalue->GetReflection()->GetRepeatedString(*lvalue, key_fds, i);
     lmap[std::move(lkey)] = lvalue;
   }
 
   for (int i = 0; i < field_size; ++i) {
-    auto rvalue = &rreflect->GetRepeatedMessage(r, field_fds, i);
+    const auto *rvalue = &rreflect->GetRepeatedMessage(r, field_fds, i);
     auto rkey = rvalue->GetReflection()->GetRepeatedString(*rvalue, key_fds, i);
     auto iter = lmap.find(rkey);
     if (iter == lmap.end()) {

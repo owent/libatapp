@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent on 2017-12-26
 
 #pragma once
@@ -54,13 +55,13 @@ class etcd_keepalive : public std::enable_shared_from_this<etcd_keepalive> {
 
   LIBATAPP_MACRO_API void active();
 
-  UTIL_FORCEINLINE etcd_cluster &get_owner() { return *owner_; }
-  UTIL_FORCEINLINE const etcd_cluster &get_owner() const { return *owner_; }
+  ATFW_UTIL_FORCEINLINE etcd_cluster &get_owner() { return *owner_; }
+  ATFW_UTIL_FORCEINLINE const etcd_cluster &get_owner() const { return *owner_; }
 
-  UTIL_FORCEINLINE bool is_check_run() const { return checker_.is_check_run; }
-  UTIL_FORCEINLINE bool is_check_passed() const { return checker_.is_check_passed; }
-  UTIL_FORCEINLINE size_t get_check_times() const { return checker_.retry_times; }
-  UTIL_FORCEINLINE bool has_data() const { return rpc_.has_data; }
+  ATFW_UTIL_FORCEINLINE bool is_check_run() const { return checker_.is_check_run; }
+  ATFW_UTIL_FORCEINLINE bool is_check_passed() const { return checker_.is_check_passed; }
+  ATFW_UTIL_FORCEINLINE size_t get_check_times() const { return checker_.retry_times; }
+  ATFW_UTIL_FORCEINLINE bool has_data() const { return rpc_.has_data; }
 
  private:
   void process();
@@ -90,3 +91,4 @@ class etcd_keepalive : public std::enable_shared_from_this<etcd_keepalive> {
   checker_t checker_;
 };
 LIBATAPP_MACRO_NAMESPACE_END
+

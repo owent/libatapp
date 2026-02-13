@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent on 2016-05-18
 
 #pragma once
@@ -61,6 +62,14 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE module_impl {
    * @note module can call get_app()->stop() to stop running.
    */
   LIBATAPP_MACRO_API virtual void ready();
+
+  /**
+   * @brief This callback is called after configure files are reloaded and before reload
+   * @note Changing the origin configure is allowed here(even app id and name).
+   *       This callback will always be called no matter it is enabled or not, so it can be used to update configure for
+   *       other module and patch configure before init.
+   */
+  LIBATAPP_MACRO_API virtual void prereload(app_conf &conf);
 
   /**
    * @brief This callback is called after configure is reloaded
@@ -149,13 +158,13 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE module_impl {
    * @brief get owner atapp object
    * @return return owner atapp object, nullptr if not added
    */
-  LIBATAPP_MACRO_API app *get_app();
+  ATFW_UTIL_FORCEINLINE app *ATFW_UTIL_MACRO_NONNULL get_app() { return owner_; }
 
   /**
    * @brief get owner atapp object
    * @return return owner atapp object, nullptr if not added
    */
-  LIBATAPP_MACRO_API const app *get_app() const;
+  ATFW_UTIL_FORCEINLINE const app *ATFW_UTIL_MACRO_NONNULL get_app() const noexcept { return owner_; }
 
  protected:
   LIBATAPP_MACRO_API bool is_enabled() const;
@@ -173,7 +182,7 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE module_impl {
  private:
   bool enabled_;
   bool actived_;
-  app *owner_;
+  app *ATFW_UTIL_MACRO_NONNULL owner_;
 
   struct suspended_stop_info {
     std::function<bool()> stop_suspend_callback;

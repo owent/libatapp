@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent on 2017-12-26
 
 #pragma once
@@ -24,7 +25,7 @@ class etcd_cluster;
 class etcd_watcher {
  public:
   struct LIBATAPP_MACRO_API_HEAD_ONLY event_t {
-    etcd_watch_event::type evt_type;
+    etcd_watch_event evt_type;
     etcd_key_value kv;
     etcd_key_value prev_kv;
   };
@@ -57,66 +58,66 @@ class etcd_watcher {
 
   LIBATAPP_MACRO_API void active();
 
-  UTIL_FORCEINLINE etcd_cluster &get_owner() noexcept { return *owner_; }
-  UTIL_FORCEINLINE const etcd_cluster &get_owner() const noexcept { return *owner_; }
+  ATFW_UTIL_FORCEINLINE etcd_cluster &get_owner() noexcept { return *owner_; }
+  ATFW_UTIL_FORCEINLINE const etcd_cluster &get_owner() const noexcept { return *owner_; }
 
   // ====================== apis for configure ==================
 
-  UTIL_FORCEINLINE bool is_progress_notify_enabled() const noexcept { return rpc_.enable_progress_notify; }
-  UTIL_FORCEINLINE void set_progress_notify_enabled(bool v) noexcept { rpc_.enable_progress_notify = v; }
+  ATFW_UTIL_FORCEINLINE bool is_progress_notify_enabled() const noexcept { return rpc_.enable_progress_notify; }
+  ATFW_UTIL_FORCEINLINE void set_progress_notify_enabled(bool v) noexcept { rpc_.enable_progress_notify = v; }
 
-  UTIL_FORCEINLINE bool is_prev_kv_enabled() const noexcept { return rpc_.enable_prev_kv; }
-  UTIL_FORCEINLINE void set_prev_kv_enabled(bool v) noexcept { rpc_.enable_prev_kv = v; }
+  ATFW_UTIL_FORCEINLINE bool is_prev_kv_enabled() const noexcept { return rpc_.enable_prev_kv; }
+  ATFW_UTIL_FORCEINLINE void set_prev_kv_enabled(bool v) noexcept { rpc_.enable_prev_kv = v; }
 
-  UTIL_FORCEINLINE void set_conf_retry_interval(std::chrono::system_clock::duration v) noexcept {
+  ATFW_UTIL_FORCEINLINE void set_conf_retry_interval(std::chrono::system_clock::duration v) noexcept {
     rpc_.retry_interval = v;
   }
-  UTIL_FORCEINLINE void set_conf_retry_interval_sec(time_t v) noexcept {
+  ATFW_UTIL_FORCEINLINE void set_conf_retry_interval_sec(time_t v) noexcept {
     set_conf_retry_interval(std::chrono::seconds(v));
   }
-  UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_retry_interval() const noexcept {
+  ATFW_UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_retry_interval() const noexcept {
     return rpc_.retry_interval;
   }
 
-  UTIL_FORCEINLINE void set_conf_request_timeout(std::chrono::system_clock::duration v) noexcept {
+  ATFW_UTIL_FORCEINLINE void set_conf_request_timeout(std::chrono::system_clock::duration v) noexcept {
     rpc_.request_timeout = v;
   }
-  UTIL_FORCEINLINE void set_conf_request_timeout_sec(time_t v) noexcept {
+  ATFW_UTIL_FORCEINLINE void set_conf_request_timeout_sec(time_t v) noexcept {
     set_conf_request_timeout(std::chrono::seconds(v));
   }
-  UTIL_FORCEINLINE void set_conf_request_timeout_min(time_t v) noexcept {
+  ATFW_UTIL_FORCEINLINE void set_conf_request_timeout_min(time_t v) noexcept {
     set_conf_request_timeout(std::chrono::minutes(v));
   }
-  UTIL_FORCEINLINE void set_conf_request_timeout_hour(time_t v) noexcept {
+  ATFW_UTIL_FORCEINLINE void set_conf_request_timeout_hour(time_t v) noexcept {
     set_conf_request_timeout(std::chrono::hours(v));
   }
-  UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_request_timeout() const noexcept {
+  ATFW_UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_request_timeout() const noexcept {
     return rpc_.request_timeout;
   }
 
-  UTIL_FORCEINLINE void set_conf_get_request_timeout(std::chrono::system_clock::duration v) noexcept {
+  ATFW_UTIL_FORCEINLINE void set_conf_get_request_timeout(std::chrono::system_clock::duration v) noexcept {
     rpc_.get_request_timeout = v;
   }
-  UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_get_request_timeout() const noexcept {
+  ATFW_UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_get_request_timeout() const noexcept {
     return rpc_.get_request_timeout;
   }
 
-  UTIL_FORCEINLINE void set_conf_startup_random_delay_min(std::chrono::system_clock::duration v) noexcept {
+  ATFW_UTIL_FORCEINLINE void set_conf_startup_random_delay_min(std::chrono::system_clock::duration v) noexcept {
     rpc_.startup_random_delay_min = v;
   }
-  UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_startup_random_delay_min() const noexcept {
+  ATFW_UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_startup_random_delay_min() const noexcept {
     return rpc_.startup_random_delay_min;
   }
 
-  UTIL_FORCEINLINE void set_conf_startup_random_delay_max(std::chrono::system_clock::duration v) noexcept {
+  ATFW_UTIL_FORCEINLINE void set_conf_startup_random_delay_max(std::chrono::system_clock::duration v) noexcept {
     rpc_.startup_random_delay_max = v;
   }
-  UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_startup_random_delay_max() const noexcept {
+  ATFW_UTIL_FORCEINLINE const std::chrono::system_clock::duration &get_conf_startup_random_delay_max() const noexcept {
     return rpc_.startup_random_delay_max;
   }
 
   // ====================== apis for events ==================
-  UTIL_FORCEINLINE void set_evt_handle(watch_event_fn_t &&fn) { evt_handle_ = std::move(fn); }
+  ATFW_UTIL_FORCEINLINE void set_evt_handle(watch_event_fn_t &&fn) { evt_handle_ = std::move(fn); }
 
  private:
   void process();

@@ -1,4 +1,5 @@
-// Copyright 2024 atframework
+// Copyright 2026 atframework
+//
 // Created by owent
 
 #include "atframe/modules/worker_pool_module.h"
@@ -30,17 +31,17 @@
 LIBATAPP_MACRO_NAMESPACE_BEGIN
 
 struct UTIL_SYMBOL_VISIBLE worker_tick_action_handle_data {
-  worker_tick_handle_type type;
+  worker_tick_handle_type type = worker_tick_handle_type::kWorkerTickHandleAny;
   worker_context specify_worker;
-  size_t version;
+  size_t version = 0;
   std::list<worker_tick_action_pointer>::iterator iter;
-  const std::list<worker_tick_action_pointer>* owner;
+  const std::list<worker_tick_action_pointer>* owner = nullptr;
 };
 
 namespace {
 
 struct UTIL_SYMBOL_LOCAL worker_tick_action_container_type {
-  size_t version;
+  size_t version = 0;
   std::list<worker_tick_action_pointer> data;
 };
 
@@ -60,7 +61,7 @@ struct UTIL_SYMBOL_LOCAL worker_compare_key {
   const void* worker_ptr;
 
   static worker_compare_key min() noexcept {
-    worker_compare_key ret;
+    worker_compare_key ret = {};
     ret.pending_job_size = 0;
     ret.cpu_time_last_second_busy_us = 0;
     ret.cpu_time_last_minute_busy_us = 0;
@@ -71,12 +72,12 @@ struct UTIL_SYMBOL_LOCAL worker_compare_key {
   }
 
   static worker_compare_key max() noexcept {
-    worker_compare_key ret;
+    worker_compare_key ret = {};
     ret.pending_job_size = std::numeric_limits<size_t>::max();
     ret.cpu_time_last_second_busy_us = std::numeric_limits<std::chrono::microseconds::rep>::max();
     ret.cpu_time_last_minute_busy_us = std::numeric_limits<std::chrono::microseconds::rep>::max();
     ret.worker_id = std::numeric_limits<uint32_t>::max();
-    ret.worker_ptr = reinterpret_cast<const void*>(std::numeric_limits<uintptr_t>::max());
+    ret.worker_ptr = nullptr;
 
     return ret;
   }
@@ -117,7 +118,7 @@ class UTIL_SYMBOL_LOCAL worker_pool_module::worker : public std::enable_shared_f
 
   worker_pool_module::worker_set& get_owner() noexcept { return *owner_; }
 
-  static void start(std::shared_ptr<worker> self, std::shared_ptr<worker_set> owner);
+  static void start(const std::shared_ptr<worker> &self, const std::shared_ptr<worker_set> &owner);
 
   inline const worker_context& get_context() const noexcept { return context_; }
 
@@ -132,7 +133,7 @@ class UTIL_SYMBOL_LOCAL worker_pool_module::worker : public std::enable_shared_f
   std::chrono::system_clock::duration collect_scaling_up_cpu_time() noexcept {
     auto current_value = cpu_time_busy_us_.load(std::memory_order_acquire);
     auto before_value = cpu_time_collect_scaling_up_us_.exchange(current_value, std::memory_order_acq_rel);
-    if UTIL_LIKELY_CONDITION (current_value > before_value) {
+    if ATFW_UTIL_LIKELY_CONDITION (current_value > before_value) {
       return std::chrono::duration_cast<std::chrono::system_clock::duration>(
           std::chrono::microseconds(current_value - before_value));
     }
@@ -143,7 +144,7 @@ class UTIL_SYMBOL_LOCAL worker_pool_module::worker : public std::enable_shared_f
   std::chrono::system_clock::duration collect_scaling_down_cpu_time() noexcept {
     auto current_value = cpu_time_busy_us_.load(std::memory_order_acquire);
     auto before_value = cpu_time_collect_scaling_down_us_.exchange(current_value, std::memory_order_acq_rel);
-    if UTIL_LIKELY_CONDITION (current_value > before_value) {
+    if ATFW_UTIL_LIKELY_CONDITION (current_value > before_value) {
       return std::chrono::duration_cast<std::chrono::system_clock::duration>(
           std::chrono::microseconds(current_value - before_value));
     }
@@ -154,7 +155,7 @@ class UTIL_SYMBOL_LOCAL worker_pool_module::worker : public std::enable_shared_f
   inline size_t get_pending_job_size() const noexcept { return private_jobs.unsafe_size(); }
 
   inline worker_compare_key make_compare_key() const noexcept {
-    worker_compare_key ret;
+    worker_compare_key ret = {};
     ret.pending_job_size = get_pending_job_size();
     ret.cpu_time_last_second_busy_us = cpu_time_last_second_busy_us_.load(std::memory_order_acquire);
     ret.cpu_time_last_minute_busy_us = cpu_time_last_minute_busy_us_.load(std::memory_order_acquire);
@@ -334,11 +335,10 @@ struct UTIL_SYMBOL_LOCAL worker_pool_module::scaling_statistics {
 
   std::chrono::system_clock::time_point leak_scan_checkpoint;
 
-  inline scaling_statistics() noexcept {
-    last_scaling_up_checkpoint = std::chrono::system_clock::now();
-    last_scaling_down_checkpoint = last_scaling_up_checkpoint;
-    leak_scan_checkpoint = last_scaling_up_checkpoint;
-  }
+  inline scaling_statistics() noexcept
+      : last_scaling_up_checkpoint(std::chrono::system_clock::now()),
+        last_scaling_down_checkpoint(last_scaling_up_checkpoint),
+        leak_scan_checkpoint(last_scaling_up_checkpoint) {}
 };
 
 worker_pool_module::worker::worker(worker_pool_module::worker_set& owner, uint32_t worker_id) : owner_(&owner) {
@@ -382,7 +382,7 @@ worker_pool_module::worker::~worker() {
   }
 }
 
-void worker_pool_module::worker::start(std::shared_ptr<worker> self, std::shared_ptr<worker_set> owner) {
+void worker_pool_module::worker::start(const std::shared_ptr<worker> &self, const std::shared_ptr<worker_set> &owner) {
   if (!self || !owner) {
     return;
   }
@@ -437,7 +437,7 @@ void worker_pool_module::worker::start(std::shared_ptr<worker> self, std::shared
                 self->cpu_checkpoint_last_second_) {
           self->cpu_checkpoint_last_minute_ =
               self->cpu_checkpoint_last_second_ -
-              self->cpu_checkpoint_last_second_ % atfw::util::time::time_utility::MINITE_SECONDS;
+              (self->cpu_checkpoint_last_second_ % atfw::util::time::time_utility::MINITE_SECONDS);
 
           std::chrono::system_clock::time_point minute_start =
               std::chrono::system_clock::from_time_t(self->cpu_checkpoint_last_minute_);
@@ -569,12 +569,10 @@ void worker_pool_module::worker::background_job_tick(std::chrono::microseconds t
   }
 }
 
-worker_pool_module::worker_set::worker_set() {
-  need_scaling_up = false;
-
-  cpu_time_collect_scaling_up_us_for_removed_workers = std::chrono::system_clock::duration::zero();
-  cpu_time_collect_scaling_down_us_for_removed_workers = std::chrono::system_clock::duration::zero();
-
+worker_pool_module::worker_set::worker_set()
+    : need_scaling_up(false),
+      cpu_time_collect_scaling_up_us_for_removed_workers(std::chrono::system_clock::duration::zero()),
+      cpu_time_collect_scaling_down_us_for_removed_workers(std::chrono::system_clock::duration::zero()) {
   closing.store(false, std::memory_order_release);
   cleaning.store(false, std::memory_order_release);
   current_expect_workers.store(2, std::memory_order_release);
@@ -595,15 +593,15 @@ LIBATAPP_MACRO_API int worker_pool_module::init() {
 }
 
 LIBATAPP_MACRO_API int worker_pool_module::reload() {
-  auto& cfg = get_app()->get_origin_configure().worker_pool();
+  const auto& cfg = get_app()->get_origin_configure().worker_pool();
   if (worker_set_) {
-    int64_t tick_interval = cfg.tick_max_interval().nanos() / 1000 + cfg.tick_max_interval().seconds() * 1000000;
+    int64_t tick_interval = (cfg.tick_max_interval().nanos() / 1000) + (cfg.tick_max_interval().seconds() * 1000000);
     if (tick_interval <= 1000) {
       tick_interval = 128000;
     }
     worker_set_->configure_tick_max_interval_microseconds.store(tick_interval, std::memory_order_release);
 
-    tick_interval = cfg.tick_min_interval().nanos() / 1000 + cfg.tick_min_interval().seconds() * 1000000;
+    tick_interval = (cfg.tick_min_interval().nanos() / 1000) + (cfg.tick_min_interval().seconds() * 1000000);
     if (tick_interval < 1000) {
       tick_interval = 4000;
     }
@@ -733,7 +731,7 @@ LIBATAPP_MACRO_API int worker_pool_module::tick(std::chrono::system_clock::time_
                                        1;
     if (scaling_configure_->scaling_up_queue_size > 0) {
       uint32_t scaling_up_target_count_by_queue =
-          static_cast<uint32_t>(queue_size / scaling_configure_->scaling_up_queue_size + 1);
+          static_cast<uint32_t>((queue_size / scaling_configure_->scaling_up_queue_size) + 1);
       if (scaling_up_target_count_by_queue > scaling_up_target_count) {
         scaling_up_target_count = scaling_up_target_count_by_queue;
       }
@@ -867,7 +865,8 @@ LIBATAPP_MACRO_API int worker_pool_module::spawn(worker_job_action_type action, 
   return spawn(atfw::util::memory::make_strong_rc<worker_job_action_type>(std::move(action)), selected_context);
 }
 
-LIBATAPP_MACRO_API int worker_pool_module::spawn(worker_job_action_pointer action, worker_context* selected_context) {
+LIBATAPP_MACRO_API int worker_pool_module::spawn(const worker_job_action_pointer &action,
+                                                  worker_context* selected_context) {
   if (!action) {
     return EN_ATBUS_ERR_PARAMS;
   }
@@ -909,7 +908,8 @@ LIBATAPP_MACRO_API int worker_pool_module::spawn(worker_job_action_type action, 
   return spawn(atfw::util::memory::make_strong_rc<worker_job_action_type>(std::move(action)), context);
 }
 
-LIBATAPP_MACRO_API int worker_pool_module::spawn(worker_job_action_pointer action, const worker_context& context) {
+LIBATAPP_MACRO_API int worker_pool_module::spawn(const worker_job_action_pointer &action,
+                                                  const worker_context& context) {
   if (!action) {
     return EN_ATBUS_ERR_PARAMS;
   }
@@ -1027,7 +1027,7 @@ LIBATAPP_MACRO_API void worker_pool_module::foreach_worker_quickly(
   // stable workers always available
   bool should_continue = true;
   for (uint32_t worker_id = 1; worker_id <= min_count; ++worker_id) {
-    worker_meta meta;
+    worker_meta meta = {};
     meta.scaling_mode = worker_scaling_mode::kStable;
     should_continue = fn(worker_context{worker_id}, meta);
     if (!should_continue) {
@@ -1049,10 +1049,11 @@ LIBATAPP_MACRO_API void worker_pool_module::foreach_worker_quickly(
       continue;
     }
 
-    worker_meta meta;
+    worker_meta meta = {};
     if (worker_ptr->get_context().worker_id <= min_count) {
       continue;
-    } else if (worker_ptr->get_context().worker_id <= except_count) {
+    }
+    if (worker_ptr->get_context().worker_id <= except_count) {
       meta.scaling_mode = worker_scaling_mode::kDynamic;
     } else {
       meta.scaling_mode = worker_scaling_mode::kPendingToDestroy;
@@ -1082,7 +1083,7 @@ LIBATAPP_MACRO_API void worker_pool_module::foreach_worker(
   // stable workers always available
   bool should_continue = true;
   for (uint32_t worker_id = 1; worker_id <= min_count; ++worker_id) {
-    worker_meta meta;
+    worker_meta meta = {};
     meta.scaling_mode = worker_scaling_mode::kStable;
     should_continue = fn(worker_context{worker_id}, meta);
     if (!should_continue) {
@@ -1103,10 +1104,11 @@ LIBATAPP_MACRO_API void worker_pool_module::foreach_worker(
       continue;
     }
 
-    worker_meta meta;
+    worker_meta meta = {};
     if (worker_ptr->get_context().worker_id <= min_count) {
       continue;
-    } else if (worker_ptr->get_context().worker_id <= except_count) {
+    }
+    if (worker_ptr->get_context().worker_id <= except_count) {
       meta.scaling_mode = worker_scaling_mode::kDynamic;
     } else {
       meta.scaling_mode = worker_scaling_mode::kPendingToDestroy;
@@ -1385,9 +1387,8 @@ int worker_pool_module::select_worker(const worker_context& context, std::shared
   if (context.worker_id > expect_workers) {
     if (worker_set_->closing.load(std::memory_order_acquire)) {
       return EN_ATAPP_ERR_WORKER_POOL_CLOSED;
-    } else {
-      return EN_ATAPP_ERR_WORKER_POOL_NO_AVAILABLE_WORKER;
     }
+    return EN_ATAPP_ERR_WORKER_POOL_NO_AVAILABLE_WORKER;
   }
 
   std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
@@ -1417,13 +1418,12 @@ int worker_pool_module::select_worker(const worker_context& context, std::shared
 
   if (output) {
     return EN_ATAPP_ERR_SUCCESS;
-  } else {
-    if (worker_set_->closing.load(std::memory_order_acquire)) {
-      return EN_ATAPP_ERR_WORKER_POOL_CLOSED;
-    } else {
-      return EN_ATAPP_ERR_WORKER_POOL_NO_AVAILABLE_WORKER;
-    }
   }
+
+  if (worker_set_->closing.load(std::memory_order_acquire)) {
+    return EN_ATAPP_ERR_WORKER_POOL_CLOSED;
+  }
+  return EN_ATAPP_ERR_WORKER_POOL_NO_AVAILABLE_WORKER;
 }
 
 std::shared_ptr<worker_pool_module::worker> worker_pool_module::select_worker() {

@@ -1,4 +1,5 @@
 #!/bin/bash
+# Copyright 2026 atframework
 
 cd "$(cd "$(dirname $0)" && pwd)/.."
 
@@ -126,3 +127,4 @@ elif [[ "$1" == "msys2.mingw.test" ]]; then
   echo "PATH=$PATH"
   ctest -VV . -C $CONFIGURATION -L libatapp.unit_test
 fi
+

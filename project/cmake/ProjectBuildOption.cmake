@@ -1,3 +1,4 @@
+# Copyright 2026 atframework
 # 默认配置选项
 # ##################################################################################################
 
@@ -29,3 +30,4 @@ math(EXPR ATFRAMEWORK_ATAPP_ABI_NUMBER "${LIBATAPP_VERSION_MAJOR}*1000+${LIBATAP
 set(ATFRAMEWORK_ATAPP_ABI_TAG
     "v${ATFRAMEWORK_ATAPP_ABI_NUMBER}"
     CACHE STRING "libatapp ABI tag")
+

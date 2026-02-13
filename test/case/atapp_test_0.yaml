@@ -1,3 +1,4 @@
+# Copyright 2026 atframework
 atapp:
   id: 0x00000010
   id_mask: 8.8.8.8
@@ -7,17 +8,20 @@ atapp:
 
   bus:
     listen: "ipv4://127.0.0.1:21536"
-    subnets: "0/0"
     proxy: ""
     backlog: 256
     access_token_max_number: 5
     overwrite_listen_path: false
+    topology:
+      rule:
+        allow_direct_connection: true
+        require_same_upstream: false
     first_idle_timeout: 10s
     ping_interval: 60s
     retry_interval: 3s
     fault_tolerant: 3
     message_size: 64KB
-    recv_buffer_size: 1MB
+    receive_buffer_size: 1MB
     send_buffer_size: 1MB
     send_buffer_number: 0
   timer:

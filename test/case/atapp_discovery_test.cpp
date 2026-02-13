@@ -1,4 +1,4 @@
-// Copyright 2022 atframework
+// Copyright 2026 atframework
 
 #include <atframe/etcdcli/etcd_discovery.h>
 
@@ -409,3 +409,4 @@ CASE_TEST(atapp_discovery, lower_bound_compact_unique) {
     }
   }
 }
+

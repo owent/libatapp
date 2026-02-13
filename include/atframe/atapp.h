@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent on 2016-04-23
 
 #pragma once
@@ -6,12 +7,14 @@
 #include <gsl/select-gsl.h>
 
 #include <cli/cmd_option.h>
+#include <time/jiffies_timer.h>
 #include <time/time_utility.h>
 
 #include <config/ini_loader.h>
 
 #include <network/http_request.h>
 
+#include <atbus_topology.h>
 #include <detail/libatbus_config.h>
 
 #include <atomic>
@@ -28,6 +31,7 @@
 
 #include "atframe/atapp_conf.h"
 
+#include "atframe/atapp_common_types.h"
 #include "atframe/atapp_log_sink_maker.h"
 #include "atframe/atapp_module_impl.h"
 #include "atframe/connectors/atapp_connector_impl.h"
@@ -60,30 +64,24 @@ class app {
   using address_type_t = atapp_connector_impl::address_type_t;
   using ev_loop_t = uv_loop_t;
 
-  struct LIBATAPP_MACRO_API_HEAD_ONLY flag_t {
-    enum type {
-      RUNNING = 0,  //
-      STOPING,      //
-      TIMEOUT,
-      IN_CALLBACK,
-      INITIALIZED,
-      INITIALIZING,
-      STOPPED,
-      DISABLE_ATBUS_FALLBACK,
-      IN_TICK,
-      DESTROYING,
-      FLAG_MAX
-    };
+  enum class flag_t : int32_t {
+    kRunning = 0,  //
+    kStoping,      //
+    kTimeout,
+    kInCallback,
+    kInitialized,
+    kInitializing,
+    kStopped,
+    kDisableAtbusFallback,
+    kInTick,
+    kDestroying,
+    kFlagMax
   };
 
   struct message_t {
     int32_t type;
-    union {
-      uint64_t msg_sequence;  // compatibility for old version
-      uint64_t message_sequence;
-    };
-    const void *data;
-    size_t data_size;
+    uint64_t message_sequence;
+    gsl::span<const unsigned char> data;
     const atapp::protocol::atapp_metadata *metadata;
 
     LIBATAPP_MACRO_API message_t();
@@ -104,27 +102,25 @@ class app {
 
   class flag_guard_t {
    public:
-    LIBATAPP_MACRO_API flag_guard_t(app &owner, flag_t::type f);
+    LIBATAPP_MACRO_API flag_guard_t(app &owner, flag_t f);
     LIBATAPP_MACRO_API ~flag_guard_t();
 
    private:
     flag_guard_t(const flag_guard_t &);
 
     app *owner_;
-    flag_t::type flag_;
+    flag_t flag_;
   };
   friend class flag_guard_t;
 
-  struct LIBATAPP_MACRO_API_HEAD_ONLY mode_t {
-    enum type {
-      CUSTOM = 0,  // custom command
-      START,       // start server
-      STOP,        // send a stop command
-      RELOAD,      // send a reload command
-      INFO,        // show information and exit
-      HELP,        // show help and exit
-      MODE_MAX
-    };
+  enum class mode_t : int32_t {
+    kCustom = 0,  // custom command
+    kStart,       // start server
+    kStop,        // send a stop command
+    kReload,      // send a reload command
+    kInfo,        // show information and exit
+    kHelp,        // show help and exit
+    kModeMax
   };
 
   struct LIBATAPP_MACRO_API_HEAD_ONLY custom_command_sender_t {
@@ -143,9 +139,7 @@ class app {
   struct tick_timer_t {
     atfw::util::time::time_utility::raw_time_t last_tick_timepoint;
     atfw::util::time::time_utility::raw_time_t last_stop_timepoint;
-    time_t sec;
-    time_t usec;
-    atfw::util::time::time_utility::raw_time_t *inner_break;
+    atfw::util::time::time_utility::raw_time_t *internal_break;
     std::chrono::system_clock::duration tick_compensation;
 
     timer_ptr_t tick_timer;
@@ -234,7 +228,7 @@ class app {
   LIBATAPP_MACRO_API app_id_t convert_app_id_by_string(const char *id_in) const noexcept;
   LIBATAPP_MACRO_API std::string convert_app_id_to_string(app_id_t id_in, bool hex = false) const noexcept;
 
-  LIBATAPP_MACRO_API bool check_flag(flag_t::type f) const noexcept;
+  LIBATAPP_MACRO_API bool check_flag(flag_t f) const noexcept;
 
   /**
    * @brief add a new module
@@ -296,14 +290,23 @@ class app {
 
   LIBATAPP_MACRO_API const std::string &get_hash_code() const noexcept;
 
-  LIBATAPP_MACRO_API std::shared_ptr<atbus::node> get_bus_node();
-  LIBATAPP_MACRO_API const std::shared_ptr<atbus::node> get_bus_node() const noexcept;
+  ATFW_UTIL_FORCEINLINE const atbus::node::ptr_t &get_bus_node() const noexcept { return bus_node_; }
+
+  ATFW_UTIL_FORCEINLINE const std::shared_ptr<atapp_connector_atbus> &get_atbus_connector() const noexcept {
+    return atbus_connector_;
+  }
+
+  ATFW_UTIL_FORCEINLINE const std::shared_ptr<atapp_connector_loopback> &get_loopback_connector() const noexcept {
+    return loopback_connector_;
+  }
 
   LIBATAPP_MACRO_API void enable_fallback_to_atbus_connector();
   LIBATAPP_MACRO_API void disable_fallback_to_atbus_connector();
   LIBATAPP_MACRO_API bool is_fallback_to_atbus_connector_enabled() const noexcept;
 
   LIBATAPP_MACRO_API atfw::util::time::time_utility::raw_time_t get_last_tick_time() const noexcept;
+  LIBATAPP_MACRO_API atfw::util::time::time_utility::raw_time_t get_next_tick_time() const noexcept;
+  LIBATAPP_MACRO_API atfw::util::time::time_utility::raw_time_t get_next_custom_timer_tick_time() const noexcept;
 
   LIBATAPP_MACRO_API atfw::util::config::ini_loader &get_configure_loader();
   LIBATAPP_MACRO_API const atfw::util::config::ini_loader &get_configure_loader() const noexcept;
@@ -352,7 +355,7 @@ class app {
    * dump default value
    */
   LIBATAPP_MACRO_API void parse_log_configures_into(atapp::protocol::atapp_log &dst,
-                                                    std::vector<gsl::string_view> configure_prefix_paths,
+                                                    const std::vector<gsl::string_view> &configure_prefix_paths,
                                                     gsl::string_view load_environemnt_prefix = "",
                                                     configure_key_set *existed_keys = nullptr) const noexcept;
 
@@ -386,13 +389,25 @@ class app {
   LIBATAPP_MACRO_API atapp::protocol::atapp_area &mutable_area();
   LIBATAPP_MACRO_API atfw::util::time::time_utility::raw_duration_t get_configure_message_timeout() const noexcept;
 
+  LIBATAPP_MACRO_API void pack(atapp::protocol::atapp_topology_info &out) const;
+
   LIBATAPP_MACRO_API void pack(atapp::protocol::atapp_discovery &out) const;
 
-  LIBATAPP_MACRO_API std::shared_ptr<::atframework::atapp::etcd_module> get_etcd_module() const noexcept;
+  LIBATAPP_MACRO_API const std::shared_ptr<::atframework::atapp::etcd_module> &get_etcd_module() const noexcept;
 
-  LIBATAPP_MACRO_API std::shared_ptr<::atframework::atapp::worker_pool_module> get_worker_pool_module() const noexcept;
+  LIBATAPP_MACRO_API const std::shared_ptr<::atframework::atapp::worker_pool_module> &get_worker_pool_module()
+      const noexcept;
 
   LIBATAPP_MACRO_API const etcd_discovery_set &get_global_discovery() const noexcept;
+
+  LIBATAPP_MACRO_API atbus::topology_peer::ptr_t get_topology_peer(atbus::bus_id_t id) const noexcept;
+
+  LIBATAPP_MACRO_API const atbus::topology_registry::ptr_t &get_topology_registry() const noexcept;
+
+  LIBATAPP_MACRO_API atbus::topology_relation_type get_topology_relation(
+      atbus::bus_id_t id, atbus::topology_peer::ptr_t *next_hop_peer) const noexcept;
+
+  LIBATAPP_MACRO_API const atbus::topology_policy_rule &get_topology_policy_rule() const noexcept;
 
   LIBATAPP_MACRO_API uint32_t get_address_type(const std::string &addr) const noexcept;
 
@@ -404,63 +419,65 @@ class app {
   LIBATAPP_MACRO_API uint64_t consume_tick_timer_compensation() noexcept;
 
   LIBATAPP_MACRO_API int32_t listen(const std::string &address);
-  LIBATAPP_MACRO_API int32_t send_message(uint64_t target_node_id, int32_t type, const void *data, size_t data_size,
+  LIBATAPP_MACRO_API int32_t send_message(uint64_t target_node_id, int32_t type, gsl::span<const unsigned char> data,
                                           uint64_t *msg_sequence = nullptr,
                                           const atapp::protocol::atapp_metadata *metadata = nullptr);
-  LIBATAPP_MACRO_API int32_t send_message(const std::string &target_node_name, int32_t type, const void *data,
-                                          size_t data_size, uint64_t *msg_sequence = nullptr,
+  LIBATAPP_MACRO_API int32_t send_message(const std::string &target_node_name, int32_t type,
+                                          gsl::span<const unsigned char> data, uint64_t *msg_sequence = nullptr,
                                           const atapp::protocol::atapp_metadata *metadata = nullptr);
   LIBATAPP_MACRO_API int32_t send_message(const etcd_discovery_node::ptr_t &target_node_discovery, int32_t type,
-                                          const void *data, size_t data_size, uint64_t *msg_sequence = nullptr,
+                                          gsl::span<const unsigned char> data, uint64_t *msg_sequence = nullptr,
                                           const atapp::protocol::atapp_metadata *metadata = nullptr);
 
-  LIBATAPP_MACRO_API int32_t send_message_by_consistent_hash(const void *hash_buf, size_t hash_bufsz, int32_t type,
-                                                             const void *data, size_t data_size,
+  LIBATAPP_MACRO_API int32_t send_message_by_consistent_hash(gsl::span<const unsigned char> hashbuf, int32_t type,
+                                                             gsl::span<const unsigned char> data,
                                                              uint64_t *msg_sequence = nullptr,
                                                              const atapp::protocol::atapp_metadata *metadata = nullptr);
-  LIBATAPP_MACRO_API int32_t send_message_by_consistent_hash(uint64_t hash_key, int32_t type, const void *data,
-                                                             size_t data_size, uint64_t *msg_sequence = nullptr,
+  LIBATAPP_MACRO_API int32_t send_message_by_consistent_hash(uint64_t hash_key, int32_t type,
+                                                             gsl::span<const unsigned char> data,
+                                                             uint64_t *msg_sequence = nullptr,
                                                              const atapp::protocol::atapp_metadata *metadata = nullptr);
-  LIBATAPP_MACRO_API int32_t send_message_by_consistent_hash(int64_t hash_key, int32_t type, const void *data,
-                                                             size_t data_size, uint64_t *msg_sequence = nullptr,
+  LIBATAPP_MACRO_API int32_t send_message_by_consistent_hash(int64_t hash_key, int32_t type,
+                                                             gsl::span<const unsigned char> data,
+                                                             uint64_t *msg_sequence = nullptr,
                                                              const atapp::protocol::atapp_metadata *metadata = nullptr);
   LIBATAPP_MACRO_API int32_t send_message_by_consistent_hash(const std::string &hash_key, int32_t type,
-                                                             const void *data, size_t data_size,
+                                                             gsl::span<const unsigned char> data,
                                                              uint64_t *msg_sequence = nullptr,
                                                              const atapp::protocol::atapp_metadata *metadata = nullptr);
 
-  LIBATAPP_MACRO_API int32_t send_message_by_random(int32_t type, const void *data, size_t data_size,
+  LIBATAPP_MACRO_API int32_t send_message_by_random(int32_t type, gsl::span<const unsigned char> data,
                                                     uint64_t *msg_sequence = nullptr,
                                                     const atapp::protocol::atapp_metadata *metadata = nullptr);
-  LIBATAPP_MACRO_API int32_t send_message_by_round_robin(int32_t type, const void *data, size_t data_size,
+  LIBATAPP_MACRO_API int32_t send_message_by_round_robin(int32_t type, gsl::span<const unsigned char> data,
                                                          uint64_t *msg_sequence = nullptr,
                                                          const atapp::protocol::atapp_metadata *metadata = nullptr);
 
   LIBATAPP_MACRO_API int32_t send_message_by_consistent_hash(const etcd_discovery_set &discovery_set,
-                                                             const void *hash_buf, size_t hash_bufsz, int32_t type,
-                                                             const void *data, size_t data_size,
+                                                             gsl::span<const unsigned char> hash_buf, int32_t type,
+                                                             gsl::span<const unsigned char> data,
                                                              uint64_t *msg_sequence = nullptr,
                                                              const atapp::protocol::atapp_metadata *metadata = nullptr);
   LIBATAPP_MACRO_API int32_t send_message_by_consistent_hash(const etcd_discovery_set &discovery_set, uint64_t hash_key,
-                                                             int32_t type, const void *data, size_t data_size,
+                                                             int32_t type, gsl::span<const unsigned char> data,
                                                              uint64_t *msg_sequence = nullptr,
                                                              const atapp::protocol::atapp_metadata *metadata = nullptr);
   LIBATAPP_MACRO_API int32_t send_message_by_consistent_hash(const etcd_discovery_set &discovery_set, int64_t hash_key,
-                                                             int32_t type, const void *data, size_t data_size,
+                                                             int32_t type, gsl::span<const unsigned char> data,
                                                              uint64_t *msg_sequence = nullptr,
                                                              const atapp::protocol::atapp_metadata *metadata = nullptr);
   LIBATAPP_MACRO_API int32_t send_message_by_consistent_hash(const etcd_discovery_set &discovery_set,
                                                              const std::string &hash_key, int32_t type,
-                                                             const void *data, size_t data_size,
+                                                             gsl::span<const unsigned char> data,
                                                              uint64_t *msg_sequence = nullptr,
                                                              const atapp::protocol::atapp_metadata *metadata = nullptr);
 
   LIBATAPP_MACRO_API int32_t send_message_by_random(const etcd_discovery_set &discovery_set, int32_t type,
-                                                    const void *data, size_t data_size,
+                                                    gsl::span<const unsigned char> data,
                                                     uint64_t *msg_sequence = nullptr,
                                                     const atapp::protocol::atapp_metadata *metadata = nullptr);
   LIBATAPP_MACRO_API int32_t send_message_by_round_robin(const etcd_discovery_set &discovery_set, int32_t type,
-                                                         const void *data, size_t data_size,
+                                                         gsl::span<const unsigned char> data,
                                                          uint64_t *msg_sequence = nullptr,
                                                          const atapp::protocol::atapp_metadata *metadata = nullptr);
 
@@ -526,10 +543,44 @@ class app {
   LIBATAPP_MACRO_API void setup_logger(atfw::util::log::log_wrapper &logger, const std::string &min_level,
                                        const atapp::protocol::atapp_log_category &log_conf) const noexcept;
 
+  LIBATAPP_MACRO_API int add_custom_timer_with_system_clock(std::chrono::system_clock::duration delta,
+                                                            jiffies_timer_handle_t &&fn, void *priv_data,
+                                                            jiffies_timer_watcher_t *watcher = nullptr);
+
+  LIBATAPP_MACRO_API int add_custom_timer_with_system_clock(std::chrono::system_clock::time_point timeout,
+                                                            jiffies_timer_handle_t &&fn, void *priv_data,
+                                                            jiffies_timer_watcher_t *watcher = nullptr);
+
+  template <class Rep, class Period, class HandleType>
+  ATFW_UTIL_FORCEINLINE int add_custom_timer(std::chrono::duration<Rep, Period> delta, HandleType &&fn, void *priv_data,
+                                             jiffies_timer_watcher_t *watcher = nullptr) {
+    return add_custom_timer_with_system_clock(std::chrono::duration_cast<std::chrono::system_clock::duration>(delta),
+                                              jiffies_timer_handle_t{std::forward<HandleType>(fn)}, priv_data, watcher);
+  }
+
+  template <class Clock, class Duration, class HandleType>
+  ATFW_UTIL_FORCEINLINE int add_custom_timer(std::chrono::time_point<Clock, Duration> timeout, HandleType &&fn,
+                                             void *priv_data, jiffies_timer_watcher_t *watcher = nullptr) {
+    return add_custom_timer_with_system_clock(
+        std::chrono::time_point_cast<std::chrono::system_clock::duration, Clock, Duration>(timeout),
+        jiffies_timer_handle_t{std::forward<HandleType>(fn)}, priv_data, watcher);
+  }
+
+  LIBATAPP_MACRO_API void remove_custom_timer(jiffies_timer_watcher_t &watcher);
+
+#if !defined(NDEBUG)
+  static LIBATAPP_MACRO_API atfw::util::time::time_utility::raw_time_t get_sys_now() noexcept;
+  static LIBATAPP_MACRO_API void set_sys_now(atfw::util::time::time_utility::raw_time_t tp) noexcept;
+#else
+  ATFW_UTIL_FORCEINLINE static atfw::util::time::time_utility::raw_time_t get_sys_now() noexcept {
+    return atfw::util::time::time_utility::sys_now();
+  }
+#endif
+
  private:
   static void ev_stop_timeout(uv_timer_t *handle);
 
-  bool set_flag(flag_t::type f, bool v);
+  bool set_flag(flag_t f, bool v);
 
   int apply_configure();
 
@@ -549,7 +600,7 @@ class app {
 
   int setup_atbus();
 
-  void close_timer(timer_ptr_t &t);
+  static void close_timer(timer_ptr_t &t);
 
   int setup_tick_timer();
 
@@ -567,7 +618,7 @@ class app {
 
   void print_help();
 
-  bool match_gateway_hosts(const atapp::protocol::atapp_gateway &checked) const noexcept;
+  static bool match_gateway_hosts(const atapp::protocol::atapp_gateway &checked) noexcept;
   bool match_gateway_namespace(const atapp::protocol::atapp_gateway &checked) const noexcept;
   bool match_gateway_labels(const atapp::protocol::atapp_gateway &checked) const noexcept;
 
@@ -616,43 +667,47 @@ class app {
   int command_handler_list_discovery(atfw::util::cli::callback_param params);
 
  private:
-  int bus_evt_callback_on_recv_msg(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
-                                   const atbus::message &, const void *, size_t);
+  int bus_evt_callback_on_forward_request(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
+                                          const atbus::message &, gsl::span<const unsigned char>);
   int bus_evt_callback_on_forward_response(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
                                            const atbus::message *m);
-  int bus_evt_callback_on_error(const atbus::node &, const atbus::endpoint *, const atbus::connection *, int, int);
+  int bus_evt_callback_on_error(const atbus::node &, const atbus::endpoint *, const atbus::connection *, int,
+                                ATBUS_ERROR_TYPE);
   int bus_evt_callback_on_info_log(const atbus::node &, const atbus::endpoint *, const atbus::connection *,
                                    const char *);
-  int bus_evt_callback_on_reg(const atbus::node &, const atbus::endpoint *, const atbus::connection *, int);
+  int bus_evt_callback_on_register(const atbus::node &, const atbus::endpoint *, const atbus::connection *, int);
   int bus_evt_callback_on_shutdown(const atbus::node &, int);
   int bus_evt_callback_on_available(const atbus::node &, int);
   int bus_evt_callback_on_invalid_connection(const atbus::node &, const atbus::connection *, int);
   int bus_evt_callback_on_custom_command_request(const atbus::node &, const atbus::endpoint *,
                                                  const atbus::connection *, app_id_t,
-                                                 const std::vector<std::pair<const void *, size_t>> &,
-                                                 std::list<std::string> &);
+                                                 gsl::span<gsl::span<const unsigned char>>, std::list<std::string> &);
   int bus_evt_callback_on_new_connection(const atbus::node &, const atbus::connection *);
+  int bus_evt_callback_on_close_connection(const atbus::node &, const atbus::endpoint *, const atbus::connection *);
   int bus_evt_callback_on_add_endpoint(const atbus::node &, atbus::endpoint *, int);
   int bus_evt_callback_on_remove_endpoint(const atbus::node &, atbus::endpoint *, int);
   int bus_evt_callback_on_custom_command_response(const atbus::node &, const atbus::endpoint *,
                                                   const atbus::connection *, app_id_t,
-                                                  const std::vector<std::pair<const void *, size_t>> &, uint64_t);
+                                                  gsl::span<gsl::span<const unsigned char>>, uint64_t);
 
   void app_evt_on_finally();
 
-  LIBATAPP_MACRO_API void add_connector_inner(std::shared_ptr<atapp_connector_impl> connector);
+  LIBATAPP_MACRO_API void add_connector_inner(const std::shared_ptr<atapp_connector_impl> &connector);
 
   /** this function should always not be used outside atapp.cpp **/
   static void _app_setup_signal_handle(int signo);
   void process_signals();
   void process_signal(int signo);
 
-  int32_t process_inner_events(const atfw::util::time::time_utility::raw_time_t &end_tick);
+  int32_t process_internal_events(const atfw::util::time::time_utility::raw_time_t &end_tick);
+
+  int32_t process_custom_timers();
 
   atapp_endpoint::ptr_t auto_mutable_self_endpoint();
 
-  void parse_environment_log_categories_into(atapp::protocol::atapp_log &dst, gsl::string_view load_environemnt_prefix,
-                                             configure_key_set *dump_existed_set) const noexcept;
+  static void parse_environment_log_categories_into(atapp::protocol::atapp_log &dst,
+                                                    gsl::string_view load_environemnt_prefix,
+                                                    configure_key_set *dump_existed_set) noexcept;
 
   void parse_ini_log_categories_into(atapp::protocol::atapp_log &dst, const std::vector<gsl::string_view> &path,
                                      configure_key_set *dump_existed_set) const noexcept;
@@ -664,8 +719,10 @@ class app {
   LIBATAPP_MACRO_API int trigger_event_on_forward_request(const message_sender_t &source, const message_t &msg);
   LIBATAPP_MACRO_API int trigger_event_on_forward_response(const message_sender_t &source, const message_t &msg,
                                                            int32_t error_code);
-  LIBATAPP_MACRO_API void trigger_event_on_discovery_event(etcd_discovery_action_t::type,
-                                                           const etcd_discovery_node::ptr_t &);
+  LIBATAPP_MACRO_API void trigger_event_on_discovery_event(etcd_discovery_action_t, const etcd_discovery_node::ptr_t &);
+  LIBATAPP_MACRO_API void trigger_event_on_topology_event(
+      etcd_watch_event, const atfw::util::memory::strong_rc_ptr<atapp::protocol::atapp_topology_info> &,
+      const etcd_data_version &);
 
  private:
   static app *last_instance_;
@@ -676,27 +733,27 @@ class app {
   std::vector<std::string> last_command_;
   int setup_result_;
 
-  enum inner_options_t {
+  enum class internal_options_t : int32_t {
     // POSIX: _POSIX_SIGQUEUE_MAX on most platform is 32
     // RLIMIT_SIGPENDING on most linux distributions is 11
     // We use 32 here
-    MAX_SIGNAL_COUNT = 32,
+    kMaxSignalCount = 32,
   };
-  int pending_signals_[MAX_SIGNAL_COUNT];
+  int pending_signals_[static_cast<size_t>(internal_options_t::kMaxSignalCount)];
 
   app_conf conf_;
   mutable std::string build_version_;
 
   ev_loop_t *ev_loop_;
-  std::shared_ptr<atbus::node> bus_node_;
+  atbus::node::ptr_t bus_node_;
   std::atomic<uint64_t> flags_;
-  mode_t::type mode_;
+  mode_t mode_;
   tick_timer_t tick_timer_;
   std::chrono::milliseconds tick_clock_granularity_;
+  jiffies_timer_t custom_timer_controller_;
 
   std::vector<module_ptr_t> modules_;
-  std::unordered_map<std::string, log_sink_maker::log_reg_t>
-      log_reg_;  // log reg will not changed or be checked outside the init, so std::map is enough
+  std::unordered_map<std::string, log_sink_maker::log_reg_t> log_reg_;
 
   // callbacks
   callback_fn_on_forward_request_t evt_on_forward_request_;
@@ -722,7 +779,7 @@ class app {
     uint64_t receive_custom_command_reponse_count;
 
     size_t endpoint_wake_count;
-    ::atframework::atapp::etcd_cluster::stats_t inner_etcd;
+    ::atframework::atapp::etcd_cluster::stats_t internal_etcd;
 
     std::vector<stats_data_module_reload_t> module_reload;
   };

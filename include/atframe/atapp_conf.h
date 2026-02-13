@@ -1,9 +1,12 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent on 2016-04-23
 
 #pragma once
 
+// clang-format off
 #include <config/compiler/protobuf_prefix.h>
+// clang-format on
 
 #include <yaml-cpp/yaml.h>
 
@@ -11,7 +14,9 @@
 #include <google/protobuf/duration.pb.h>
 #include <google/protobuf/timestamp.pb.h>
 
+// clang-format off
 #include <config/compiler/protobuf_suffix.h>
+// clang-format on
 
 #include <libatbus_protocol.h>
 
@@ -38,8 +43,8 @@ LIBATAPP_MACRO_NAMESPACE_BEGIN
 struct app_conf {
   // bus configure
   std::string id_cmd;
-  atbus::node::bus_id_t id;
-  std::vector<atbus::node::bus_id_t> id_mask;  // convert a.b.c.d -> id
+  atbus::bus_id_t id;
+  std::vector<atbus::bus_id_t> id_mask;  // convert a.b.c.d -> id
   std::string conf_file;
   std::string pid_file;
   std::string start_error_file;
@@ -86,12 +91,16 @@ enum ATAPP_ERROR_TYPE {
   EN_ATAPP_ERR_SETUP_ATBUS = -1101,
   EN_ATAPP_ERR_SEND_FAILED = -1102,
   EN_ATAPP_ERR_DISCOVERY_DISABLED = -1103,
+  EN_ATAPP_ERR_TOPOLOGY_UNKNOWN = -1104,
+  EN_ATAPP_ERR_DISCOVERY_NOT_FOUND = -1105,
+  EN_ATAPP_ERR_TOPOLOGY_DENY = -1106,
   EN_ATAPP_ERR_WORKER_POOL_BUSY = -1201,
   EN_ATAPP_ERR_WORKER_POOL_NO_AVAILABLE_WORKER = -1202,
   EN_ATAPP_ERR_WORKER_POOL_CLOSED = -1203,
   EN_ATAPP_ERR_COMMAND_IS_NULL = -1801,
   EN_ATAPP_ERR_NO_AVAILABLE_ADDRESS = -1802,
   EN_ATAPP_ERR_CONNECT_ATAPP_FAILED = -1803,
+  EN_ATAPP_ERR_TRY_NEXT = -1804,
   EN_ATAPP_ERR_MIN = -1999,
 };
 
@@ -99,6 +108,36 @@ using configure_key_set = std::unordered_set<std::string>;
 
 LIBATAPP_MACRO_API void parse_timepoint(gsl::string_view in, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp &out);
 LIBATAPP_MACRO_API void parse_duration(gsl::string_view in, ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &out);
+
+template <class Rep, class Period>
+ATFW_UTIL_FORCEINLINE std::chrono::duration<Rep, Period> protobuf_to_chrono_convert_duration(
+    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &in) {
+  return std::chrono::duration<Rep, Period>(
+      std::chrono::duration_cast<std::chrono::duration<Rep, Period>>(std::chrono::seconds(in.seconds())) +
+      std::chrono::duration_cast<std::chrono::duration<Rep, Period>>(std::chrono::nanoseconds(in.nanos())));
+}
+
+template <class Rep, class Period>
+ATFW_UTIL_FORCEINLINE void protobuf_to_chrono_set_duration(std::chrono::duration<Rep, Period> &out,
+                                                           const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &in) {
+  out = protobuf_to_chrono_convert_duration<Rep, Period>(in);
+}
+
+template <class Clock, class Rep, class Period>
+ATFW_UTIL_FORCEINLINE std::chrono::time_point<Clock, std::chrono::duration<Rep, Period>>
+protobuf_to_chrono_convert_timepoint(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp &in) {
+  std::chrono::system_clock::time_point tp = std::chrono::system_clock::from_time_t(in.seconds());
+  tp += std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::nanoseconds(in.nanos()));
+  return std::chrono::time_point_cast<std::chrono::time_point<Clock, std::chrono::duration<Rep, Period>>,
+                                      std::chrono::system_clock, std::chrono::system_clock::duration>(tp);
+}
+
+template <class Clock, class Rep, class Period>
+ATFW_UTIL_FORCEINLINE void protobuf_to_chrono_set_duration(
+    std::chrono::time_point<Clock, std::chrono::duration<Rep, Period>> &out,
+    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp &in) {
+  out = protobuf_to_chrono_convert_timepoint<Clock, Rep, Period>(in);
+}
 
 LIBATAPP_MACRO_API bool ini_loader_dump_to(const atfw::util::config::ini_value &src,
                                            ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &dst,
@@ -132,4 +171,22 @@ LIBATAPP_MACRO_API void default_loader_dump_to(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID
 
 LIBATAPP_MACRO_API bool protobuf_equal(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &l,
                                        const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &r);
+
+/**
+ * @brief Expand environment variable expressions in a string.
+ *
+ * Supported expression syntax:
+ *   - $VARIABLE_NAME : replaced by the value of the environment variable (POSIX names: [A-Za-z0-9_])
+ *   - ${VARIABLE_NAME} : braced reference, supports any characters including '.', '-', '/' (k8s labels)
+ *   - ${VARIABLE:-default} : if VARIABLE is unset or empty, use default
+ *   - ${VARIABLE:+word} : if VARIABLE is set and non-empty, use word; otherwise empty string
+ *   - \$ : literal dollar sign (escape)
+ *   - Nested expressions: ${OUTER_${INNER}}, ${VAR:-${OTHER:-fallback}}
+ *
+ * @param input The input string potentially containing expressions.
+ * @return The expanded string with all expressions resolved.
+ */
+LIBATAPP_MACRO_API std::string expand_environment_expression(gsl::string_view input);
+
 LIBATAPP_MACRO_NAMESPACE_END
+
