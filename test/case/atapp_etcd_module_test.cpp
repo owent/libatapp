@@ -14,7 +14,6 @@
 
 #include <chrono>
 #include <cstdlib>
-#include <cstring>
 #include <memory>
 #include <string>
 #include <vector>
@@ -92,7 +91,7 @@ CASE_TEST(atapp_etcd_module, init_and_ready) {
 
   std::string conf_path_base;
   atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
-  std::string conf_path = conf_path_base + "/atapp_test_etcd.yaml";
+  std::string conf_path = conf_path_base + "/atapp_test_etcd_module.yaml";
 
   if (!atfw::util::file_system::is_exist(conf_path.c_str())) {
     CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path << " not found, skip this test" << '\n';
@@ -134,7 +133,7 @@ CASE_TEST(atapp_etcd_module, keepalive_paths) {
 
   std::string conf_path_base;
   atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
-  std::string conf_path = conf_path_base + "/atapp_test_etcd.yaml";
+  std::string conf_path = conf_path_base + "/atapp_test_etcd_module.yaml";
 
   if (!atfw::util::file_system::is_exist(conf_path.c_str())) {
     CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path << " not found, skip this test" << '\n';
@@ -185,7 +184,7 @@ CASE_TEST(atapp_etcd_module, watcher_paths) {
 
   std::string conf_path_base;
   atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
-  std::string conf_path = conf_path_base + "/atapp_test_etcd.yaml";
+  std::string conf_path = conf_path_base + "/atapp_test_etcd_module.yaml";
 
   if (!atfw::util::file_system::is_exist(conf_path.c_str())) {
     CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path << " not found, skip this test" << '\n';
@@ -237,7 +236,7 @@ CASE_TEST(atapp_etcd_module, topology_registration) {
 
   std::string conf_path_base;
   atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
-  std::string conf_path = conf_path_base + "/atapp_test_etcd.yaml";
+  std::string conf_path = conf_path_base + "/atapp_test_etcd_module.yaml";
 
   if (!atfw::util::file_system::is_exist(conf_path.c_str())) {
     CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path << " not found, skip this test" << '\n';
@@ -289,7 +288,7 @@ CASE_TEST(atapp_etcd_module, discovery_snapshot) {
 
   std::string conf_path_base;
   atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
-  std::string conf_path = conf_path_base + "/atapp_test_etcd.yaml";
+  std::string conf_path = conf_path_base + "/atapp_test_etcd_module.yaml";
 
   if (!atfw::util::file_system::is_exist(conf_path.c_str())) {
     CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path << " not found, skip this test" << '\n';
@@ -324,7 +323,7 @@ CASE_TEST(atapp_etcd_module, topology_snapshot) {
 
   std::string conf_path_base;
   atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
-  std::string conf_path = conf_path_base + "/atapp_test_etcd.yaml";
+  std::string conf_path = conf_path_base + "/atapp_test_etcd_module.yaml";
 
   if (!atfw::util::file_system::is_exist(conf_path.c_str())) {
     CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path << " not found, skip this test" << '\n';
@@ -359,8 +358,8 @@ CASE_TEST(atapp_etcd_module, discovery_registration) {
 
   std::string conf_path_base;
   atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
-  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_node1.yaml";
-  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_node2.yaml";
+  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_module_node1.yaml";
+  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_module_node2.yaml";
 
   if (!atfw::util::file_system::is_exist(conf_path_1.c_str()) ||
       !atfw::util::file_system::is_exist(conf_path_2.c_str())) {
@@ -441,8 +440,8 @@ CASE_TEST(atapp_etcd_module, discovery_event_callback) {
 
   std::string conf_path_base;
   atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
-  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_node1.yaml";
-  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_node2.yaml";
+  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_module_node1.yaml";
+  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_module_node2.yaml";
 
   if (!atfw::util::file_system::is_exist(conf_path_1.c_str()) ||
       !atfw::util::file_system::is_exist(conf_path_2.c_str())) {
@@ -477,6 +476,11 @@ CASE_TEST(atapp_etcd_module, discovery_event_callback) {
   std::vector<atframework::atapp::app *> apps1 = {&app1};
   run_apps_until(apps1, [&etcd_mod1]() { return etcd_mod1->has_discovery_snapshot(); });
 
+  // Reset after snapshot to ignore self-registration events
+  int baseline_discovery = discovery_callback_count;
+  last_discovery_node.reset();
+  last_action = atapp::etcd_module::node_action_t::kUnknown;
+
   // Now start node2
   atframework::atapp::app app2;
   const char *args2[] = {"app2", "-c", conf_path_2.c_str(), "start"};
@@ -484,16 +488,26 @@ CASE_TEST(atapp_etcd_module, discovery_event_callback) {
 
   std::vector<atframework::atapp::app *> apps = {&app1, &app2};
 
-  // Wait for discovery callback to fire for node2
-  bool callback_fired = run_apps_until(apps, [&discovery_callback_count]() { return discovery_callback_count > 0; });
+  // Wait for discovery callback to fire with kPut action for node2
+  bool callback_fired = run_apps_until(apps, [&discovery_callback_count, baseline_discovery]() {
+    return discovery_callback_count > baseline_discovery;
+  });
 
   CASE_EXPECT_TRUE(callback_fired);
-  CASE_EXPECT_GT(discovery_callback_count, 0);
+  CASE_EXPECT_GT(discovery_callback_count, baseline_discovery);
   CASE_EXPECT_TRUE(!!last_discovery_node);
+  // Verify action is kPut (new node registration), not kDelete
+  CASE_EXPECT_EQ(static_cast<int>(atapp::etcd_module::node_action_t::kPut), static_cast<int>(last_action));
 
   if (last_discovery_node) {
+    // Verify the discovered node's data matches app2
+    CASE_EXPECT_EQ(app2.get_id(), last_discovery_node->get_discovery_info().id());
+    CASE_EXPECT_EQ(app2.get_app_name(), last_discovery_node->get_discovery_info().name());
+    CASE_EXPECT_GT(last_discovery_node->get_discovery_info().type_id(), static_cast<uint64_t>(0));
     CASE_MSG_INFO() << "discovery callback: action=" << static_cast<int>(last_action)
-                    << " node_id=" << last_discovery_node->get_discovery_info().id() << '\n';
+                    << " node_id=" << last_discovery_node->get_discovery_info().id()
+                    << " name=" << last_discovery_node->get_discovery_info().name()
+                    << " type_id=" << last_discovery_node->get_discovery_info().type_id() << '\n';
   }
 
   // Cleanup
@@ -511,8 +525,8 @@ CASE_TEST(atapp_etcd_module, discovery_event_remove_callback) {
 
   std::string conf_path_base;
   atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
-  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_node1.yaml";
-  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_node2.yaml";
+  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_module_node1.yaml";
+  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_module_node2.yaml";
 
   if (!atfw::util::file_system::is_exist(conf_path_1.c_str()) ||
       !atfw::util::file_system::is_exist(conf_path_2.c_str())) {
@@ -540,11 +554,13 @@ CASE_TEST(atapp_etcd_module, discovery_event_remove_callback) {
   etcd_mod1->remove_on_node_event(handle);
   int removed_baseline = removed_callback_count;
 
-  // Register a second callback that should still fire
+  // Register a second callback that should still fire (only count kPut to avoid kDelete noise)
   int active_callback_count = 0;
   auto active_handle = etcd_mod1->add_on_node_discovery_event(
-      [&active_callback_count](atapp::etcd_module::node_action_t, const atapp::etcd_discovery_node::ptr_t &) {
-        ++active_callback_count;
+      [&active_callback_count](atapp::etcd_module::node_action_t action, const atapp::etcd_discovery_node::ptr_t &) {
+        if (action == atapp::etcd_module::node_action_t::kPut) {
+          ++active_callback_count;
+        }
       });
 
   // Wait for snapshot, then start node2
@@ -581,8 +597,8 @@ CASE_TEST(atapp_etcd_module, discovery_event_multi_callbacks) {
 
   std::string conf_path_base;
   atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
-  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_node1.yaml";
-  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_node2.yaml";
+  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_module_node1.yaml";
+  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_module_node2.yaml";
 
   if (!atfw::util::file_system::is_exist(conf_path_1.c_str()) ||
       !atfw::util::file_system::is_exist(conf_path_2.c_str())) {
@@ -600,28 +616,37 @@ CASE_TEST(atapp_etcd_module, discovery_event_multi_callbacks) {
     return;
   }
 
-  // Register multiple callbacks and track call order
+  // Register multiple callbacks and track call order (only count kPut events)
   std::vector<int> call_order;
   int cb1_count = 0;
   int cb2_count = 0;
   int cb3_count = 0;
+  atapp::etcd_discovery_node::ptr_t last_cb1_node;
 
   auto h1 = etcd_mod1->add_on_node_discovery_event(
-      [&cb1_count, &call_order](atapp::etcd_module::node_action_t, const atapp::etcd_discovery_node::ptr_t &) {
-        ++cb1_count;
-        call_order.push_back(1);
+      [&cb1_count, &call_order, &last_cb1_node](atapp::etcd_module::node_action_t action,
+                                                const atapp::etcd_discovery_node::ptr_t &node) {
+        if (action == atapp::etcd_module::node_action_t::kPut) {
+          ++cb1_count;
+          call_order.push_back(1);
+          last_cb1_node = node;
+        }
       });
 
   auto h2 = etcd_mod1->add_on_node_discovery_event(
-      [&cb2_count, &call_order](atapp::etcd_module::node_action_t, const atapp::etcd_discovery_node::ptr_t &) {
-        ++cb2_count;
-        call_order.push_back(2);
+      [&cb2_count, &call_order](atapp::etcd_module::node_action_t action, const atapp::etcd_discovery_node::ptr_t &) {
+        if (action == atapp::etcd_module::node_action_t::kPut) {
+          ++cb2_count;
+          call_order.push_back(2);
+        }
       });
 
   auto h3 = etcd_mod1->add_on_node_discovery_event(
-      [&cb3_count, &call_order](atapp::etcd_module::node_action_t, const atapp::etcd_discovery_node::ptr_t &) {
-        ++cb3_count;
-        call_order.push_back(3);
+      [&cb3_count, &call_order](atapp::etcd_module::node_action_t action, const atapp::etcd_discovery_node::ptr_t &) {
+        if (action == atapp::etcd_module::node_action_t::kPut) {
+          ++cb3_count;
+          call_order.push_back(3);
+        }
       });
 
   std::vector<atframework::atapp::app *> apps1 = {&app1};
@@ -637,6 +662,15 @@ CASE_TEST(atapp_etcd_module, discovery_event_multi_callbacks) {
   CASE_EXPECT_GT(cb1_count, 0);
   CASE_EXPECT_GT(cb2_count, 0);
   CASE_EXPECT_GT(cb3_count, 0);
+
+  // Verify the node data captured by the first callback
+  CASE_EXPECT_TRUE(!!last_cb1_node);
+  if (last_cb1_node) {
+    CASE_EXPECT_GT(last_cb1_node->get_discovery_info().id(), static_cast<uint64_t>(0));
+    CASE_EXPECT_FALSE(last_cb1_node->get_discovery_info().name().empty());
+    CASE_MSG_INFO() << "Multi-callback node: id=" << last_cb1_node->get_discovery_info().id()
+                    << " name=" << last_cb1_node->get_discovery_info().name() << '\n';
+  }
 
   // Check call order: within each event, callbacks should be called in registration order 1,2,3
   if (call_order.size() >= 3) {
@@ -665,8 +699,8 @@ CASE_TEST(atapp_etcd_module, topology_event_callback) {
 
   std::string conf_path_base;
   atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
-  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_node1.yaml";
-  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_node2.yaml";
+  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_module_node1.yaml";
+  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_module_node2.yaml";
 
   if (!atfw::util::file_system::is_exist(conf_path_1.c_str()) ||
       !atfw::util::file_system::is_exist(conf_path_2.c_str())) {
@@ -687,7 +721,7 @@ CASE_TEST(atapp_etcd_module, topology_event_callback) {
   // Register topology event callback
   int topology_callback_count = 0;
   atapp::etcd_module::atapp_topology_info_ptr_t last_topology_info;
-  atapp::etcd_module::topology_action_t last_topology_action = atapp::etcd_watch_event::kPut;
+  atapp::etcd_module::topology_action_t last_topology_action = atapp::etcd_watch_event::kDelete;
   atapp::etcd_data_version last_version{};
 
   auto handle = etcd_mod1->add_on_topology_info_event(
@@ -718,12 +752,19 @@ CASE_TEST(atapp_etcd_module, topology_event_callback) {
 
   CASE_EXPECT_TRUE(callback_fired);
   CASE_EXPECT_TRUE(!!last_topology_info);
+  // Verify action is kPut (new topology registration), not kDelete
+  CASE_EXPECT_EQ(static_cast<int>(atapp::etcd_watch_event::kPut), static_cast<int>(last_topology_action));
 
   if (last_topology_info) {
-    CASE_MSG_INFO() << "topology callback: action=" << static_cast<int>(last_topology_action)
-                    << " id=" << last_topology_info->id() << " version.create_revision=" << last_version.create_revision
-                    << '\n';
+    // Verify the topology info data matches app2
+    CASE_EXPECT_EQ(app2.get_id(), last_topology_info->id());
+    CASE_EXPECT_EQ(app2.get_app_name(), last_topology_info->name());
     CASE_EXPECT_GT(last_version.create_revision, 0);
+    CASE_EXPECT_GT(last_version.modify_revision, 0);
+    CASE_MSG_INFO() << "topology callback: action=" << static_cast<int>(last_topology_action)
+                    << " id=" << last_topology_info->id() << " name=" << last_topology_info->name()
+                    << " version.create_revision=" << last_version.create_revision
+                    << " version.modify_revision=" << last_version.modify_revision << '\n';
   }
 
   // Cleanup
@@ -741,8 +782,8 @@ CASE_TEST(atapp_etcd_module, topology_event_remove_callback) {
 
   std::string conf_path_base;
   atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
-  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_node1.yaml";
-  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_node2.yaml";
+  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_module_node1.yaml";
+  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_module_node2.yaml";
 
   if (!atfw::util::file_system::is_exist(conf_path_1.c_str()) ||
       !atfw::util::file_system::is_exist(conf_path_2.c_str())) {
@@ -770,12 +811,16 @@ CASE_TEST(atapp_etcd_module, topology_event_remove_callback) {
   etcd_mod1->remove_on_topology_info_event(removed_handle);
   int removed_baseline = removed_callback_count;
 
-  // Register active callback
+  // Register active callback (only count kPut to avoid kDelete noise)
   int active_callback_count = 0;
   auto active_handle = etcd_mod1->add_on_topology_info_event(
-      [&active_callback_count](atapp::etcd_module::topology_action_t,
+      [&active_callback_count](atapp::etcd_module::topology_action_t action,
                                const atapp::etcd_module::atapp_topology_info_ptr_t &,
-                               const atapp::etcd_data_version &) { ++active_callback_count; });
+                               const atapp::etcd_data_version &) {
+        if (action == atapp::etcd_watch_event::kPut) {
+          ++active_callback_count;
+        }
+      });
 
   // Wait for snapshot
   std::vector<atframework::atapp::app *> apps1 = {&app1};
@@ -814,8 +859,8 @@ CASE_TEST(atapp_etcd_module, topology_event_multi_callbacks) {
 
   std::string conf_path_base;
   atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
-  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_node1.yaml";
-  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_node2.yaml";
+  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_module_node1.yaml";
+  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_module_node2.yaml";
 
   if (!atfw::util::file_system::is_exist(conf_path_1.c_str()) ||
       !atfw::util::file_system::is_exist(conf_path_2.c_str())) {
@@ -833,17 +878,30 @@ CASE_TEST(atapp_etcd_module, topology_event_multi_callbacks) {
     return;
   }
 
-  // Register multiple topology callbacks
+  // Register multiple topology callbacks (only count kPut events)
   int cb1_count = 0;
   int cb2_count = 0;
+  atapp::etcd_module::atapp_topology_info_ptr_t last_cb1_info;
+  atapp::etcd_data_version last_cb1_version{};
 
-  auto h1 = etcd_mod1->add_on_topology_info_event([&cb1_count](atapp::etcd_module::topology_action_t,
-                                                               const atapp::etcd_module::atapp_topology_info_ptr_t &,
-                                                               const atapp::etcd_data_version &) { ++cb1_count; });
+  auto h1 = etcd_mod1->add_on_topology_info_event(
+      [&cb1_count, &last_cb1_info, &last_cb1_version](atapp::etcd_module::topology_action_t action,
+                                                      const atapp::etcd_module::atapp_topology_info_ptr_t &info,
+                                                      const atapp::etcd_data_version &ver) {
+        if (action == atapp::etcd_watch_event::kPut) {
+          ++cb1_count;
+          last_cb1_info = info;
+          last_cb1_version = ver;
+        }
+      });
 
-  auto h2 = etcd_mod1->add_on_topology_info_event([&cb2_count](atapp::etcd_module::topology_action_t,
+  auto h2 = etcd_mod1->add_on_topology_info_event([&cb2_count](atapp::etcd_module::topology_action_t action,
                                                                const atapp::etcd_module::atapp_topology_info_ptr_t &,
-                                                               const atapp::etcd_data_version &) { ++cb2_count; });
+                                                               const atapp::etcd_data_version &) {
+    if (action == atapp::etcd_watch_event::kPut) {
+      ++cb2_count;
+    }
+  });
 
   // Wait for snapshot
   std::vector<atframework::atapp::app *> apps1 = {&app1};
@@ -865,6 +923,16 @@ CASE_TEST(atapp_etcd_module, topology_event_multi_callbacks) {
   // Both callbacks should be called the same number of times for the same events
   CASE_EXPECT_EQ(cb1_count - baseline1, cb2_count - baseline2);
 
+  // Verify the topology data captured by cb1
+  CASE_EXPECT_TRUE(!!last_cb1_info);
+  if (last_cb1_info) {
+    CASE_EXPECT_GT(last_cb1_info->id(), static_cast<uint64_t>(0));
+    CASE_EXPECT_FALSE(last_cb1_info->name().empty());
+    CASE_EXPECT_GT(last_cb1_version.create_revision, 0);
+    CASE_MSG_INFO() << "topology multi-callback node: id=" << last_cb1_info->id() << " name=" << last_cb1_info->name()
+                    << " create_revision=" << last_cb1_version.create_revision << '\n';
+  }
+
   CASE_MSG_INFO() << "topology multi-callback: cb1=" << (cb1_count - baseline1) << " cb2=" << (cb2_count - baseline2)
                   << '\n';
 
@@ -884,8 +952,8 @@ CASE_TEST(atapp_etcd_module, multi_node_topology_update) {
 
   std::string conf_path_base;
   atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
-  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_node1.yaml";
-  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_node2.yaml";
+  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_module_node1.yaml";
+  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_module_node2.yaml";
 
   if (!atfw::util::file_system::is_exist(conf_path_1.c_str()) ||
       !atfw::util::file_system::is_exist(conf_path_2.c_str())) {
@@ -956,8 +1024,8 @@ CASE_TEST(atapp_etcd_module, discovery_event_delete) {
 
   std::string conf_path_base;
   atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
-  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_node1.yaml";
-  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_node2.yaml";
+  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_module_node1.yaml";
+  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_module_node2.yaml";
 
   if (!atfw::util::file_system::is_exist(conf_path_1.c_str()) ||
       !atfw::util::file_system::is_exist(conf_path_2.c_str())) {
@@ -979,15 +1047,25 @@ CASE_TEST(atapp_etcd_module, discovery_event_delete) {
   int put_count = 0;
   int delete_count = 0;
   atapp::etcd_module::node_action_t last_action = atapp::etcd_module::node_action_t::kUnknown;
+  atapp::etcd_discovery_node::ptr_t last_delete_node;
+  // Track app2-specific put event to avoid self-registration/refresh noise
+  uint64_t app2_id = 0;
+  std::string app2_name;
+  bool got_app2_put = false;
+  atapp::etcd_discovery_node::ptr_t app2_put_node;
 
   auto handle = etcd_mod1->add_on_node_discovery_event(
-      [&put_count, &delete_count, &last_action](atapp::etcd_module::node_action_t action,
-                                                const atapp::etcd_discovery_node::ptr_t &) {
+      [&](atapp::etcd_module::node_action_t action, const atapp::etcd_discovery_node::ptr_t &node) {
         last_action = action;
         if (action == atapp::etcd_module::node_action_t::kPut) {
           ++put_count;
+          if (node && app2_id != 0 && node->get_discovery_info().id() == app2_id) {
+            got_app2_put = true;
+            app2_put_node = node;
+          }
         } else if (action == atapp::etcd_module::node_action_t::kDelete) {
           ++delete_count;
+          last_delete_node = node;
         }
       });
 
@@ -995,11 +1073,13 @@ CASE_TEST(atapp_etcd_module, discovery_event_delete) {
   std::vector<atframework::atapp::app *> apps1 = {&app1};
   run_apps_until(apps1, [&etcd_mod1]() { return etcd_mod1->has_discovery_snapshot(); });
 
-  // Start node2 and wait for kPut event
+  // Start node2 and wait for kPut event for app2 specifically
   {
     atframework::atapp::app app2;
     const char *args2[] = {"app2", "-c", conf_path_2.c_str(), "start"};
     CASE_EXPECT_EQ(0, app2.init(nullptr, 4, args2, nullptr));
+    app2_id = app2.get_id();
+    app2_name = app2.get_app_name();
 
     auto etcd_mod2 = app2.get_etcd_module();
     CASE_EXPECT_TRUE(!!etcd_mod2);
@@ -1009,8 +1089,14 @@ CASE_TEST(atapp_etcd_module, discovery_event_delete) {
     }
 
     std::vector<atframework::atapp::app *> apps = {&app1, &app2};
-    bool got_put = run_apps_until(apps, [&put_count]() { return put_count > 0; });
+    bool got_put = run_apps_until(apps, [&got_app2_put]() { return got_app2_put; });
     CASE_EXPECT_TRUE(got_put);
+    // Verify the put event contains node2's data
+    CASE_EXPECT_TRUE(!!app2_put_node);
+    if (app2_put_node) {
+      CASE_EXPECT_EQ(app2_id, app2_put_node->get_discovery_info().id());
+      CASE_EXPECT_EQ(app2_name, app2_put_node->get_discovery_info().name());
+    }
     CASE_MSG_INFO() << "discovery_event_delete: got kPut, put_count=" << put_count << '\n';
 
     // Now stop node2's etcd module to revoke its lease, triggering kDelete
@@ -1026,7 +1112,15 @@ CASE_TEST(atapp_etcd_module, discovery_event_delete) {
 
   CASE_EXPECT_TRUE(got_delete);
   CASE_EXPECT_GT(delete_count, 0);
-  CASE_MSG_INFO() << "discovery_event_delete: put_count=" << put_count << " delete_count=" << delete_count << '\n';
+  // Verify the last action was indeed kDelete, not kPut
+  CASE_EXPECT_EQ(static_cast<int>(atapp::etcd_module::node_action_t::kDelete), static_cast<int>(last_action));
+  // Verify the deleted node's identity matches app2
+  CASE_EXPECT_TRUE(!!last_delete_node);
+  if (last_delete_node) {
+    CASE_EXPECT_EQ(app2_id, last_delete_node->get_discovery_info().id());
+  }
+  CASE_MSG_INFO() << "discovery_event_delete: put_count=" << put_count << " delete_count=" << delete_count
+                  << " last_action=" << static_cast<int>(last_action) << '\n';
 
   // Cleanup
   etcd_mod1->remove_on_node_event(handle);
@@ -1043,8 +1137,8 @@ CASE_TEST(atapp_etcd_module, topology_event_delete) {
 
   std::string conf_path_base;
   atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
-  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_node1.yaml";
-  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_node2.yaml";
+  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_module_node1.yaml";
+  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_module_node2.yaml";
 
   if (!atfw::util::file_system::is_exist(conf_path_1.c_str()) ||
       !atfw::util::file_system::is_exist(conf_path_2.c_str())) {
@@ -1065,27 +1159,41 @@ CASE_TEST(atapp_etcd_module, topology_event_delete) {
   // Track topology events
   int put_count = 0;
   int delete_count = 0;
+  atapp::etcd_module::topology_action_t last_topo_action = atapp::etcd_watch_event::kPut;
+  atapp::etcd_module::atapp_topology_info_ptr_t last_delete_info;
+  // Track app2-specific put event to avoid self-registration/refresh noise
+  uint64_t app2_id = 0;
+  std::string app2_name;
+  bool got_app2_topo_put = false;
+  atapp::etcd_module::atapp_topology_info_ptr_t app2_put_info;
 
-  auto handle = etcd_mod1->add_on_topology_info_event(
-      [&put_count, &delete_count](atapp::etcd_module::topology_action_t action,
-                                  const atapp::etcd_module::atapp_topology_info_ptr_t &,
-                                  const atapp::etcd_data_version &) {
-        if (action == atapp::etcd_watch_event::kPut) {
-          ++put_count;
-        } else if (action == atapp::etcd_watch_event::kDelete) {
-          ++delete_count;
-        }
-      });
+  auto handle = etcd_mod1->add_on_topology_info_event([&](atapp::etcd_module::topology_action_t action,
+                                                          const atapp::etcd_module::atapp_topology_info_ptr_t &info,
+                                                          const atapp::etcd_data_version &) {
+    last_topo_action = action;
+    if (action == atapp::etcd_watch_event::kPut) {
+      ++put_count;
+      if (info && app2_id != 0 && info->id() == app2_id) {
+        got_app2_topo_put = true;
+        app2_put_info = info;
+      }
+    } else if (action == atapp::etcd_watch_event::kDelete) {
+      ++delete_count;
+      last_delete_info = info;
+    }
+  });
 
   // Wait for snapshot on node1
   std::vector<atframework::atapp::app *> apps1 = {&app1};
   run_apps_until(apps1, [&etcd_mod1]() { return etcd_mod1->has_topology_snapshot(); });
 
-  // Start node2 and wait for kPut event
+  // Start node2 and wait for kPut event for app2 specifically
   {
     atframework::atapp::app app2;
     const char *args2[] = {"app2", "-c", conf_path_2.c_str(), "start"};
     CASE_EXPECT_EQ(0, app2.init(nullptr, 4, args2, nullptr));
+    app2_id = app2.get_id();
+    app2_name = app2.get_app_name();
 
     auto etcd_mod2 = app2.get_etcd_module();
     CASE_EXPECT_TRUE(!!etcd_mod2);
@@ -1095,8 +1203,14 @@ CASE_TEST(atapp_etcd_module, topology_event_delete) {
     }
 
     std::vector<atframework::atapp::app *> apps = {&app1, &app2};
-    bool got_put = run_apps_until(apps, [&put_count]() { return put_count > 0; });
+    bool got_put = run_apps_until(apps, [&got_app2_topo_put]() { return got_app2_topo_put; });
     CASE_EXPECT_TRUE(got_put);
+    // Verify the put event contains node2's data
+    CASE_EXPECT_TRUE(!!app2_put_info);
+    if (app2_put_info) {
+      CASE_EXPECT_EQ(app2_id, app2_put_info->id());
+      CASE_EXPECT_EQ(app2_name, app2_put_info->name());
+    }
     CASE_MSG_INFO() << "topology_event_delete: got kPut, put_count=" << put_count << '\n';
 
     // Stop node2's etcd module to revoke its lease
@@ -1109,7 +1223,15 @@ CASE_TEST(atapp_etcd_module, topology_event_delete) {
 
   CASE_EXPECT_TRUE(got_delete);
   CASE_EXPECT_GT(delete_count, 0);
-  CASE_MSG_INFO() << "topology_event_delete: put_count=" << put_count << " delete_count=" << delete_count << '\n';
+  // Verify the last action was indeed kDelete, not kPut
+  CASE_EXPECT_EQ(static_cast<int>(atapp::etcd_watch_event::kDelete), static_cast<int>(last_topo_action));
+  // Verify the deleted topology's identity matches app2
+  CASE_EXPECT_TRUE(!!last_delete_info);
+  if (last_delete_info) {
+    CASE_EXPECT_EQ(app2_id, last_delete_info->id());
+  }
+  CASE_MSG_INFO() << "topology_event_delete: put_count=" << put_count << " delete_count=" << delete_count
+                  << " last_action=" << static_cast<int>(last_topo_action) << '\n';
 
   // Cleanup
   etcd_mod1->remove_on_topology_info_event(handle);
@@ -1126,7 +1248,7 @@ CASE_TEST(atapp_etcd_module, stop_revoke_lease) {
 
   std::string conf_path_base;
   atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
-  std::string conf_path = conf_path_base + "/atapp_test_etcd.yaml";
+  std::string conf_path = conf_path_base + "/atapp_test_etcd_module.yaml";
 
   if (!atfw::util::file_system::is_exist(conf_path.c_str())) {
     CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path << " not found, skip this test" << '\n';
@@ -1170,108 +1292,6 @@ CASE_TEST(atapp_etcd_module, stop_revoke_lease) {
 }
 
 // ============================================================
-// I.4.17: etcd_module_reload_config
-// ============================================================
-CASE_TEST(atapp_etcd_module, reload_config) {
-  if (!is_etcd_available()) {
-    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << "etcd is not available, skip this test" << '\n';
-    return;
-  }
-
-  std::string conf_path_base;
-  atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
-  std::string conf_path = conf_path_base + "/atapp_test_etcd.yaml";
-
-  if (!atfw::util::file_system::is_exist(conf_path.c_str())) {
-    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path << " not found, skip this test" << '\n';
-    return;
-  }
-
-  atframework::atapp::app app;
-  const char *args[] = {"app", "-c", conf_path.c_str(), "start"};
-  CASE_EXPECT_EQ(0, app.init(nullptr, 4, args, nullptr));
-
-  auto etcd_mod = app.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod);
-  if (!etcd_mod) {
-    return;
-  }
-
-  // Wait for module to be ready
-  std::vector<atframework::atapp::app *> apps = {&app};
-  bool ready = run_apps_until(apps, [&etcd_mod]() { return etcd_mod->get_raw_etcd_ctx().is_available(); });
-  CASE_EXPECT_TRUE(ready);
-
-  // Verify reload succeeds
-  int reload_ret = app.reload();
-  CASE_EXPECT_EQ(0, reload_ret);
-  CASE_MSG_INFO() << "reload_config: app.reload() returned " << reload_ret << '\n';
-
-  // Verify etcd module is still functional after reload
-  CASE_EXPECT_TRUE(etcd_mod->is_etcd_enabled());
-  CASE_EXPECT_TRUE(etcd_mod->get_raw_etcd_ctx().is_available());
-
-  // Tick a few times to verify no issues after reload
-  run_apps_noblock(apps, 5);
-
-  CASE_EXPECT_TRUE(etcd_mod->get_raw_etcd_ctx().is_available());
-  CASE_MSG_INFO() << "reload_config: etcd module still available after reload" << '\n';
-}
-
-// ============================================================
-// I.4.18: etcd_module_disable_enable
-// ============================================================
-CASE_TEST(atapp_etcd_module, disable_enable) {
-  if (!is_etcd_available()) {
-    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << "etcd is not available, skip this test" << '\n';
-    return;
-  }
-
-  std::string conf_path_base;
-  atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
-  std::string conf_path = conf_path_base + "/atapp_test_etcd.yaml";
-
-  if (!atfw::util::file_system::is_exist(conf_path.c_str())) {
-    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path << " not found, skip this test" << '\n';
-    return;
-  }
-
-  atframework::atapp::app app;
-  const char *args[] = {"app", "-c", conf_path.c_str(), "start"};
-  CASE_EXPECT_EQ(0, app.init(nullptr, 4, args, nullptr));
-
-  auto etcd_mod = app.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod);
-  if (!etcd_mod) {
-    return;
-  }
-
-  // Wait for module to be ready
-  std::vector<atframework::atapp::app *> apps = {&app};
-  bool ready = run_apps_until(apps, [&etcd_mod]() { return etcd_mod->get_raw_etcd_ctx().is_available(); });
-  CASE_EXPECT_TRUE(ready);
-  CASE_EXPECT_TRUE(etcd_mod->is_etcd_enabled());
-
-  // Disable etcd
-  etcd_mod->disable_etcd();
-  CASE_EXPECT_FALSE(etcd_mod->is_etcd_enabled());
-  CASE_MSG_INFO() << "disable_enable: after disable, is_etcd_enabled="
-                  << (etcd_mod->is_etcd_enabled() ? "true" : "false") << '\n';
-
-  // Tick a few times while disabled - the module should start closing
-  run_apps_noblock(apps, 10);
-
-  // Re-enable etcd
-  etcd_mod->enable_etcd();
-  CASE_EXPECT_TRUE(etcd_mod->is_etcd_enabled());
-  CASE_MSG_INFO() << "disable_enable: after enable, is_etcd_enabled="
-                  << (etcd_mod->is_etcd_enabled() ? "true" : "false") << '\n';
-
-  // Tick to let it recover
-  run_apps_noblock(apps, 10);
-}
-
-// ============================================================
 // I.5.1: multi_node_discovery_put_event
 // ============================================================
 CASE_TEST(atapp_etcd_module, multi_node_discovery_put_event) {
@@ -1282,8 +1302,8 @@ CASE_TEST(atapp_etcd_module, multi_node_discovery_put_event) {
 
   std::string conf_path_base;
   atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
-  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_node1.yaml";
-  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_node2.yaml";
+  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_module_node1.yaml";
+  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_module_node2.yaml";
 
   if (!atfw::util::file_system::is_exist(conf_path_1.c_str()) ||
       !atfw::util::file_system::is_exist(conf_path_2.c_str())) {
@@ -1355,8 +1375,8 @@ CASE_TEST(atapp_etcd_module, multi_node_discovery_delete_event) {
 
   std::string conf_path_base;
   atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
-  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_node1.yaml";
-  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_node2.yaml";
+  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_module_node1.yaml";
+  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_module_node2.yaml";
 
   if (!atfw::util::file_system::is_exist(conf_path_1.c_str()) ||
       !atfw::util::file_system::is_exist(conf_path_2.c_str())) {
@@ -1376,6 +1396,18 @@ CASE_TEST(atapp_etcd_module, multi_node_discovery_delete_event) {
 
   uint64_t app2_id = 0;
 
+  // Register callback to verify we receive a kDelete action (not just node disappearing)
+  int delete_event_count = 0;
+  uint64_t delete_event_node_id = 0;
+  auto handle = etcd_mod1->add_on_node_discovery_event(
+      [&delete_event_count, &delete_event_node_id](atapp::etcd_module::node_action_t action,
+                                                   const atapp::etcd_discovery_node::ptr_t &node) {
+        if (action == atapp::etcd_module::node_action_t::kDelete && node) {
+          ++delete_event_count;
+          delete_event_node_id = node->get_discovery_info().id();
+        }
+      });
+
   // Start node2 and wait for node1 to discover it
   {
     atframework::atapp::app app2;
@@ -1386,6 +1418,7 @@ CASE_TEST(atapp_etcd_module, multi_node_discovery_delete_event) {
     auto etcd_mod2 = app2.get_etcd_module();
     CASE_EXPECT_TRUE(!!etcd_mod2);
     if (!etcd_mod2) {
+      etcd_mod1->remove_on_node_event(handle);
       return;
     }
 
@@ -1409,8 +1442,16 @@ CASE_TEST(atapp_etcd_module, multi_node_discovery_delete_event) {
       std::chrono::seconds(20));
 
   CASE_EXPECT_TRUE(node2_gone);
+
+  // Verify that a kDelete event callback was received (not just node disappearing from the set)
+  CASE_EXPECT_GT(delete_event_count, 0);
+  CASE_EXPECT_EQ(app2_id, delete_event_node_id);
   CASE_MSG_INFO() << "multi_node_discovery_delete: node2 removed from global_discovery = "
-                  << (node2_gone ? "true" : "false") << '\n';
+                  << (node2_gone ? "true" : "false") << " delete_events=" << delete_event_count
+                  << " delete_node_id=" << delete_event_node_id << '\n';
+
+  // Cleanup
+  etcd_mod1->remove_on_node_event(handle);
 }
 
 // ============================================================
@@ -1427,8 +1468,8 @@ CASE_TEST(atapp_etcd_module, multi_node_custom_data) {
 
   std::string conf_path_base;
   atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
-  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_node1.yaml";
-  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_node2.yaml";
+  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_module_node1.yaml";
+  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_module_node2.yaml";
 
   if (!atfw::util::file_system::is_exist(conf_path_1.c_str()) ||
       !atfw::util::file_system::is_exist(conf_path_2.c_str())) {

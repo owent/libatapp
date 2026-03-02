@@ -1,13 +1,13 @@
-﻿# Copyright 2026 atframework
+# Copyright 2026 atframework
 atapp:
-  id: 0x00000701
+  id: 0x00000801
   id_mask: 8.8.8.8
-  name: "etcd-test-node"
-  type_id: 7
-  type_name: "etcd-test"
+  name: "etcd-test-node1"
+  type_id: 8
+  type_name: "etcd-multi-test"
 
   bus:
-    listen: "ipv4://127.0.0.1:22201"
+    listen: "ipv4://127.0.0.1:22301"
     proxy: ""
     backlog: 256
     access_token_max_number: 5
@@ -32,7 +32,7 @@ atapp:
     enable: true
     hosts:
       - "${ATAPP_UNIT_TEST_ETCD_HOST:-http://127.0.0.1:12379}"
-    path: "/atapp/unit-test/libatapp"
+    path: "/atapp/unit-test/atapp_etcd_module/libatapp"
     init:
       timeout: "15s"
       tick_interval: "64ms"
@@ -64,8 +64,8 @@ atapp:
             rotate:
               number: 10
               size: 10485760
-            file: "../log/etcd-test-node.%N.log"
-            writing_alias: "../log/etcd-test-node.log"
+            file: "../log/etcd-test-node1.%N.log"
+            writing_alias: "../log/etcd-test-node1.log"
             auto_flush: info
             flush_interval: 1s
           - type: stderr
