@@ -1,4 +1,4 @@
-# Copyright 2026 atframework
+﻿# Copyright 2026 atframework
 atapp:
   id: 0x00000802
   id_mask: 8.8.8.8
@@ -32,7 +32,7 @@ atapp:
     enable: true
     hosts:
       - "${ATAPP_UNIT_TEST_ETCD_HOST:-http://127.0.0.1:12379}"
-    path: "/unit-test/libatapp"
+    path: "/atapp/unit-test/libatapp"
     init:
       timeout: "15s"
       tick_interval: "64ms"
