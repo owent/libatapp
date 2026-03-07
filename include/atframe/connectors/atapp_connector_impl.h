@@ -31,6 +31,13 @@ class atapp_endpoint;
 class atapp_connector_impl;
 class atapp_connection_handle;
 
+// clang-format off
+#if defined(__clang__)
+#  pragma clang diagnostic push
+#  pragma clang diagnostic ignored "-Wnullability-completeness"
+#endif
+// clang-format on
+
 struct atapp_connector_bind_helper {
   // This API is used by inner system and will not be exported, do not call it directly
   static LIBATAPP_MACRO_API_SYMBOL_HIDDEN void unbind(atapp_connection_handle &handle, atapp_connector_impl &connect);
@@ -193,3 +200,9 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE atapp_connector_impl {
 };
 
 LIBATAPP_MACRO_NAMESPACE_END
+
+// clang-format off
+#if defined(__clang__)
+#  pragma clang diagnostic pop
+#endif
+// clang-format on
