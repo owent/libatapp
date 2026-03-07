@@ -1,9 +1,8 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent on 2020-08-18
 
 #pragma once
-
-#include <gsl/select-gsl.h>
 
 #include <config/atframe_utils_build_feature.h>
 #include <config/compiler_features.h>
@@ -16,7 +15,6 @@
 #include <memory/rc_ptr.h>
 #include <random/random_generator.h>
 
-#include <memory>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
@@ -24,15 +22,14 @@
 #include <utility>
 #include <vector>
 
-#include "atframe/atapp_conf.h"
+#include "atframe/atapp_conf.h"  // IWYU pragma: keep
+#include "atframe/etcdcli/etcd_def.h"
 
 LIBATAPP_MACRO_NAMESPACE_BEGIN
-struct LIBATAPP_MACRO_API_HEAD_ONLY etcd_discovery_action_t {
-  enum type {
-    EN_NAT_UNKNOWN = 0,
-    EN_NAT_PUT,
-    EN_NAT_DELETE,
-  };
+enum class etcd_discovery_action_t : int32_t {
+  kUnknown = 0,
+  kPut,
+  kDelete,
 };
 
 class etcd_discovery_node {
@@ -40,33 +37,7 @@ class etcd_discovery_node {
   using on_destroy_fn_type = std::function<void(etcd_discovery_node &)>;
   using ptr_t = atfw::util::memory::strong_rc_ptr<etcd_discovery_node>;
 
-  struct LIBATAPP_MACRO_API_SYMBOL_VISIBLE node_version {
-    int64_t create_revision;
-    // Causion: modify_revision of multiple key may be same when they are modifiedx in one transaction of etcd
-    // @see https://etcd.io/docs/v3.5/learning/api_guarantees/#revision
-    int64_t modify_revision;
-    int64_t version;
-
-    UTIL_FORCEINLINE node_version() : create_revision(0), modify_revision(0), version(0) {}
-    UTIL_FORCEINLINE node_version(const node_version &other)
-        : create_revision(other.create_revision), modify_revision(other.modify_revision), version(other.version) {}
-    UTIL_FORCEINLINE node_version(node_version &&other)
-        : create_revision(other.create_revision), modify_revision(other.modify_revision), version(other.version) {}
-
-    UTIL_FORCEINLINE node_version &operator=(const node_version &other) {
-      create_revision = other.create_revision;
-      modify_revision = other.modify_revision;
-      version = other.version;
-      return *this;
-    }
-
-    UTIL_FORCEINLINE node_version &operator=(node_version &&other) {
-      create_revision = other.create_revision;
-      modify_revision = other.modify_revision;
-      version = other.version;
-      return *this;
-    }
-  };
+  using node_version = etcd_data_version;
 
   UTIL_DESIGN_PATTERN_NOCOPYABLE(etcd_discovery_node)
   UTIL_DESIGN_PATTERN_NOMOVABLE(etcd_discovery_node)
@@ -75,31 +46,32 @@ class etcd_discovery_node {
   LIBATAPP_MACRO_API etcd_discovery_node();
   LIBATAPP_MACRO_API ~etcd_discovery_node();
 
-  UTIL_FORCEINLINE const atapp::protocol::atapp_discovery &get_discovery_info() const { return node_info_; }
-  UTIL_FORCEINLINE const node_version &get_version() const noexcept { return node_version_; }
+  ATFW_UTIL_FORCEINLINE const atapp::protocol::atapp_discovery &get_discovery_info() const { return node_info_; }
+  ATFW_UTIL_FORCEINLINE const node_version &get_version() const noexcept { return node_version_; }
 
   LIBATAPP_MACRO_API void copy_from(const atapp::protocol::atapp_discovery &input, const node_version &version);
   LIBATAPP_MACRO_API void update_version(const node_version &version, bool upgrade);
   LIBATAPP_MACRO_API void copy_to(atapp::protocol::atapp_discovery &output) const;
   LIBATAPP_MACRO_API void copy_key_to(atapp::protocol::atapp_discovery &output) const;
 
-  UTIL_FORCEINLINE const std::pair<uint64_t, uint64_t> &get_name_hash() const noexcept { return name_hash_; }
+  ATFW_UTIL_FORCEINLINE const std::pair<uint64_t, uint64_t> &get_name_hash() const noexcept { return name_hash_; }
 
-  UTIL_FORCEINLINE void set_private_data_ptr(void *input) noexcept { private_data_ptr_ = input; }
-  UTIL_FORCEINLINE void *get_private_data_ptr() const noexcept { return private_data_ptr_; }
-  UTIL_FORCEINLINE void set_private_data_u64(uint64_t input) noexcept { private_data_u64_ = input; }
-  UTIL_FORCEINLINE uint64_t get_private_data_u64() const noexcept { return private_data_u64_; }
-  UTIL_FORCEINLINE void set_private_data_i64(int64_t input) noexcept { private_data_i64_ = input; }
-  UTIL_FORCEINLINE int64_t get_private_data_i64() const noexcept { return private_data_i64_; }
-  UTIL_FORCEINLINE void set_private_data_uptr(uintptr_t input) noexcept { private_data_uptr_ = input; }
-  UTIL_FORCEINLINE uintptr_t get_private_data_uptr() const noexcept { return private_data_uptr_; }
-  UTIL_FORCEINLINE void set_private_data_iptr(intptr_t input) noexcept { private_data_iptr_ = input; }
-  UTIL_FORCEINLINE intptr_t get_private_data_iptr() const noexcept { return private_data_iptr_; }
+  ATFW_UTIL_FORCEINLINE void set_private_data_ptr(void *input) noexcept { private_data_ptr_ = input; }
+  ATFW_UTIL_FORCEINLINE void *get_private_data_ptr() const noexcept { return private_data_ptr_; }
+  ATFW_UTIL_FORCEINLINE void set_private_data_u64(uint64_t input) noexcept { private_data_u64_ = input; }
+  ATFW_UTIL_FORCEINLINE uint64_t get_private_data_u64() const noexcept { return private_data_u64_; }
+  ATFW_UTIL_FORCEINLINE void set_private_data_i64(int64_t input) noexcept { private_data_i64_ = input; }
+  ATFW_UTIL_FORCEINLINE int64_t get_private_data_i64() const noexcept { return private_data_i64_; }
+  ATFW_UTIL_FORCEINLINE void set_private_data_uptr(uintptr_t input) noexcept { private_data_uptr_ = input; }
+  ATFW_UTIL_FORCEINLINE uintptr_t get_private_data_uptr() const noexcept { return private_data_uptr_; }
+  ATFW_UTIL_FORCEINLINE void set_private_data_iptr(intptr_t input) noexcept { private_data_iptr_ = input; }
+  ATFW_UTIL_FORCEINLINE intptr_t get_private_data_iptr() const noexcept { return private_data_iptr_; }
 
   LIBATAPP_MACRO_API void set_on_destroy(on_destroy_fn_type fn);
   LIBATAPP_MACRO_API const on_destroy_fn_type &get_on_destroy() const;
   LIBATAPP_MACRO_API void reset_on_destroy();
 
+  LIBATAPP_MACRO_API void reset_ingress_index() const noexcept;
   LIBATAPP_MACRO_API const atapp::protocol::atapp_gateway &next_ingress_gateway() const;
   LIBATAPP_MACRO_API int32_t get_ingress_size() const;
 
@@ -143,7 +115,7 @@ class etcd_discovery_set {
     etcd_discovery_node::ptr_t node;
     std::pair<uint64_t, uint64_t> hash_code;
 
-    inline node_hash_type() noexcept : node(), hash_code(0, 0) {}
+    inline node_hash_type() noexcept : hash_code(0, 0) {}
 
     template <class NodeType, class CodeType>
     inline node_hash_type(NodeType &&n, CodeType &&hc) noexcept
@@ -189,7 +161,7 @@ class etcd_discovery_set {
       gsl::span<node_hash_type> output, const node_hash_type &key, const metadata_type *metadata = nullptr,
       node_hash_type::search_mode searchmode = node_hash_type::search_mode::kAll) const;
 
-  LIBATAPP_MACRO_API node_hash_type get_node_hash_by_consistent_hash(const void *buf, size_t bufsz,
+  LIBATAPP_MACRO_API node_hash_type get_node_hash_by_consistent_hash(gsl::span<const unsigned char> buf,
                                                                      const metadata_type *metadata = nullptr) const;
   LIBATAPP_MACRO_API node_hash_type get_node_hash_by_consistent_hash(uint64_t key,
                                                                      const metadata_type *metadata = nullptr) const;
@@ -199,7 +171,7 @@ class etcd_discovery_set {
                                                                      const metadata_type *metadata = nullptr) const;
 
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_consistent_hash(
-      const void *buf, size_t bufsz, const metadata_type *metadata = nullptr) const;
+      gsl::span<const unsigned char> buf, const metadata_type *metadata = nullptr) const;
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_consistent_hash(
       uint64_t key, const metadata_type *metadata = nullptr) const;
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_consistent_hash(
@@ -211,7 +183,9 @@ class etcd_discovery_set {
   LIBATAPP_MACRO_API_HEAD_ONLY etcd_discovery_node::ptr_t get_node_by_consistent_hash(
       TKEY &&key, const metadata_type *metadata = nullptr) const {
     return get_node_by_consistent_hash(
-        static_cast<typename std::conditional<std::is_unsigned<TKEY>::value, uint64_t, int64_t>::type>(key), metadata);
+        static_cast<typename std::conditional<std::is_unsigned<TKEY>::value, uint64_t, int64_t>::type>(
+            std::forward<TKEY>(key)),
+        metadata);
   }
 
   LIBATAPP_MACRO_API etcd_discovery_node::ptr_t get_node_by_random(const metadata_type *metadata = nullptr) const;
@@ -230,14 +204,14 @@ class etcd_discovery_set {
   LIBATAPP_MACRO_API void remove_node(const std::string &name);
 
  private:
-  typedef struct {
+  using index_cache_type = struct {
     std::vector<node_hash_type> normal_hashing_ring;
     std::vector<node_hash_type> compact_hashing_ring;
     std::vector<etcd_discovery_node::ptr_t> round_robin_cache;
     size_t round_robin_index;
 
     std::unordered_set<const etcd_discovery_node *> reference_cache;
-  } index_cache_type;
+  };
 
   void rebuild_cache(index_cache_type &cache_set, const metadata_type *rule) const;
   void rebuild_compact_cache(index_cache_type &cache_set, const metadata_type *rule) const;

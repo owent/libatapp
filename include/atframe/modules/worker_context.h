@@ -1,4 +1,5 @@
-// Copyright 2024 atframework
+// Copyright 2026 atframework
+//
 // Created by owent
 
 #pragma once
@@ -73,3 +74,4 @@ enum class worker_type : int32_t {
 };
 
 LIBATAPP_MACRO_NAMESPACE_END
+

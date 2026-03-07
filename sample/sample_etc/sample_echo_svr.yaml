@@ -1,3 +1,4 @@
+# Copyright 2026 atframework
 atapp:
   # =========== bus configure ===========
   id: 0x00000001 # bus id
@@ -9,7 +10,7 @@ atapp:
   hostname: # hostname, any host should has a unique name. if empty, use the hostname of system network
   # remove_pidfile_after_exit: false
   bus:
-    listen: "ipv6://:::21437" # tcp channel
+    listen: "atcp://:::21437" # tcp channel
     subnets: "0/16" # children mask(at most 2^16 children )
     proxy: "" # atproxy has no parent node
     loop_times: 1000 # max message number in one loop
@@ -23,11 +24,11 @@ atapp:
     retry_interval: 3s # retry interval when error happen(second)
     fault_tolerant: 3 # how many errors will lead to kill connection
     message_size: 262144 # max message size(256KB)
-    recv_buffer_size: 8388608 # recv channel size(8MB), will be used to initialize (shared) memory channel size
+    receive_buffer_size: 8388608 # recv channel size(8MB), will be used to initialize (shared) memory channel size
     send_buffer_size: 2097152 # send buffer size, will be used to initialize io_stream channel write queue
     send_buffer_number: 0 # send message number limit, will be used to initialize io_stream channel write queue, 0 for dynamic buffer
     gateways:
-    #   - address: "ipv6://:::21437"
+    #   - address: "atcp://:::21437"
     #     match_namespaces:
     #       -
     #     match_labels: {}

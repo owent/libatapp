@@ -1,0 +1,60 @@
+# Copyright 2026 atframework
+# Test configuration for expression expansion feature.
+# Environment variables ATAPP_EXPR_TEST_* are expected to be set before loading.
+atapp:
+  id: 0x00001234
+  id_mask: 8.8.8.8
+  # Test $VAR simple reference
+  name: "$ATAPP_EXPR_TEST_NAME"
+  type_id: 1
+  # Test ${VAR} braced reference
+  type_name: "${ATAPP_EXPR_TEST_TYPE}"
+  # Test ${VAR:-default} with existing variable
+  hostname: "${ATAPP_EXPR_TEST_HOST:-default_host}"
+  # Test ${VAR:-default} with missing variable — should use default
+  identity: "${ATAPP_EXPR_TEST_MISSING_VAR:-fallback_identity}"
+  metadata:
+    api_version: v1
+    # Test ${VAR:+word} with existing variable — should use word
+    namespace_name: "${ATAPP_EXPR_TEST_NAME:+ns_override}"
+    # Test ${VAR:+word} with missing variable — should be empty
+    uid: "${ATAPP_EXPR_TEST_MISSING_VAR:+should_not_appear}"
+    # Test nested expression: ${OUTER_${INNER}}
+    name: "${ATAPP_EXPR_TEST_NESTED_${ATAPP_EXPR_TEST_SUFFIX}}"
+    # Test multi-level nested default: ${A:-${B:-default}}
+    service_subset: "${ATAPP_EXPR_TEST_MISSING1:-${ATAPP_EXPR_TEST_MISSING2:-multi_level_default}}"
+    labels:
+      # Map keys and values should also support expressions
+      "${ATAPP_EXPR_TEST_LABEL_KEY}": "${ATAPP_EXPR_TEST_LABEL_VALUE}"
+      literal_key: "literal_value"
+  bus:
+    listen: "atcp://:::21437"
+    proxy: ""
+    backlog: 256
+    first_idle_timeout: 30s
+    ping_interval: 60s
+    retry_interval: 3s
+    fault_tolerant: 3
+    message_size: 262144
+    receive_buffer_size: 8388608
+    send_buffer_size: 2097152
+    send_buffer_number: 0
+  timer:
+    tick_interval: 32ms
+    stop_timeout: 10s
+    stop_interval: 256ms
+  etcd:
+    enable: false
+    hosts:
+      - "http://127.0.0.1:2375"
+    path: "/atapp/services/astf4g/"
+    authorization: ""
+  log:
+    level: debug
+    category:
+      - name: default
+        index: 0
+        prefix: "[Log %L][%F %T.%f][%s:%n(%C)]: "
+        stacktrace:
+          min: disable
+          max: disable

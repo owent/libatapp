@@ -1,3 +1,4 @@
+# Copyright 2026 atframework
 set(PROJECT_BINDING_NAME "atapp_c")
 echowithcolor(COLOR GREEN "-- Configure ${CMAKE_CURRENT_LIST_DIR}")
 
@@ -40,3 +41,4 @@ install(
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 install(FILES ${CMAKE_CURRENT_LIST_DIR}/atframe/libatapp_c.h DESTINATION include/atframe)
+

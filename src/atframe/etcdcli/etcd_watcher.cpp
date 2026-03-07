@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent
 
 #include <libatbus.h>
@@ -13,6 +14,9 @@
 #include <atframe/etcdcli/etcd_cluster.h>
 #include <atframe/etcdcli/etcd_watcher.h>
 
+#include <atframe/atapp.h>
+
+#include <ios>
 #include <memory>
 
 #ifdef GetObject
@@ -77,7 +81,7 @@ void etcd_watcher::process() {
 
   rpc_.is_actived = false;
 
-  if (rpc_.watcher_next_request_time > atfw::util::time::time_utility::sys_now()) {
+  if (rpc_.watcher_next_request_time > app::get_sys_now()) {
     return;
   }
 
@@ -90,7 +94,7 @@ void etcd_watcher::process() {
         int pid = atbus::node::get_pid();
         memcpy(&buffer[0], &pid, sizeof(pid));
         time_t now_usec =
-            atfw::util::time::time_utility::get_sys_now() * 1000000 + atfw::util::time::time_utility::get_now_usec();
+            (atfw::util::time::time_utility::get_sys_now() * 1000000) + atfw::util::time::time_utility::get_now_usec();
         memcpy(&buffer[sizeof(pid)], &now_usec, sizeof(now_usec));
 
         uint32_t seed = atfw::util::hash::murmur_hash3_x86_32(buffer, sizeof(buffer), LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
@@ -99,9 +103,9 @@ void etcd_watcher::process() {
         int64_t offset = (rpc_.startup_random_delay_max - rpc_.startup_random_delay_min).count();
         std::chrono::system_clock::duration select_offset =
             std::chrono::system_clock::duration(random_generator.random_between<int64_t>(0, offset));
-        rpc_.watcher_next_request_time = atfw::util::time::time_utility::sys_now() + select_offset;
+        rpc_.watcher_next_request_time = app::get_sys_now() + select_offset;
       } else {
-        rpc_.watcher_next_request_time = atfw::util::time::time_utility::sys_now() + rpc_.startup_random_delay_min;
+        rpc_.watcher_next_request_time = app::get_sys_now() + rpc_.startup_random_delay_min;
       }
 
       auto delay_timepoint =
@@ -125,7 +129,7 @@ void etcd_watcher::process() {
     if (!rpc_.rpc_opr_) {
       LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*owner_, "Etcd watcher {} create range request to {} failed",
                                             reinterpret_cast<const void *>(this), path_);
-      rpc_.watcher_next_request_time = atfw::util::time::time_utility::sys_now() + rpc_.retry_interval;
+      rpc_.watcher_next_request_time = app::get_sys_now() + rpc_.retry_interval;
       return;
     }
 
@@ -157,7 +161,7 @@ void etcd_watcher::process() {
   if (!rpc_.rpc_opr_) {
     LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*owner_, "Etcd watcher {} create watch request to {} from revision {} failed",
                                           reinterpret_cast<const void *>(this), path_, rpc_.last_revision + 1);
-    rpc_.watcher_next_request_time = atfw::util::time::time_utility::sys_now() + rpc_.retry_interval;
+    rpc_.watcher_next_request_time = app::get_sys_now() + rpc_.retry_interval;
     return;
   }
 
@@ -182,8 +186,6 @@ void etcd_watcher::process() {
     FWLOGINFO("Etcd watcher {} start watch request to {} from revision {} success.",
               reinterpret_cast<const void *>(this), rpc_.rpc_opr_->get_url(), rpc_.last_revision + 1);
   }
-
-  return;
 }
 
 int etcd_watcher::libcurl_callback_on_range_completed(atfw::util::network::http_request &req) {
@@ -205,7 +207,7 @@ int etcd_watcher::libcurl_callback_on_range_completed(atfw::util::network::http_
                                           reinterpret_cast<const void *>(self), req.get_error_code(),
                                           req.get_response_code(), req.get_error_msg(), response_content);
 
-    self->rpc_.watcher_next_request_time = atfw::util::time::time_utility::sys_now() + self->rpc_.retry_interval;
+    self->rpc_.watcher_next_request_time = app::get_sys_now() + self->rpc_.retry_interval;
 
     self->owner_->check_socket_error_code(req.get_error_code());
     self->owner_->check_authorization_expired(req.get_response_code(), response_content);
@@ -216,7 +218,7 @@ int etcd_watcher::libcurl_callback_on_range_completed(atfw::util::network::http_
   if (self->rpc_.is_retry_mode) {
     self->rpc_.is_retry_mode = false;
     // reset request time to invoke watch request immediately
-    self->rpc_.watcher_next_request_time = atfw::util::time::time_utility::sys_now();
+    self->rpc_.watcher_next_request_time = app::get_sys_now();
 
     // 立刻开启下一次watch
     self->active();
@@ -233,13 +235,13 @@ int etcd_watcher::libcurl_callback_on_range_completed(atfw::util::network::http_
     LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self->owner_, "Etcd watcher {} got range response parse failed: {}",
                                           reinterpret_cast<const void *>(self), http_content);
 
-    self->rpc_.watcher_next_request_time = atfw::util::time::time_utility::sys_now() + self->rpc_.retry_interval;
+    self->rpc_.watcher_next_request_time = app::get_sys_now() + self->rpc_.retry_interval;
     self->active();
     return 0;
   }
 
   // unpack header
-  etcd_response_header header;
+  etcd_response_header header{};
   {
     header.revision = 0;
     rapidjson::Document::ConstMemberIterator res = doc.FindMember("header");
@@ -252,7 +254,7 @@ int etcd_watcher::libcurl_callback_on_range_completed(atfw::util::network::http_
     LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self->owner_, "Etcd watcher {} got range response without header",
                                           reinterpret_cast<const void *>(self));
 
-    self->rpc_.watcher_next_request_time = atfw::util::time::time_utility::sys_now() + self->rpc_.retry_interval;
+    self->rpc_.watcher_next_request_time = app::get_sys_now() + self->rpc_.retry_interval;
     self->active();
     return 0;
   }
@@ -285,7 +287,7 @@ int etcd_watcher::libcurl_callback_on_range_completed(atfw::util::network::http_
           response.events.push_back(event_t());
           event_t &evt = response.events.back();
 
-          evt.evt_type = etcd_watch_event::EN_WEVT_PUT;  // 查询的结果都认为是PUT
+          evt.evt_type = etcd_watch_event::kPut;  // 查询的结果都认为是PUT
           etcd_packer::unpack(evt.kv, *iter);
         }
       }
@@ -309,7 +311,7 @@ int etcd_watcher::libcurl_callback_on_range_completed(atfw::util::network::http_
   }
 
   // reset request time to invoke watch request immediately
-  self->rpc_.watcher_next_request_time = atfw::util::time::time_utility::sys_now();
+  self->rpc_.watcher_next_request_time = app::get_sys_now();
 
   // 立刻开启下一次watch
   self->active();
@@ -339,12 +341,12 @@ int etcd_watcher::libcurl_callback_on_watch_completed(atfw::util::network::http_
           reinterpret_cast<const void *>(self), req.get_error_code(), req.get_response_code(), req.get_error_msg(),
           req.get_response_stream().str());
 
-      self->rpc_.watcher_next_request_time = atfw::util::time::time_utility::sys_now() + self->rpc_.retry_interval;
+      self->rpc_.watcher_next_request_time = app::get_sys_now() + self->rpc_.retry_interval;
 
     } else {
       FWLOGINFO("Etcd watcher {} watch request finished, start another request later, msg: {}.\n{}",
                 reinterpret_cast<const void *>(self), req.get_error_msg(), req.get_response_stream().str());
-      self->rpc_.watcher_next_request_time = atfw::util::time::time_utility::sys_now();
+      self->rpc_.watcher_next_request_time = app::get_sys_now();
     }
 
     self->owner_->check_socket_error_code(req.get_error_code());
@@ -406,7 +408,7 @@ int etcd_watcher::libcurl_callback_on_watch_write(atfw::util::network::http_requ
       }
 
       if (rpc_data_brackets <= 0) {
-        self->rpc_data_stream_.write(inbuf, i + 1);
+        self->rpc_data_stream_.write(inbuf, static_cast<std::streamsize>(i) + 1);
         inbuf += i + 1;
         inbufsz -= i + 1;
         need_process = true;
@@ -415,7 +417,7 @@ int etcd_watcher::libcurl_callback_on_watch_write(atfw::util::network::http_requ
     }
 
     if (!need_process) {
-      self->rpc_data_stream_.write(inbuf, inbufsz);
+      self->rpc_data_stream_.write(inbuf, static_cast<std::streamsize>(inbufsz));
       self->rpc_data_brackets_ = rpc_data_brackets;
       break;
     }
@@ -445,7 +447,7 @@ int etcd_watcher::libcurl_callback_on_watch_write(atfw::util::network::http_requ
 
     // unpack header
     int64_t previous_revision = self->rpc_.last_revision;
-    etcd_response_header header;
+    etcd_response_header header{};
     {
       rapidjson::Document::ConstMemberIterator res = result->FindMember("header");
       if (res != result->MemberEnd()) {
@@ -477,21 +479,21 @@ int etcd_watcher::libcurl_callback_on_watch_write(atfw::util::network::http_requ
 
         rapidjson::Document::ConstMemberIterator type = iter->FindMember("type");
         if (type == iter->MemberEnd()) {
-          evt.evt_type = etcd_watch_event::EN_WEVT_PUT;  // etcd可能不会下发默认值
+          evt.evt_type = etcd_watch_event::kPut;  // etcd可能不会下发默认值
         } else {
           if (type->value.IsString()) {
             if (0 == UTIL_STRFUNC_STRCASE_CMP("DELETE", type->value.GetString())) {
-              evt.evt_type = etcd_watch_event::EN_WEVT_DELETE;
+              evt.evt_type = etcd_watch_event::kDelete;
             } else {
-              evt.evt_type = etcd_watch_event::EN_WEVT_PUT;
+              evt.evt_type = etcd_watch_event::kPut;
             }
           } else if (type->value.IsNumber()) {
             uint64_t type_int = 0;
             etcd_packer::unpack_int(*iter, "type", type_int);
             if (0 == type_int) {
-              evt.evt_type = etcd_watch_event::EN_WEVT_PUT;
+              evt.evt_type = etcd_watch_event::kPut;
             } else {
-              evt.evt_type = etcd_watch_event::EN_WEVT_DELETE;
+              evt.evt_type = etcd_watch_event::kDelete;
             }
           } else {
             LIBATAPP_MACRO_ETCD_CLUSTER_LOG_ERROR(*self->owner_, "Etcd watcher {} got unknown event type. msg: {}",
@@ -520,8 +522,8 @@ int etcd_watcher::libcurl_callback_on_watch_write(atfw::util::network::http_requ
           response.created ? "Yes" : "No", response.canceled ? "Yes" : "No", response.events.size());
       for (size_t i = 0; i < response.events.size(); ++i) {
         etcd_key_value *kv = &response.events[i].kv;
-        const char *name;
-        if (etcd_watch_event::EN_WEVT_PUT == response.events[i].evt_type) {
+        const char *name = nullptr;
+        if (etcd_watch_event::kPut == response.events[i].evt_type) {
           name = "PUT";
         } else {
           name = "DELETE";

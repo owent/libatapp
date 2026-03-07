@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent on 2016-05-21
 
 #pragma once
@@ -51,3 +52,4 @@ class log_sink_maker {
   static LIBATAPP_MACRO_API log_reg_t get_syslog_sink_reg();
 };
 LIBATAPP_MACRO_NAMESPACE_END
+

@@ -8,34 +8,19 @@
 - **License**: MIT
 - **Languages**: C++ (C++17 required, C++17/C++20/C++23 features used when available)
 
+## Skills (How-to playbooks)
+
+Operational, copy/paste-friendly guides live in `.github/skills/`:
+
+- Entry point: `.github/skills/README.md`
+
 ## Build System
 
 This project uses **CMake** (minimum version 3.24.0).
 
-### Build Commands
+Build steps and common configuration options are documented in:
 
-```bash
-# Clone and configure
-git clone --single-branch --depth=1 -b main https://github.com/atframework/libatapp.git
-mkdir libatapp/build && cd libatapp/build
-
-# Configure
-cmake ..
-
-# Build
-cmake --build .                          # Linux/macOS
-cmake --build . --config RelWithDebInfo  # Windows (MSVC)
-
-# Run tests
-ctest . -V
-```
-
-### Key CMake Options
-
-| Option              | Default | Description           |
-| ------------------- | ------- | --------------------- |
-| `BUILD_SHARED_LIBS` | NO      | Build dynamic library |
-| `CMAKE_BUILD_TYPE`  | Debug   | Build type            |
+- `.github/skills/build.md`
 
 ## Directory Structure
 
@@ -100,67 +85,9 @@ CASE_THREAD_SLEEP_MS(milliseconds)
 CASE_THREAD_YIELD()
 ```
 
-### Running Tests
+### Running and writing tests
 
-The test executable is `atapp_unit_test`.
-
-```bash
-# Run all tests
-./atapp_unit_test
-
-# List all test cases
-./atapp_unit_test -l
-./atapp_unit_test --list-tests
-
-# Run specific test group(s) or case(s)
-./atapp_unit_test -r <test_group_name>
-./atapp_unit_test -r <test_group_name>.<test_case_name>
-
-# Examples:
-./atapp_unit_test -r atapp_setup
-./atapp_unit_test -r atapp_configure_loader
-./atapp_unit_test -r atapp_connector
-./atapp_unit_test -r atapp_discovery
-./atapp_unit_test -r atapp_message
-./atapp_unit_test -r atapp_worker_pool
-
-# Run with filter pattern (supports wildcards)
-./atapp_unit_test -f "atapp_*"
-./atapp_unit_test --filter "connector*"
-
-# Show help
-./atapp_unit_test -h
-
-# Show version
-./atapp_unit_test -v
-```
-
-### Test Groups
-
-Common test groups include:
-
-- `atapp_setup` - Application setup tests
-- `atapp_configure_loader` - Configuration loading tests
-- `atapp_connector` - Connector tests
-- `atapp_discovery` - Service discovery tests
-- `atapp_message` - Message handling tests
-- `atapp_worker_pool` - Worker pool tests
-
-### Writing Test Cases
-
-Test files are located in `test/case/`. Example:
-
-```cpp
-#include "frame/test_macros.h"
-#include "atframe/atapp.h"
-
-CASE_TEST(atapp_setup, create_app) {
-    atframework::atapp::app app;
-
-    CASE_EXPECT_EQ(0, app.get_id());
-    CASE_MSG_INFO() << "App instance created successfully";
-}
-```
+See `.github/skills/testing.md`.
 
 ## Key Components
 
@@ -308,6 +235,7 @@ Configuration is defined in `atapp_conf.proto` and can be loaded from:
 
 - YAML files (`.yaml`)
 - JSON files
+- INI files (`.conf`)
 - Environment variables
 - Command-line arguments
 
@@ -323,6 +251,13 @@ log:
   level: info
 ```
 
+### Expression Expansion in Configuration
+
+Protobuf fields annotated with `enable_expression: true` in the `atapp_configure_meta` extension
+support **environment-variable expression expansion** at config-load time.
+
+See `.github/skills/configure-expression.md` for the full syntax reference and how-to guide.
+
 ## Logging
 
 Use the FWLOG macros for logging:
@@ -336,6 +271,14 @@ FWLOGERROR("Error message: {}", value);
 FWLOGFATAL("Fatal message: {}", value);
 ```
 
+## Code Formatting
+
+This project uses **clang-format** for code formatting. The `.clang-format` file is located at the project root.
+
+- Style: Based on Google style
+- Column limit: 120
+- Run formatting: `clang-format -i <file>`
+
 ## Coding Conventions
 
 1. **Namespace**: `atframework::atapp`
@@ -346,6 +289,12 @@ FWLOGFATAL("Fatal message: {}", value);
    - Functions: `snake_case`
    - Types: `*_t` suffix for typedefs
 5. **Smart pointers**: Use `std::shared_ptr` for modules and app components
+6. **Anonymous namespace + static**: In `.cpp` files, file-local functions should be placed inside an anonymous namespace **and** keep the `static` keyword. Do **not** remove `static` when moving a function into an anonymous namespace.
+   ```cpp
+   namespace {
+   static void my_helper() { /* ... */ }
+   }  // namespace
+   ```
 
 ## Compiler Support
 

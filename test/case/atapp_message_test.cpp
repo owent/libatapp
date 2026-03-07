@@ -1,19 +1,14 @@
-// Copyright 2022 atframework
+// Copyright 2026 atframework
 
 #include <atframe/atapp.h>
+#include <atframe/modules/etcd_module.h>
 
 #include <common/file_system.h>
 
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
-#include <fstream>
-#include <iostream>
-#include <limits>
-#include <map>
 #include <memory>
-#include <numeric>
-#include <vector>
 
 #include "frame/test_macros.h"
 
@@ -23,13 +18,13 @@ CASE_TEST(atapp_message, send_message_remote) {
   std::string conf_path_1 = conf_path_base + "/atapp_test_1.yaml";
 
   if (!atfw::util::file_system::is_exist(conf_path_1.c_str())) {
-    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path_1 << " not found, skip this test" << std::endl;
+    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path_1 << " not found, skip this test" << '\n';
     return;
   }
 
   std::string conf_path_2 = conf_path_base + "/atapp_test_2.yaml";
   if (!atfw::util::file_system::is_exist(conf_path_2.c_str())) {
-    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path_2 << " not found, skip this test" << std::endl;
+    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path_2 << " not found, skip this test" << '\n';
     return;
   }
 
@@ -48,9 +43,11 @@ CASE_TEST(atapp_message, send_message_remote) {
   uint64_t set_sequence = 691;
   uint64_t expect_sequence = 691;
   char expect_message[] = "hello app2";
+  gsl::span<const unsigned char> expect_message_span{reinterpret_cast<const unsigned char*>(expect_message),
+                                                     static_cast<size_t>(strlen(expect_message))};
 
-  int received_messge_count = 0;
-  auto message_callback_fn = [expect_message, &app1, &expect_sequence, &received_messge_count](
+  int received_message_count = 0;
+  auto message_callback_fn = [expect_message, &app1, &expect_sequence, &received_message_count](
                                  atframework::atapp::app&, const atframework::atapp::app::message_sender_t& sender,
                                  const atframework::atapp::app::message_t& msg) {
     CASE_EXPECT_EQ(app1.get_app_id(), sender.id);
@@ -59,46 +56,51 @@ CASE_TEST(atapp_message, send_message_remote) {
     CASE_EXPECT_EQ(223, msg.type);
     CASE_EXPECT_EQ(expect_sequence++, msg.message_sequence);
 
-    auto received_message = gsl::string_view{reinterpret_cast<const char*>(msg.data), msg.data_size};
+    auto received_message = gsl::string_view{reinterpret_cast<const char*>(msg.data.data()), msg.data.size()};
     CASE_EXPECT_EQ(expect_message, received_message);
-    CASE_MSG_INFO() << "Got message: " << received_message << std::endl;
+    CASE_MSG_INFO() << "Got message: " << received_message << '\n';
 
-    ++received_messge_count;
+    ++received_message_count;
     return 0;
   };
 
   app2.set_evt_on_forward_request(message_callback_fn);
 
+  auto app1_discovery = atfw::util::memory::make_strong_rc<atapp::etcd_discovery_node>();
   auto app2_discovery = atfw::util::memory::make_strong_rc<atapp::etcd_discovery_node>();
   {
     atapp::protocol::atapp_discovery app2_discovery_info;
     app2.pack(app2_discovery_info);
     app2_discovery->copy_from(app2_discovery_info, atapp::etcd_discovery_node::node_version());
-    CASE_EXPECT_TRUE(app1.mutable_endpoint(app2_discovery));
   }
 
   {
     // Mutable app1 in app2 to get name of remote node
-    auto app1_discovery = atfw::util::memory::make_strong_rc<atapp::etcd_discovery_node>();
     atapp::protocol::atapp_discovery app1_discovery_info;
     app1.pack(app1_discovery_info);
     app1_discovery->copy_from(app1_discovery_info, atapp::etcd_discovery_node::node_version());
-    CASE_EXPECT_TRUE(app2.mutable_endpoint(app1_discovery));
   }
+  app1.get_etcd_module()->get_global_discovery().add_node(app1_discovery);
+  app2.get_etcd_module()->get_global_discovery().add_node(app1_discovery);
+  app1.get_etcd_module()->get_global_discovery().add_node(app2_discovery);
+  app2.get_etcd_module()->get_global_discovery().add_node(app2_discovery);
 
-  CASE_MSG_INFO() << "Start to send message..." << std::endl;
+  CASE_EXPECT_TRUE(app1.mutable_endpoint(app2_discovery));
+  CASE_EXPECT_TRUE(app2.mutable_endpoint(app1_discovery));
+
+  CASE_MSG_INFO() << "Start to send message..." << '\n';
   auto now = atfw::util::time::time_utility::sys_now();
   auto end_time = now + std::chrono::seconds(3);
 
-  CASE_EXPECT_EQ(0, app1.send_message(app2.get_app_id(), 223, expect_message, strlen(expect_message), &set_sequence));
+  CASE_EXPECT_EQ(0, app1.send_message(app2.get_app_id(), 223, expect_message_span, &set_sequence));
   ++set_sequence;
 
-  CASE_EXPECT_EQ(0, app1.send_message(app2.get_app_name(), 223, expect_message, strlen(expect_message), &set_sequence));
+  CASE_EXPECT_EQ(0, app1.send_message(app2.get_app_name(), 223, expect_message_span, &set_sequence));
   ++set_sequence;
 
   CASE_EXPECT_EQ(2, app1.mutable_endpoint(app2_discovery)->get_pending_message_count());
 
-  while (received_messge_count < 2 && end_time > now) {
+  while (received_message_count < 2 && end_time > now) {
     app1.run_noblock();
     app2.run_noblock();
 
@@ -108,10 +110,10 @@ CASE_TEST(atapp_message, send_message_remote) {
 
   CASE_EXPECT_EQ(0, app1.mutable_endpoint(app2_discovery)->get_pending_message_count());
 
-  CASE_EXPECT_EQ(0, app1.send_message(app2_discovery, 223, expect_message, strlen(expect_message), &set_sequence));
+  CASE_EXPECT_EQ(0, app1.send_message(app2_discovery, 223, expect_message_span, &set_sequence));
   ++set_sequence;
 
-  while (received_messge_count < 3 && end_time > now) {
+  while (received_message_count < 3 && end_time > now) {
     app1.run_noblock();
     app2.run_noblock();
 
@@ -119,7 +121,7 @@ CASE_TEST(atapp_message, send_message_remote) {
     atfw::util::time::time_utility::update();
   }
 
-  CASE_EXPECT_EQ(received_messge_count, 3);
+  CASE_EXPECT_EQ(received_message_count, 3);
 }
 
 CASE_TEST(atapp_message, send_message_loopback) {
@@ -128,7 +130,7 @@ CASE_TEST(atapp_message, send_message_loopback) {
   std::string conf_path_1 = conf_path_base + "/atapp_test_0.yaml";
 
   if (!atfw::util::file_system::is_exist(conf_path_1.c_str())) {
-    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path_1 << " not found, skip this test" << std::endl;
+    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path_1 << " not found, skip this test" << '\n';
     return;
   }
 
@@ -143,9 +145,11 @@ CASE_TEST(atapp_message, send_message_loopback) {
   uint64_t set_sequence = 671;
   uint64_t expect_sequence = 671;
   char expect_message[] = "hello loopback";
+  gsl::span<const unsigned char> expect_message_span{reinterpret_cast<const unsigned char*>(expect_message),
+                                                     static_cast<size_t>(strlen(expect_message))};
 
-  int received_messge_count = 0;
-  app1.set_evt_on_forward_request([expect_message, &expect_sequence, &received_messge_count](
+  int received_message_count = 0;
+  app1.set_evt_on_forward_request([expect_message, &expect_sequence, &received_message_count](
                                       atframework::atapp::app& app,
                                       const atframework::atapp::app::message_sender_t& sender,
                                       const atframework::atapp::app::message_t& msg) {
@@ -155,29 +159,29 @@ CASE_TEST(atapp_message, send_message_loopback) {
     CASE_EXPECT_EQ(321, msg.type);
     CASE_EXPECT_EQ(expect_sequence++, msg.message_sequence);
 
-    auto received_message = gsl::string_view{reinterpret_cast<const char*>(msg.data), msg.data_size};
+    auto received_message = gsl::string_view{reinterpret_cast<const char*>(msg.data.data()), msg.data.size()};
     CASE_EXPECT_EQ(expect_message, received_message);
-    CASE_MSG_INFO() << "Got message: " << received_message << std::endl;
+    CASE_MSG_INFO() << "Got message: " << received_message << '\n';
 
-    ++received_messge_count;
+    ++received_message_count;
     return 0;
   });
 
   auto now = atfw::util::time::time_utility::sys_now();
   auto end_time = now + std::chrono::seconds(3);
 
-  CASE_EXPECT_EQ(0, app1.send_message(app1.get_app_id(), 321, expect_message, strlen(expect_message), &set_sequence));
+  CASE_EXPECT_EQ(0, app1.send_message(app1.get_app_id(), 321, expect_message_span, &set_sequence));
   ++set_sequence;
 
-  CASE_EXPECT_EQ(0, app1.send_message(app1.get_app_name(), 321, expect_message, strlen(expect_message), &set_sequence));
+  CASE_EXPECT_EQ(0, app1.send_message(app1.get_app_name(), 321, expect_message_span, &set_sequence));
   ++set_sequence;
 
-  while (received_messge_count < 2 && end_time > now) {
+  while (received_message_count < 2 && end_time > now) {
     app1.run_once(1, end_time - now);
     now = atfw::util::time::time_utility::sys_now();
     atfw::util::time::time_utility::update();
   }
-  CASE_EXPECT_EQ(received_messge_count, 2);
+  CASE_EXPECT_EQ(received_message_count, 2);
 
   auto self_discovery = atfw::util::memory::make_strong_rc<atapp::etcd_discovery_node>();
   atapp::protocol::atapp_discovery self_discovery_info;
@@ -188,17 +192,17 @@ CASE_TEST(atapp_message, send_message_loopback) {
   now = atfw::util::time::time_utility::sys_now();
   end_time = now + std::chrono::seconds(3);
 
-  CASE_EXPECT_EQ(0, app1.send_message(self_discovery, 321, expect_message, strlen(expect_message), &set_sequence));
+  CASE_EXPECT_EQ(0, app1.send_message(self_discovery, 321, expect_message_span, &set_sequence));
   ++set_sequence;
 
-  CASE_EXPECT_EQ(0, app1.send_message(app1.get_app_name(), 321, expect_message, strlen(expect_message), &set_sequence));
+  CASE_EXPECT_EQ(0, app1.send_message(app1.get_app_name(), 321, expect_message_span, &set_sequence));
   ++set_sequence;
 
-  while (received_messge_count < 4 && end_time > now) {
+  while (received_message_count < 4 && end_time > now) {
     app1.run_once(1, end_time - now);
     now = atfw::util::time::time_utility::sys_now();
     atfw::util::time::time_utility::update();
   }
 
-  CASE_EXPECT_EQ(received_messge_count, 4);
+  CASE_EXPECT_EQ(received_message_count, 4);
 }

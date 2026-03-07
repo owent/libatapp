@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent
 
 #include "atframe/connectors/atapp_connector_impl.h"
@@ -6,6 +7,7 @@
 #include <common/string_oprs.h>
 
 #include <algorithm>
+#include <new>
 
 #include "atframe/atapp.h"
 #include "atframe/connectors/atapp_endpoint.h"
@@ -25,10 +27,10 @@ LIBATAPP_MACRO_API_SYMBOL_HIDDEN void atapp_connector_bind_helper::unbind(atapp_
     // It's safe to recall close after set handle.connector_ = nullptr
     handle.close();
 
-    // child shoud call cleanup() to trigger on_close_connect event
+    // child shoud call cleanup() to trigger on_close_connection event
     // This callback must be called at last, because it may destroy handle
     if (!connect.is_destroying_) {
-      connect.on_close_connect(handle);
+      connect.on_close_connection(handle);
     }
   }
 }
@@ -51,8 +53,20 @@ LIBATAPP_MACRO_API_SYMBOL_HIDDEN void atapp_endpoint_bind_helper::unbind(atapp_c
                                                                          atapp_endpoint &endpoint) {
   if (endpoint.refer_connections_.erase(&handle) > 0) {
     if (endpoint.refer_connections_.empty()) {
+      endpoint.gc_timepoint_ = endpoint.owner_->get_next_tick_time();
+      const auto &endpoint_gc_timeout = endpoint.owner_->get_origin_configure().timer().endpoint_gc_timeout();
+
+      if (endpoint_gc_timeout.seconds() < 0) {
+        endpoint.gc_timepoint_ +=
+            std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::seconds(60));
+      } else {
+        endpoint.gc_timepoint_ += std::chrono::duration_cast<std::chrono::system_clock::duration>(
+            std::chrono::seconds(endpoint_gc_timeout.seconds()));
+        endpoint.gc_timepoint_ += std::chrono::duration_cast<std::chrono::system_clock::duration>(
+            std::chrono::nanoseconds(endpoint_gc_timeout.nanos()));
+      }
       if (nullptr != endpoint.owner_) {
-        endpoint.add_waker(endpoint.owner_->get_last_tick_time());
+        endpoint.add_waker(endpoint.gc_timepoint_);
       }
     }
   }
@@ -80,7 +94,7 @@ LIBATAPP_MACRO_API_SYMBOL_HIDDEN void atapp_endpoint_bind_helper::bind(atapp_con
   if (handle.is_ready()) {
     app *owner = endpoint.get_owner();
     if (nullptr != owner) {
-      endpoint.add_waker(owner->get_last_tick_time());
+      endpoint.add_waker(owner->get_next_tick_time());
     }
   }
 }
@@ -112,8 +126,8 @@ LIBATAPP_MACRO_API void atapp_connection_handle::close() {
   }
   // printf("====== Visit atapp_connection_handle::close %p\n", this);
 
-  flags_ |= flags_t::EN_ACH_CLOSING;
-  flags_ &= ~static_cast<uint32_t>(flags_t::EN_ACH_READY);
+  flags_ |= static_cast<uint32_t>(flags_t::kClosing);
+  flags_ &= ~static_cast<uint32_t>(flags_t::kReady);
 
   // Maybe recursive call, check endpiont_ first
   if (nullptr != endpiont_) {
@@ -128,7 +142,7 @@ LIBATAPP_MACRO_API void atapp_connection_handle::close() {
 }
 
 LIBATAPP_MACRO_API bool atapp_connection_handle::is_closing() const noexcept {
-  return 0 != (flags_ & flags_t::EN_ACH_CLOSING);
+  return 0 != (flags_ & static_cast<uint32_t>(flags_t::kClosing));
 }
 
 LIBATAPP_MACRO_API void atapp_connection_handle::set_ready() noexcept {
@@ -136,23 +150,40 @@ LIBATAPP_MACRO_API void atapp_connection_handle::set_ready() noexcept {
     return;
   }
 
-  flags_ |= flags_t::EN_ACH_READY;
-  flags_ &= ~static_cast<uint32_t>(flags_t::EN_ACH_CLOSING);
+  flags_ |= static_cast<uint32_t>(flags_t::kReady);
+  flags_ &= ~static_cast<uint32_t>(flags_t::kClosing);
 
   // reactive endpoint and call retry_pending_messages()
   if (nullptr != endpiont_ && nullptr != connector_) {
     app *owner = connector_->get_owner();
     if (nullptr != owner) {
-      endpiont_->add_waker(owner->get_last_tick_time());
+      endpiont_->add_waker(owner->get_next_tick_time());
+    }
+  }
+}
+
+LIBATAPP_MACRO_API void atapp_connection_handle::set_unready() noexcept {
+  if (!is_ready()) {
+    return;
+  }
+  flags_ &= ~static_cast<uint32_t>(flags_t::kReady);
+
+  // 如果endpoint没有可用的connection了，需要按pending的message设置add_waker
+  atapp_endpoint *ep = get_endpoint();
+  if (ep != nullptr && !ep->has_connection_handle()) {
+    if (ep->get_pending_message_count() > 0) {
+      ep->add_waker(ep->get_next_pending_message_timeout());
     }
   }
 }
 
 LIBATAPP_MACRO_API bool atapp_connection_handle::is_ready() const noexcept {
-  return 0 != (flags_ & flags_t::EN_ACH_READY);
+  return 0 != (flags_ & static_cast<uint32_t>(flags_t::kReady));
 }
 
-LIBATAPP_MACRO_API void atapp_connection_handle::set_on_destroy(on_destroy_fn_type fn) { on_destroy_fn_ = fn; }
+LIBATAPP_MACRO_API void atapp_connection_handle::set_on_destroy(on_destroy_fn_type fn) {
+  on_destroy_fn_ = std::move(fn);
+}
 
 LIBATAPP_MACRO_API const atapp_connection_handle::on_destroy_fn_type &atapp_connection_handle::get_on_destroy() const {
   return on_destroy_fn_;
@@ -167,18 +198,17 @@ LIBATAPP_MACRO_API atapp_connector_impl::atapp_connector_impl(app &owner) : owne
 
 LIBATAPP_MACRO_API atapp_connector_impl::~atapp_connector_impl() { is_destroying_ = true; }
 
-LIBATAPP_MACRO_API const char *atapp_connector_impl::name() noexcept {
+LIBATAPP_MACRO_API gsl::string_view atapp_connector_impl::name() const noexcept {
   if (auto_demangled_name_) {
     return auto_demangled_name_->get();
   }
 
 #if defined(LIBATFRAME_UTILS_ENABLE_RTTI) && LIBATFRAME_UTILS_ENABLE_RTTI
-  auto_demangled_name_.reset(new atfw::util::scoped_demangled_name(typeid(*this).name()));
+  auto_demangled_name_.reset(new (std::nothrow) atfw::util::scoped_demangled_name(typeid(*this).name()));
   if (auto_demangled_name_) {
     return auto_demangled_name_->get();
-  } else {
-    return "atapp::connector demangle symbol failed";
   }
+  return "atapp::connector demangle symbol failed";
 #else
   return "atapp::connector RTTI Unavailable";
 #endif
@@ -196,7 +226,7 @@ LIBATAPP_MACRO_API void atapp_connector_impl::cleanup() {
     handles.swap(handles_);
 
     for (handle_set_t::const_iterator iter = handles.begin(); iter != handles.end(); ++iter) {
-      if (*iter) {
+      if (*iter != nullptr) {
         atapp_connector_bind_helper::unbind(**iter, *this);
       }
     }
@@ -209,36 +239,31 @@ LIBATAPP_MACRO_API int32_t atapp_connector_impl::on_start_listen(const atbus::ch
   return EN_ATBUS_ERR_CHANNEL_NOT_SUPPORT;
 }
 
-LIBATAPP_MACRO_API int32_t atapp_connector_impl::on_start_connect(const etcd_discovery_node *,
+LIBATAPP_MACRO_API int32_t atapp_connector_impl::on_start_connect(const etcd_discovery_node &, atapp_endpoint &,
                                                                   const atbus::channel::channel_address_t &,
                                                                   const atapp_connection_handle::ptr_t &) {
   return EN_ATBUS_ERR_CHANNEL_NOT_SUPPORT;
 }
 
-LIBATAPP_MACRO_API int32_t atapp_connector_impl::on_close_connect(atapp_connection_handle &) {
+LIBATAPP_MACRO_API int32_t atapp_connector_impl::on_close_connection(atapp_connection_handle &) {
   return EN_ATBUS_ERR_SUCCESS;
 }
 
 LIBATAPP_MACRO_API int32_t atapp_connector_impl::on_send_forward_request(atapp_connection_handle *handle, int32_t type,
-                                                                         uint64_t *sequence, const void *,
-                                                                         size_t data_size,
+                                                                         uint64_t *sequence,
+                                                                         gsl::span<const unsigned char> data,
                                                                          const atapp::protocol::atapp_metadata *) {
-  FWLOGERROR("{} forward data {}(type={}, sequence={}) bytes using handle {} failed, not support", name(), data_size,
+  FWLOGERROR("{} forward data {}(type={}, sequence={}) bytes using handle {} failed, not support", name(), data.size(),
              type, (sequence == nullptr ? 0 : *sequence), reinterpret_cast<const void *>(handle));
   return EN_ATBUS_ERR_CHANNEL_NOT_SUPPORT;
 }
 
 LIBATAPP_MACRO_API void atapp_connector_impl::on_receive_forward_response(
-    atapp_connection_handle *handle, int32_t type, uint64_t sequence, int32_t error_code, const void *data,
-    size_t data_size, const atapp::protocol::atapp_metadata *metadata) {
-  if (nullptr == get_owner()) {
-    return;
-  }
-
+    atapp_connection_handle *handle, int32_t type, uint64_t sequence, int32_t error_code,
+    gsl::span<const unsigned char> data, const atapp::protocol::atapp_metadata *metadata) {
   // notify app
   app::message_t msg;
   msg.data = data;
-  msg.data_size = data_size;
   msg.metadata = metadata;
   msg.message_sequence = sequence;
   msg.type = type;
@@ -255,7 +280,7 @@ LIBATAPP_MACRO_API void atapp_connector_impl::on_receive_forward_response(
   get_owner()->trigger_event_on_forward_response(sender, msg, error_code);
 }
 
-LIBATAPP_MACRO_API void atapp_connector_impl::on_discovery_event(etcd_discovery_action_t::type,
+LIBATAPP_MACRO_API void atapp_connector_impl::on_discovery_event(etcd_discovery_action_t,
                                                                  const etcd_discovery_node::ptr_t &) {}
 
 LIBATAPP_MACRO_API const atapp_connector_impl::protocol_set_t &atapp_connector_impl::get_support_protocols()

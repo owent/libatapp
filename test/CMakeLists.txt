@@ -1,3 +1,4 @@
+# Copyright 2026 atframework
 echowithcolor(COLOR GREEN "-- Configure Unit Test ${CMAKE_CURRENT_LIST_DIR}")
 
 include("${PROJECT_TEST_BAS_DIR}/test.build_bin.cmake")
@@ -28,3 +29,4 @@ target_link_libraries(atapp_unit_test atapp)
 
 add_test(NAME "libatapp.unit_test" COMMAND "$<TARGET_FILE:atapp_unit_test>")
 set_tests_properties("libatapp.unit_test" PROPERTIES LABELS "libatapp;libatapp.unit_test")
+

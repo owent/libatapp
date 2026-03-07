@@ -1,4 +1,5 @@
-// Copyright 2021 atframework
+// Copyright 2026 atframework
+//
 // Created by owent
 
 #include <common/string_oprs.h>
@@ -74,10 +75,10 @@ static_assert(0 != (static_cast<uint8_t>(search_mode_internal_flag::kUnique) &
                     static_cast<uint8_t>(etcd_discovery_set::node_hash_type::search_mode::kUniqueNode)),
               "search_mode_internal_flag unique checking");
 
-static std::pair<uint64_t, uint64_t> consistent_hash_calc(const void *buf, size_t bufsz, uint32_t seed) {
+static std::pair<uint64_t, uint64_t> consistent_hash_calc(gsl::span<const unsigned char> buf, uint32_t seed) {
   std::pair<uint64_t, uint64_t> ret;
   uint64_t out[2] = {0};
-  ::atfw::util::hash::murmur_hash3_x64_128(buf, static_cast<int>(bufsz), seed, out);
+  ::atfw::util::hash::murmur_hash3_x64_128(buf.data(), static_cast<int>(buf.size()), seed, out);
   ret.first = out[0];
   ret.second = out[1];
 
@@ -101,10 +102,23 @@ static void consistent_hash_combine(uint64_t &seed, uint64_t v) {
   seed += 0xe6546b64;
 }
 
-static void consistent_hash_combine(const void *buf, size_t bufsz, std::pair<uint64_t, uint64_t> &seed) {
-  std::pair<uint64_t, uint64_t> hash_value = consistent_hash_calc(buf, bufsz, static_cast<uint32_t>(seed.first));
+static void consistent_hash_combine(gsl::span<const unsigned char> buf, std::pair<uint64_t, uint64_t> &seed) {
+  std::pair<uint64_t, uint64_t> hash_value = consistent_hash_calc(buf, static_cast<uint32_t>(seed.first));
   consistent_hash_combine(seed.first, hash_value.first);
   consistent_hash_combine(seed.second, hash_value.second);
+}
+
+static gsl::span<const unsigned char> consistent_hash_to_span(const std::string &hash_code) {
+  return gsl::make_span(reinterpret_cast<const unsigned char *>(hash_code.data()), hash_code.size());
+}
+
+static gsl::span<const unsigned char> consistent_hash_to_span(gsl::string_view hash_code) {
+  return gsl::make_span(reinterpret_cast<const unsigned char *>(hash_code.data()), hash_code.size());
+}
+
+template <class T, class = atfw::util::nostd::enable_if_t<std::is_scalar<T>::value>>
+static gsl::span<const unsigned char> consistent_hash_to_span(const T &d) {
+  return gsl::make_span(reinterpret_cast<const unsigned char *>(&d), sizeof(d));
 }
 
 static bool consistent_hash_compare_find(const etcd_discovery_set::node_hash_type &l,
@@ -117,8 +131,8 @@ static bool round_robin_compare_index(const etcd_discovery_node::ptr_t &l, const
     return reinterpret_cast<uintptr_t>(l.get()) < reinterpret_cast<uintptr_t>(r.get());
   }
 
-  auto &ldi = l->get_discovery_info();
-  auto &rdi = r->get_discovery_info();
+  const auto &ldi = l->get_discovery_info();
+  const auto &rdi = r->get_discovery_info();
   if (ldi.runtime().stateful_pod_index() != rdi.runtime().stateful_pod_index()) {
     return ldi.runtime().stateful_pod_index() < rdi.runtime().stateful_pod_index();
   }
@@ -163,6 +177,7 @@ static void sort_string_map(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Map<std::st
             });
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
 struct lower_upper_bound_pred_t {
   uint64_t id;
   gsl::string_view name;
@@ -215,6 +230,10 @@ static const std::vector<etcd_discovery_node::ptr_t> &get_empty_discovery_set() 
 }
 
 static bool is_empty(const etcd_discovery_set::metadata_type &metadata) noexcept {
+  if (&metadata == &etcd_discovery_set::metadata_type::default_instance()) {
+    return true;
+  }
+
   return metadata.api_version().empty() && metadata.kind().empty() && metadata.group().empty() &&
          metadata.namespace_name().empty() && metadata.name().empty() && metadata.uid().empty() &&
          metadata.service_subset().empty() && 0 == metadata.labels_size();
@@ -253,7 +272,9 @@ LIBATAPP_MACRO_API void etcd_discovery_node::copy_from(const atapp::protocol::at
                                                        const node_version &version) {
   node_info_.CopyFrom(input);
 
-  name_hash_ = consistent_hash_calc(input.name().data(), input.name().size(), LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
+  name_hash_ = consistent_hash_calc(
+      gsl::span<const unsigned char>{reinterpret_cast<const unsigned char *>(input.name().data()), input.name().size()},
+      LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
 
   node_version_ = version;
 }
@@ -295,7 +316,7 @@ LIBATAPP_MACRO_API void etcd_discovery_node::copy_key_to(atapp::protocol::atapp_
   output.set_hostname(node_info_.hostname());
 }
 
-LIBATAPP_MACRO_API void etcd_discovery_node::set_on_destroy(on_destroy_fn_type fn) { on_destroy_fn_ = fn; }
+LIBATAPP_MACRO_API void etcd_discovery_node::set_on_destroy(on_destroy_fn_type fn) { on_destroy_fn_ = std::move(fn); }
 
 LIBATAPP_MACRO_API const etcd_discovery_node::on_destroy_fn_type &etcd_discovery_node::get_on_destroy() const {
   return on_destroy_fn_;
@@ -305,6 +326,8 @@ LIBATAPP_MACRO_API void etcd_discovery_node::reset_on_destroy() {
   on_destroy_fn_type empty;
   on_destroy_fn_.swap(empty);
 }
+
+LIBATAPP_MACRO_API void etcd_discovery_node::reset_ingress_index() const noexcept { ingress_index_ = 0; }
 
 LIBATAPP_MACRO_API const atapp::protocol::atapp_gateway &etcd_discovery_node::next_ingress_gateway() const {
   if (ingress_index_ < 0) {
@@ -343,43 +366,38 @@ etcd_discovery_set::metadata_hash_type::operator()(const metadata_type &metadata
   std::pair<uint64_t, uint64_t> hash_value{LIBATAPP_MACRO_HASH_MAGIC_NUMBER, 0};
 
   if (!metadata.api_version().empty()) {
-    consistent_hash_combine(reinterpret_cast<const void *>(metadata.api_version().c_str()),
-                            metadata.api_version().size(), hash_value);
+    consistent_hash_combine(consistent_hash_to_span(metadata.api_version()), hash_value);
   }
 
   if (!metadata.kind().empty()) {
-    consistent_hash_combine(reinterpret_cast<const void *>(metadata.kind().c_str()), metadata.kind().size(),
-                            hash_value);
+    consistent_hash_combine(consistent_hash_to_span(metadata.kind()), hash_value);
   }
 
   if (!metadata.group().empty()) {
-    consistent_hash_combine(reinterpret_cast<const void *>(metadata.group().c_str()), metadata.group().size(),
-                            hash_value);
+    consistent_hash_combine(consistent_hash_to_span(metadata.group()), hash_value);
   }
 
   if (!metadata.name().empty()) {
-    consistent_hash_combine(reinterpret_cast<const void *>(metadata.name().data()), metadata.name().size(), hash_value);
+    consistent_hash_combine(consistent_hash_to_span(metadata.name()), hash_value);
   }
 
   if (!metadata.namespace_name().empty()) {
-    consistent_hash_combine(reinterpret_cast<const void *>(metadata.namespace_name().c_str()),
-                            metadata.namespace_name().size(), hash_value);
+    consistent_hash_combine(consistent_hash_to_span(metadata.namespace_name()), hash_value);
   }
 
   if (!metadata.uid().empty()) {
-    consistent_hash_combine(reinterpret_cast<const void *>(metadata.uid().c_str()), metadata.uid().size(), hash_value);
+    consistent_hash_combine(consistent_hash_to_span(metadata.uid()), hash_value);
   }
 
   if (!metadata.service_subset().empty()) {
-    consistent_hash_combine(reinterpret_cast<const void *>(metadata.service_subset().c_str()),
-                            metadata.service_subset().size(), hash_value);
+    consistent_hash_combine(consistent_hash_to_span(metadata.service_subset()), hash_value);
   }
 
   std::vector<std::pair<gsl::string_view, gsl::string_view>> kvs;
   if (metadata.labels_size() > 0) {
     sort_string_map(metadata.labels(), kvs);
     for (auto &label : kvs) {
-      consistent_hash_combine(reinterpret_cast<const void *>(label.second.data()), label.second.size(), hash_value);
+      consistent_hash_combine(consistent_hash_to_span(label.second), hash_value);
     }
   }
 
@@ -499,7 +517,7 @@ LIBATAPP_MACRO_API bool etcd_discovery_set::metadata_equal_type::filter(const me
     return false;
   }
 
-  for (auto &label : rule.labels()) {
+  for (const auto &label : rule.labels()) {
     if (label.second.empty()) {
       continue;
     }
@@ -570,8 +588,8 @@ LIBATAPP_MACRO_API size_t etcd_discovery_set::lower_bound_node_hash_by_consisten
       0 != (static_cast<uint8_t>(search_mode_internal_flag::kCompact) & static_cast<uint8_t>(searchmode));
   bool unique_node = 0 != (static_cast<uint8_t>(search_mode_internal_flag::kUnique) & static_cast<uint8_t>(searchmode));
 
-  const std::vector<node_hash_type> *select_hash_ring;
-  size_t max_output_size;
+  const std::vector<node_hash_type> *select_hash_ring = nullptr;
+  size_t max_output_size = 0;
   std::unordered_set<etcd_discovery_node *> unique_cache;
 
   // 紧凑模式使用紧凑集合，可以减少对比开销
@@ -630,8 +648,8 @@ LIBATAPP_MACRO_API size_t etcd_discovery_set::lower_bound_node_hash_by_consisten
 }
 
 LIBATAPP_MACRO_API etcd_discovery_set::node_hash_type etcd_discovery_set::get_node_hash_by_consistent_hash(
-    const void *buf, size_t bufsz, const metadata_type *metadata) const {
-  std::pair<uint64_t, uint64_t> hash_key = consistent_hash_calc(buf, bufsz, LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
+    gsl::span<const unsigned char> buf, const metadata_type *metadata) const {
+  std::pair<uint64_t, uint64_t> hash_key = consistent_hash_calc(buf, LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
   node_hash_type ret[1];
   if (lower_bound_node_hash_by_consistent_hash(gsl::make_span(ret), node_hash_type{nullptr, hash_key}, metadata) <= 0) {
     return node_hash_type{nullptr, hash_key};
@@ -642,37 +660,37 @@ LIBATAPP_MACRO_API etcd_discovery_set::node_hash_type etcd_discovery_set::get_no
 
 LIBATAPP_MACRO_API etcd_discovery_set::node_hash_type etcd_discovery_set::get_node_hash_by_consistent_hash(
     uint64_t key, const metadata_type *metadata) const {
-  return get_node_hash_by_consistent_hash(&key, sizeof(key), metadata);
+  return get_node_hash_by_consistent_hash(consistent_hash_to_span(key), metadata);
 }
 
 LIBATAPP_MACRO_API etcd_discovery_set::node_hash_type etcd_discovery_set::get_node_hash_by_consistent_hash(
     int64_t key, const metadata_type *metadata) const {
-  return get_node_hash_by_consistent_hash(&key, sizeof(key), metadata);
+  return get_node_hash_by_consistent_hash(consistent_hash_to_span(key), metadata);
 }
 
 LIBATAPP_MACRO_API etcd_discovery_set::node_hash_type etcd_discovery_set::get_node_hash_by_consistent_hash(
     gsl::string_view key, const metadata_type *metadata) const {
-  return get_node_hash_by_consistent_hash(key.data(), key.size(), metadata);
+  return get_node_hash_by_consistent_hash(consistent_hash_to_span(key), metadata);
 }
 
 LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_consistent_hash(
-    const void *buf, size_t bufsz, const metadata_type *metadata) const {
-  return get_node_hash_by_consistent_hash(buf, bufsz, metadata).node;
+    gsl::span<const unsigned char> buf, const metadata_type *metadata) const {
+  return get_node_hash_by_consistent_hash(buf, metadata).node;
 }
 
 LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_consistent_hash(
     uint64_t key, const metadata_type *metadata) const {
-  return get_node_by_consistent_hash(&key, sizeof(key), metadata);
+  return get_node_by_consistent_hash(consistent_hash_to_span(key), metadata);
 }
 
 LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_consistent_hash(
     int64_t key, const metadata_type *metadata) const {
-  return get_node_by_consistent_hash(&key, sizeof(key), metadata);
+  return get_node_by_consistent_hash(consistent_hash_to_span(key), metadata);
 }
 
 LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_consistent_hash(
     gsl::string_view key, const metadata_type *metadata) const {
-  return get_node_by_consistent_hash(key.data(), key.size(), metadata);
+  return get_node_by_consistent_hash(consistent_hash_to_span(key), metadata);
 }
 
 LIBATAPP_MACRO_API etcd_discovery_node::ptr_t etcd_discovery_set::get_node_by_random(
@@ -743,7 +761,7 @@ LIBATAPP_MACRO_API std::vector<etcd_discovery_node::ptr_t>::const_iterator etcd_
   pred_val.id = id;
   pred_val.name = name;
   if (!name.empty()) {
-    pred_val.hash_code = consistent_hash_calc(name.data(), name.size(), LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
+    pred_val.hash_code = consistent_hash_calc(consistent_hash_to_span(name), LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
   } else {
     pred_val.hash_code = std::pair<uint64_t, uint64_t>(0, 0);
   }
@@ -759,7 +777,7 @@ LIBATAPP_MACRO_API std::vector<etcd_discovery_node::ptr_t>::const_iterator etcd_
   pred_val.id = id;
   pred_val.name = name;
   if (!name.empty()) {
-    pred_val.hash_code = consistent_hash_calc(name.data(), name.size(), LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
+    pred_val.hash_code = consistent_hash_calc(consistent_hash_to_span(name), LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
   } else {
     pred_val.hash_code = std::pair<uint64_t, uint64_t>(0, 0);
   }
@@ -966,8 +984,9 @@ void etcd_discovery_set::rebuild_cache(index_cache_type &cache_set, const metada
     for (size_t i = 0; i < node_hash_type::HASH_POINT_PER_INS; ++i) {
       node_hash_type hash_node;
       hash_node.node = iter->second;
-      const std::string &name = iter->second->get_discovery_info().name();
-      hash_node.hash_code = consistent_hash_calc(name.c_str(), name.size(), static_cast<uint32_t>(i));
+      gsl::string_view name{iter->second->get_discovery_info().name().data(),
+                            iter->second->get_discovery_info().name().size()};
+      hash_node.hash_code = consistent_hash_calc(consistent_hash_to_span(name), static_cast<uint32_t>(i));
 
       cache_set.normal_hashing_ring.push_back(hash_node);
     }
@@ -990,7 +1009,7 @@ void etcd_discovery_set::rebuild_cache(index_cache_type &cache_set, const metada
       node_hash_type hash_node;
       hash_node.node = iter->second;
       uint64_t key = iter->second->get_discovery_info().id();
-      hash_node.hash_code = consistent_hash_calc(&key, sizeof(key), static_cast<uint32_t>(i));
+      hash_node.hash_code = consistent_hash_calc(consistent_hash_to_span(key), static_cast<uint32_t>(i));
 
       cache_set.normal_hashing_ring.push_back(hash_node);
     }
@@ -1101,7 +1120,7 @@ etcd_discovery_set::index_cache_type *etcd_discovery_set::get_index_cache(
 
 etcd_discovery_set::index_cache_type *etcd_discovery_set::mutable_index_cache(
     const etcd_discovery_set::metadata_type *metadata) const {
-  auto ret = get_index_cache(metadata);
+  auto *ret = get_index_cache(metadata);
   if (nullptr != ret) {
     return ret;
   }
