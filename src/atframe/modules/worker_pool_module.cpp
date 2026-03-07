@@ -863,12 +863,13 @@ LIBATAPP_MACRO_API int worker_pool_module::stop() {
 
 LIBATAPP_MACRO_API void worker_pool_module::cleanup() { internal_cleanup(); }
 
-LIBATAPP_MACRO_API int worker_pool_module::spawn(worker_job_action_type action, worker_context* selected_context) {
+LIBATAPP_MACRO_API int worker_pool_module::spawn(worker_job_action_type action,
+                                                 worker_context* ATFW_UTIL_MACRO_NULLABLE selected_context) {
   return spawn(atfw::util::memory::make_strong_rc<worker_job_action_type>(std::move(action)), selected_context);
 }
 
 LIBATAPP_MACRO_API int worker_pool_module::spawn(const worker_job_action_pointer& action,
-                                                 worker_context* selected_context) {
+                                                 worker_context* ATFW_UTIL_MACRO_NULLABLE selected_context) {
   if (!action) {
     return EN_ATBUS_ERR_PARAMS;
   }

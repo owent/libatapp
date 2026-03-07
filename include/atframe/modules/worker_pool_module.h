@@ -51,10 +51,12 @@ class worker_pool_module : public ::atframework::atapp::module_impl {
   LIBATAPP_MACRO_API void cleanup() override;
 
   // thread-safe
-  LIBATAPP_MACRO_API int spawn(worker_job_action_type action, worker_context* selected_context = nullptr);
+  LIBATAPP_MACRO_API int spawn(worker_job_action_type action,
+                               worker_context* ATFW_UTIL_MACRO_NULLABLE selected_context = nullptr);
 
   // thread-safe
-  LIBATAPP_MACRO_API int spawn(const worker_job_action_pointer& action, worker_context* selected_context = nullptr);
+  LIBATAPP_MACRO_API int spawn(const worker_job_action_pointer& action,
+                               worker_context* ATFW_UTIL_MACRO_NULLABLE selected_context = nullptr);
 
   // thread-safe
   LIBATAPP_MACRO_API int spawn(worker_job_action_type action, const worker_context& context);
