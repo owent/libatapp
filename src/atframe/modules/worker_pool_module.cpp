@@ -118,7 +118,7 @@ class UTIL_SYMBOL_LOCAL worker_pool_module::worker : public std::enable_shared_f
 
   worker_pool_module::worker_set& get_owner() noexcept { return *owner_; }
 
-  static void start(const std::shared_ptr<worker> &self, const std::shared_ptr<worker_set> &owner);
+  static void start(const std::shared_ptr<worker>& self, const std::shared_ptr<worker_set>& owner);
 
   inline const worker_context& get_context() const noexcept { return context_; }
 
@@ -382,7 +382,7 @@ worker_pool_module::worker::~worker() {
   }
 }
 
-void worker_pool_module::worker::start(const std::shared_ptr<worker> &self, const std::shared_ptr<worker_set> &owner) {
+void worker_pool_module::worker::start(const std::shared_ptr<worker>& self, const std::shared_ptr<worker_set>& owner) {
   if (!self || !owner) {
     return;
   }
@@ -664,7 +664,9 @@ LIBATAPP_MACRO_API int worker_pool_module::reload() {
   return 0;
 }
 
-LIBATAPP_MACRO_API const char* worker_pool_module::name() const { return "atapp: worker pool module"; }
+LIBATAPP_MACRO_API const char* ATFW_UTIL_MACRO_NONNULL worker_pool_module::name() const {
+  return "atapp: worker pool module";
+}
 
 LIBATAPP_MACRO_API int worker_pool_module::tick() { return tick(std::chrono::system_clock::now()); }
 
@@ -865,8 +867,8 @@ LIBATAPP_MACRO_API int worker_pool_module::spawn(worker_job_action_type action, 
   return spawn(atfw::util::memory::make_strong_rc<worker_job_action_type>(std::move(action)), selected_context);
 }
 
-LIBATAPP_MACRO_API int worker_pool_module::spawn(const worker_job_action_pointer &action,
-                                                  worker_context* selected_context) {
+LIBATAPP_MACRO_API int worker_pool_module::spawn(const worker_job_action_pointer& action,
+                                                 worker_context* selected_context) {
   if (!action) {
     return EN_ATBUS_ERR_PARAMS;
   }
@@ -908,8 +910,8 @@ LIBATAPP_MACRO_API int worker_pool_module::spawn(worker_job_action_type action, 
   return spawn(atfw::util::memory::make_strong_rc<worker_job_action_type>(std::move(action)), context);
 }
 
-LIBATAPP_MACRO_API int worker_pool_module::spawn(const worker_job_action_pointer &action,
-                                                  const worker_context& context) {
+LIBATAPP_MACRO_API int worker_pool_module::spawn(const worker_job_action_pointer& action,
+                                                 const worker_context& context) {
   if (!action) {
     return EN_ATBUS_ERR_PARAMS;
   }

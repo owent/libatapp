@@ -202,7 +202,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_start_listen(const atbus::c
 }
 
 LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_start_connect(const etcd_discovery_node &discovery,
-                                                                   atapp_endpoint &endpoint,
+                                                                   atapp_endpoint & /*endpoint*/,
                                                                    const atbus::channel::channel_address_t & /*addr*/,
                                                                    const atapp_connection_handle::ptr_t &handle) {
   // 上传会循环查询多个连接，对于atbus来说一次连接就会考虑所有拓扑关系，不需要重复查询
@@ -342,7 +342,7 @@ LIBATAPP_MACRO_API void atapp_connector_atbus::remove_topology_peer(atbus::bus_i
 
 LIBATAPP_MACRO_API void atapp_connector_atbus::update_topology_peer(atbus::bus_id_t target_bus_id,
                                                                     atbus::bus_id_t target_upstream_id,
-                                                                    const atbus::topology_data::ptr_t &data) {
+                                                                    const atbus::topology_data::ptr_t & /*data*/) {
   // clear connect result cache
   last_connect_bus_id_ = 0;
   last_connect_handle_ = nullptr;
@@ -566,7 +566,7 @@ bool atapp_connector_atbus::need_keep_handle(const atbus_connection_handle_data 
   return ep->get_pending_message_count() > 0;
 }
 
-int atapp_connector_atbus::on_update_endpoint(const atbus::node &n, const atbus::endpoint *ep, int res) {
+int atapp_connector_atbus::on_update_endpoint(const atbus::node & /*n*/, const atbus::endpoint *ep, int res) {
   if (ep == nullptr) {
     return res;
   }

@@ -35,7 +35,7 @@ class worker_pool_module : public ::atframework::atapp::module_impl {
 
   LIBATAPP_MACRO_API int init() override;
 
-  LIBATAPP_MACRO_API const char* name() const override;
+  LIBATAPP_MACRO_API const char* ATFW_UTIL_MACRO_NONNULL name() const override;
 
   LIBATAPP_MACRO_API int tick() override;
 

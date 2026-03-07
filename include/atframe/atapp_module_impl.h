@@ -8,6 +8,7 @@
 #include <design_pattern/noncopyable.h>
 
 #include <config/compiler_features.h>
+#include <nostd/nullability.h>
 #include <std/explicit_declare.h>
 
 #include <common/demangle.h>
@@ -109,7 +110,7 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE module_impl {
    * @brief get module name
    * @return module name
    */
-  LIBATAPP_MACRO_API virtual const char *name() const;
+  LIBATAPP_MACRO_API virtual const char *ATFW_UTIL_MACRO_NONNULL name() const;
 
   /**
    * @brief run tick handle and return active action number
