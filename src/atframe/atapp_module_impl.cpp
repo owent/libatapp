@@ -45,7 +45,7 @@ LIBATAPP_MACRO_API int module_impl::timeout() { return 0; }
 
 LIBATAPP_MACRO_API int module_impl::tick() { return 0; }
 
-LIBATAPP_MACRO_API const char *module_impl::name() const {
+LIBATAPP_MACRO_API const char *ATFW_UTIL_MACRO_NONNULL module_impl::name() const {
   if (auto_demangled_name_) {
     return auto_demangled_name_->get();
   }

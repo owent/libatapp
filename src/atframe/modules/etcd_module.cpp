@@ -733,7 +733,7 @@ LIBATAPP_MACRO_API int etcd_module::timeout() {
   return 0;
 }
 
-LIBATAPP_MACRO_API const char *etcd_module::name() const { return "atapp: etcd module"; }
+LIBATAPP_MACRO_API const char *ATFW_UTIL_MACRO_NONNULL etcd_module::name() const { return "atapp: etcd module"; }
 
 LIBATAPP_MACRO_API int etcd_module::tick() {
   atframework::atapp::app *owner = get_app();

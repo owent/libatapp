@@ -12,6 +12,7 @@
 
 #include <common/demangle.h>
 #include <gsl/select-gsl.h>
+#include <nostd/nullability.h>
 
 #include <detail/buffer.h>
 #include <detail/libatbus_channel_export.h>
@@ -61,8 +62,12 @@ class atapp_connection_handle {
   LIBATAPP_MACRO_API void set_unready() noexcept;
   LIBATAPP_MACRO_API bool is_ready() const noexcept;
 
-  ATFW_UTIL_FORCEINLINE void set_private_data_ptr(void *input) noexcept { private_data_ptr_ = input; }
-  ATFW_UTIL_FORCEINLINE void *get_private_data_ptr() const noexcept { return private_data_ptr_; }
+  ATFW_UTIL_FORCEINLINE void set_private_data_ptr(void *ATFW_UTIL_MACRO_NULLABLE input) noexcept {
+    private_data_ptr_ = input;
+  }
+  ATFW_UTIL_FORCEINLINE void *ATFW_UTIL_MACRO_NULLABLE get_private_data_ptr() const noexcept {
+    return private_data_ptr_;
+  }
   ATFW_UTIL_FORCEINLINE void set_private_data_u64(uint64_t input) noexcept { private_data_u64_ = input; }
   ATFW_UTIL_FORCEINLINE uint64_t get_private_data_u64() const noexcept { return private_data_u64_; }
   ATFW_UTIL_FORCEINLINE void set_private_data_i64(int64_t input) noexcept { private_data_i64_ = input; }
