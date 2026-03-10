@@ -348,7 +348,7 @@ CASE_TEST(atapp_etcd_cluster, cluster_close_revoke_lease) {
   bool kv_set_done = false;
   auto set_req = cluster.create_request_kv_set(test_key, "lease-bound-value", true);
   if (set_req) {
-    set_req->set_on_complete([&kv_set_done](atfw::util::network::http_request &req) -> int {
+    set_req->set_on_complete([&kv_set_done](atfw::util::network::http_request &) -> int {
       kv_set_done = true;
       return 0;
     });
@@ -1248,7 +1248,7 @@ CASE_TEST(atapp_etcd_cluster, watcher_revision_continuity) {
     return;
   }
 
-  watcher->set_evt_handle([&got_snapshot, &revisions](const atapp::etcd_response_header &header,
+  watcher->set_evt_handle([&got_snapshot, &revisions](const atapp::etcd_response_header &,
                                                       const atapp::etcd_watcher::response_t &evt_data) {
     if (evt_data.snapshot) {
       got_snapshot = true;
