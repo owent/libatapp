@@ -257,8 +257,7 @@ CASE_TEST(atapp_upstream_forward, upstream_wait_discovery_then_send) {
   apps.pump(32);
 
   // Set up message callback on node3
-  apps.node3.set_evt_on_forward_request([](atframework::atapp::app &,
-                                           const atframework::atapp::app::message_sender_t &sender,
+  apps.node3.set_evt_on_forward_request([](atframework::atapp::app &, const atframework::atapp::app::message_sender_t &,
                                            const atframework::atapp::app::message_t &msg) {
     auto received = gsl::string_view{reinterpret_cast<const char *>(msg.data.data()), msg.data.size()};
     g_upstream_test_ctx.received_messages.emplace_back(received.data(), received.size());
@@ -362,7 +361,7 @@ CASE_TEST(atapp_upstream_forward, upstream_connected_forward_success) {
   int node1_received = 0;
   apps.node1.set_evt_on_forward_request(
       [&node1_received, &apps](atframework::atapp::app &, const atframework::atapp::app::message_sender_t &sender,
-                               const atframework::atapp::app::message_t &msg) {
+                               const atframework::atapp::app::message_t &) {
         CASE_EXPECT_EQ(apps.node3.get_app_id(), sender.id);
         ++node1_received;
         return 0;
