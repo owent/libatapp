@@ -23,7 +23,7 @@ atapp:
     retry_interval: 3s
     reconnect_start_interval: 2s
     reconnect_max_interval: 16s
-    reconnect_max_try_times: 3
+    reconnect_max_try_times: 2
     lost_topology_timeout: 32s
     fault_tolerant: 3
     message_size: 64KB

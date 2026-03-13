@@ -10,6 +10,7 @@
 #include <atframe/connectors/atapp_endpoint.h>
 
 #include <limits>
+#include "atframe/atapp_common_types.h"
 
 #ifdef max
 #  undef max
@@ -141,6 +142,10 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::push_forward_message(int32_t type, ui
                                                                 gsl::span<const unsigned char> data,
                                                                 const atapp::protocol::atapp_metadata *metadata) {
   // Closing
+  app_id_t self_app_id = 0;
+  if (owner_ != nullptr) {
+    self_app_id = owner_->get_id();
+  }
   if (closing_ || nullptr == owner_) {
     do {
       atapp_connection_handle *handle = get_ready_connection_handle();
@@ -149,7 +154,8 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::push_forward_message(int32_t type, ui
         connector = handle->get_connector();
       }
 
-      trigger_on_receive_forward_response(connector, handle, type, msg_sequence, EN_ATBUS_ERR_CLOSING, data, metadata);
+      trigger_on_receive_forward_response(self_app_id, connector, handle, type, msg_sequence, EN_ATBUS_ERR_CLOSING,
+                                          data, metadata);
     } while (false);
     return EN_ATBUS_ERR_CLOSING;
   }
@@ -180,7 +186,7 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::push_forward_message(int32_t type, ui
       if (EN_ATBUS_ERR_ATNODE_NO_CONNECTION == ret || EN_ATBUS_ERR_ATNODE_INVALID_ID == ret) {
         break;
       }
-      trigger_on_receive_forward_response(connector, handle, type, msg_sequence, ret, data, metadata);
+      trigger_on_receive_forward_response(self_app_id, connector, handle, type, msg_sequence, ret, data, metadata);
     }
 
     return ret;
@@ -213,7 +219,8 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::push_forward_message(int32_t type, ui
       connector = handle->get_connector();
     }
 
-    trigger_on_receive_forward_response(connector, handle, type, msg_sequence, failed_error_code, data, metadata);
+    trigger_on_receive_forward_response(self_app_id, connector, handle, type, msg_sequence, failed_error_code, data,
+                                        metadata);
     return failed_error_code;
   }
 
@@ -266,6 +273,11 @@ atapp_endpoint::retry_pending_messages(const atfw::util::time::time_utility::raw
                reinterpret_cast<const void *>(connector), reinterpret_cast<const void *>(handle));
   }
 
+  app_id_t self_app_id = 0;
+  if (owner_ != nullptr) {
+    self_app_id = owner_->get_id();
+  }
+
   while (!pending_message_.empty()) {
     pending_message_t &msg = pending_message_.front();
 
@@ -281,7 +293,7 @@ atapp_endpoint::retry_pending_messages(const atfw::util::time::time_utility::raw
     }
 
     if (0 != res) {
-      trigger_on_receive_forward_response(connector, handle, msg.type, msg.message_sequence, res,
+      trigger_on_receive_forward_response(self_app_id, connector, handle, msg.type, msg.message_sequence, res,
                                           gsl::span<const unsigned char>(msg.data.data(), msg.data.size()),
                                           msg.metadata.get());
     }
@@ -356,9 +368,9 @@ void atapp_endpoint::cancel_pending_messages() {
 
   while (!pending_message_.empty()) {
     const pending_message_t &msg = pending_message_.front();
-    trigger_on_receive_forward_response(connector, handle, msg.type, msg.message_sequence, EN_ATBUS_ERR_CLOSING,
-                                        gsl::span<const unsigned char>(msg.data.data(), msg.data.size()),
-                                        msg.metadata.get());
+    trigger_on_receive_forward_response(
+        owner_->get_app_id(), connector, handle, msg.type, msg.message_sequence, EN_ATBUS_ERR_CLOSING,
+        gsl::span<const unsigned char>(msg.data.data(), msg.data.size()), msg.metadata.get());
 
     UTIL_LIKELY_IF (pending_message_size_ >= msg.data.size()) {
       pending_message_size_ -= msg.data.size();
@@ -392,13 +404,13 @@ LIBATAPP_MACRO_API atfw::util::time::time_utility::raw_time_t atapp_endpoint::ge
   return pending_message_.front().expired_timepoint;
 }
 
-void atapp_endpoint::trigger_on_receive_forward_response(atapp_connector_impl *connector,
+void atapp_endpoint::trigger_on_receive_forward_response(app_id_t direct_source_id, atapp_connector_impl *connector,
                                                          atapp_connection_handle *handle, int32_t type,
                                                          uint64_t sequence, int32_t error_code,
                                                          gsl::span<const unsigned char> data,
                                                          const atapp::protocol::atapp_metadata *metadata) {
   if (nullptr != connector && nullptr != handle) {
-    connector->on_receive_forward_response(handle, type, sequence, error_code, data, metadata);
+    connector->on_receive_forward_response(direct_source_id, handle, type, sequence, error_code, data, metadata);
     return;
   }
 
@@ -415,6 +427,7 @@ void atapp_endpoint::trigger_on_receive_forward_response(atapp_connector_impl *c
   msg.type = type;
 
   app::message_sender_t sender;
+  sender.direct_source_id = direct_source_id;
   if (nullptr != handle) {
     sender.remote = handle->get_endpoint();
   }

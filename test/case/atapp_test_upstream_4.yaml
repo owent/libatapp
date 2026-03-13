@@ -1,16 +1,17 @@
 # Copyright 2026 atframework
-# A group - upstream forward test: child node 3
-# Topology: node1(0x101) --proxy--> upstream(0x102) <--proxy-- node3(0x103)
+# A group - upstream forward test: replacement upstream for A.8
+# Takes over listener address :21602 when old upstream(0x102) goes offline.
+# Same role as upstream(0x102), but with different bus_id (0x104).
 atapp:
-  id: 0x00000103
+  id: 0x00000104
   id_mask: 8.8.8.8
-  name: "upstream-test-node3"
+  name: "new-upstream-test-relay"
   type_id: 1
   type_name: "upstream-test"
 
   bus:
-    listen: "ipv4://127.0.0.1:21603"
-    proxy: "ipv4://127.0.0.1:21602"
+    listen: "ipv4://127.0.0.1:21602"
+    proxy: ""
     backlog: 256
     access_token_max_number: 5
     overwrite_listen_path: false
@@ -48,5 +49,5 @@ atapp:
         sink:
           - type: stdout
             level:
-              min: fatal
-              max: debug
+              min: info
+              max: fatal

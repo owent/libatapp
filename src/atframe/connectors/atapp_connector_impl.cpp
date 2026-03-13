@@ -259,7 +259,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_impl::on_send_forward_request(atapp_c
 }
 
 LIBATAPP_MACRO_API void atapp_connector_impl::on_receive_forward_response(
-    atapp_connection_handle *handle, int32_t type, uint64_t sequence, int32_t error_code,
+    app_id_t direct_source_id, atapp_connection_handle *handle, int32_t type, uint64_t sequence, int32_t error_code,
     gsl::span<const unsigned char> data, const atapp::protocol::atapp_metadata *metadata) {
   // notify app
   app::message_t msg;
@@ -269,6 +269,7 @@ LIBATAPP_MACRO_API void atapp_connector_impl::on_receive_forward_response(
   msg.type = type;
 
   app::message_sender_t sender;
+  sender.direct_source_id = direct_source_id;
   if (nullptr != handle) {
     sender.remote = handle->get_endpoint();
   }

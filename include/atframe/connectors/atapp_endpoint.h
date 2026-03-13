@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "atframe/atapp_conf.h"
+#include "atframe/atapp_common_types.h"
 #include "atframe/etcdcli/etcd_discovery.h"
 
 LIBATAPP_MACRO_NAMESPACE_BEGIN
@@ -101,7 +102,7 @@ class atapp_endpoint {
   void reset();
   void cancel_pending_messages();
 
-  void trigger_on_receive_forward_response(atapp_connector_impl *connector, atapp_connection_handle *handle,
+  void trigger_on_receive_forward_response(app_id_t direct_source_id, atapp_connector_impl *connector, atapp_connection_handle *handle,
                                            int32_t type, uint64_t sequence, int32_t error_code,
                                            gsl::span<const unsigned char> data,
                                            const atapp::protocol::atapp_metadata *metadata);

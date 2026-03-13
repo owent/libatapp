@@ -15,5 +15,7 @@ using jiffies_timer_t = atfw::util::time::jiffies_timer<8, 3, 9>;
 using jiffies_timer_handle_t = jiffies_timer_t::timer_callback_fn_t;
 using jiffies_timer_watcher_t = jiffies_timer_t::timer_wptr_t;
 
+using app_id_t = LIBATAPP_MACRO_BUSID_TYPE;
+
 LIBATAPP_MACRO_NAMESPACE_END
 
