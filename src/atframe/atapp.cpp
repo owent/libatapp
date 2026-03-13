@@ -339,10 +339,11 @@ LIBATAPP_MACRO_API app::message_t &app::message_t::operator=(const message_t &ot
   return *this;
 }
 
-LIBATAPP_MACRO_API app::message_sender_t::message_sender_t() : id(0), remote(nullptr) {}
+LIBATAPP_MACRO_API app::message_sender_t::message_sender_t() : direct_source_id(0), id(0), remote(nullptr) {}
 LIBATAPP_MACRO_API app::message_sender_t::~message_sender_t() {}
 
-LIBATAPP_MACRO_API app::message_sender_t::message_sender_t(const message_sender_t &other) : id(0), remote(nullptr) {
+LIBATAPP_MACRO_API app::message_sender_t::message_sender_t(const message_sender_t &other)
+    : direct_source_id(0), id(0), remote(nullptr) {
   (*this) = other;
 }
 
@@ -350,6 +351,7 @@ LIBATAPP_MACRO_API app::message_sender_t &app::message_sender_t::operator=(const
   if (this == &other) {
     return *this;
   }
+  direct_source_id = other.direct_source_id;
   id = other.id;
   name = other.name;
   remote = other.remote;
@@ -1392,11 +1394,11 @@ LIBATAPP_MACRO_API int app::tick() {
   return active_count;
 }
 
-LIBATAPP_MACRO_API app::app_id_t app::get_id() const noexcept { return conf_.id; }
+LIBATAPP_MACRO_API app_id_t app::get_id() const noexcept { return conf_.id; }
 
 LIBATAPP_MACRO_API app::ev_loop_t *app::get_evloop() { return ev_loop_; }
 
-LIBATAPP_MACRO_API app::app_id_t app::convert_app_id_by_string(const char *id_in) const noexcept {
+LIBATAPP_MACRO_API app_id_t app::convert_app_id_by_string(const char *id_in) const noexcept {
   return convert_app_id_by_string(id_in, conf_.id_mask);
 }
 
@@ -1526,7 +1528,7 @@ LIBATAPP_MACRO_API const std::string &app::get_build_version() const noexcept {
   return build_version_;
 }
 
-LIBATAPP_MACRO_API app::app_id_t app::get_app_id() const noexcept { return conf_.id; }
+LIBATAPP_MACRO_API app_id_t app::get_app_id() const noexcept { return conf_.id; }
 
 LIBATAPP_MACRO_API const std::string &app::get_app_name() const noexcept { return conf_.origin.name(); }
 
@@ -1534,9 +1536,7 @@ LIBATAPP_MACRO_API const std::string &app::get_app_identity() const noexcept { r
 
 LIBATAPP_MACRO_API const std::string &app::get_type_name() const noexcept { return conf_.origin.type_name(); }
 
-LIBATAPP_MACRO_API app::app_id_t app::get_type_id() const noexcept {
-  return static_cast<app::app_id_t>(conf_.origin.type_id());
-}
+LIBATAPP_MACRO_API app_id_t app::get_type_id() const noexcept { return static_cast<app_id_t>(conf_.origin.type_id()); }
 
 LIBATAPP_MACRO_API const std::string &app::get_hash_code() const noexcept { return conf_.hash_code; }
 
@@ -4373,8 +4373,7 @@ LIBATAPP_MACRO_API void app::split_ids_by_string(const char *in, std::vector<app
   }
 }
 
-LIBATAPP_MACRO_API app::app_id_t app::convert_app_id_by_string(const char *id_in,
-                                                               const std::vector<app_id_t> &mask_in) {
+LIBATAPP_MACRO_API app_id_t app::convert_app_id_by_string(const char *id_in, const std::vector<app_id_t> &mask_in) {
   if (nullptr == id_in || 0 == *id_in) {
     return 0;
   }
@@ -4403,7 +4402,7 @@ LIBATAPP_MACRO_API app::app_id_t app::convert_app_id_by_string(const char *id_in
   return ret;
 }
 
-LIBATAPP_MACRO_API app::app_id_t app::convert_app_id_by_string(const char *id_in, const char *mask_in) {
+LIBATAPP_MACRO_API app_id_t app::convert_app_id_by_string(const char *id_in, const char *mask_in) {
   if (nullptr == id_in || 0 == *id_in) {
     return 0;
   }
@@ -4859,6 +4858,7 @@ int app::bus_evt_callback_on_forward_request(const atbus::node &, const atbus::e
   message.type = head == nullptr ? 0 : head->type();
 
   app::message_sender_t sender;
+  sender.direct_source_id = source_bus_id;
   sender.id = from_id;
   sender.remote = get_endpoint(from_id);
   if (nullptr != sender.remote) {
@@ -4908,7 +4908,7 @@ int app::bus_evt_callback_on_forward_response(const atbus::node &, const atbus::
   const auto &transform_rsp = m->body().data_transform_rsp();
   if (atbus_connector_) {
     atbus_connector_->on_receive_forward_response(
-        transform_rsp.from(), head->type(), head->sequence(), head->result_code(),
+        head->source_bus_id(), transform_rsp.from(), head->type(), head->sequence(), head->result_code(),
         gsl::span<const unsigned char>(reinterpret_cast<const unsigned char *>(transform_rsp.content().c_str()),
                                        transform_rsp.content().size()),
         nullptr);
@@ -4924,6 +4924,7 @@ int app::bus_evt_callback_on_forward_response(const atbus::node &, const atbus::
   message.type = head->type();
 
   app::message_sender_t sender;
+  sender.direct_source_id = head->source_bus_id();
   sender.id = from_id;
   sender.remote = get_endpoint(from_id);
   if (nullptr != sender.remote) {

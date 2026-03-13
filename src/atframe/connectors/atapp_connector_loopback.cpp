@@ -111,7 +111,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_loopback::on_send_forward_request(
 }
 
 LIBATAPP_MACRO_API void atapp_connector_loopback::on_receive_forward_response(
-    atapp_connection_handle *handle, int32_t type, uint64_t msg_sequence, int32_t error_code,
+    app_id_t direct_source_id, atapp_connection_handle *handle, int32_t type, uint64_t msg_sequence, int32_t error_code,
     gsl::span<const unsigned char> data, const atapp::protocol::atapp_metadata *metadata) {
   auto *owner = get_owner();
   if (nullptr == owner) {
@@ -126,6 +126,7 @@ LIBATAPP_MACRO_API void atapp_connector_loopback::on_receive_forward_response(
   msg.type = type;
 
   app::message_sender_t sender;
+  sender.direct_source_id = direct_source_id;
   sender.id = owner->get_id();
   sender.name = owner->get_app_name();
   if (nullptr != handle) {
@@ -169,6 +170,7 @@ LIBATAPP_MACRO_API int32_t atapp_connector_loopback::process(
       msg.type = pending_msg.type;
 
       app::message_sender_t sender;
+      sender.direct_source_id = owner->get_id();
       sender.id = owner->get_id();
       sender.name = owner->get_app_name();
       // endpoint maybe replaced in callback , so we need refind it every time

@@ -59,9 +59,17 @@ class atapp_connector_atbus : public atapp_connector_impl, public std::enable_sh
 
   LIBATAPP_MACRO_API const atbus::topology_policy_rule &get_topology_policy_rule() const noexcept;
 
+#if !defined(NDEBUG)
+  LIBATAPP_MACRO_API atbus::bus_id_t get_connection_handle_proxy_bus_id(atbus::bus_id_t target_bus_id) const noexcept;
+  LIBATAPP_MACRO_API bool has_connection_handle(atbus::bus_id_t target_bus_id) const noexcept;
+  LIBATAPP_MACRO_API void set_handle_ready_by_bus_id(atbus::bus_id_t target_bus_id);
+  LIBATAPP_MACRO_API void set_handle_unready_by_bus_id(atbus::bus_id_t target_bus_id);
+#endif
+
   using atapp_connector_impl::on_receive_forward_response;
-  LIBATAPP_MACRO_API void on_receive_forward_response(uint64_t app_id, int32_t type, uint64_t msg_sequence,
-                                                      int32_t error_code, gsl::span<const unsigned char> data,
+  LIBATAPP_MACRO_API void on_receive_forward_response(app_id_t direct_source_id, uint64_t app_id, int32_t type,
+                                                      uint64_t msg_sequence, int32_t error_code,
+                                                      gsl::span<const unsigned char> data,
                                                       const atapp::protocol::atapp_metadata *metadata);
 
  private:

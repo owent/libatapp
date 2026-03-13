@@ -274,8 +274,8 @@ LIBATAPP_MACRO_API int32_t atapp_connector_atbus::on_send_forward_request(atapp_
 }
 
 LIBATAPP_MACRO_API void atapp_connector_atbus::on_receive_forward_response(
-    uint64_t app_id, int32_t type, uint64_t msg_sequence, int32_t error_code, gsl::span<const unsigned char> data,
-    const atapp::protocol::atapp_metadata *metadata) {
+    app_id_t direct_source_id, uint64_t app_id, int32_t type, uint64_t msg_sequence, int32_t error_code,
+    gsl::span<const unsigned char> data, const atapp::protocol::atapp_metadata *metadata) {
   handle_map_t::iterator iter = handles_.find(app_id);
 
   if (iter != handles_.end()) {
@@ -283,7 +283,8 @@ LIBATAPP_MACRO_API void atapp_connector_atbus::on_receive_forward_response(
     if (iter->second) {
       app_handle = iter->second->app_handle.get();
     }
-    atapp_connector_impl::on_receive_forward_response(app_handle, type, msg_sequence, error_code, data, metadata);
+    atapp_connector_impl::on_receive_forward_response(direct_source_id, app_handle, type, msg_sequence, error_code,
+                                                      data, metadata);
     return;
   }
 
@@ -295,6 +296,7 @@ LIBATAPP_MACRO_API void atapp_connector_atbus::on_receive_forward_response(
   msg.type = type;
 
   app::message_sender_t sender;
+  sender.direct_source_id = direct_source_id;
   sender.id = app_id;
   sender.remote = get_owner()->get_endpoint(app_id);
   if (nullptr != sender.remote) {
@@ -493,6 +495,35 @@ LIBATAPP_MACRO_API void atapp_connector_atbus::update_topology_peer(atbus::bus_i
 LIBATAPP_MACRO_API const atbus::topology_policy_rule &atapp_connector_atbus::get_topology_policy_rule() const noexcept {
   return atbus_topology_policy_rule_;
 }
+
+#if !defined(NDEBUG)
+LIBATAPP_MACRO_API atbus::bus_id_t atapp_connector_atbus::get_connection_handle_proxy_bus_id(
+    atbus::bus_id_t target_bus_id) const noexcept {
+  auto iter = handles_.find(target_bus_id);
+  if (iter == handles_.end() || !iter->second) {
+    return 0;
+  }
+  return iter->second->proxy_bus_id;
+}
+
+LIBATAPP_MACRO_API bool atapp_connector_atbus::has_connection_handle(atbus::bus_id_t target_bus_id) const noexcept {
+  return handles_.find(target_bus_id) != handles_.end();
+}
+
+LIBATAPP_MACRO_API void atapp_connector_atbus::set_handle_ready_by_bus_id(atbus::bus_id_t target_bus_id) {
+  auto iter = handles_.find(target_bus_id);
+  if (iter != handles_.end() && iter->second) {
+    set_handle_ready(iter->second);
+  }
+}
+
+LIBATAPP_MACRO_API void atapp_connector_atbus::set_handle_unready_by_bus_id(atbus::bus_id_t target_bus_id) {
+  auto iter = handles_.find(target_bus_id);
+  if (iter != handles_.end() && iter->second) {
+    set_handle_unready(iter->second);
+  }
+}
+#endif
 
 atfw::util::nostd::nonnull<atapp_connector_atbus::atbus_connection_handle_ptr_t>
 atapp_connector_atbus::create_connection_handle(atbus::bus_id_t bus_id, atbus::bus_id_t topology_upstream_bus_id,

@@ -21,6 +21,7 @@
 #include <string>
 #include <unordered_set>
 
+#include "atframe/atapp_common_types.h"
 #include "atframe/atapp_config.h"
 #include "atframe/etcdcli/etcd_discovery.h"
 
@@ -177,7 +178,8 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE atapp_connector_impl {
   /**
    * @brief implement should call this when receive a response to tell app if a message is success delivered
    */
-  LIBATAPP_MACRO_API virtual void on_receive_forward_response(atapp_connection_handle *handle, int32_t type,
+  LIBATAPP_MACRO_API virtual void on_receive_forward_response(app_id_t direct_source_id,
+                                                              atapp_connection_handle *handle, int32_t type,
                                                               uint64_t msg_sequence, int32_t error_code,
                                                               gsl::span<const unsigned char> data,
                                                               const atapp::protocol::atapp_metadata *metadata);

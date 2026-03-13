@@ -55,7 +55,6 @@ class atapp_connector_loopback;
 
 class app {
  public:
-  using app_id_t = LIBATAPP_MACRO_BUSID_TYPE;
   using module_ptr_t = std::shared_ptr<module_impl>;
   using yaml_conf_map_t = std::unordered_map<std::string, std::vector<YAML::Node>>;
   using endpoint_index_by_id_t = std::unordered_map<uint64_t, atapp_endpoint::ptr_t>;
@@ -91,6 +90,7 @@ class app {
   };
 
   struct message_sender_t {
+    app_id_t direct_source_id;
     app_id_t id;
     gsl::string_view name;
     atapp_endpoint *remote;
