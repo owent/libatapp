@@ -805,12 +805,17 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_timeout_downstream_cleanup) {
     n1_connector->set_handle_unready_by_bus_id(apps.node3.get_app_id());
   }
 
-  // Verify node3 handle is now unready
+  // Verify: handle exists, not ready, reconnect_retry_times incremented to 1
+  // set_handle_unready_by_bus_id -> set_handle_unready -> setup_reconnect_timer -> retry 0→1, timer at T+2s
+  if (n1_connector) {
+    CASE_EXPECT_TRUE(n1_connector->has_connection_handle(apps.node3.get_app_id()));
+    CASE_EXPECT_FALSE(n1_connector->is_connection_handle_ready(apps.node3.get_app_id()));
+    CASE_EXPECT_GE(n1_connector->get_connection_handle_reconnect_retry_times(apps.node3.get_app_id()), 1);
+  }
+
   auto *ep_node3 = apps.node1.get_endpoint(apps.node3.get_app_id());
   CASE_EXPECT_TRUE(ep_node3 != nullptr);
   if (ep_node3 != nullptr) {
-    CASE_MSG_INFO() << "A.6: node3 handle exists=" << ep_node3->has_connection_handle()
-                    << " ready=" << (ep_node3->get_ready_connection_handle() != nullptr) << '\n';
     CASE_EXPECT_TRUE(ep_node3->get_ready_connection_handle() == nullptr);
   }
 
@@ -832,17 +837,10 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_timeout_downstream_cleanup) {
 
   // Advance to T+30s — timer at T+2s should fire, exhausting retries
   atframework::atapp::app::set_sys_now(now + std::chrono::seconds(30));
-  CASE_MSG_INFO() << "A.6: advanced to T+30s, calling tick() then run_noblock()" << '\n';
   apps.node1.tick();
   for (int i = 0; i < 3; ++i) {
     apps.node1.run_noblock();
     CASE_THREAD_SLEEP_MS(10);
-  }
-
-  // Check handle after T+30s
-  if (n1_connector) {
-    CASE_MSG_INFO() << "A.6: has_connection_handle after T+30s: "
-                    << n1_connector->has_connection_handle(apps.node3.get_app_id()) << '\n';
   }
 
   // Advance to T+60s for extra margin
@@ -854,11 +852,9 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_timeout_downstream_cleanup) {
   }
 
   // Verify forward response error was triggered
-  CASE_MSG_INFO() << "A.6: forward response count=" << g_upstream_test_ctx.forward_response_count << '\n';
   CASE_EXPECT_GT(g_upstream_test_ctx.forward_response_count, 0);
   if (g_upstream_test_ctx.forward_response_count > 0) {
     CASE_EXPECT_EQ(EN_ATBUS_ERR_NODE_TIMEOUT, g_upstream_test_ctx.last_forward_response_error);
-    CASE_MSG_INFO() << "A.6: last error_code=" << g_upstream_test_ctx.last_forward_response_error << '\n';
   }
 
   // Reconnect retries are exhausted by app::tick() / process_custom_timers().
@@ -867,7 +863,6 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_timeout_downstream_cleanup) {
   // Config: reconnect_max_try_times=2, reconnect_start_interval=2s.
   if (n1_connector) {
     CASE_EXPECT_FALSE(n1_connector->has_connection_handle(apps.node3.get_app_id()));
-    CASE_MSG_INFO() << "A.6: handle removed after reconnect retry exhaustion via app::tick()" << '\n';
   }
 
   // After GC timeout (endpoint_gc_timeout default=60s), verify endpoint is cleaned up.
@@ -878,7 +873,6 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_timeout_downstream_cleanup) {
   }
 
   ep_node3 = apps.node1.get_endpoint(apps.node3.get_app_id());
-  CASE_MSG_INFO() << "A.6: node3 endpoint on node1 after GC: " << (ep_node3 ? "exists" : "null") << '\n';
   CASE_EXPECT_TRUE(!ep_node3);
 
   // Reset time using real system clock
@@ -1047,14 +1041,16 @@ CASE_TEST(atapp_upstream_forward, upstream_topology_change_new_upstream) {
 #else
   reset_test_context();
 
-  // 4-node topology:
-  // node1(0x101) --proxy--> upstream(0x102) <--proxy-- node3(0x103)
-  //                            ^
-  //                            |
-  //               new_upstream(0x104) --proxy--> upstream(0x102)
+  // Scenario: old upstream(0x102) goes offline, new upstream(0x104) takes over
+  // on the same listen address (:21602). bus_id changes from 0x102 to 0x104.
+  // Node3 is unchanged — it always connects to proxy :21602.
   //
-  // Initial: node1 routes to node3 via upstream(0x102) [proxy_bus_id = 0x102]
-  // After:   update_topology_peer switches to new_upstream(0x104) [proxy_bus_id = 0x104]
+  // Phase 1: node1(0x101) → upstream(0x102, :21602) ← node3(0x103)
+  //   Send message → direct_source_id = 0x102
+  //
+  // Phase 2: upstream(0x102) stops; new_upstream(0x104) starts on :21602
+  //   node1 and node3 auto-reconnect → connected to 0x104
+  //   Send message → direct_source_id = 0x104
 
   std::string conf1 = get_test_conf_path("atapp_test_upstream_1.yaml");
   std::string conf2 = get_test_conf_path("atapp_test_upstream_2.yaml");
@@ -1067,227 +1063,287 @@ CASE_TEST(atapp_upstream_forward, upstream_topology_change_new_upstream) {
   if (check_and_skip_if_missing(conf4)) return;
 
   atframework::atapp::app node1;
-  atframework::atapp::app upstream_app;
   atframework::atapp::app node3;
+  uint64_t old_upstream_id = 0;
+
+  // ---- Phase 1: upstream(0x102) on :21602 ----
+  {
+    atframework::atapp::app upstream_app;
+    const char *args_up[] = {"upstream", "-c", conf2.c_str(), "start"};
+    CASE_EXPECT_EQ(0, upstream_app.init(nullptr, 4, args_up, nullptr));
+    old_upstream_id = upstream_app.get_app_id();
+
+    const char *args1[] = {"node1", "-c", conf1.c_str(), "start"};
+    CASE_EXPECT_EQ(0, node1.init(nullptr, 4, args1, nullptr));
+
+    const char *args3[] = {"node3", "-c", conf3.c_str(), "start"};
+    CASE_EXPECT_EQ(0, node3.init(nullptr, 4, args3, nullptr));
+
+    auto pump_phase1 = [&](const std::function<bool()> &cond, std::chrono::seconds timeout = std::chrono::seconds(8)) {
+      auto start = atfw::util::time::time_utility::sys_now();
+      auto end = start + timeout;
+      while (!cond() && atfw::util::time::time_utility::sys_now() < end) {
+        upstream_app.run_noblock();
+        node1.run_noblock();
+        node3.run_noblock();
+        atfw::util::time::time_utility::update();
+      }
+    };
+
+    pump_phase1([&]() {
+      auto b1 = node1.get_bus_node();
+      auto b3 = node3.get_bus_node();
+      return b1 && b1->get_upstream_endpoint() != nullptr && b3 && b3->get_upstream_endpoint() != nullptr;
+    });
+
+    // Create discoveries
+    auto node1_disc = atfw::util::memory::make_strong_rc<atapp::etcd_discovery_node>();
+    auto upstream_disc = atfw::util::memory::make_strong_rc<atapp::etcd_discovery_node>();
+    auto node3_disc = atfw::util::memory::make_strong_rc<atapp::etcd_discovery_node>();
+
+    {
+      atapp::protocol::atapp_discovery info;
+      node1.pack(info);
+      node1_disc->copy_from(info, atapp::etcd_discovery_node::node_version());
+    }
+    {
+      atapp::protocol::atapp_discovery info;
+      upstream_app.pack(info);
+      upstream_disc->copy_from(info, atapp::etcd_discovery_node::node_version());
+    }
+    {
+      atapp::protocol::atapp_discovery info;
+      node3.pack(info);
+      node3_disc->copy_from(info, atapp::etcd_discovery_node::node_version());
+    }
+
+    atframework::atapp::app *apps[] = {&node1, &upstream_app, &node3};
+    atfw::util::memory::strong_rc_ptr<atapp::etcd_discovery_node> discs[] = {node1_disc, upstream_disc, node3_disc};
+    for (auto *app : apps) {
+      for (auto &disc : discs) {
+        app->get_etcd_module()->get_global_discovery().add_node(disc);
+      }
+    }
+
+    // Bus topology registries
+    auto bus_up = upstream_app.get_bus_node();
+    auto bus1 = node1.get_bus_node();
+    auto bus3 = node3.get_bus_node();
+
+    if (bus_up && bus_up->get_topology_registry()) {
+      bus_up->get_topology_registry()->update_peer(node1.get_app_id(), upstream_app.get_app_id(), nullptr);
+      bus_up->get_topology_registry()->update_peer(node3.get_app_id(), upstream_app.get_app_id(), nullptr);
+    }
+    if (bus1 && bus1->get_topology_registry()) {
+      bus1->get_topology_registry()->update_peer(upstream_app.get_app_id(), 0, nullptr);
+      bus1->get_topology_registry()->update_peer(node3.get_app_id(), upstream_app.get_app_id(), nullptr);
+    }
+    if (bus3 && bus3->get_topology_registry()) {
+      bus3->get_topology_registry()->update_peer(upstream_app.get_app_id(), 0, nullptr);
+      bus3->get_topology_registry()->update_peer(node1.get_app_id(), upstream_app.get_app_id(), nullptr);
+    }
+
+    // Create endpoints
+    CASE_EXPECT_TRUE(node1.mutable_endpoint(upstream_disc));
+    CASE_EXPECT_TRUE(node1.mutable_endpoint(node3_disc));
+    CASE_EXPECT_TRUE(upstream_app.mutable_endpoint(node1_disc));
+    CASE_EXPECT_TRUE(upstream_app.mutable_endpoint(node3_disc));
+    CASE_EXPECT_TRUE(node3.mutable_endpoint(node1_disc));
+    CASE_EXPECT_TRUE(node3.mutable_endpoint(upstream_disc));
+
+    // Connector topologies
+    auto up_conn = upstream_app.get_atbus_connector();
+    if (up_conn) {
+      up_conn->update_topology_peer(node1.get_app_id(), upstream_app.get_app_id(), nullptr);
+      up_conn->update_topology_peer(node3.get_app_id(), upstream_app.get_app_id(), nullptr);
+    }
+    auto n1_conn = node1.get_atbus_connector();
+    if (n1_conn) {
+      n1_conn->update_topology_peer(upstream_app.get_app_id(), 0, nullptr);
+      n1_conn->update_topology_peer(node3.get_app_id(), upstream_app.get_app_id(), nullptr);
+    }
+    auto n3_conn = node3.get_atbus_connector();
+    if (n3_conn) {
+      n3_conn->update_topology_peer(upstream_app.get_app_id(), 0, nullptr);
+      n3_conn->update_topology_peer(node1.get_app_id(), upstream_app.get_app_id(), nullptr);
+    }
+
+    // Wait for node3 handle to be ready on node1
+    pump_phase1([&]() {
+      auto *ep = node1.get_endpoint(node3.get_app_id());
+      return ep != nullptr && ep->get_ready_connection_handle() != nullptr;
+    });
+
+    // Set up receive callback on node3 (persists across phases)
+    node3.set_evt_on_forward_request([](atframework::atapp::app &,
+                                        const atframework::atapp::app::message_sender_t &sender,
+                                        const atframework::atapp::app::message_t &msg) {
+      auto received = gsl::string_view{reinterpret_cast<const char *>(msg.data.data()), msg.data.size()};
+      g_upstream_test_ctx.received_messages.emplace_back(received.data(), received.size());
+      g_upstream_test_ctx.received_direct_source_ids.push_back(sender.direct_source_id);
+      ++g_upstream_test_ctx.received_message_count;
+      CASE_MSG_INFO() << "A.8: node3 received: " << received << ", direct_source_id=0x" << std::hex
+                      << sender.direct_source_id << std::dec << '\n';
+      return 0;
+    });
+
+    // Send first message: relayed by upstream(0x102), direct_source_id = 0x102
+    char msg_data[] = "before-upstream-switch-A8";
+    gsl::span<const unsigned char> msg_span{reinterpret_cast<const unsigned char *>(msg_data),
+                                            static_cast<size_t>(strlen(msg_data))};
+    uint64_t seq = 800;
+    CASE_EXPECT_EQ(0, node1.send_message(node3.get_app_id(), 100, msg_span, &seq));
+
+    pump_phase1([&]() { return g_upstream_test_ctx.received_message_count >= 1; });
+    CASE_EXPECT_EQ(1, g_upstream_test_ctx.received_message_count);
+
+    // upstream_app goes out of scope → destructor releases port :21602
+  }
+
+  // Let node1 and node3 process disconnect events
+  for (int i = 0; i < 10; ++i) {
+    node1.run_noblock();
+    node3.run_noblock();
+    CASE_THREAD_SLEEP_MS(10);
+  }
+
+  // ---- Phase 2: new_upstream(0x104) takes over on :21602 ----
   atframework::atapp::app new_upstream;
-
-  // Init upstream first, then children
-  const char *args_up[] = {"upstream", "-c", conf2.c_str(), "start"};
-  CASE_EXPECT_EQ(0, upstream_app.init(nullptr, 4, args_up, nullptr));
-
-  const char *args1[] = {"node1", "-c", conf1.c_str(), "start"};
-  CASE_EXPECT_EQ(0, node1.init(nullptr, 4, args1, nullptr));
-
-  const char *args3[] = {"node3", "-c", conf3.c_str(), "start"};
-  CASE_EXPECT_EQ(0, node3.init(nullptr, 4, args3, nullptr));
-
   const char *args4[] = {"new_upstream", "-c", conf4.c_str(), "start"};
   CASE_EXPECT_EQ(0, new_upstream.init(nullptr, 4, args4, nullptr));
 
-  // Helper for 4-node pumping
-  auto pump4_until = [&](const std::function<bool()> &cond, std::chrono::seconds timeout = std::chrono::seconds(8)) {
+  auto pump_phase2 = [&](const std::function<bool()> &cond, std::chrono::seconds timeout = std::chrono::seconds(8)) {
     auto start = atfw::util::time::time_utility::sys_now();
     auto end = start + timeout;
     while (!cond() && atfw::util::time::time_utility::sys_now() < end) {
-      upstream_app.run_noblock();
+      new_upstream.run_noblock();
       node1.run_noblock();
       node3.run_noblock();
-      new_upstream.run_noblock();
       atfw::util::time::time_utility::update();
     }
   };
 
-  // Wait for all nodes to connect to their upstreams
-  pump4_until([&]() {
-    auto bus1 = node1.get_bus_node();
-    auto bus3 = node3.get_bus_node();
-    auto bus4 = new_upstream.get_bus_node();
-    return bus1 && bus1->get_upstream_endpoint() != nullptr && bus3 && bus3->get_upstream_endpoint() != nullptr &&
-           bus4 && bus4->get_upstream_endpoint() != nullptr;
+  // Wait for node1 and node3 to auto-reconnect to :21602 (now 0x104)
+  pump_phase2([&]() {
+    auto b1 = node1.get_bus_node();
+    auto b3 = node3.get_bus_node();
+    return b1 && b1->get_upstream_endpoint() != nullptr && b3 && b3->get_upstream_endpoint() != nullptr;
   });
 
-  // Create discovery for all 4 nodes
-  auto node1_disc = atfw::util::memory::make_strong_rc<atapp::etcd_discovery_node>();
-  auto upstream_disc = atfw::util::memory::make_strong_rc<atapp::etcd_discovery_node>();
-  auto node3_disc = atfw::util::memory::make_strong_rc<atapp::etcd_discovery_node>();
-  auto new_up_disc = atfw::util::memory::make_strong_rc<atapp::etcd_discovery_node>();
+  // Verify reconnection to 0x104
+  {
+    auto b1 = node1.get_bus_node();
+    auto b3 = node3.get_bus_node();
+    if (b1 && b1->get_upstream_endpoint()) {
+      CASE_EXPECT_EQ(new_upstream.get_app_id(), b1->get_upstream_endpoint()->get_id());
+    }
+    if (b3 && b3->get_upstream_endpoint()) {
+      CASE_EXPECT_EQ(new_upstream.get_app_id(), b3->get_upstream_endpoint()->get_id());
+    }
+  }
 
-  {
-    atapp::protocol::atapp_discovery info;
-    node1.pack(info);
-    node1_disc->copy_from(info, atapp::etcd_discovery_node::node_version());
-  }
-  {
-    atapp::protocol::atapp_discovery info;
-    upstream_app.pack(info);
-    upstream_disc->copy_from(info, atapp::etcd_discovery_node::node_version());
-  }
-  {
-    atapp::protocol::atapp_discovery info;
-    node3.pack(info);
-    node3_disc->copy_from(info, atapp::etcd_discovery_node::node_version());
-  }
+  // Create discovery for new_upstream and re-create for node1/node3
+  auto new_up_disc = atfw::util::memory::make_strong_rc<atapp::etcd_discovery_node>();
+  auto node1_disc2 = atfw::util::memory::make_strong_rc<atapp::etcd_discovery_node>();
+  auto node3_disc2 = atfw::util::memory::make_strong_rc<atapp::etcd_discovery_node>();
+
   {
     atapp::protocol::atapp_discovery info;
     new_upstream.pack(info);
     new_up_disc->copy_from(info, atapp::etcd_discovery_node::node_version());
   }
-
-  // Add all discoveries to all nodes
-  atframework::atapp::app *all_apps[] = {&node1, &upstream_app, &node3, &new_upstream};
-  atfw::util::memory::strong_rc_ptr<atapp::etcd_discovery_node> all_discs[] = {node1_disc, upstream_disc, node3_disc,
-                                                                               new_up_disc};
-  for (auto *app : all_apps) {
-    for (auto &disc : all_discs) {
-      app->get_etcd_module()->get_global_discovery().add_node(disc);
-    }
+  {
+    atapp::protocol::atapp_discovery info;
+    node1.pack(info);
+    node1_disc2->copy_from(info, atapp::etcd_discovery_node::node_version());
+  }
+  {
+    atapp::protocol::atapp_discovery info;
+    node3.pack(info);
+    node3_disc2->copy_from(info, atapp::etcd_discovery_node::node_version());
   }
 
-  // Update bus node topology registries (required for mutable_connection_handle to find peers)
+  node1.get_etcd_module()->get_global_discovery().add_node(new_up_disc);
+  node3.get_etcd_module()->get_global_discovery().add_node(new_up_disc);
+  new_upstream.get_etcd_module()->get_global_discovery().add_node(new_up_disc);
+  new_upstream.get_etcd_module()->get_global_discovery().add_node(node1_disc2);
+  new_upstream.get_etcd_module()->get_global_discovery().add_node(node3_disc2);
+
+  // Update bus topology registries for the new upstream
   auto bus1 = node1.get_bus_node();
-  auto bus_up = upstream_app.get_bus_node();
   auto bus3 = node3.get_bus_node();
   auto bus_nu = new_upstream.get_bus_node();
 
-  if (bus_up && bus_up->get_topology_registry()) {
-    bus_up->get_topology_registry()->update_peer(node1.get_app_id(), upstream_app.get_app_id(), nullptr);
-    bus_up->get_topology_registry()->update_peer(node3.get_app_id(), upstream_app.get_app_id(), nullptr);
-    bus_up->get_topology_registry()->update_peer(new_upstream.get_app_id(), upstream_app.get_app_id(), nullptr);
-  }
   if (bus1 && bus1->get_topology_registry()) {
-    bus1->get_topology_registry()->update_peer(upstream_app.get_app_id(), 0, nullptr);
-    bus1->get_topology_registry()->update_peer(node3.get_app_id(), upstream_app.get_app_id(), nullptr);
-    // Register 0x104 with upstream=0 so chain check won't find 0x102 in node3's path after topology change
     bus1->get_topology_registry()->update_peer(new_upstream.get_app_id(), 0, nullptr);
+    bus1->get_topology_registry()->update_peer(node3.get_app_id(), new_upstream.get_app_id(), nullptr);
   }
   if (bus3 && bus3->get_topology_registry()) {
-    bus3->get_topology_registry()->update_peer(upstream_app.get_app_id(), 0, nullptr);
-    bus3->get_topology_registry()->update_peer(node1.get_app_id(), upstream_app.get_app_id(), nullptr);
+    bus3->get_topology_registry()->update_peer(new_upstream.get_app_id(), 0, nullptr);
+    bus3->get_topology_registry()->update_peer(node1.get_app_id(), new_upstream.get_app_id(), nullptr);
   }
   if (bus_nu && bus_nu->get_topology_registry()) {
-    bus_nu->get_topology_registry()->update_peer(upstream_app.get_app_id(), 0, nullptr);
+    bus_nu->get_topology_registry()->update_peer(node1.get_app_id(), new_upstream.get_app_id(), nullptr);
+    bus_nu->get_topology_registry()->update_peer(node3.get_app_id(), new_upstream.get_app_id(), nullptr);
   }
 
-  // Create endpoints first (handles must exist before connector-level topology update)
-  CASE_EXPECT_TRUE(node1.mutable_endpoint(upstream_disc));
-  CASE_EXPECT_TRUE(node1.mutable_endpoint(node3_disc));
+  // Create endpoints for new_upstream
   CASE_EXPECT_TRUE(node1.mutable_endpoint(new_up_disc));
-  CASE_EXPECT_TRUE(upstream_app.mutable_endpoint(node1_disc));
-  CASE_EXPECT_TRUE(upstream_app.mutable_endpoint(node3_disc));
-  CASE_EXPECT_TRUE(upstream_app.mutable_endpoint(new_up_disc));
-  CASE_EXPECT_TRUE(node3.mutable_endpoint(node1_disc));
-  CASE_EXPECT_TRUE(node3.mutable_endpoint(upstream_disc));
-  CASE_EXPECT_TRUE(new_upstream.mutable_endpoint(upstream_disc));
+  CASE_EXPECT_TRUE(new_upstream.mutable_endpoint(node1_disc2));
+  CASE_EXPECT_TRUE(new_upstream.mutable_endpoint(node3_disc2));
+  CASE_EXPECT_TRUE(node3.mutable_endpoint(new_up_disc));
 
-  // Setup connector-level topology AFTER endpoints so handles exist
-  auto up_connector = upstream_app.get_atbus_connector();
-  if (up_connector) {
-    up_connector->update_topology_peer(node1.get_app_id(), upstream_app.get_app_id(), nullptr);
-    up_connector->update_topology_peer(node3.get_app_id(), upstream_app.get_app_id(), nullptr);
-    up_connector->update_topology_peer(new_upstream.get_app_id(), upstream_app.get_app_id(), nullptr);
-  }
-
+  // Update connector topologies: node3 now proxied through 0x104
   auto n1_connector = node1.get_atbus_connector();
   if (n1_connector) {
-    n1_connector->update_topology_peer(upstream_app.get_app_id(), 0, nullptr);
-    n1_connector->update_topology_peer(node3.get_app_id(), upstream_app.get_app_id(), nullptr);
-    // Use upstream=0x102 so 0x104's handle gets proxied through 0x102 and becomes ready
-    n1_connector->update_topology_peer(new_upstream.get_app_id(), upstream_app.get_app_id(), nullptr);
+    n1_connector->update_topology_peer(new_upstream.get_app_id(), 0, nullptr);
+    n1_connector->update_topology_peer(node3.get_app_id(), new_upstream.get_app_id(), nullptr);
   }
-
   auto n3_connector = node3.get_atbus_connector();
   if (n3_connector) {
-    n3_connector->update_topology_peer(upstream_app.get_app_id(), 0, nullptr);
-    n3_connector->update_topology_peer(node1.get_app_id(), upstream_app.get_app_id(), nullptr);
+    n3_connector->update_topology_peer(new_upstream.get_app_id(), 0, nullptr);
+    n3_connector->update_topology_peer(node1.get_app_id(), new_upstream.get_app_id(), nullptr);
   }
-
   auto nu_connector = new_upstream.get_atbus_connector();
   if (nu_connector) {
-    nu_connector->update_topology_peer(upstream_app.get_app_id(), 0, nullptr);
+    nu_connector->update_topology_peer(node1.get_app_id(), new_upstream.get_app_id(), nullptr);
+    nu_connector->update_topology_peer(node3.get_app_id(), new_upstream.get_app_id(), nullptr);
   }
 
   // Wait for node3 handle to be ready on node1
-  pump4_until([&]() {
+  pump_phase2([&]() {
     auto *ep = node1.get_endpoint(node3.get_app_id());
     return ep != nullptr && ep->get_ready_connection_handle() != nullptr;
   });
 
-  // Verify initial proxy_bus_id = upstream(0x102)
-  CASE_EXPECT_TRUE(n1_connector != nullptr);
+  // Verify proxy changed to new_upstream(0x104)
   if (n1_connector) {
-    auto initial_proxy = n1_connector->get_connection_handle_proxy_bus_id(node3.get_app_id());
-    CASE_MSG_INFO() << "A.8: initial proxy_bus_id for node3: 0x" << std::hex << initial_proxy << std::dec << '\n';
-    CASE_EXPECT_EQ(upstream_app.get_app_id(), initial_proxy);
+    CASE_EXPECT_EQ(new_upstream.get_app_id(), n1_connector->get_connection_handle_proxy_bus_id(node3.get_app_id()));
   }
 
-  // Set up receive callback on node3
-  node3.set_evt_on_forward_request([](atframework::atapp::app &,
-                                      const atframework::atapp::app::message_sender_t &sender,
-                                      const atframework::atapp::app::message_t &msg) {
-    auto received = gsl::string_view{reinterpret_cast<const char *>(msg.data.data()), msg.data.size()};
-    g_upstream_test_ctx.received_messages.emplace_back(received.data(), received.size());
-    g_upstream_test_ctx.received_direct_source_ids.push_back(sender.direct_source_id);
-    ++g_upstream_test_ctx.received_message_count;
-    CASE_MSG_INFO() << "A.8: node3 received: " << received << ", direct_source_id=0x" << std::hex
-                    << sender.direct_source_id << std::dec << '\n';
-    return 0;
-  });
-
-  // First message: routed via upstream(0x102)
-  char msg_data[] = "before-topo-change-A8";
-  gsl::span<const unsigned char> msg_span{reinterpret_cast<const unsigned char *>(msg_data),
-                                          static_cast<size_t>(strlen(msg_data))};
-  uint64_t seq = 800;
-  CASE_EXPECT_EQ(0, node1.send_message(node3.get_app_id(), 100, msg_span, &seq));
-
-  pump4_until([&]() { return g_upstream_test_ctx.received_message_count >= 1; });
-  CASE_EXPECT_EQ(1, g_upstream_test_ctx.received_message_count);
-
-  // Change topology: node1 now routes to node3 via new_upstream(0x104)
-  if (bus1 && bus1->get_topology_registry()) {
-    bus1->get_topology_registry()->update_peer(node3.get_app_id(), new_upstream.get_app_id(), nullptr);
-  }
-  if (n1_connector) {
-    n1_connector->update_topology_peer(node3.get_app_id(), new_upstream.get_app_id(), nullptr);
-  }
-
-  // Wait for handle to be ready with new proxy binding
-  pump4_until([&]() {
-    auto *ep = node1.get_endpoint(node3.get_app_id());
-    return ep != nullptr && ep->get_ready_connection_handle() != nullptr;
-  });
-
-  // Verify proxy_bus_id changed to new_upstream(0x104)
-  if (n1_connector) {
-    auto new_proxy = n1_connector->get_connection_handle_proxy_bus_id(node3.get_app_id());
-    CASE_MSG_INFO() << "A.8: new proxy_bus_id for node3: 0x" << std::hex << new_proxy << std::dec << '\n';
-    CASE_EXPECT_EQ(new_upstream.get_app_id(), new_proxy);
-  }
-
-  // Second message: routed via new_upstream(0x104) at connector level
-  char msg_data2[] = "after-topo-change-A8";
+  // Send second message: relayed by new_upstream(0x104), direct_source_id = 0x104
+  char msg_data2[] = "after-upstream-switch-A8";
   gsl::span<const unsigned char> msg_span2{reinterpret_cast<const unsigned char *>(msg_data2),
                                            static_cast<size_t>(strlen(msg_data2))};
-  CASE_EXPECT_EQ(0, node1.send_message(node3.get_app_id(), 100, msg_span2, &seq));
+  uint64_t seq2 = 801;
+  CASE_EXPECT_EQ(0, node1.send_message(node3.get_app_id(), 100, msg_span2, &seq2));
 
-  pump4_until([&]() { return g_upstream_test_ctx.received_message_count >= 2; });
+  pump_phase2([&]() { return g_upstream_test_ctx.received_message_count >= 2; });
   CASE_EXPECT_EQ(2, g_upstream_test_ctx.received_message_count);
 
   if (g_upstream_test_ctx.received_messages.size() >= 2) {
-    CASE_EXPECT_EQ("before-topo-change-A8", g_upstream_test_ctx.received_messages[0]);
-    CASE_EXPECT_EQ("after-topo-change-A8", g_upstream_test_ctx.received_messages[1]);
+    CASE_EXPECT_EQ("before-upstream-switch-A8", g_upstream_test_ctx.received_messages[0]);
+    CASE_EXPECT_EQ("after-upstream-switch-A8", g_upstream_test_ctx.received_messages[1]);
   }
 
-  // Verify two messages came from different upstream sources.
-  // Note: direct_source_id reflects the atbus-level last-hop relay node (always 0x102 in this
-  // topology since all messages traverse the same atbus hub). The connector-level proxy_bus_id
-  // (verified above) correctly tracks the logical upstream change from 0x102 to 0x104.
+  // Verify the two messages arrived from different upstream relays
+  // First: relayed by old upstream(0x102), direct_source_id = 0x102
+  // Second: relayed by new_upstream(0x104), direct_source_id = 0x104
   if (g_upstream_test_ctx.received_direct_source_ids.size() >= 2) {
-    CASE_EXPECT_EQ(upstream_app.get_app_id(), g_upstream_test_ctx.received_direct_source_ids[0]);
-    CASE_EXPECT_EQ(upstream_app.get_app_id(), g_upstream_test_ctx.received_direct_source_ids[1]);
-    CASE_MSG_INFO() << "A.8: first direct_source_id=0x" << std::hex << g_upstream_test_ctx.received_direct_source_ids[0]
-                    << ", second direct_source_id=0x" << g_upstream_test_ctx.received_direct_source_ids[1] << std::dec
-                    << '\n';
+    CASE_EXPECT_EQ(old_upstream_id, g_upstream_test_ctx.received_direct_source_ids[0]);
+    CASE_EXPECT_EQ(new_upstream.get_app_id(), g_upstream_test_ctx.received_direct_source_ids[1]);
+    CASE_EXPECT_NE(g_upstream_test_ctx.received_direct_source_ids[0],
+                   g_upstream_test_ctx.received_direct_source_ids[1]);
   }
 #endif
 }

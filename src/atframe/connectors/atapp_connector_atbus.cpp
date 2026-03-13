@@ -510,12 +510,30 @@ LIBATAPP_MACRO_API bool atapp_connector_atbus::has_connection_handle(atbus::bus_
   return handles_.find(target_bus_id) != handles_.end();
 }
 
+LIBATAPP_MACRO_API bool atapp_connector_atbus::is_connection_handle_ready(
+    atbus::bus_id_t target_bus_id) const noexcept {
+  auto iter = handles_.find(target_bus_id);
+  if (iter == handles_.end() || !iter->second) {
+    return false;
+  }
+  return check_flag(iter->second->flags, atbus_connection_handle_flags_t::kReady);
+}
+
 LIBATAPP_MACRO_API bool atapp_connector_atbus::has_lost_topology_flag(atbus::bus_id_t target_bus_id) const noexcept {
   auto iter = handles_.find(target_bus_id);
   if (iter == handles_.end() || !iter->second) {
     return false;
   }
   return check_flag(iter->second->flags, atbus_connection_handle_flags_t::kLostTopology);
+}
+
+LIBATAPP_MACRO_API uint32_t atapp_connector_atbus::get_connection_handle_reconnect_retry_times(
+    atbus::bus_id_t target_bus_id) const noexcept {
+  auto iter = handles_.find(target_bus_id);
+  if (iter == handles_.end() || !iter->second) {
+    return 0;
+  }
+  return iter->second->reconnect_retry_times;
 }
 
 LIBATAPP_MACRO_API void atapp_connector_atbus::set_handle_ready_by_bus_id(atbus::bus_id_t target_bus_id) {

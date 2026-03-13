@@ -1,6 +1,7 @@
 # Copyright 2026 atframework
-# A group - upstream forward test: new upstream node for A.8 topology change test
-# Used as alternate upstream in topology change scenarios
+# A group - upstream forward test: replacement upstream for A.8
+# Takes over listener address :21602 when old upstream(0x102) goes offline.
+# Same role as upstream(0x102), but with different bus_id (0x104).
 atapp:
   id: 0x00000104
   id_mask: 8.8.8.8
@@ -9,8 +10,8 @@ atapp:
   type_name: "upstream-test"
 
   bus:
-    listen: "ipv4://127.0.0.1:21604"
-    proxy: "ipv4://127.0.0.1:21602"
+    listen: "ipv4://127.0.0.1:21602"
+    proxy: ""
     backlog: 256
     access_token_max_number: 5
     overwrite_listen_path: false
