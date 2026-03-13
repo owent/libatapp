@@ -62,6 +62,7 @@ class atapp_connector_atbus : public atapp_connector_impl, public std::enable_sh
 #if !defined(NDEBUG)
   LIBATAPP_MACRO_API atbus::bus_id_t get_connection_handle_proxy_bus_id(atbus::bus_id_t target_bus_id) const noexcept;
   LIBATAPP_MACRO_API bool has_connection_handle(atbus::bus_id_t target_bus_id) const noexcept;
+  LIBATAPP_MACRO_API bool has_lost_topology_flag(atbus::bus_id_t target_bus_id) const noexcept;
   LIBATAPP_MACRO_API void set_handle_ready_by_bus_id(atbus::bus_id_t target_bus_id);
   LIBATAPP_MACRO_API void set_handle_unready_by_bus_id(atbus::bus_id_t target_bus_id);
 #endif

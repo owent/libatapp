@@ -7,6 +7,7 @@
 #include <atframe/atapp.h>
 #include <atframe/connectors/atapp_connector_atbus.h>
 #include <atframe/modules/etcd_module.h>
+#include <detail/libatbus_error.h>
 
 #include <common/file_system.h>
 
@@ -27,6 +28,7 @@ struct upstream_test_context {
   int forward_response_count = 0;
   int32_t last_forward_response_error = 0;
   std::vector<std::string> received_messages;
+  std::vector<atframework::atapp::app_id_t> received_direct_source_ids;
 };
 
 static upstream_test_context g_upstream_test_ctx;
@@ -36,6 +38,7 @@ static void reset_test_context() {
   g_upstream_test_ctx.forward_response_count = 0;
   g_upstream_test_ctx.last_forward_response_error = 0;
   g_upstream_test_ctx.received_messages.clear();
+  g_upstream_test_ctx.received_direct_source_ids.clear();
 }
 
 static std::string get_test_conf_path(const char *filename) {
@@ -269,8 +272,7 @@ CASE_TEST(atapp_upstream_forward, upstream_wait_discovery_then_send) {
       [&apps]() {
         auto bus1 = apps.node1.get_bus_node();
         auto bus3 = apps.node3.get_bus_node();
-        return bus1 && bus1->get_upstream_endpoint() != nullptr && bus3 &&
-               bus3->get_upstream_endpoint() != nullptr;
+        return bus1 && bus1->get_upstream_endpoint() != nullptr && bus3 && bus3->get_upstream_endpoint() != nullptr;
       },
       std::chrono::seconds(8));
 
@@ -394,8 +396,7 @@ CASE_TEST(atapp_upstream_forward, upstream_connected_forward_success) {
       [&apps]() {
         auto bus1 = apps.node1.get_bus_node();
         auto bus3 = apps.node3.get_bus_node();
-        return bus1 && bus1->get_upstream_endpoint() != nullptr && bus3 &&
-               bus3->get_upstream_endpoint() != nullptr;
+        return bus1 && bus1->get_upstream_endpoint() != nullptr && bus3 && bus3->get_upstream_endpoint() != nullptr;
       },
       std::chrono::seconds(8));
 
@@ -538,8 +539,8 @@ CASE_TEST(atapp_upstream_forward, upstream_connected_target_unreachable) {
 // ============================================================
 CASE_TEST(atapp_upstream_forward, upstream_reconnect_then_send_success) {
 #if defined(NDEBUG)
-  CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW)
-                  << "set_handle_unready_by_bus_id() only available in Debug builds, skip" << '\n';
+  CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << "set_handle_unready_by_bus_id() only available in Debug builds, skip"
+                  << '\n';
   return;
 #else
   reset_test_context();
@@ -553,8 +554,7 @@ CASE_TEST(atapp_upstream_forward, upstream_reconnect_then_send_success) {
       [&apps]() {
         auto bus1 = apps.node1.get_bus_node();
         auto bus3 = apps.node3.get_bus_node();
-        return bus1 && bus1->get_upstream_endpoint() != nullptr && bus3 &&
-               bus3->get_upstream_endpoint() != nullptr;
+        return bus1 && bus1->get_upstream_endpoint() != nullptr && bus3 && bus3->get_upstream_endpoint() != nullptr;
       },
       std::chrono::seconds(8));
 
@@ -660,8 +660,7 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_exceed_limit_fail) {
       [&apps]() {
         auto bus1 = apps.node1.get_bus_node();
         auto bus3 = apps.node3.get_bus_node();
-        return bus1 && bus1->get_upstream_endpoint() != nullptr && bus3 &&
-               bus3->get_upstream_endpoint() != nullptr;
+        return bus1 && bus1->get_upstream_endpoint() != nullptr && bus3 && bus3->get_upstream_endpoint() != nullptr;
       },
       std::chrono::seconds(8));
 
@@ -741,15 +740,15 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_exceed_limit_fail) {
 
   // Check whether forward response was triggered
   CASE_MSG_INFO() << "A.5: forward response count=" << g_upstream_test_ctx.forward_response_count << '\n';
+  CASE_EXPECT_GT(g_upstream_test_ctx.forward_response_count, 0);
   if (g_upstream_test_ctx.forward_response_count > 0) {
-    CASE_EXPECT_NE(0, g_upstream_test_ctx.last_forward_response_error);
+    CASE_EXPECT_EQ(EN_ATBUS_ERR_NODE_TIMEOUT, g_upstream_test_ctx.last_forward_response_error);
     CASE_MSG_INFO() << "A.5: last error_code=" << g_upstream_test_ctx.last_forward_response_error << '\n';
   }
 
-  // Verify handle has been removed after retry exhaustion
+  // After retry exhaustion, handle should be removed by timer callback
   if (n1_connector) {
-    bool handle_exists = n1_connector->has_connection_handle(apps.node3.get_app_id());
-    CASE_MSG_INFO() << "A.5: handle exists after retry exhaustion=" << handle_exists << '\n';
+    CASE_EXPECT_FALSE(n1_connector->has_connection_handle(apps.node3.get_app_id()));
   }
 
   // Reset time using real system clock
@@ -778,8 +777,7 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_timeout_downstream_cleanup) {
       [&apps]() {
         auto bus1 = apps.node1.get_bus_node();
         auto bus3 = apps.node3.get_bus_node();
-        return bus1 && bus1->get_upstream_endpoint() != nullptr && bus3 &&
-               bus3->get_upstream_endpoint() != nullptr;
+        return bus1 && bus1->get_upstream_endpoint() != nullptr && bus3 && bus3->get_upstream_endpoint() != nullptr;
       },
       std::chrono::seconds(8));
 
@@ -800,6 +798,7 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_timeout_downstream_cleanup) {
   });
 
   // Use debug API to set handle unready (simulates upstream disconnect)
+  // set_handle_unready_by_bus_id also starts the reconnect timer
   auto n1_connector = apps.node1.get_atbus_connector();
   CASE_EXPECT_TRUE(n1_connector != nullptr);
   if (n1_connector) {
@@ -831,13 +830,24 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_timeout_downstream_cleanup) {
   // Advance time past retry limits to trigger forward_response error
   auto now = atframework::atapp::app::get_sys_now();
 
+  // Advance to T+30s — timer at T+2s should fire, exhausting retries
   atframework::atapp::app::set_sys_now(now + std::chrono::seconds(30));
+  CASE_MSG_INFO() << "A.6: advanced to T+30s, calling tick() then run_noblock()" << '\n';
+  apps.node1.tick();
   for (int i = 0; i < 3; ++i) {
     apps.node1.run_noblock();
     CASE_THREAD_SLEEP_MS(10);
   }
 
+  // Check handle after T+30s
+  if (n1_connector) {
+    CASE_MSG_INFO() << "A.6: has_connection_handle after T+30s: "
+                    << n1_connector->has_connection_handle(apps.node3.get_app_id()) << '\n';
+  }
+
+  // Advance to T+60s for extra margin
   atframework::atapp::app::set_sys_now(now + std::chrono::seconds(60));
+  apps.node1.tick();
   for (int i = 0; i < 3; ++i) {
     apps.node1.run_noblock();
     CASE_THREAD_SLEEP_MS(10);
@@ -845,14 +855,23 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_timeout_downstream_cleanup) {
 
   // Verify forward response error was triggered
   CASE_MSG_INFO() << "A.6: forward response count=" << g_upstream_test_ctx.forward_response_count << '\n';
+  CASE_EXPECT_GT(g_upstream_test_ctx.forward_response_count, 0);
   if (g_upstream_test_ctx.forward_response_count > 0) {
-    CASE_EXPECT_NE(0, g_upstream_test_ctx.last_forward_response_error);
+    CASE_EXPECT_EQ(EN_ATBUS_ERR_NODE_TIMEOUT, g_upstream_test_ctx.last_forward_response_error);
     CASE_MSG_INFO() << "A.6: last error_code=" << g_upstream_test_ctx.last_forward_response_error << '\n';
   }
 
+  // Reconnect retries are exhausted by app::tick() / process_custom_timers().
+  // set_handle_unready_by_bus_id started the reconnect timer (retry 0→1, timer at T+2s).
+  // At +30s, tick() fires the timer callback: setup_reconnect_timer → retry 1→2 >= max(2) → remove_connection_handle.
+  // Config: reconnect_max_try_times=2, reconnect_start_interval=2s.
+  if (n1_connector) {
+    CASE_EXPECT_FALSE(n1_connector->has_connection_handle(apps.node3.get_app_id()));
+    CASE_MSG_INFO() << "A.6: handle removed after reconnect retry exhaustion via app::tick()" << '\n';
+  }
+
   // After GC timeout (endpoint_gc_timeout default=60s), verify endpoint is cleaned up.
-  // Connection handle was set unready and eventually removed, so endpoint should be GC'd.
-  atframework::atapp::app::set_sys_now(now + std::chrono::seconds(180));
+  atframework::atapp::app::set_sys_now(now + std::chrono::seconds(200));
   for (int i = 0; i < 5; ++i) {
     apps.node1.run_noblock();
     CASE_THREAD_SLEEP_MS(10);
@@ -888,8 +907,7 @@ CASE_TEST(atapp_upstream_forward, upstream_topology_offline_pending_fail) {
       [&apps]() {
         auto bus1 = apps.node1.get_bus_node();
         auto bus3 = apps.node3.get_bus_node();
-        return bus1 && bus1->get_upstream_endpoint() != nullptr && bus3 &&
-               bus3->get_upstream_endpoint() != nullptr;
+        return bus1 && bus1->get_upstream_endpoint() != nullptr && bus3 && bus3->get_upstream_endpoint() != nullptr;
       },
       std::chrono::seconds(8));
 
@@ -930,8 +948,11 @@ CASE_TEST(atapp_upstream_forward, upstream_topology_offline_pending_fail) {
   // Handle should still exist after topology removal (kLostTopology set but handle not removed yet)
   if (n1_connector) {
     CASE_EXPECT_TRUE(n1_connector->has_connection_handle(apps.node3.get_app_id()));
+    CASE_EXPECT_TRUE(n1_connector->has_lost_topology_flag(apps.node3.get_app_id()));
     CASE_MSG_INFO() << "A.7: has_connection_handle after remove_topology_peer: "
-                    << n1_connector->has_connection_handle(apps.node3.get_app_id()) << '\n';
+                    << n1_connector->has_connection_handle(apps.node3.get_app_id())
+                    << ", has_lost_topology_flag: " << n1_connector->has_lost_topology_flag(apps.node3.get_app_id())
+                    << '\n';
   }
 
   // Now simulate the handle becoming unready (e.g., connection failure after topology loss)
@@ -957,13 +978,23 @@ CASE_TEST(atapp_upstream_forward, upstream_topology_offline_pending_fail) {
   // Advance time past retry timeout to trigger forward_response error
   auto now = atframework::atapp::app::get_sys_now();
 
+  // Advance to T+30s — reconnect timer should fire
   atframework::atapp::app::set_sys_now(now + std::chrono::seconds(30));
+  CASE_MSG_INFO() << "A.7: advanced to T+30s, calling tick() then run_noblock()" << '\n';
+  apps.node1.tick();
   for (int i = 0; i < 3; ++i) {
     apps.node1.run_noblock();
     CASE_THREAD_SLEEP_MS(10);
   }
 
+  if (n1_connector) {
+    CASE_MSG_INFO() << "A.7: has_connection_handle after T+30s: "
+                    << n1_connector->has_connection_handle(apps.node3.get_app_id()) << '\n';
+  }
+
+  // Advance to T+60s — lost_topology_timeout (32s) should be exceeded
   atframework::atapp::app::set_sys_now(now + std::chrono::seconds(60));
+  apps.node1.tick();
   for (int i = 0; i < 3; ++i) {
     apps.node1.run_noblock();
     CASE_THREAD_SLEEP_MS(10);
@@ -971,9 +1002,20 @@ CASE_TEST(atapp_upstream_forward, upstream_topology_offline_pending_fail) {
 
   // Verify forward response error was triggered (pending message failed)
   CASE_MSG_INFO() << "A.7: forward response count=" << g_upstream_test_ctx.forward_response_count << '\n';
+  CASE_EXPECT_GT(g_upstream_test_ctx.forward_response_count, 0);
   if (g_upstream_test_ctx.forward_response_count > 0) {
-    CASE_EXPECT_NE(0, g_upstream_test_ctx.last_forward_response_error);
+    CASE_EXPECT_EQ(EN_ATBUS_ERR_NODE_TIMEOUT, g_upstream_test_ctx.last_forward_response_error);
     CASE_MSG_INFO() << "A.7: last error_code=" << g_upstream_test_ctx.last_forward_response_error << '\n';
+  }
+
+  // The lost_topology_timeout timer (32s from config) was set by remove_topology_peer.
+  // set_handle_unready_by_bus_id also started reconnect timers.
+  // At T+30s, tick() fires the timer callback — detects kLostTopology but timeout not yet reached.
+  // The reconnect retry also fires: retry 1→2 >= max(2), but kLostTopology prevents reconnect.
+  // At T+60s, tick() fires again — sys_now(+60s) >= lost_topology_timeout(+32s) → remove_connection_handle.
+  if (n1_connector) {
+    CASE_EXPECT_FALSE(n1_connector->has_connection_handle(apps.node3.get_app_id()));
+    CASE_MSG_INFO() << "A.7: handle removed by lost_topology_timeout via app::tick()" << '\n';
   }
 
   // Advance time past endpoint GC timeout (default 60s) to verify endpoint cleanup
@@ -984,6 +1026,7 @@ CASE_TEST(atapp_upstream_forward, upstream_topology_offline_pending_fail) {
   }
 
   ep_node3 = apps.node1.get_endpoint(apps.node3.get_app_id());
+  CASE_EXPECT_TRUE(ep_node3 == nullptr);
   CASE_MSG_INFO() << "A.7: node3 endpoint after GC: " << (ep_node3 ? "exists" : "null") << '\n';
 
   // Reset time using real system clock
@@ -1059,8 +1102,8 @@ CASE_TEST(atapp_upstream_forward, upstream_topology_change_new_upstream) {
     auto bus1 = node1.get_bus_node();
     auto bus3 = node3.get_bus_node();
     auto bus4 = new_upstream.get_bus_node();
-    return bus1 && bus1->get_upstream_endpoint() != nullptr && bus3 &&
-           bus3->get_upstream_endpoint() != nullptr && bus4 && bus4->get_upstream_endpoint() != nullptr;
+    return bus1 && bus1->get_upstream_endpoint() != nullptr && bus3 && bus3->get_upstream_endpoint() != nullptr &&
+           bus4 && bus4->get_upstream_endpoint() != nullptr;
   });
 
   // Create discovery for all 4 nodes
@@ -1178,12 +1221,15 @@ CASE_TEST(atapp_upstream_forward, upstream_topology_change_new_upstream) {
   }
 
   // Set up receive callback on node3
-  node3.set_evt_on_forward_request([](atframework::atapp::app &, const atframework::atapp::app::message_sender_t &,
+  node3.set_evt_on_forward_request([](atframework::atapp::app &,
+                                      const atframework::atapp::app::message_sender_t &sender,
                                       const atframework::atapp::app::message_t &msg) {
     auto received = gsl::string_view{reinterpret_cast<const char *>(msg.data.data()), msg.data.size()};
     g_upstream_test_ctx.received_messages.emplace_back(received.data(), received.size());
+    g_upstream_test_ctx.received_direct_source_ids.push_back(sender.direct_source_id);
     ++g_upstream_test_ctx.received_message_count;
-    CASE_MSG_INFO() << "A.8: node3 received: " << received << '\n';
+    CASE_MSG_INFO() << "A.8: node3 received: " << received << ", direct_source_id=0x" << std::hex
+                    << sender.direct_source_id << std::dec << '\n';
     return 0;
   });
 
@@ -1230,6 +1276,18 @@ CASE_TEST(atapp_upstream_forward, upstream_topology_change_new_upstream) {
   if (g_upstream_test_ctx.received_messages.size() >= 2) {
     CASE_EXPECT_EQ("before-topo-change-A8", g_upstream_test_ctx.received_messages[0]);
     CASE_EXPECT_EQ("after-topo-change-A8", g_upstream_test_ctx.received_messages[1]);
+  }
+
+  // Verify two messages came from different upstream sources.
+  // Note: direct_source_id reflects the atbus-level last-hop relay node (always 0x102 in this
+  // topology since all messages traverse the same atbus hub). The connector-level proxy_bus_id
+  // (verified above) correctly tracks the logical upstream change from 0x102 to 0x104.
+  if (g_upstream_test_ctx.received_direct_source_ids.size() >= 2) {
+    CASE_EXPECT_EQ(upstream_app.get_app_id(), g_upstream_test_ctx.received_direct_source_ids[0]);
+    CASE_EXPECT_EQ(upstream_app.get_app_id(), g_upstream_test_ctx.received_direct_source_ids[1]);
+    CASE_MSG_INFO() << "A.8: first direct_source_id=0x" << std::hex << g_upstream_test_ctx.received_direct_source_ids[0]
+                    << ", second direct_source_id=0x" << g_upstream_test_ctx.received_direct_source_ids[1] << std::dec
+                    << '\n';
   }
 #endif
 }

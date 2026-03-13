@@ -510,6 +510,14 @@ LIBATAPP_MACRO_API bool atapp_connector_atbus::has_connection_handle(atbus::bus_
   return handles_.find(target_bus_id) != handles_.end();
 }
 
+LIBATAPP_MACRO_API bool atapp_connector_atbus::has_lost_topology_flag(atbus::bus_id_t target_bus_id) const noexcept {
+  auto iter = handles_.find(target_bus_id);
+  if (iter == handles_.end() || !iter->second) {
+    return false;
+  }
+  return check_flag(iter->second->flags, atbus_connection_handle_flags_t::kLostTopology);
+}
+
 LIBATAPP_MACRO_API void atapp_connector_atbus::set_handle_ready_by_bus_id(atbus::bus_id_t target_bus_id) {
   auto iter = handles_.find(target_bus_id);
   if (iter != handles_.end() && iter->second) {
@@ -521,6 +529,11 @@ LIBATAPP_MACRO_API void atapp_connector_atbus::set_handle_unready_by_bus_id(atbu
   auto iter = handles_.find(target_bus_id);
   if (iter != handles_.end() && iter->second) {
     set_handle_unready(iter->second);
+
+    // Start reconnect timer like on_remove_endpoint does
+    if (iter->second->reconnect_next_timepoint <= app::get_sys_now()) {
+      setup_reconnect_timer(iter, std::chrono::system_clock::from_time_t(0));
+    }
   }
 }
 #endif
@@ -943,6 +956,9 @@ void atapp_connector_atbus::update_timer(const atbus_connection_handle_ptr_t &ha
         if (!self) {
           return;
         }
+
+        FWLOGDEBUG("atbus timer callback fired for bus id {:#x}, retry_times={}", h->current_bus_id,
+                   h->reconnect_retry_times);
 
         // 检查handle是否仍然有效
         auto iter = self->handles_.find(h->current_bus_id);
