@@ -2746,12 +2746,16 @@ LIBATAPP_MACRO_API int app::add_custom_timer_with_system_clock(std::chrono::syst
 LIBATAPP_MACRO_API int app::add_custom_timer_with_system_clock(std::chrono::system_clock::time_point timeout_tp,
                                                                jiffies_timer_handle_t &&fn, void *priv_data,
                                                                jiffies_timer_watcher_t *watcher) {
-  time_t timeout_tick = get_custom_timer_tick(timeout_tp);
-  if (timeout_tick <= custom_timer_controller_.get_last_tick()) {
+  // Use duration-based delta computation to avoid dependency on custom_timer_controller_.get_last_tick().
+  // When timers are added outside of tick() (e.g. from atbus callbacks during run_noblock()),
+  // last_tick_ may not be synced to current time, causing timeout_tick - last_tick_ to exceed
+  // get_max_tick_distance() and fail with EN_JTET_TIMEOUT_EXTENDED.
+  auto sys_now = check_flag(flag_t::kInTick) ? tick_timer_.last_tick_timepoint : get_sys_now();
+  if (timeout_tp <= sys_now) {
     return custom_timer_controller_.add_timer(1, std::move(fn), priv_data, watcher);
   }
 
-  return custom_timer_controller_.add_timer(timeout_tick - custom_timer_controller_.get_last_tick(), std::move(fn),
+  return custom_timer_controller_.add_timer(get_custom_timer_tick_offset(timeout_tp - sys_now), std::move(fn),
                                             priv_data, watcher);
 }
 

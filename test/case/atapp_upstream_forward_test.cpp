@@ -740,8 +740,8 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_exceed_limit_fail) {
                     << " retry=" << dbg.reconnect_retry_times << " timer_expired=" << dbg.timer_handle_expired
                     << " pending_timeout=" << ms_pending << "ms lost_timeout=" << ms_lost
                     << "ms reconn_next=" << ms_reconn << "ms proxy=0x" << std::hex << dbg.proxy_bus_id << std::dec
-                    << " proxy_for=" << dbg.proxy_for_count
-                    << " timer_err=" << dbg.last_update_timer_error << '\n';
+                    << " proxy_for=" << dbg.proxy_for_count << " timer_err=" << dbg.last_update_timer_error
+                    << " sizeof_time_t=" << sizeof(time_t) << '\n';
   }
 
   for (int i = 1; i <= 1000; ++i) {
@@ -894,8 +894,7 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_timeout_downstream_cleanup) {
                     << " retry=" << dbg.reconnect_retry_times << " timer_expired=" << dbg.timer_handle_expired
                     << " pending_timeout=" << ms_pending << "ms lost_timeout=" << ms_lost
                     << "ms reconn_next=" << ms_reconn << "ms proxy=0x" << std::hex << dbg.proxy_bus_id << std::dec
-                    << " proxy_for=" << dbg.proxy_for_count
-                    << " timer_err=" << dbg.last_update_timer_error << '\n';
+                    << " proxy_for=" << dbg.proxy_for_count << " timer_err=" << dbg.last_update_timer_error << '\n';
   }
 
   for (int i = 1; i <= 1000; ++i) {
@@ -1067,8 +1066,7 @@ CASE_TEST(atapp_upstream_forward, upstream_topology_offline_pending_fail) {
                     << " retry=" << dbg.reconnect_retry_times << " timer_expired=" << dbg.timer_handle_expired
                     << " pending_timeout=" << ms_pending << "ms lost_timeout=" << ms_lost
                     << "ms reconn_next=" << ms_reconn << "ms proxy=0x" << std::hex << dbg.proxy_bus_id << std::dec
-                    << " proxy_for=" << dbg.proxy_for_count
-                    << " timer_err=" << dbg.last_update_timer_error << '\n';
+                    << " proxy_for=" << dbg.proxy_for_count << " timer_err=" << dbg.last_update_timer_error << '\n';
   }
 
   for (int i = 1; i <= 1000; ++i) {
