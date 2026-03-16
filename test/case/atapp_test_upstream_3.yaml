@@ -18,8 +18,8 @@ atapp:
       rule:
         allow_direct_connection: false
         require_same_upstream: false
-    first_idle_timeout: 10s
-    ping_interval: 60s
+    first_idle_timeout: 3600s
+    ping_interval: 3600s
     retry_interval: 3s
     reconnect_start_interval: 2s
     reconnect_max_interval: 16s

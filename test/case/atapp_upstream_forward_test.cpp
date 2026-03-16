@@ -711,32 +711,22 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_exceed_limit_fail) {
   }
 
   // Advance time past reconnect retries using set_sys_now
+  // Config: reconnect_start_interval=2s, reconnect_max_try_times=2
+  //
+  // The jiffies timer callback uses get_sys_now() (the jumped virtual time) to compute the
+  // next timer timeout, so each tick() call only fires ONE intermediate timer.  Two rounds needed:
+  //
+  // Round 1: T+33s fires T+2s timer → retry 1→2, next timer at T+37s
+  // Round 2: T+38s fires T+37s timer → retry 2 >= max(2) → remove handle
   auto now = atframework::atapp::app::get_sys_now();
 
-  // Step through retries with time advances + pumping
-  atframework::atapp::app::set_sys_now(now + std::chrono::seconds(3));
-  for (int i = 0; i < 3; ++i) {
-    apps.node1.run_noblock();
-    CASE_THREAD_SLEEP_MS(10);
-  }
+  atframework::atapp::app::set_sys_now(now + std::chrono::seconds(33));
+  apps.node1.tick();
+  apps.node1.run_noblock();
 
-  atframework::atapp::app::set_sys_now(now + std::chrono::seconds(7));
-  for (int i = 0; i < 3; ++i) {
-    apps.node1.run_noblock();
-    CASE_THREAD_SLEEP_MS(10);
-  }
-
-  atframework::atapp::app::set_sys_now(now + std::chrono::seconds(15));
-  for (int i = 0; i < 3; ++i) {
-    apps.node1.run_noblock();
-    CASE_THREAD_SLEEP_MS(10);
-  }
-
-  atframework::atapp::app::set_sys_now(now + std::chrono::seconds(25));
-  for (int i = 0; i < 3; ++i) {
-    apps.node1.run_noblock();
-    CASE_THREAD_SLEEP_MS(10);
-  }
+  atframework::atapp::app::set_sys_now(now + std::chrono::seconds(38));
+  apps.node1.tick();
+  apps.node1.run_noblock();
 
   // Check whether forward response was triggered
   CASE_MSG_INFO() << "A.5: forward response count=" << g_upstream_test_ctx.forward_response_count << '\n';
@@ -751,7 +741,7 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_exceed_limit_fail) {
     CASE_EXPECT_FALSE(n1_connector->has_connection_handle(apps.node3.get_app_id()));
   }
 
-  // Reset time using real system clock
+  // Restore system time
   atframework::atapp::app::set_sys_now(atfw::util::time::time_utility::sys_now());
 #endif
 }
@@ -829,27 +819,23 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_timeout_downstream_cleanup) {
   // Pump to process handle state changes
   for (int i = 0; i < 3; ++i) {
     apps.node1.run_noblock();
-    CASE_THREAD_SLEEP_MS(10);
   }
 
   // Advance time past retry limits to trigger forward_response error
+  // Config: reconnect_start_interval=2s, reconnect_max_try_times=2
+  //
+  // Two rounds needed (jiffies timer callback uses jumped virtual time for next timeout):
+  // Round 1: T+33s fires T+2s timer → retry 1→2, next timer at T+37s
+  // Round 2: T+38s fires T+37s timer → retry 2 >= max(2) → remove handle
   auto now = atframework::atapp::app::get_sys_now();
 
-  // Advance to T+30s — timer at T+2s should fire, exhausting retries
-  atframework::atapp::app::set_sys_now(now + std::chrono::seconds(30));
+  atframework::atapp::app::set_sys_now(now + std::chrono::seconds(33));
   apps.node1.tick();
-  for (int i = 0; i < 3; ++i) {
-    apps.node1.run_noblock();
-    CASE_THREAD_SLEEP_MS(10);
-  }
+  apps.node1.run_noblock();
 
-  // Advance to T+60s for extra margin
-  atframework::atapp::app::set_sys_now(now + std::chrono::seconds(60));
+  atframework::atapp::app::set_sys_now(now + std::chrono::seconds(38));
   apps.node1.tick();
-  for (int i = 0; i < 3; ++i) {
-    apps.node1.run_noblock();
-    CASE_THREAD_SLEEP_MS(10);
-  }
+  apps.node1.run_noblock();
 
   // Verify forward response error was triggered
   CASE_EXPECT_GT(g_upstream_test_ctx.forward_response_count, 0);
@@ -859,18 +845,16 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_timeout_downstream_cleanup) {
 
   // Reconnect retries are exhausted by app::tick() / process_custom_timers().
   // set_handle_unready_by_bus_id started the reconnect timer (retry 0→1, timer at T+2s).
-  // At +30s, tick() fires the timer callback: setup_reconnect_timer → retry 1→2 >= max(2) → remove_connection_handle.
-  // Config: reconnect_max_try_times=2, reconnect_start_interval=2s.
+  // Round 1 (+33s): timer fires → retry 1→2, new timer at T+37s.
+  // Round 2 (+38s): timer fires → retry 2 >= max(2) → remove_connection_handle.
   if (n1_connector) {
     CASE_EXPECT_FALSE(n1_connector->has_connection_handle(apps.node3.get_app_id()));
   }
 
   // After GC timeout (endpoint_gc_timeout default=60s), verify endpoint is cleaned up.
   atframework::atapp::app::set_sys_now(now + std::chrono::seconds(200));
-  for (int i = 0; i < 5; ++i) {
-    apps.node1.run_noblock();
-    CASE_THREAD_SLEEP_MS(10);
-  }
+  apps.node1.tick();
+  apps.node1.run_noblock();
 
   ep_node3 = apps.node1.get_endpoint(apps.node3.get_app_id());
   CASE_EXPECT_TRUE(!ep_node3);
@@ -969,29 +953,19 @@ CASE_TEST(atapp_upstream_forward, upstream_topology_offline_pending_fail) {
   uint64_t seq = 700;
   apps.node1.send_message(apps.node3.get_app_id(), 100, msg_span, &seq);
 
-  // Advance time past retry timeout to trigger forward_response error
+  // Advance time past retry timeout and lost_topology_timeout to trigger
+  // both forward_response error and handle removal.
+  // Config: reconnect_max_try_times=2, lost_topology_timeout=32s
+  // Advance to T+33s — exceeds both retry limits and lost_topology_timeout.
   auto now = atframework::atapp::app::get_sys_now();
-
-  // Advance to T+30s — reconnect timer should fire
-  atframework::atapp::app::set_sys_now(now + std::chrono::seconds(30));
-  CASE_MSG_INFO() << "A.7: advanced to T+30s, calling tick() then run_noblock()" << '\n';
+  atframework::atapp::app::set_sys_now(now + std::chrono::seconds(33));
+  CASE_MSG_INFO() << "A.7: advanced to T+33s, calling tick() then run_noblock()" << '\n';
   apps.node1.tick();
-  for (int i = 0; i < 3; ++i) {
-    apps.node1.run_noblock();
-    CASE_THREAD_SLEEP_MS(10);
-  }
+  apps.node1.run_noblock();
 
   if (n1_connector) {
-    CASE_MSG_INFO() << "A.7: has_connection_handle after T+30s: "
+    CASE_MSG_INFO() << "A.7: has_connection_handle after T+33s: "
                     << n1_connector->has_connection_handle(apps.node3.get_app_id()) << '\n';
-  }
-
-  // Advance to T+60s — lost_topology_timeout (32s) should be exceeded
-  atframework::atapp::app::set_sys_now(now + std::chrono::seconds(60));
-  apps.node1.tick();
-  for (int i = 0; i < 3; ++i) {
-    apps.node1.run_noblock();
-    CASE_THREAD_SLEEP_MS(10);
   }
 
   // Verify forward response error was triggered (pending message failed)
@@ -1004,9 +978,9 @@ CASE_TEST(atapp_upstream_forward, upstream_topology_offline_pending_fail) {
 
   // The lost_topology_timeout timer (32s from config) was set by remove_topology_peer.
   // set_handle_unready_by_bus_id also started reconnect timers.
-  // At T+30s, tick() fires the timer callback — detects kLostTopology but timeout not yet reached.
-  // The reconnect retry also fires: retry 1→2 >= max(2), but kLostTopology prevents reconnect.
-  // At T+60s, tick() fires again — sys_now(+60s) >= lost_topology_timeout(+32s) → remove_connection_handle.
+  // At T+33s, tick() fires:
+  //   1. Reconnect retry exhausted: retry 1→2 >= max(2)
+  //   2. Lost topology timeout (32s) exceeded → remove_connection_handle.
   if (n1_connector) {
     CASE_EXPECT_FALSE(n1_connector->has_connection_handle(apps.node3.get_app_id()));
     CASE_MSG_INFO() << "A.7: handle removed by lost_topology_timeout via app::tick()" << '\n';
@@ -1014,10 +988,8 @@ CASE_TEST(atapp_upstream_forward, upstream_topology_offline_pending_fail) {
 
   // Advance time past endpoint GC timeout (default 60s) to verify endpoint cleanup
   atframework::atapp::app::set_sys_now(now + std::chrono::seconds(180));
-  for (int i = 0; i < 5; ++i) {
-    apps.node1.run_noblock();
-    CASE_THREAD_SLEEP_MS(10);
-  }
+  apps.node1.tick();
+  apps.node1.run_noblock();
 
   ep_node3 = apps.node1.get_endpoint(apps.node3.get_app_id());
   CASE_EXPECT_TRUE(ep_node3 == nullptr);
