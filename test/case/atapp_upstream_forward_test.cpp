@@ -684,6 +684,10 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_exceed_limit_fail) {
   auto n1_connector = apps.node1.get_atbus_connector();
   CASE_EXPECT_TRUE(n1_connector != nullptr);
   if (n1_connector) {
+    // Sync jiffies timer to current time before adding connection timers,
+    // ensuring add_custom_timer computes correct delta from get_last_tick().
+    apps.node1.tick();
+
     n1_connector->set_handle_unready_by_bus_id(apps.node3.get_app_id());
     // Also remove topology to set kLostTopology flag.  The timer callback checks
     // kLostTopology FIRST and removes the handle when lost_topology_timeout (32s)
@@ -736,7 +740,8 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_exceed_limit_fail) {
                     << " retry=" << dbg.reconnect_retry_times << " timer_expired=" << dbg.timer_handle_expired
                     << " pending_timeout=" << ms_pending << "ms lost_timeout=" << ms_lost
                     << "ms reconn_next=" << ms_reconn << "ms proxy=0x" << std::hex << dbg.proxy_bus_id << std::dec
-                    << " proxy_for=" << dbg.proxy_for_count << '\n';
+                    << " proxy_for=" << dbg.proxy_for_count
+                    << " timer_err=" << dbg.last_update_timer_error << '\n';
   }
 
   for (int i = 1; i <= 1000; ++i) {
@@ -844,6 +849,9 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_timeout_downstream_cleanup) {
   auto n1_connector = apps.node1.get_atbus_connector();
   CASE_EXPECT_TRUE(n1_connector != nullptr);
   if (n1_connector) {
+    // Sync jiffies timer to current time before adding connection timers
+    apps.node1.tick();
+
     n1_connector->set_handle_unready_by_bus_id(apps.node3.get_app_id());
     // Also remove topology to set kLostTopology flag.
     n1_connector->remove_topology_peer(apps.node3.get_app_id());
@@ -886,7 +894,8 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_timeout_downstream_cleanup) {
                     << " retry=" << dbg.reconnect_retry_times << " timer_expired=" << dbg.timer_handle_expired
                     << " pending_timeout=" << ms_pending << "ms lost_timeout=" << ms_lost
                     << "ms reconn_next=" << ms_reconn << "ms proxy=0x" << std::hex << dbg.proxy_bus_id << std::dec
-                    << " proxy_for=" << dbg.proxy_for_count << '\n';
+                    << " proxy_for=" << dbg.proxy_for_count
+                    << " timer_err=" << dbg.last_update_timer_error << '\n';
   }
 
   for (int i = 1; i <= 1000; ++i) {
@@ -1006,6 +1015,9 @@ CASE_TEST(atapp_upstream_forward, upstream_topology_offline_pending_fail) {
 
   // Remove topology for node3 on node1 → sets kLostTopology flag
   if (n1_connector) {
+    // Sync jiffies timer to current time before adding connection timers
+    apps.node1.tick();
+
     n1_connector->remove_topology_peer(apps.node3.get_app_id());
   }
 
@@ -1055,7 +1067,8 @@ CASE_TEST(atapp_upstream_forward, upstream_topology_offline_pending_fail) {
                     << " retry=" << dbg.reconnect_retry_times << " timer_expired=" << dbg.timer_handle_expired
                     << " pending_timeout=" << ms_pending << "ms lost_timeout=" << ms_lost
                     << "ms reconn_next=" << ms_reconn << "ms proxy=0x" << std::hex << dbg.proxy_bus_id << std::dec
-                    << " proxy_for=" << dbg.proxy_for_count << '\n';
+                    << " proxy_for=" << dbg.proxy_for_count
+                    << " timer_err=" << dbg.last_update_timer_error << '\n';
   }
 
   for (int i = 1; i <= 1000; ++i) {

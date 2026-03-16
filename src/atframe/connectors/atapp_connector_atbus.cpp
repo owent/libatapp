@@ -77,6 +77,9 @@ struct ATFW_UTIL_SYMBOL_LOCAL atapp_connector_atbus::atbus_connection_handle_dat
 
   jiffies_timer_watcher_t timer_handle;
   atfw::util::time::time_utility::raw_time_t pending_timer_timeout;
+#if !defined(NDEBUG)
+  int32_t last_update_timer_error = 0;
+#endif
 };
 
 LIBATAPP_MACRO_API atapp_connector_atbus::atapp_connector_atbus(app &owner)
@@ -571,6 +574,7 @@ atapp_connector_atbus::get_connection_handle_debug_info(atbus::bus_id_t target_b
   info.timer_handle_expired = iter->second->timer_handle.expired();
   info.proxy_bus_id = iter->second->proxy_bus_id;
   info.proxy_for_count = iter->second->proxy_for_bus_id.size();
+  info.last_update_timer_error = iter->second->last_update_timer_error;
   return info;
 }
 #endif
@@ -1047,10 +1051,19 @@ void atapp_connector_atbus::update_timer(const atbus_connection_handle_ptr_t &ha
       },
       nullptr, &handle->timer_handle);
   if (res < 0) {
-    FWLOGERROR("atbus node {:#x} failed to add timer for connection handle of bus id {:#x}, error code: {}",
-               get_owner()->get_app_id(), handle->current_bus_id, res);
+    FWLOGERROR(
+        "atbus node {:#x} failed to add timer for connection handle of bus id {:#x}, error code: {}, "
+        "timeout: {:%F %T}, timer_expired: {}, pending_timer_timeout: {:%F %T}",
+        get_owner()->get_app_id(), handle->current_bus_id, res, timeout, handle->timer_handle.expired(),
+        handle->pending_timer_timeout);
+#if !defined(NDEBUG)
+    handle->last_update_timer_error = res;
+#endif
     return;
   }
+#if !defined(NDEBUG)
+  handle->last_update_timer_error = 0;
+#endif
   handle->pending_timer_timeout = timeout;
 }
 

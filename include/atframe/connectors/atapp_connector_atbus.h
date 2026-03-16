@@ -78,6 +78,7 @@ class atapp_connector_atbus : public atapp_connector_impl, public std::enable_sh
     bool timer_handle_expired = true;
     atbus::bus_id_t proxy_bus_id = 0;
     size_t proxy_for_count = 0;
+    int32_t last_update_timer_error = 0;
   };
   LIBATAPP_MACRO_API connection_handle_debug_info
   get_connection_handle_debug_info(atbus::bus_id_t target_bus_id) const noexcept;
