@@ -720,13 +720,13 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_exceed_limit_fail) {
   // apps, but kLostTopology prevents re-readying from removing the handle.
   auto now = atframework::atapp::app::get_sys_now();
   bool handle_removed = false;
-  for (int i = 1; i <= 50; ++i) {
-    atframework::atapp::app::set_sys_now(now + std::chrono::seconds(i));
+  for (int i = 1; i <= 1000; ++i) {
+    atframework::atapp::app::set_sys_now(now + std::chrono::milliseconds(i * 50));
     apps.node1.tick();
     apps.node1.run_noblock();
     if (!handle_removed && n1_connector && !n1_connector->has_connection_handle(apps.node3.get_app_id())) {
       handle_removed = true;
-      CASE_MSG_INFO() << "A.5: handle removed after " << i << "s" << '\n';
+      CASE_MSG_INFO() << "A.5: handle removed after " << i * 50 << "ms" << '\n';
     }
     if (handle_removed && g_upstream_test_ctx.forward_response_count > 0) {
       break;
@@ -827,13 +827,13 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_timeout_downstream_cleanup) {
   // apps, but kLostTopology prevents re-readying from removing the handle.
   auto now = atframework::atapp::app::get_sys_now();
   bool handle_removed = false;
-  for (int i = 1; i <= 50; ++i) {
-    atframework::atapp::app::set_sys_now(now + std::chrono::seconds(i));
+  for (int i = 1; i <= 1000; ++i) {
+    atframework::atapp::app::set_sys_now(now + std::chrono::milliseconds(i * 50));
     apps.node1.tick();
     apps.node1.run_noblock();
     if (!handle_removed && n1_connector && !n1_connector->has_connection_handle(apps.node3.get_app_id())) {
       handle_removed = true;
-      CASE_MSG_INFO() << "A.6: handle removed after " << i << "s" << '\n';
+      CASE_MSG_INFO() << "A.6: handle removed after " << i * 50 << "ms" << '\n';
     }
     if (handle_removed && g_upstream_test_ctx.forward_response_count > 0) {
       break;
@@ -956,13 +956,13 @@ CASE_TEST(atapp_upstream_forward, upstream_topology_offline_pending_fail) {
   // Config: reconnect_max_try_times=2, lost_topology_timeout=32s, message_timeout=8s
   auto now = atframework::atapp::app::get_sys_now();
   bool handle_removed = false;
-  for (int i = 1; i <= 50; ++i) {
-    atframework::atapp::app::set_sys_now(now + std::chrono::seconds(i));
+  for (int i = 1; i <= 1000; ++i) {
+    atframework::atapp::app::set_sys_now(now + std::chrono::milliseconds(i * 50));
     apps.node1.tick();
     apps.node1.run_noblock();
     if (!handle_removed && n1_connector && !n1_connector->has_connection_handle(apps.node3.get_app_id())) {
       handle_removed = true;
-      CASE_MSG_INFO() << "A.7: handle removed after " << i << "s" << '\n';
+      CASE_MSG_INFO() << "A.7: handle removed after " << i * 50 << "ms" << '\n';
     }
     if (handle_removed && g_upstream_test_ctx.forward_response_count > 0) {
       break;
