@@ -64,10 +64,23 @@ class atapp_connector_atbus : public atapp_connector_impl, public std::enable_sh
   LIBATAPP_MACRO_API bool has_connection_handle(atbus::bus_id_t target_bus_id) const noexcept;
   LIBATAPP_MACRO_API bool is_connection_handle_ready(atbus::bus_id_t target_bus_id) const noexcept;
   LIBATAPP_MACRO_API bool has_lost_topology_flag(atbus::bus_id_t target_bus_id) const noexcept;
-  LIBATAPP_MACRO_API uint32_t get_connection_handle_reconnect_retry_times(
-      atbus::bus_id_t target_bus_id) const noexcept;
+  LIBATAPP_MACRO_API uint32_t get_connection_handle_reconnect_retry_times(atbus::bus_id_t target_bus_id) const noexcept;
   LIBATAPP_MACRO_API void set_handle_ready_by_bus_id(atbus::bus_id_t target_bus_id);
   LIBATAPP_MACRO_API void set_handle_unready_by_bus_id(atbus::bus_id_t target_bus_id);
+
+  struct connection_handle_debug_info {
+    bool exists = false;
+    uint32_t flags = 0;
+    uint32_t reconnect_retry_times = 0;
+    std::chrono::system_clock::time_point pending_timer_timeout{};
+    std::chrono::system_clock::time_point lost_topology_timeout{};
+    std::chrono::system_clock::time_point reconnect_next_timepoint{};
+    bool timer_handle_expired = true;
+    atbus::bus_id_t proxy_bus_id = 0;
+    size_t proxy_for_count = 0;
+  };
+  LIBATAPP_MACRO_API connection_handle_debug_info
+  get_connection_handle_debug_info(atbus::bus_id_t target_bus_id) const noexcept;
 #endif
 
   using atapp_connector_impl::on_receive_forward_response;

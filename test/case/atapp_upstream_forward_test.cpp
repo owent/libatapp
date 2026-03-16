@@ -714,23 +714,72 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_exceed_limit_fail) {
     CASE_EXPECT_GT(ep_node3->get_pending_message_count(), static_cast<size_t>(0));
   }
 
-  // Advance time 1s at a time past lost_topology_timeout.
-  // Config: lost_topology_timeout=32s, message_timeout=8s
-  // All apps share uv_default_loop(); run_noblock() may process I/O for other
-  // apps, but kLostTopology prevents re-readying from removing the handle.
+  // Advance time past retry limits and message_timeout.
+  // Config: reconnect_start_interval=2s, reconnect_max_try_times=2,
+  //         lost_topology_timeout=32s, message_timeout=8s
+  // Only call tick() — no run_noblock() — to avoid shared uv_default_loop()
+  // I/O processing that triggers set_handle_ready() cascade from other apps,
+  // which resets reconnect_retry_times to 0 and prevents retry-exceed removal.
+  // tick() processes both:
+  //   step 3: process_internal_events → endpoint_waker → pending msg timeout
+  //   step 4: process_custom_timers  → connection handle timer → retry-exceed
   auto now = atframework::atapp::app::get_sys_now();
   bool handle_removed = false;
+
+  // Diagnostic: log initial state
+  if (n1_connector) {
+    auto dbg = n1_connector->get_connection_handle_debug_info(apps.node3.get_app_id());
+    auto ms_pending = std::chrono::duration_cast<std::chrono::milliseconds>(dbg.pending_timer_timeout - now).count();
+    auto ms_lost = std::chrono::duration_cast<std::chrono::milliseconds>(dbg.lost_topology_timeout - now).count();
+    auto ms_reconn = std::chrono::duration_cast<std::chrono::milliseconds>(dbg.reconnect_next_timepoint - now).count();
+    CASE_MSG_INFO() << "A.5 DIAG @0ms: exists=" << dbg.exists << " flags=0x" << std::hex << dbg.flags << std::dec
+                    << " retry=" << dbg.reconnect_retry_times << " timer_expired=" << dbg.timer_handle_expired
+                    << " pending_timeout=" << ms_pending << "ms lost_timeout=" << ms_lost
+                    << "ms reconn_next=" << ms_reconn << "ms proxy=0x" << std::hex << dbg.proxy_bus_id << std::dec
+                    << " proxy_for=" << dbg.proxy_for_count << '\n';
+  }
+
   for (int i = 1; i <= 1000; ++i) {
     atframework::atapp::app::set_sys_now(now + std::chrono::milliseconds(i * 50));
     apps.node1.tick();
-    apps.node1.run_noblock();
     if (!handle_removed && n1_connector && !n1_connector->has_connection_handle(apps.node3.get_app_id())) {
       handle_removed = true;
       CASE_MSG_INFO() << "A.5: handle removed after " << i * 50 << "ms" << '\n';
     }
+    // Periodic diagnostic: every 20 iterations (1s)
+    if (!handle_removed && n1_connector && (i % 20 == 0)) {
+      auto dbg = n1_connector->get_connection_handle_debug_info(apps.node3.get_app_id());
+      auto elapsed = i * 50;
+      auto cur = now + std::chrono::milliseconds(elapsed);
+      auto ms_pending = std::chrono::duration_cast<std::chrono::milliseconds>(dbg.pending_timer_timeout - cur).count();
+      auto ms_lost = std::chrono::duration_cast<std::chrono::milliseconds>(dbg.lost_topology_timeout - cur).count();
+      auto ms_reconn =
+          std::chrono::duration_cast<std::chrono::milliseconds>(dbg.reconnect_next_timepoint - cur).count();
+      CASE_MSG_INFO() << "A.5 DIAG @" << elapsed << "ms: exists=" << dbg.exists << " flags=0x" << std::hex << dbg.flags
+                      << std::dec << " retry=" << dbg.reconnect_retry_times
+                      << " timer_expired=" << dbg.timer_handle_expired << " pending_timeout=" << ms_pending
+                      << "ms lost_timeout=" << ms_lost << "ms reconn_next=" << ms_reconn << "ms proxy=0x" << std::hex
+                      << dbg.proxy_bus_id << std::dec << " proxy_for=" << dbg.proxy_for_count
+                      << " fwd_resp=" << g_upstream_test_ctx.forward_response_count << '\n';
+    }
     if (handle_removed && g_upstream_test_ctx.forward_response_count > 0) {
       break;
     }
+  }
+
+  // Diagnostic: log final state if handle was NOT removed
+  if (!handle_removed && n1_connector) {
+    auto dbg = n1_connector->get_connection_handle_debug_info(apps.node3.get_app_id());
+    auto cur = now + std::chrono::milliseconds(1000 * 50);
+    auto ms_pending = std::chrono::duration_cast<std::chrono::milliseconds>(dbg.pending_timer_timeout - cur).count();
+    auto ms_lost = std::chrono::duration_cast<std::chrono::milliseconds>(dbg.lost_topology_timeout - cur).count();
+    auto ms_reconn = std::chrono::duration_cast<std::chrono::milliseconds>(dbg.reconnect_next_timepoint - cur).count();
+    CASE_MSG_INFO() << "A.5 DIAG FINAL: exists=" << dbg.exists << " flags=0x" << std::hex << dbg.flags << std::dec
+                    << " retry=" << dbg.reconnect_retry_times << " timer_expired=" << dbg.timer_handle_expired
+                    << " pending_timeout=" << ms_pending << "ms lost_timeout=" << ms_lost
+                    << "ms reconn_next=" << ms_reconn << "ms proxy=0x" << std::hex << dbg.proxy_bus_id << std::dec
+                    << " proxy_for=" << dbg.proxy_for_count
+                    << " fwd_resp=" << g_upstream_test_ctx.forward_response_count << '\n';
   }
 
   // Check whether forward response was triggered
@@ -741,7 +790,7 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_exceed_limit_fail) {
     CASE_MSG_INFO() << "A.5: last error_code=" << g_upstream_test_ctx.last_forward_response_error << '\n';
   }
 
-  // After lost_topology_timeout, handle should be removed by timer callback
+  // After retry exhaustion, handle should be removed by timer callback
   CASE_EXPECT_TRUE(handle_removed);
 
   // Restore system time
@@ -821,23 +870,66 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_timeout_downstream_cleanup) {
   uint64_t seq = 600;
   apps.node1.send_message(apps.node3.get_app_id(), 100, msg_span, &seq);
 
-  // Advance time 1s at a time past lost_topology_timeout.
-  // Config: lost_topology_timeout=32s, message_timeout=8s
-  // All apps share uv_default_loop(); run_noblock() may process I/O for other
-  // apps, but kLostTopology prevents re-readying from removing the handle.
+  // Advance time past retry limits and message_timeout.
+  // Only call tick() — no run_noblock() — to avoid shared uv_default_loop()
+  // I/O processing that triggers set_handle_ready() cascade.
   auto now = atframework::atapp::app::get_sys_now();
   bool handle_removed = false;
+
+  // Diagnostic: log initial state
+  if (n1_connector) {
+    auto dbg = n1_connector->get_connection_handle_debug_info(apps.node3.get_app_id());
+    auto ms_pending = std::chrono::duration_cast<std::chrono::milliseconds>(dbg.pending_timer_timeout - now).count();
+    auto ms_lost = std::chrono::duration_cast<std::chrono::milliseconds>(dbg.lost_topology_timeout - now).count();
+    auto ms_reconn = std::chrono::duration_cast<std::chrono::milliseconds>(dbg.reconnect_next_timepoint - now).count();
+    CASE_MSG_INFO() << "A.6 DIAG @0ms: exists=" << dbg.exists << " flags=0x" << std::hex << dbg.flags << std::dec
+                    << " retry=" << dbg.reconnect_retry_times << " timer_expired=" << dbg.timer_handle_expired
+                    << " pending_timeout=" << ms_pending << "ms lost_timeout=" << ms_lost
+                    << "ms reconn_next=" << ms_reconn << "ms proxy=0x" << std::hex << dbg.proxy_bus_id << std::dec
+                    << " proxy_for=" << dbg.proxy_for_count << '\n';
+  }
+
   for (int i = 1; i <= 1000; ++i) {
     atframework::atapp::app::set_sys_now(now + std::chrono::milliseconds(i * 50));
     apps.node1.tick();
-    apps.node1.run_noblock();
     if (!handle_removed && n1_connector && !n1_connector->has_connection_handle(apps.node3.get_app_id())) {
       handle_removed = true;
       CASE_MSG_INFO() << "A.6: handle removed after " << i * 50 << "ms" << '\n';
     }
+    // Periodic diagnostic: every 20 iterations (1s)
+    if (!handle_removed && n1_connector && (i % 20 == 0)) {
+      auto dbg = n1_connector->get_connection_handle_debug_info(apps.node3.get_app_id());
+      auto elapsed = i * 50;
+      auto cur = now + std::chrono::milliseconds(elapsed);
+      auto ms_pending = std::chrono::duration_cast<std::chrono::milliseconds>(dbg.pending_timer_timeout - cur).count();
+      auto ms_lost = std::chrono::duration_cast<std::chrono::milliseconds>(dbg.lost_topology_timeout - cur).count();
+      auto ms_reconn =
+          std::chrono::duration_cast<std::chrono::milliseconds>(dbg.reconnect_next_timepoint - cur).count();
+      CASE_MSG_INFO() << "A.6 DIAG @" << elapsed << "ms: exists=" << dbg.exists << " flags=0x" << std::hex << dbg.flags
+                      << std::dec << " retry=" << dbg.reconnect_retry_times
+                      << " timer_expired=" << dbg.timer_handle_expired << " pending_timeout=" << ms_pending
+                      << "ms lost_timeout=" << ms_lost << "ms reconn_next=" << ms_reconn << "ms proxy=0x" << std::hex
+                      << dbg.proxy_bus_id << std::dec << " proxy_for=" << dbg.proxy_for_count
+                      << " fwd_resp=" << g_upstream_test_ctx.forward_response_count << '\n';
+    }
     if (handle_removed && g_upstream_test_ctx.forward_response_count > 0) {
       break;
     }
+  }
+
+  // Diagnostic: log final state if handle was NOT removed
+  if (!handle_removed && n1_connector) {
+    auto dbg = n1_connector->get_connection_handle_debug_info(apps.node3.get_app_id());
+    auto cur = now + std::chrono::milliseconds(1000 * 50);
+    auto ms_pending = std::chrono::duration_cast<std::chrono::milliseconds>(dbg.pending_timer_timeout - cur).count();
+    auto ms_lost = std::chrono::duration_cast<std::chrono::milliseconds>(dbg.lost_topology_timeout - cur).count();
+    auto ms_reconn = std::chrono::duration_cast<std::chrono::milliseconds>(dbg.reconnect_next_timepoint - cur).count();
+    CASE_MSG_INFO() << "A.6 DIAG FINAL: exists=" << dbg.exists << " flags=0x" << std::hex << dbg.flags << std::dec
+                    << " retry=" << dbg.reconnect_retry_times << " timer_expired=" << dbg.timer_handle_expired
+                    << " pending_timeout=" << ms_pending << "ms lost_timeout=" << ms_lost
+                    << "ms reconn_next=" << ms_reconn << "ms proxy=0x" << std::hex << dbg.proxy_bus_id << std::dec
+                    << " proxy_for=" << dbg.proxy_for_count
+                    << " fwd_resp=" << g_upstream_test_ctx.forward_response_count << '\n';
   }
 
   // Verify forward response error was triggered
@@ -846,13 +938,12 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_timeout_downstream_cleanup) {
     CASE_EXPECT_EQ(EN_ATBUS_ERR_NODE_TIMEOUT, g_upstream_test_ctx.last_forward_response_error);
   }
 
-  // After lost_topology_timeout, handle should be removed by timer callback
+  // After retry exhaustion, handle should be removed by timer callback
   CASE_EXPECT_TRUE(handle_removed);
 
   // After GC timeout (endpoint_gc_timeout default=60s), verify endpoint is cleaned up.
   atframework::atapp::app::set_sys_now(now + std::chrono::seconds(200));
   apps.node1.tick();
-  apps.node1.run_noblock();
 
   ep_node3 = apps.node1.get_endpoint(apps.node3.get_app_id());
   CASE_EXPECT_TRUE(!ep_node3);
@@ -918,10 +1009,6 @@ CASE_TEST(atapp_upstream_forward, upstream_topology_offline_pending_fail) {
     n1_connector->remove_topology_peer(apps.node3.get_app_id());
   }
 
-  // Run one tick to process the topology change
-  apps.node1.tick();
-  apps.node1.run_noblock();
-
   // Handle should still exist after topology removal (kLostTopology set but handle not removed yet)
   if (n1_connector) {
     CASE_EXPECT_TRUE(n1_connector->has_connection_handle(apps.node3.get_app_id()));
@@ -952,21 +1039,66 @@ CASE_TEST(atapp_upstream_forward, upstream_topology_offline_pending_fail) {
   uint64_t seq = 700;
   apps.node1.send_message(apps.node3.get_app_id(), 100, msg_span, &seq);
 
-  // Advance time 1s at a time past reconnect retries and lost_topology_timeout.
-  // Config: reconnect_max_try_times=2, lost_topology_timeout=32s, message_timeout=8s
+  // Advance time past reconnect retries and message_timeout.
+  // Only call tick() — no run_noblock() — to avoid shared uv_default_loop()
+  // I/O processing that triggers set_handle_ready() cascade.
   auto now = atframework::atapp::app::get_sys_now();
   bool handle_removed = false;
+
+  // Diagnostic: log initial state
+  if (n1_connector) {
+    auto dbg = n1_connector->get_connection_handle_debug_info(apps.node3.get_app_id());
+    auto ms_pending = std::chrono::duration_cast<std::chrono::milliseconds>(dbg.pending_timer_timeout - now).count();
+    auto ms_lost = std::chrono::duration_cast<std::chrono::milliseconds>(dbg.lost_topology_timeout - now).count();
+    auto ms_reconn = std::chrono::duration_cast<std::chrono::milliseconds>(dbg.reconnect_next_timepoint - now).count();
+    CASE_MSG_INFO() << "A.7 DIAG @0ms: exists=" << dbg.exists << " flags=0x" << std::hex << dbg.flags << std::dec
+                    << " retry=" << dbg.reconnect_retry_times << " timer_expired=" << dbg.timer_handle_expired
+                    << " pending_timeout=" << ms_pending << "ms lost_timeout=" << ms_lost
+                    << "ms reconn_next=" << ms_reconn << "ms proxy=0x" << std::hex << dbg.proxy_bus_id << std::dec
+                    << " proxy_for=" << dbg.proxy_for_count << '\n';
+  }
+
   for (int i = 1; i <= 1000; ++i) {
     atframework::atapp::app::set_sys_now(now + std::chrono::milliseconds(i * 50));
     apps.node1.tick();
-    apps.node1.run_noblock();
     if (!handle_removed && n1_connector && !n1_connector->has_connection_handle(apps.node3.get_app_id())) {
       handle_removed = true;
       CASE_MSG_INFO() << "A.7: handle removed after " << i * 50 << "ms" << '\n';
     }
+    // Periodic diagnostic: every 20 iterations (1s)
+    if (!handle_removed && n1_connector && (i % 20 == 0)) {
+      auto dbg = n1_connector->get_connection_handle_debug_info(apps.node3.get_app_id());
+      auto elapsed = i * 50;
+      auto cur = now + std::chrono::milliseconds(elapsed);
+      auto ms_pending = std::chrono::duration_cast<std::chrono::milliseconds>(dbg.pending_timer_timeout - cur).count();
+      auto ms_lost = std::chrono::duration_cast<std::chrono::milliseconds>(dbg.lost_topology_timeout - cur).count();
+      auto ms_reconn =
+          std::chrono::duration_cast<std::chrono::milliseconds>(dbg.reconnect_next_timepoint - cur).count();
+      CASE_MSG_INFO() << "A.7 DIAG @" << elapsed << "ms: exists=" << dbg.exists << " flags=0x" << std::hex << dbg.flags
+                      << std::dec << " retry=" << dbg.reconnect_retry_times
+                      << " timer_expired=" << dbg.timer_handle_expired << " pending_timeout=" << ms_pending
+                      << "ms lost_timeout=" << ms_lost << "ms reconn_next=" << ms_reconn << "ms proxy=0x" << std::hex
+                      << dbg.proxy_bus_id << std::dec << " proxy_for=" << dbg.proxy_for_count
+                      << " fwd_resp=" << g_upstream_test_ctx.forward_response_count << '\n';
+    }
     if (handle_removed && g_upstream_test_ctx.forward_response_count > 0) {
       break;
     }
+  }
+
+  // Diagnostic: log final state if handle was NOT removed
+  if (!handle_removed && n1_connector) {
+    auto dbg = n1_connector->get_connection_handle_debug_info(apps.node3.get_app_id());
+    auto cur = now + std::chrono::milliseconds(1000 * 50);
+    auto ms_pending = std::chrono::duration_cast<std::chrono::milliseconds>(dbg.pending_timer_timeout - cur).count();
+    auto ms_lost = std::chrono::duration_cast<std::chrono::milliseconds>(dbg.lost_topology_timeout - cur).count();
+    auto ms_reconn = std::chrono::duration_cast<std::chrono::milliseconds>(dbg.reconnect_next_timepoint - cur).count();
+    CASE_MSG_INFO() << "A.7 DIAG FINAL: exists=" << dbg.exists << " flags=0x" << std::hex << dbg.flags << std::dec
+                    << " retry=" << dbg.reconnect_retry_times << " timer_expired=" << dbg.timer_handle_expired
+                    << " pending_timeout=" << ms_pending << "ms lost_timeout=" << ms_lost
+                    << "ms reconn_next=" << ms_reconn << "ms proxy=0x" << std::hex << dbg.proxy_bus_id << std::dec
+                    << " proxy_for=" << dbg.proxy_for_count
+                    << " fwd_resp=" << g_upstream_test_ctx.forward_response_count << '\n';
   }
 
   // Verify forward response error was triggered (pending message failed)
@@ -983,7 +1115,6 @@ CASE_TEST(atapp_upstream_forward, upstream_topology_offline_pending_fail) {
   // Advance time past endpoint GC timeout (default 60s) to verify endpoint cleanup
   atframework::atapp::app::set_sys_now(now + std::chrono::seconds(180));
   apps.node1.tick();
-  apps.node1.run_noblock();
 
   ep_node3 = apps.node1.get_endpoint(apps.node3.get_app_id());
   CASE_EXPECT_TRUE(ep_node3 == nullptr);

@@ -527,8 +527,8 @@ LIBATAPP_MACRO_API bool atapp_connector_atbus::has_lost_topology_flag(atbus::bus
   return check_flag(iter->second->flags, atbus_connection_handle_flags_t::kLostTopology);
 }
 
-LIBATAPP_MACRO_API uint32_t atapp_connector_atbus::get_connection_handle_reconnect_retry_times(
-    atbus::bus_id_t target_bus_id) const noexcept {
+LIBATAPP_MACRO_API uint32_t
+atapp_connector_atbus::get_connection_handle_reconnect_retry_times(atbus::bus_id_t target_bus_id) const noexcept {
   auto iter = handles_.find(target_bus_id);
   if (iter == handles_.end() || !iter->second) {
     return 0;
@@ -553,6 +553,25 @@ LIBATAPP_MACRO_API void atapp_connector_atbus::set_handle_unready_by_bus_id(atbu
       setup_reconnect_timer(iter, std::chrono::system_clock::from_time_t(0));
     }
   }
+}
+
+LIBATAPP_MACRO_API atapp_connector_atbus::connection_handle_debug_info
+atapp_connector_atbus::get_connection_handle_debug_info(atbus::bus_id_t target_bus_id) const noexcept {
+  connection_handle_debug_info info;
+  auto iter = handles_.find(target_bus_id);
+  if (iter == handles_.end() || !iter->second) {
+    return info;
+  }
+  info.exists = true;
+  info.flags = iter->second->flags;
+  info.reconnect_retry_times = iter->second->reconnect_retry_times;
+  info.pending_timer_timeout = iter->second->pending_timer_timeout;
+  info.lost_topology_timeout = iter->second->lost_topology_timeout;
+  info.reconnect_next_timepoint = iter->second->reconnect_next_timepoint;
+  info.timer_handle_expired = iter->second->timer_handle.expired();
+  info.proxy_bus_id = iter->second->proxy_bus_id;
+  info.proxy_for_count = iter->second->proxy_for_bus_id.size();
+  return info;
 }
 #endif
 
@@ -1026,7 +1045,7 @@ void atapp_connector_atbus::update_timer(const atbus_connection_handle_ptr_t &ha
         }
         self->try_direct_reconnect(h);
       },
-      &handle->timer_handle);
+      nullptr, &handle->timer_handle);
   if (res < 0) {
     FWLOGERROR("atbus node {:#x} failed to add timer for connection handle of bus id {:#x}, error code: {}",
                get_owner()->get_app_id(), handle->current_bus_id, res);
