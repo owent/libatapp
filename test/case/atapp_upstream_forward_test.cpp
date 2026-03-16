@@ -716,17 +716,19 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_exceed_limit_fail) {
   // The jiffies timer callback uses get_sys_now() (the jumped virtual time) to compute the
   // next timer timeout, so each tick() call only fires ONE intermediate timer.  Two rounds needed:
   //
-  // Round 1: T+33s fires T+2s timer → retry 1→2, next timer at T+37s
-  // Round 2: T+38s fires T+37s timer → retry 2 >= max(2) → remove handle
+  // Round 1: T+5s fires T+2s timer → retry 1→2, next timer at T+9s
+  // Round 2: T+12s fires T+9s timer → retry 2 >= max(2) → remove handle
+  //
+  // IMPORTANT: Only use tick() here, NOT run_noblock().  All three test apps share
+  // uv_default_loop(), so run_noblock() → uv_run() fires tick timers for ALL apps,
+  // causing cross-app I/O that can re-ready the handle via set_handle_ready cascade.
   auto now = atframework::atapp::app::get_sys_now();
 
-  atframework::atapp::app::set_sys_now(now + std::chrono::seconds(33));
+  atframework::atapp::app::set_sys_now(now + std::chrono::seconds(5));
   apps.node1.tick();
-  apps.node1.run_noblock();
 
-  atframework::atapp::app::set_sys_now(now + std::chrono::seconds(38));
+  atframework::atapp::app::set_sys_now(now + std::chrono::seconds(12));
   apps.node1.tick();
-  apps.node1.run_noblock();
 
   // Check whether forward response was triggered
   CASE_MSG_INFO() << "A.5: forward response count=" << g_upstream_test_ctx.forward_response_count << '\n';
@@ -816,26 +818,23 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_timeout_downstream_cleanup) {
   uint64_t seq = 600;
   apps.node1.send_message(apps.node3.get_app_id(), 100, msg_span, &seq);
 
-  // Pump to process handle state changes
-  for (int i = 0; i < 3; ++i) {
-    apps.node1.run_noblock();
-  }
-
   // Advance time past retry limits to trigger forward_response error
   // Config: reconnect_start_interval=2s, reconnect_max_try_times=2
   //
   // Two rounds needed (jiffies timer callback uses jumped virtual time for next timeout):
-  // Round 1: T+33s fires T+2s timer → retry 1→2, next timer at T+37s
-  // Round 2: T+38s fires T+37s timer → retry 2 >= max(2) → remove handle
+  // Round 1: T+5s fires T+2s timer → retry 1→2, next timer at T+9s
+  // Round 2: T+12s fires T+9s timer → retry 2 >= max(2) → remove handle
+  //
+  // IMPORTANT: Only use tick() here, NOT run_noblock().  All three test apps share
+  // uv_default_loop(), so run_noblock() → uv_run() fires tick timers for ALL apps,
+  // causing cross-app I/O that can re-ready the handle via set_handle_ready cascade.
   auto now = atframework::atapp::app::get_sys_now();
 
-  atframework::atapp::app::set_sys_now(now + std::chrono::seconds(33));
+  atframework::atapp::app::set_sys_now(now + std::chrono::seconds(5));
   apps.node1.tick();
-  apps.node1.run_noblock();
 
-  atframework::atapp::app::set_sys_now(now + std::chrono::seconds(38));
+  atframework::atapp::app::set_sys_now(now + std::chrono::seconds(12));
   apps.node1.tick();
-  apps.node1.run_noblock();
 
   // Verify forward response error was triggered
   CASE_EXPECT_GT(g_upstream_test_ctx.forward_response_count, 0);
@@ -845,8 +844,8 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_timeout_downstream_cleanup) {
 
   // Reconnect retries are exhausted by app::tick() / process_custom_timers().
   // set_handle_unready_by_bus_id started the reconnect timer (retry 0→1, timer at T+2s).
-  // Round 1 (+33s): timer fires → retry 1→2, new timer at T+37s.
-  // Round 2 (+38s): timer fires → retry 2 >= max(2) → remove_connection_handle.
+  // Round 1 (+5s): timer fires → retry 1→2, new timer at T+9s.
+  // Round 2 (+12s): timer fires → retry 2 >= max(2) → remove_connection_handle.
   if (n1_connector) {
     CASE_EXPECT_FALSE(n1_connector->has_connection_handle(apps.node3.get_app_id()));
   }
@@ -854,7 +853,6 @@ CASE_TEST(atapp_upstream_forward, upstream_retry_timeout_downstream_cleanup) {
   // After GC timeout (endpoint_gc_timeout default=60s), verify endpoint is cleaned up.
   atframework::atapp::app::set_sys_now(now + std::chrono::seconds(200));
   apps.node1.tick();
-  apps.node1.run_noblock();
 
   ep_node3 = apps.node1.get_endpoint(apps.node3.get_app_id());
   CASE_EXPECT_TRUE(!ep_node3);
@@ -920,8 +918,9 @@ CASE_TEST(atapp_upstream_forward, upstream_topology_offline_pending_fail) {
     n1_connector->remove_topology_peer(apps.node3.get_app_id());
   }
 
-  // Run one tick to process the topology change
-  apps.node1.run_noblock();
+  // Run one tick to process the topology change (use tick(), not run_noblock(),
+  // because all test apps share uv_default_loop())
+  apps.node1.tick();
 
   // Handle should still exist after topology removal (kLostTopology set but handle not removed yet)
   if (n1_connector) {
@@ -957,11 +956,14 @@ CASE_TEST(atapp_upstream_forward, upstream_topology_offline_pending_fail) {
   // both forward_response error and handle removal.
   // Config: reconnect_max_try_times=2, lost_topology_timeout=32s
   // Advance to T+33s — exceeds both retry limits and lost_topology_timeout.
+  //
+  // IMPORTANT: Only use tick() here, NOT run_noblock().  All three test apps share
+  // uv_default_loop(), so run_noblock() → uv_run() fires tick timers for ALL apps,
+  // causing cross-app I/O that can re-ready the handle via set_handle_ready cascade.
   auto now = atframework::atapp::app::get_sys_now();
   atframework::atapp::app::set_sys_now(now + std::chrono::seconds(33));
-  CASE_MSG_INFO() << "A.7: advanced to T+33s, calling tick() then run_noblock()" << '\n';
+  CASE_MSG_INFO() << "A.7: advanced to T+33s, calling tick()" << '\n';
   apps.node1.tick();
-  apps.node1.run_noblock();
 
   if (n1_connector) {
     CASE_MSG_INFO() << "A.7: has_connection_handle after T+33s: "
@@ -989,7 +991,6 @@ CASE_TEST(atapp_upstream_forward, upstream_topology_offline_pending_fail) {
   // Advance time past endpoint GC timeout (default 60s) to verify endpoint cleanup
   atframework::atapp::app::set_sys_now(now + std::chrono::seconds(180));
   apps.node1.tick();
-  apps.node1.run_noblock();
 
   ep_node3 = apps.node1.get_endpoint(apps.node3.get_app_id());
   CASE_EXPECT_TRUE(ep_node3 == nullptr);
