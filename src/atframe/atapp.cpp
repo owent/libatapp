@@ -2666,11 +2666,10 @@ LIBATAPP_MACRO_API bool app::match_gateway(const atapp::protocol::atapp_gateway 
 
 LIBATAPP_MACRO_API void app::setup_logger(atfw::util::log::log_wrapper &logger, const std::string &min_level,
                                           const atapp::protocol::atapp_log_category &log_conf) const noexcept {
-  int log_level_id = atfw::util::log::log_wrapper::level_t::LOG_LW_INFO;
-  log_level_id = atfw::util::log::log_formatter::get_level_by_name(min_level);
+  atfw::util::log::log_level log_level_id = atfw::util::log::log_formatter::get_level_by_name(min_level);
 
   // init and set prefix
-  if (0 != logger.init(WLOG_LEVELID(log_level_id))) {
+  if (0 != logger.init(log_level_id)) {
     FWLOGERROR("Log initialize for {}({}) failed, skipped", log_conf.name(), log_conf.index());
     return;
   }
@@ -2681,10 +2680,8 @@ LIBATAPP_MACRO_API void app::setup_logger(atfw::util::log::log_wrapper &logger, 
 
   // load stacktrace configure
   if (!log_conf.stacktrace().min().empty() || !log_conf.stacktrace().max().empty()) {
-    atfw::util::log::log_formatter::level_t::type stacktrace_level_min =
-        atfw::util::log::log_formatter::level_t::LOG_LW_DISABLED;
-    atfw::util::log::log_formatter::level_t::type stacktrace_level_max =
-        atfw::util::log::log_formatter::level_t::LOG_LW_DISABLED;
+    atfw::util::log::log_level stacktrace_level_min = atfw::util::log::log_level::kDisabled;
+    atfw::util::log::log_level stacktrace_level_max = atfw::util::log::log_level::kDisabled;
     if (!log_conf.stacktrace().min().empty()) {
       stacktrace_level_min = atfw::util::log::log_formatter::get_level_by_name(log_conf.stacktrace().min());
     }
@@ -2703,8 +2700,8 @@ LIBATAPP_MACRO_API void app::setup_logger(atfw::util::log::log_wrapper &logger, 
   // register log handles
   for (int j = 0; j < log_conf.sink_size(); ++j) {
     const ::atframework::atapp::protocol::atapp_log_sink &log_sink = log_conf.sink(j);
-    int log_handle_min = atfw::util::log::log_wrapper::level_t::LOG_LW_DEBUG,
-        log_handle_max = atfw::util::log::log_wrapper::level_t::LOG_LW_FATAL;
+    atfw::util::log::log_level log_handle_min = atfw::util::log::log_level::kDebug;
+    atfw::util::log::log_level log_handle_max = atfw::util::log::log_level::kFatal;
     if (!log_sink.level().min().empty()) {
       log_handle_min = atfw::util::log::log_formatter::get_level_by_name(log_sink.level().min());
     }
@@ -2718,16 +2715,14 @@ LIBATAPP_MACRO_API void app::setup_logger(atfw::util::log::log_wrapper &logger, 
       if (iter != log_reg_.end()) {
         atfw::util::log::log_wrapper::log_handler_t log_handler =
             iter->second(logger, j, conf_.log, log_conf, log_sink);
-        logger.add_sink(log_handler, static_cast<atfw::util::log::log_wrapper::level_t::type>(log_handle_min),
-                        static_cast<atfw::util::log::log_wrapper::level_t::type>(log_handle_max));
+        logger.add_sink(std::move(log_handler), log_handle_min, log_handle_max);
         ++new_sink_number;
       } else {
         FWLOGERROR("Unavailable log type {} for log {}({}), you can add log type register handle before init.",
                    log_sink.type(), log_conf.name(), log_conf.index());
       }
     } else {
-      logger.set_sink(new_sink_number, static_cast<atfw::util::log::log_wrapper::level_t::type>(log_handle_min),
-                      static_cast<atfw::util::log::log_wrapper::level_t::type>(log_handle_max));
+      logger.set_sink(new_sink_number, log_handle_min, log_handle_max);
       ++new_sink_number;
     }
   }

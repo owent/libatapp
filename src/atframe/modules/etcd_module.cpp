@@ -542,8 +542,7 @@ LIBATAPP_MACRO_API int etcd_module::reload() {
 
   // load logger
   atfw::util::log::log_wrapper::ptr_t logger;
-  atfw::util::log::log_formatter::level_t::type startup_level =
-      atfw::util::log::log_formatter::level_t::LOG_LW_DISABLED;
+  atfw::util::log::log_level startup_level = atfw::util::log::log_level::kDisabled;
   do {
     atapp::protocol::atapp_log etcd_log_conf;
     get_app()->parse_log_configures_into(etcd_log_conf, std::vector<gsl::string_view>{"atapp", "etcd", "log"},
@@ -553,9 +552,9 @@ LIBATAPP_MACRO_API int etcd_module::reload() {
     }
 
     startup_level = atfw::util::log::log_formatter::get_level_by_name(conf.log().startup_level());
-    if (startup_level <= atfw::util::log::log_formatter::level_t::LOG_LW_DISABLED &&
+    if (startup_level <= atfw::util::log::log_level::kDisabled &&
         atfw::util::log::log_formatter::get_level_by_name(etcd_log_conf.level()) <=
-            atfw::util::log::log_formatter::level_t::LOG_LW_DISABLED) {
+            atfw::util::log::log_level::kDisabled) {
       break;
     }
 

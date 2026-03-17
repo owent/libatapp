@@ -4,6 +4,7 @@
 #include <atframe/atapp_module_impl.h>
 
 #include <common/file_system.h>
+#include <log/log_wrapper.h>
 #include <time/time_utility.h>
 
 #include <chrono>
@@ -11,6 +12,7 @@
 #include <cstring>
 #include <ctime>
 #include <fstream>
+#include <ios>
 #include <iostream>
 #include <limits>
 #include <map>
@@ -19,6 +21,8 @@
 #include <vector>
 
 #include "frame/test_macros.h"
+#include "log/log_formatter.h"
+#include "nostd/string_view.h"
 
 class atapp_setup_test_timeout_module : public ::atframework::atapp::module_impl {
  public:
@@ -62,3 +66,22 @@ CASE_TEST(atapp_setup, timeout) {
   CASE_EXPECT_LE(std::chrono::duration_cast<std::chrono::seconds>(after - before).count(), 3);
 }
 
+namespace {
+static atfw::util::log::log_level print_log_level = atfw::util::log::log_level::kDisabled;
+}  // namespace
+
+void atapp_unit_test_set_print_log_level(atfw::util::log::log_level level) { print_log_level = level; }
+
+CASE_TEST_EVENT_ON_START(unit_test_event_on_start_setup_logger) {
+  auto* default_cat =
+      atfw::util::log::log_wrapper::mutable_log_cat(atfw::util::log::log_wrapper::categorize_t::DEFAULT);
+  if (default_cat) {
+    default_cat->add_sink(
+        [](const atfw::util::log::log_formatter::caller_info_t& caller, atfw::util::nostd::string_view content) {
+          if (static_cast<int>(caller.level_id) >= static_cast<int>(print_log_level)) {
+            std::cout.write(content.data(), static_cast<std::streamsize>(content.size()));
+            std::cout << '\n';
+          }
+        });
+  }
+}

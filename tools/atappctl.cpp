@@ -19,10 +19,10 @@
 
 static int exit_code = 0;
 
-static void _log_sink_stdout_handle(const atfw::util::log::log_wrapper::caller_info_t &, const char *content,
-                                    size_t content_size) {
-  std::cout.write(content, content_size);
-  std::cout << std::endl;
+static void _log_sink_stdout_handle(const atfw::util::log::log_wrapper::caller_info_t &,
+                                    atfw::util::nostd::string_view content) {
+  std::cout.write(content.data(), static_cast<std::streamsize>(content.size()));
+  std::cout << '\n';
 }
 
 class atappctl_module : public atapp::module_impl {
@@ -30,8 +30,7 @@ class atappctl_module : public atapp::module_impl {
   int init() override {
     WLOG_GETCAT(atfw::util::log::log_wrapper::categorize_t::DEFAULT)->add_sink(_log_sink_stdout_handle);
     WLOG_GETCAT(atfw::util::log::log_wrapper::categorize_t::DEFAULT)
-        ->set_stacktrace_level(atfw::util::log::log_formatter::level_t::LOG_LW_DISABLED,
-                               atfw::util::log::log_formatter::level_t::LOG_LW_DISABLED);
+        ->set_stacktrace_level(atfw::util::log::log_level::kDisabled, atfw::util::log::log_level::kDisabled);
     return 0;
   };
 
@@ -104,4 +103,3 @@ int main(int argc, char *argv[]) {
 
   return ret;
 }
-

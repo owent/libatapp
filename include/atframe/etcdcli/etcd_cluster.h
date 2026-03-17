@@ -100,13 +100,13 @@ class etcd_cluster {
     bool auto_update_hosts;  // auto update cluster member
 
     ssl_version_t ssl_min_version;  // CURLOPT_SSLVERSION and CURLOPT_PROXY_SSLVERSION @see ssl_version_t,
-                                          // TLSv1.1/TLSv1.2/TLSv1.3
-    std::string user_agent;               // CURLOPT_USERAGENT
-    std::string proxy;            // CURLOPT_HTTPPROXYTUNNEL, CURLOPT_PROXY: [SCHEME]://HOST[:PORT], SCHEME is one of
-                                  // http,https,socks4,socks4a,socks5,socks5h. PORT's default value is 1080
-    std::string no_proxy;         // curl 7.19.4 CURLOPT_NOPROXY
-    std::string proxy_user_name;  // curl 7.19.1 CURLOPT_PROXYUSERNAME
-    std::string proxy_password;   // curl 7.19.1 CURLOPT_PROXYPASSWORD
+                                    // TLSv1.1/TLSv1.2/TLSv1.3
+    std::string user_agent;         // CURLOPT_USERAGENT
+    std::string proxy;              // CURLOPT_HTTPPROXYTUNNEL, CURLOPT_PROXY: [SCHEME]://HOST[:PORT], SCHEME is one of
+                                    // http,https,socks4,socks4a,socks5,socks5h. PORT's default value is 1080
+    std::string no_proxy;           // curl 7.19.4 CURLOPT_NOPROXY
+    std::string proxy_user_name;    // curl 7.19.1 CURLOPT_PROXYUSERNAME
+    std::string proxy_password;     // curl 7.19.1 CURLOPT_PROXYPASSWORD
 
     std::string ssl_client_cert;              // CURLOPT_SSLCERT
     std::string ssl_client_cert_type;         // curl 7.9.3 CURLOPT_SSLCERTTYPE, PEM or DER, PEM for default
@@ -162,7 +162,7 @@ class etcd_cluster {
   ATFW_UTIL_FORCEINLINE const stats_t &get_stats() const { return stats_; }
 
   LIBATAPP_MACRO_API void set_logger(const atfw::util::log::log_wrapper::ptr_t &logger,
-                                     atfw::util::log::log_formatter::level_t::type log_level) noexcept;
+                                     atfw::util::log::log_level log_level) noexcept;
   ATFW_UTIL_FORCEINLINE const atfw::util::log::log_wrapper::ptr_t &get_logger() const noexcept { return logger_; }
 
   // ====================== apis for configure ==================
@@ -515,8 +515,8 @@ class etcd_cluster {
   conf_t conf_;
   stats_t stats_;
   atfw::util::log::log_wrapper::ptr_t logger_;
-  atfw::util::log::log_formatter::level_t::type startup_log_level_;
-  atfw::util::log::log_formatter::level_t::type runtime_log_level_;
+  atfw::util::log::log_level startup_log_level_;
+  atfw::util::log::log_level runtime_log_level_;
 
   atfw::util::network::http_request::curl_m_bind_ptr_t curl_multi_;
   atfw::util::network::http_request::ptr_t rpc_authenticate_;

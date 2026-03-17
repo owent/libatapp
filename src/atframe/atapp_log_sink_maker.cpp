@@ -7,6 +7,7 @@
 #include <atframe/atapp_conf.h>
 
 #include <iostream>
+#include "nostd/string_view.h"
 
 #if defined(ATFRAMEWORK_UTILS_LOG_SINK_ENABLE_SYSLOG_SUPPORT) && ATFRAMEWORK_UTILS_LOG_SINK_ENABLE_SYSLOG_SUPPORT
 #  include <syslog.h>
@@ -54,15 +55,15 @@ static atfw::util::log::log_wrapper::log_handler_t _log_sink_file(
   return file_sink;
 }
 
-static void _log_sink_stdout_handle(const atfw::util::log::log_wrapper::caller_info_t& caller, const char* content,
-                                    size_t content_size) {
-  if (caller.level_id <= atfw::util::log::log_formatter::level_t::LOG_LW_NOTICE) {
-    std::cout.write(content, static_cast<std::streamsize>(content_size));
+static void _log_sink_stdout_handle(const atfw::util::log::log_wrapper::caller_info_t& caller,
+                                    atfw::util::nostd::string_view content) {
+  if (caller.level_id <= atfw::util::log::log_level::kNotice) {
+    std::cout.write(content.data(), static_cast<std::streamsize>(content.size()));
     std::cout << '\n';
-  } else if (caller.level_id == atfw::util::log::log_formatter::level_t::LOG_LW_INFO) {
+  } else if (caller.level_id == atfw::util::log::log_level::kInfo) {
     atfw::util::cli::shell_stream ss(std::cout);
     ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_GREEN << content << '\n';
-  } else if (caller.level_id == atfw::util::log::log_formatter::level_t::LOG_LW_WARNING) {
+  } else if (caller.level_id == atfw::util::log::log_level::kWarning) {
     atfw::util::cli::shell_stream ss(std::cout);
     ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW << content << '\n';
   } else {
@@ -79,15 +80,15 @@ static atfw::util::log::log_wrapper::log_handler_t _log_sink_stdout(
   return _log_sink_stdout_handle;
 }
 
-static void _log_sink_stderr_handle(const atfw::util::log::log_wrapper::caller_info_t& caller, const char* content,
-                                    size_t content_size) {
-  if (caller.level_id <= atfw::util::log::log_formatter::level_t::LOG_LW_NOTICE) {
-    std::cerr.write(content, static_cast<std::streamsize>(content_size));
+static void _log_sink_stderr_handle(const atfw::util::log::log_wrapper::caller_info_t& caller,
+                                    atfw::util::nostd::string_view content) {
+  if (caller.level_id <= atfw::util::log::log_level::kNotice) {
+    std::cerr.write(content.data(), static_cast<std::streamsize>(content.size()));
     std::cerr << '\n';
-  } else if (caller.level_id == atfw::util::log::log_formatter::level_t::LOG_LW_INFO) {
+  } else if (caller.level_id == atfw::util::log::log_level::kInfo) {
     atfw::util::cli::shell_stream ss(std::cerr);
     ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_GREEN << content << '\n';
-  } else if (caller.level_id == atfw::util::log::log_formatter::level_t::LOG_LW_WARNING) {
+  } else if (caller.level_id == atfw::util::log::log_level::kWarning) {
     atfw::util::cli::shell_stream ss(std::cerr);
     ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_YELLOW << content << '\n';
   } else {

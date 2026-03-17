@@ -15,11 +15,15 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <gsl/util>
 #include <memory>
 #include <string>
 #include <vector>
 
 #include "frame/test_macros.h"
+#include "log/log_formatter.h"
+
+void atapp_unit_test_set_print_log_level(atfw::util::log::log_level level);
 
 namespace {
 
@@ -977,6 +981,9 @@ CASE_TEST(atapp_upstream_forward, upstream_topology_offline_pending_fail) {
   if (!apps.init_all()) {
     return;
   }
+
+  atapp_unit_test_set_print_log_level(atfw::util::log::log_level::kDebug);
+  auto log_guard = gsl::finally([]() { atapp_unit_test_set_print_log_level(atfw::util::log::log_level::kDisabled); });
 
   apps.pump_until(
       [&apps]() {

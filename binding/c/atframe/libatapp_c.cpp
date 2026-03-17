@@ -715,14 +715,13 @@ LIBATAPP_MACRO_API void __cdecl libatapp_c_log_write(uint32_t tag, uint32_t leve
     return;
   }
 
-  if (!log_cat->check_level(static_cast<atfw::util::log::log_wrapper::level_t::type>(level))) {
+  if (!log_cat->check_level(static_cast<atfw::util::log::log_level>(level))) {
     return;
   }
 
-  log_cat->log(
-      atfw::util::log::log_formatter::caller_info_t(static_cast<atfw::util::log::log_wrapper::level_t::type>(level),
-                                                    level_name, file_path, line_number, func_name),
-      "%s", content);
+  log_cat->log(atfw::util::log::log_formatter::caller_info_t(static_cast<atfw::util::log::log_level>(level), level_name,
+                                                             file_path, line_number, func_name),
+               "%s", content);
 }
 
 LIBATAPP_MACRO_API void __cdecl libatapp_c_log_update() { atfw::util::log::log_wrapper::update(); }
@@ -733,7 +732,7 @@ LIBATAPP_MACRO_API uint32_t __cdecl libatapp_c_log_get_level(uint32_t tag) {
     return 0;
   }
 
-  return log_cat->get_level();
+  return static_cast<uint32_t>(log_cat->get_level());
 }
 
 LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_log_check_level(uint32_t tag, uint32_t level) {
@@ -742,7 +741,7 @@ LIBATAPP_MACRO_API int32_t __cdecl libatapp_c_log_check_level(uint32_t tag, uint
     return 0;
   }
 
-  return log_cat->check_level(static_cast<atfw::util::log::log_wrapper::level_t::type>(level)) ? 1 : 0;
+  return log_cat->check_level(static_cast<atfw::util::log::log_level>(level)) ? 1 : 0;
 }
 
 LIBATAPP_MACRO_API void __cdecl libatapp_c_log_set_project_directory(const char *project_dir, uint64_t dirsz) {
@@ -752,4 +751,3 @@ LIBATAPP_MACRO_API void __cdecl libatapp_c_log_set_project_directory(const char 
 #ifdef __cplusplus
 }
 #endif
-

@@ -143,8 +143,8 @@ EXPLICIT_UNUSED_ATTR static int etcd_cluster_verbose_callback(atfw::util::networ
                                                               curl_infotype type, char *data, size_t size,
                                                               const atfw::util::log::log_wrapper::ptr_t &logger) {
   if (atfw::util::log::log_wrapper::check_level(WDTLOGGETCAT(atfw::util::log::log_wrapper::categorize_t::DEFAULT),
-                                                atfw::util::log::log_wrapper::level_t::LOG_LW_TRACE) ||
-      (logger && logger->check_level(atfw::util::log::log_wrapper::level_t::LOG_LW_TRACE))) {
+                                                atfw::util::log::log_level::kTrace) ||
+      (logger && logger->check_level(atfw::util::log::log_level::kTrace))) {
     const char *verbose_type = "Unknown Action";
     switch (type) {
       case CURLINFO_TEXT:
@@ -172,13 +172,12 @@ EXPLICIT_UNUSED_ATTR static int etcd_cluster_verbose_callback(atfw::util::networ
         break;
     }
 
-    atfw::util::log::log_wrapper::caller_info_t caller =
-        WDTLOGFILENF(atfw::util::log::log_wrapper::level_t::LOG_LW_TRACE, "Trace");
+    atfw::util::log::log_wrapper::caller_info_t caller = WDTLOGFILENF(atfw::util::log::log_level::kTrace, "Trace");
     WDTLOGGETCAT(atfw::util::log::log_wrapper::categorize_t::DEFAULT)
         ->log(caller, "Etcd cluster %p http request %p to %s => Verbose: %s", req.get_priv_data(), &req,
               req.get_url().c_str(), verbose_type);
     WDTLOGGETCAT(atfw::util::log::log_wrapper::categorize_t::DEFAULT)->write_log(caller, data, size);
-    if (logger && logger->check_level(atfw::util::log::log_wrapper::level_t::LOG_LW_TRACE)) {
+    if (logger && logger->check_level(atfw::util::log::log_level::kTrace)) {
       logger->log(caller, "Etcd cluster %p http request %p to %s => Verbose: %s", req.get_priv_data(), &req,
                   req.get_url().c_str(), verbose_type);
       logger->write_log(caller, data, size);
@@ -192,8 +191,8 @@ EXPLICIT_UNUSED_ATTR static int etcd_cluster_verbose_callback(atfw::util::networ
 LIBATAPP_MACRO_API etcd_cluster::etcd_cluster()
     : flags_(0),
       stats_{},
-      startup_log_level_(atfw::util::log::log_formatter::level_t::LOG_LW_DISABLED),
-      runtime_log_level_(atfw::util::log::log_formatter::level_t::LOG_LW_DISABLED) {
+      startup_log_level_(atfw::util::log::log_level::kDisabled),
+      runtime_log_level_(atfw::util::log::log_level::kDisabled) {
   conf_.authorization_next_update_time = std::chrono::system_clock::from_time_t(0);
   conf_.authorization_retry_interval = std::chrono::seconds(5);
   conf_.auth_user_get_next_update_time = std::chrono::system_clock::from_time_t(0);
@@ -539,7 +538,7 @@ LIBATAPP_MACRO_API void etcd_cluster::set_flag(flag_t f, bool v) {
 }
 
 LIBATAPP_MACRO_API void etcd_cluster::set_logger(const atfw::util::log::log_wrapper::ptr_t &logger,
-                                                 atfw::util::log::log_formatter::level_t::type log_level) noexcept {
+                                                 atfw::util::log::log_level log_level) noexcept {
   logger_ = logger;
   startup_log_level_ = log_level;
   if (logger) {
@@ -2245,8 +2244,8 @@ LIBATAPP_MACRO_API void etcd_cluster::setup_http_request(atfw::util::network::ht
   }
 
   if (atfw::util::log::log_wrapper::check_level(WDTLOGGETCAT(atfw::util::log::log_wrapper::categorize_t::DEFAULT),
-                                                atfw::util::log::log_wrapper::level_t::LOG_LW_TRACE) ||
-      (logger_ && logger_->check_level(atfw::util::log::log_wrapper::level_t::LOG_LW_TRACE))) {
+                                                atfw::util::log::log_level::kTrace) ||
+      (logger_ && logger_->check_level(atfw::util::log::log_level::kTrace))) {
     auto logger = logger_;
     req->set_on_progress([logger](atfw::util::network::http_request &self_req,
                                   const atfw::util::network::http_request::progress_t &process) {

@@ -295,7 +295,7 @@ int etcd_watcher::libcurl_callback_on_range_completed(atfw::util::network::http_
   }
 
   if (atfw::util::log::log_wrapper::check_level(WDTLOGGETCAT(atfw::util::log::log_wrapper::categorize_t::DEFAULT),
-                                                atfw::util::log::log_wrapper::level_t::LOG_LW_DEBUG)) {
+                                                atfw::util::log::log_level::kDebug)) {
     LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(*self->owner_, "Etcd watcher {} got range response",
                                           reinterpret_cast<const void *>(self));
     for (size_t i = 0; i < response.events.size(); ++i) {
@@ -514,7 +514,7 @@ int etcd_watcher::libcurl_callback_on_watch_write(atfw::util::network::http_requ
     }
 
     if (atfw::util::log::log_wrapper::check_level(WDTLOGGETCAT(atfw::util::log::log_wrapper::categorize_t::DEFAULT),
-                                                  atfw::util::log::log_wrapper::level_t::LOG_LW_DEBUG)) {
+                                                  atfw::util::log::log_level::kDebug)) {
       LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(
           *self->owner_,
           "Etcd watcher {} got response: watch_id: {}, compact_revision: {}, created: {}, canceled: {}, event: {}",
