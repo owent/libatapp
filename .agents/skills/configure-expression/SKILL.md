@@ -1,3 +1,8 @@
+---
+name: configure-expression
+description: Environment-variable expression expansion syntax for protobuf config fields annotated with enable_expression in libatapp.
+---
+
 # Configuration Expression Expansion (libatapp)
 
 Protobuf fields annotated with `enable_expression: true` in the `atapp_configure_meta` extension
@@ -6,14 +11,14 @@ or environment-variable files.
 
 ## Expression Syntax
 
-| Syntax | Description |
-| --- | --- |
-| `$VAR` | Bare variable — POSIX names only (`[A-Za-z_][A-Za-z0-9_]*`) |
-| `${VAR}` | Braced variable — any characters allowed, including `.`, `-`, `/` (k8s labels) |
-| `${VAR:-default}` | If `VAR` is **unset or empty**, expand to `default` |
-| `${VAR:+word}` | If `VAR` is **set and non-empty**, expand to `word`; otherwise empty string |
-| `\$` | Literal dollar sign (escape) |
-| Nested | `${OUTER_${INNER}}`, `${VAR:-${OTHER:-fallback}}` — arbitrary nesting |
+| Syntax            | Description                                                                    |
+| ----------------- | ------------------------------------------------------------------------------ |
+| `$VAR`            | Bare variable — POSIX names only (`[A-Za-z_][A-Za-z0-9_]*`)                    |
+| `${VAR}`          | Braced variable — any characters allowed, including `.`, `-`, `/` (k8s labels) |
+| `${VAR:-default}` | If `VAR` is **unset or empty**, expand to `default`                            |
+| `${VAR:+word}`    | If `VAR` is **set and non-empty**, expand to `word`; otherwise empty string    |
+| `\$`              | Literal dollar sign (escape)                                                   |
+| Nested            | `${OUTER_${INNER}}`, `${VAR:-${OTHER:-fallback}}` — arbitrary nesting          |
 
 ### Bare `$VAR` vs Braced `${VAR}`
 

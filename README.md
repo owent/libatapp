@@ -275,3 +275,58 @@ int main(int argc, char *argv[]) {
 ```
 
 **更多的细节请参照 [sample](sample)**
+
+## 本地 etcd 测试
+
+部分单元测试（`atapp_etcd_cluster`、`atapp_etcd_module`）需要连接 etcd 服务。`ci/etcd/` 目录下提供了自动下载、启动和管理本地 etcd 的脚本。
+
+### Windows (PowerShell)
+
+```powershell
+# 下载并启动 etcd（默认客户端端口 12379）
+.\ci\etcd\setup-etcd.ps1 -Command start
+
+# 设置环境变量，让单元测试发现 etcd
+$env:ATAPP_UNIT_TEST_ETCD_HOST = "http://127.0.0.1:12379"
+
+# 运行 etcd 相关测试
+./atapp_unit_test.exe -r atapp_etcd_cluster
+./atapp_unit_test.exe -r atapp_etcd_module
+
+# 停止 etcd
+.\ci\etcd\setup-etcd.ps1 -Command stop
+
+# 完全清理（停止 + 删除二进制和数据）
+.\ci\etcd\setup-etcd.ps1 -Command cleanup
+```
+
+### Linux / macOS (Bash)
+
+```bash
+bash ci/etcd/setup-etcd.sh start
+export ATAPP_UNIT_TEST_ETCD_HOST="http://127.0.0.1:12379"
+./atapp_unit_test -r atapp_etcd_cluster
+./atapp_unit_test -r atapp_etcd_module
+bash ci/etcd/setup-etcd.sh stop
+```
+
+### 可用命令
+
+| 命令        | 说明                           |
+| ----------- | ------------------------------ |
+| `download`  | 仅下载 etcd 二进制             |
+| `start`     | 下载（如需）并启动 etcd        |
+| `stop`      | 停止 etcd                      |
+| `cleanup`   | 停止并删除所有二进制和数据     |
+| `status`    | 检查 etcd 运行状态和健康状况   |
+
+### 可选参数
+
+| 参数 (PS1)      | 参数 (sh)          | 默认值                  | 说明               |
+| --------------- | ------------------ | ----------------------- | ------------------ |
+| `-WorkDir`      | `--work-dir`       | `$TEMP/etcd-unit-test`  | 工作目录           |
+| `-ClientPort`   | `--client-port`    | `12379`                 | 客户端监听端口     |
+| `-PeerPort`     | `--peer-port`      | `12380`                 | 节点间通信端口     |
+| `-EtcdVersion`  | `--etcd-version`   | `latest`                | etcd 版本号        |
+
+如果已有 etcd 服务运行，只需设置环境变量 `ATAPP_UNIT_TEST_ETCD_HOST` 即可。未设置时 etcd 相关测试将被跳过。

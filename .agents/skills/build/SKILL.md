@@ -1,3 +1,8 @@
+---
+name: build
+description: Configure and build libatapp with CMake, including shared library and build type options.
+---
+
 # Build (libatapp)
 
 This repo uses **CMake (>= 3.24)** and requires C++17.
