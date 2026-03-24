@@ -3,9 +3,17 @@
 用于搭建高性能、全异步(a)的跨平台应用框架库。
 
 [![ci-badge]][ci-link]
+[![codeql-badge]][codeql-link]
+[![codecov-badge]][codecov-link]
+![license-badge]
 
 [ci-badge]: https://github.com/atframework/libatapp/actions/workflows/main.yml/badge.svg "Github action build status"
 [ci-link]:  https://github.com/atframework/libatapp/actions/workflows/main.yml "Github action build status"
+[codeql-badge]: https://github.com/atframework/libatapp/actions/workflows/codeql.yml/badge.svg "CodeQL"
+[codeql-link]:  https://github.com/atframework/libatapp/actions/workflows/codeql.yml "CodeQL"
+[codecov-badge]: https://codecov.io/gh/owent/libatapp/branch/main/graph/badge.svg
+[codecov-link]: https://codecov.io/gh/owent/libatapp
+[license-badge]: https://img.shields.io/github/license/atframework/libatapp
 
 ## CI Job Matrix
 
@@ -13,7 +21,6 @@
 | ------------- | ------------------ | --------------------- |
 | Linux         | GCC                |
 | Linux         | Clang              | With libc++           |
-| MinGW64       | GCC                | Dynamic linking       |
 | Windows       | Visual Studio 2022 | Dynamic linking       |
 | Windows       | Visual Studio 2022 | Static linking        |
 | macOS         | AppleClang         | With libc++           |

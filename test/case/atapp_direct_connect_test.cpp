@@ -384,12 +384,15 @@ CASE_TEST(atapp_direct_connect, direct_discovery_missing_wait_then_send) {
   CASE_EXPECT_TRUE(apps.node1.get_endpoint(apps.node2.get_app_id()) == nullptr);
 
   // Set up receive callback on node2
-  apps.node2.set_evt_on_forward_request([](atframework::atapp::app &, const atframework::atapp::app::message_sender_t &,
+  apps.node2.set_evt_on_forward_request([](atframework::atapp::app &,
+                                           const atframework::atapp::app::message_sender_t &sender,
                                            const atframework::atapp::app::message_t &msg) {
     auto received = gsl::string_view{reinterpret_cast<const char *>(msg.data.data()), msg.data.size()};
     g_direct_test_ctx.received_messages.emplace_back(received.data(), received.size());
+    g_direct_test_ctx.received_direct_source_ids.push_back(sender.direct_source_id);
     ++g_direct_test_ctx.received_message_count;
-    CASE_MSG_INFO() << "B.2: node2 received: " << received << '\n';
+    CASE_MSG_INFO() << "B.2: node2 received: " << received << ", direct_source=0x" << std::hex
+                    << sender.direct_source_id << std::dec << '\n';
     return 0;
   });
 
@@ -421,28 +424,50 @@ CASE_TEST(atapp_direct_connect, direct_discovery_missing_wait_then_send) {
   CASE_EXPECT_TRUE(apps.node2.mutable_endpoint(apps.node1_discovery));
   CASE_EXPECT_TRUE(apps.node2.mutable_endpoint(apps.upstream_discovery));
 
-  // Wait for direct connection to be ready
-  apps.pump_until_direct_connected();
-
+  // Endpoint exists but direct connection not ready yet — send should go to pending queue
   auto *ep_node2 = apps.node1.get_endpoint(apps.node2.get_app_id());
   CASE_EXPECT_TRUE(ep_node2 != nullptr);
   if (ep_node2 != nullptr) {
-    CASE_EXPECT_TRUE(ep_node2->get_ready_connection_handle() != nullptr);
+    CASE_EXPECT_TRUE(ep_node2->get_ready_connection_handle() == nullptr);
   }
 
-  // Send message — should be delivered via direct connection
-  char msg_data[] = "after-discovery-B2";
+  // Send message — should NOT be delivered immediately, goes to pending queue
+  char msg_data[] = "pending-before-connect-B2";
   gsl::span<const unsigned char> msg_span{reinterpret_cast<const unsigned char *>(msg_data),
                                           static_cast<size_t>(strlen(msg_data))};
   uint64_t seq = 0;
-  int old_count = g_direct_test_ctx.received_message_count;
-  CASE_EXPECT_EQ(0, apps.node1.send_message(apps.node2.get_app_id(), 100, msg_span, &seq));
+  apps.node1.send_message(apps.node2.get_app_id(), 100, msg_span, &seq);
 
-  apps.pump_until([&]() { return g_direct_test_ctx.received_message_count >= old_count + 1; });
+  // Pump event loop a few rounds to rule out false negatives —
+  // ensure the message stays pending because there is no direct connection,
+  // not because IO events haven't been processed yet.
+  for (int i = 0; i < 64; ++i) {
+    apps.upstream.run_noblock();
+    apps.node1.run_noblock();
+    apps.node2.run_noblock();
+  }
 
-  CASE_EXPECT_EQ(old_count + 1, g_direct_test_ctx.received_message_count);
+  // Verify message is still NOT delivered after pumping
+  CASE_EXPECT_EQ(0, g_direct_test_ctx.received_message_count);
+
+  // Verify message is in pending queue
+  ep_node2 = apps.node1.get_endpoint(apps.node2.get_app_id());
+  if (ep_node2 != nullptr) {
+    CASE_EXPECT_GT(ep_node2->get_pending_message_count(), static_cast<size_t>(0));
+    CASE_MSG_INFO() << "B.2: pending_message_count=" << ep_node2->get_pending_message_count() << '\n';
+  }
+
+  // Wait for direct connection → pending message should be delivered
+  apps.pump_until_direct_connected();
+  apps.pump_until([&]() { return g_direct_test_ctx.received_message_count >= 1; });
+
+  CASE_EXPECT_EQ(1, g_direct_test_ctx.received_message_count);
   if (!g_direct_test_ctx.received_messages.empty()) {
-    CASE_EXPECT_EQ("after-discovery-B2", g_direct_test_ctx.received_messages.back());
+    CASE_EXPECT_EQ("pending-before-connect-B2", g_direct_test_ctx.received_messages[0]);
+  }
+  // Verify data arrived via direct connection
+  if (!g_direct_test_ctx.received_direct_source_ids.empty()) {
+    CASE_EXPECT_EQ(apps.node1.get_app_id(), g_direct_test_ctx.received_direct_source_ids[0]);
   }
 }
 
@@ -468,8 +493,10 @@ CASE_TEST(atapp_direct_connect, direct_connected_send_success) {
     CASE_EXPECT_EQ(200, msg.type);
     auto received = gsl::string_view{reinterpret_cast<const char *>(msg.data.data()), msg.data.size()};
     g_direct_test_ctx.received_messages.emplace_back(received.data(), received.size());
+    g_direct_test_ctx.received_direct_source_ids.push_back(sender.direct_source_id);
     ++g_direct_test_ctx.received_message_count;
-    CASE_MSG_INFO() << "B.3: node2 received: " << received << '\n';
+    CASE_MSG_INFO() << "B.3: node2 received: " << received << ", direct_source=0x" << std::hex
+                    << sender.direct_source_id << std::dec << '\n';
     return 0;
   });
 
@@ -489,6 +516,11 @@ CASE_TEST(atapp_direct_connect, direct_connected_send_success) {
   if (g_direct_test_ctx.received_messages.size() >= 2) {
     CASE_EXPECT_EQ("direct-msg1-B3", g_direct_test_ctx.received_messages[0]);
     CASE_EXPECT_EQ("direct-msg2-B3", g_direct_test_ctx.received_messages[1]);
+  }
+
+  // Verify all messages arrived via direct connection (not upstream relay)
+  for (const auto &src_id : g_direct_test_ctx.received_direct_source_ids) {
+    CASE_EXPECT_EQ(apps.node1.get_app_id(), src_id);
   }
 
   // Also test reverse direction: node2 → node1
@@ -530,12 +562,15 @@ CASE_TEST(atapp_direct_connect, direct_reconnect_success_after_failure) {
   apps.full_setup_and_connect();
 
   // Set up receive callback on node2
-  apps.node2.set_evt_on_forward_request([](atframework::atapp::app &, const atframework::atapp::app::message_sender_t &,
+  apps.node2.set_evt_on_forward_request([](atframework::atapp::app &,
+                                           const atframework::atapp::app::message_sender_t &sender,
                                            const atframework::atapp::app::message_t &msg) {
     auto received = gsl::string_view{reinterpret_cast<const char *>(msg.data.data()), msg.data.size()};
     g_direct_test_ctx.received_messages.emplace_back(received.data(), received.size());
+    g_direct_test_ctx.received_direct_source_ids.push_back(sender.direct_source_id);
     ++g_direct_test_ctx.received_message_count;
-    CASE_MSG_INFO() << "B.4: node2 received: " << received << '\n';
+    CASE_MSG_INFO() << "B.4: node2 received: " << received << ", direct_source=0x" << std::hex
+                    << sender.direct_source_id << std::dec << '\n';
     return 0;
   });
 
@@ -589,6 +624,18 @@ CASE_TEST(atapp_direct_connect, direct_reconnect_success_after_failure) {
 
   apps.pump_until([&]() { return g_direct_test_ctx.received_message_count >= 3; });
   CASE_EXPECT_EQ(3, g_direct_test_ctx.received_message_count);
+
+  // Verify all messages content
+  if (g_direct_test_ctx.received_messages.size() >= 3) {
+    CASE_EXPECT_EQ("before-disconnect-B4", g_direct_test_ctx.received_messages[0]);
+    CASE_EXPECT_EQ("during-reconnect-B4", g_direct_test_ctx.received_messages[1]);
+    CASE_EXPECT_EQ("after-reconnect-B4", g_direct_test_ctx.received_messages[2]);
+  }
+
+  // Verify all messages arrived via direct connection
+  for (const auto &src_id : g_direct_test_ctx.received_direct_source_ids) {
+    CASE_EXPECT_EQ(apps.node1.get_app_id(), src_id);
+  }
 #endif
 }
 
@@ -675,7 +722,7 @@ CASE_TEST(atapp_direct_connect, direct_reconnect_retry_backoff) {
     CASE_MSG_INFO() << "B.5: first_interval=" << first_interval << "ms, second_interval=" << second_interval << "ms"
                     << '\n';
     // Second interval should be approximately 2x the first (with some tolerance)
-    CASE_EXPECT_GE(second_interval, first_interval);
+    CASE_EXPECT_GT(second_interval, first_interval);
   }
 
   // Handle should eventually be removed when retry_times >= max_try_times
@@ -729,6 +776,9 @@ CASE_TEST(atapp_direct_connect, direct_retry_exceed_limit_fail) {
   n1_connector->set_handle_unready_by_bus_id(apps.node2.get_app_id());
   n1_connector->remove_topology_peer(apps.node2.get_app_id());
 
+  // Verify lost topology flag is set
+  CASE_EXPECT_TRUE(n1_connector->has_lost_topology_flag(apps.node2.get_app_id()));
+
   // Verify handle is unready
   auto *ep_node2 = apps.node1.get_endpoint(apps.node2.get_app_id());
   CASE_EXPECT_TRUE(ep_node2 != nullptr);
@@ -770,90 +820,11 @@ CASE_TEST(atapp_direct_connect, direct_retry_exceed_limit_fail) {
     CASE_EXPECT_EQ(EN_ATBUS_ERR_NODE_TIMEOUT, g_direct_test_ctx.last_forward_response_error);
   }
 
-  // Reset time
-  atframework::atapp::app::set_sys_now(atfw::util::time::time_utility::sys_now());
-#endif
-}
-
-// ============================================================
-// B.7: direct_topology_offline_timeout
-// Topology goes offline → advance time past lost_topology_timeout →
-// handle should be removed.
-// ============================================================
-CASE_TEST(atapp_direct_connect, direct_topology_offline_timeout) {
-#if defined(NDEBUG)
-  CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << "set_sys_now() only available in Debug builds, skip" << '\n';
-  return;
-#else
-  reset_direct_test_context();
-
-  direct_three_node_apps apps;
-  if (!apps.init_all()) {
-    return;
-  }
-
-  apps.full_setup_and_connect();
-
-  // Setup forward response callback
-  apps.node1.set_evt_on_forward_response([](atframework::atapp::app &,
-                                            const atframework::atapp::app::message_sender_t &,
-                                            const atframework::atapp::app::message_t &, int32_t error_code) {
-    g_direct_test_ctx.last_forward_response_error = error_code;
-    ++g_direct_test_ctx.forward_response_count;
-    CASE_MSG_INFO() << "B.7: forward response error_code=" << error_code << '\n';
-    return 0;
-  });
-
-  auto n1_connector = apps.node1.get_atbus_connector();
-  CASE_EXPECT_TRUE(n1_connector != nullptr);
-  if (!n1_connector) {
-    return;
-  }
-
-  // Sync jiffies timer
-  apps.node1.tick();
-
-  // Remove topology → sets kLostTopology
-  n1_connector->remove_topology_peer(apps.node2.get_app_id());
-  CASE_EXPECT_TRUE(n1_connector->has_lost_topology_flag(apps.node2.get_app_id()));
-
-  // Set handle unready
-  n1_connector->set_handle_unready_by_bus_id(apps.node2.get_app_id());
-
-  // Send a message — should go to pending queue
-  char msg_data[] = "topology-offline-B7";
-  gsl::span<const unsigned char> msg_span{reinterpret_cast<const unsigned char *>(msg_data),
-                                          static_cast<size_t>(strlen(msg_data))};
-  uint64_t seq = 0;
-  apps.node1.send_message(apps.node2.get_app_id(), 100, msg_span, &seq);
-
-  // Advance time past lost_topology_timeout (32s)
-  auto now = atframework::atapp::app::get_sys_now();
-  bool handle_removed = false;
-
-  for (int i = 1; i <= 1000; ++i) {
-    atframework::atapp::app::set_sys_now(now + std::chrono::milliseconds(i * 50));
-    apps.node1.tick();
-    if (!handle_removed && !n1_connector->has_connection_handle(apps.node2.get_app_id())) {
-      handle_removed = true;
-      CASE_MSG_INFO() << "B.7: handle removed after " << i * 50 << "ms" << '\n';
-    }
-    if (handle_removed && g_direct_test_ctx.forward_response_count > 0) {
-      break;
-    }
-  }
-
-  CASE_EXPECT_TRUE(handle_removed);
-  CASE_EXPECT_GT(g_direct_test_ctx.forward_response_count, 0);
-  if (g_direct_test_ctx.forward_response_count > 0) {
-    CASE_EXPECT_EQ(EN_ATBUS_ERR_NODE_TIMEOUT, g_direct_test_ctx.last_forward_response_error);
-  }
-
-  // Verify endpoint is cleaned up after GC
+  // Verify endpoint is cleaned up after GC (advance time further)
   atframework::atapp::app::set_sys_now(now + std::chrono::seconds(200));
   apps.node1.tick();
 
-  auto *ep_node2 = apps.node1.get_endpoint(apps.node2.get_app_id());
+  ep_node2 = apps.node1.get_endpoint(apps.node2.get_app_id());
   CASE_EXPECT_TRUE(ep_node2 == nullptr);
 
   // Reset time
@@ -862,9 +833,10 @@ CASE_TEST(atapp_direct_connect, direct_topology_offline_timeout) {
 }
 
 // ============================================================
-// B.8: direct_prefer_direct_over_upstream
+// B.7: direct_prefer_direct_over_upstream
 // Both upstream and direct paths available, verify direct connection
 // is used (direct_source_id = node1, not upstream).
+// Verify proxy_bus_id, and that both nodes share the same upstream.
 // ============================================================
 CASE_TEST(atapp_direct_connect, direct_prefer_direct_over_upstream) {
 #if defined(NDEBUG)
@@ -881,31 +853,49 @@ CASE_TEST(atapp_direct_connect, direct_prefer_direct_over_upstream) {
 
   apps.full_setup_and_connect();
 
-  // While the handle is ready, the proxy_bus_id should be 0 (direct) or the node itself
+  // Verify both nodes have upstream and it's the same upstream and connected
+  auto bus1 = apps.node1.get_bus_node();
+  auto bus2 = apps.node2.get_bus_node();
+  CASE_EXPECT_TRUE(bus1 != nullptr);
+  CASE_EXPECT_TRUE(bus2 != nullptr);
+  if (bus1 && bus2) {
+    auto *up1 = bus1->get_upstream_endpoint();
+    auto *up2 = bus2->get_upstream_endpoint();
+    CASE_EXPECT_TRUE(up1 != nullptr);
+    CASE_EXPECT_TRUE(up2 != nullptr);
+    if (up1 && up2) {
+      CASE_EXPECT_EQ(up1->get_id(), up2->get_id());
+      CASE_EXPECT_EQ(apps.upstream.get_app_id(), up1->get_id());
+      CASE_MSG_INFO() << "B.7: node1 upstream=0x" << std::hex << up1->get_id() << ", node2 upstream=0x" << up2->get_id()
+                      << std::dec << '\n';
+    }
+  }
+
+  // Verify proxy_bus_id — should be 0 for direct connection (no proxy relay)
   auto n1_connector = apps.node1.get_atbus_connector();
   CASE_EXPECT_TRUE(n1_connector != nullptr);
   if (n1_connector) {
     auto proxy_id = n1_connector->get_connection_handle_proxy_bus_id(apps.node2.get_app_id());
-    CASE_MSG_INFO() << "B.8: proxy_bus_id for node2 = 0x" << std::hex << proxy_id << std::dec << '\n';
-    // If direct connection is used, proxy_bus_id should NOT be the upstream's ID
-    // It should be 0 (no proxy) or the shared upstream (which is used to find the direct route)
-    // The key verification is via direct_source_id in the message
+    CASE_MSG_INFO() << "B.7: proxy_bus_id for node2 = 0x" << std::hex << proxy_id << std::dec << '\n';
+    // Direct connection: proxy_bus_id should be 0 (data goes directly, not through upstream)
+    CASE_EXPECT_EQ(static_cast<atframework::atapp::app_id_t>(0), proxy_id);
   }
 
-  // Set up receive callback on node2 to track direct_source_id
-  apps.node2.set_evt_on_forward_request([&apps](atframework::atapp::app &,
-                                                const atframework::atapp::app::message_sender_t &sender,
-                                                const atframework::atapp::app::message_t &msg) {
+  // Set up receive callback on node2 to track direct_source_id and data
+  apps.node2.set_evt_on_forward_request([](atframework::atapp::app &,
+                                           const atframework::atapp::app::message_sender_t &sender,
+                                           const atframework::atapp::app::message_t &msg) {
     g_direct_test_ctx.received_direct_source_ids.push_back(sender.direct_source_id);
-    ++g_direct_test_ctx.received_message_count;
     auto received = gsl::string_view{reinterpret_cast<const char *>(msg.data.data()), msg.data.size()};
-    CASE_MSG_INFO() << "B.8: node2 received: " << received << ", direct_source=0x" << std::hex
+    g_direct_test_ctx.received_messages.emplace_back(received.data(), received.size());
+    ++g_direct_test_ctx.received_message_count;
+    CASE_MSG_INFO() << "B.7: node2 received: " << received << ", direct_source=0x" << std::hex
                     << sender.direct_source_id << std::dec << '\n';
     return 0;
   });
 
   // Send message
-  char msg_data[] = "prefer-direct-B8";
+  char msg_data[] = "prefer-direct-B7";
   gsl::span<const unsigned char> msg_span{reinterpret_cast<const unsigned char *>(msg_data),
                                           static_cast<size_t>(strlen(msg_data))};
   uint64_t seq = 0;
@@ -915,13 +905,15 @@ CASE_TEST(atapp_direct_connect, direct_prefer_direct_over_upstream) {
 
   CASE_EXPECT_EQ(1, g_direct_test_ctx.received_message_count);
 
+  // Verify received data content
+  if (!g_direct_test_ctx.received_messages.empty()) {
+    CASE_EXPECT_EQ("prefer-direct-B7", g_direct_test_ctx.received_messages[0]);
+  }
+
   // Verify: direct_source_id should be node1 (direct connection), NOT upstream
   if (!g_direct_test_ctx.received_direct_source_ids.empty()) {
     CASE_EXPECT_EQ(apps.node1.get_app_id(), g_direct_test_ctx.received_direct_source_ids[0]);
     CASE_EXPECT_NE(apps.upstream.get_app_id(), g_direct_test_ctx.received_direct_source_ids[0]);
-    CASE_MSG_INFO() << "B.8: Verified direct connection (direct_source=0x" << std::hex
-                    << g_direct_test_ctx.received_direct_source_ids[0] << " != upstream=0x"
-                    << apps.upstream.get_app_id() << std::dec << ")" << '\n';
   }
 
   // Also verify the atbus endpoint exists for direct connection
@@ -934,9 +926,10 @@ CASE_TEST(atapp_direct_connect, direct_prefer_direct_over_upstream) {
 }
 
 // ============================================================
-// B.9: direct_prefer_direct_wait_discovery
+// B.8: direct_prefer_direct_wait_discovery
 // Allow direct connection, target discovery missing → wait →
 // discovery arrives → direct connection established.
+// Verify both nodes share the same upstream before send.
 // ============================================================
 CASE_TEST(atapp_direct_connect, direct_prefer_direct_wait_discovery) {
 #if defined(NDEBUG)
@@ -953,14 +946,29 @@ CASE_TEST(atapp_direct_connect, direct_prefer_direct_wait_discovery) {
 
   apps.wait_for_upstream_connections();
 
+  // Verify both nodes have upstream and it's the same upstream and connected
+  auto bus1 = apps.node1.get_bus_node();
+  auto bus_up = apps.upstream.get_bus_node();
+  auto bus2 = apps.node2.get_bus_node();
+  CASE_EXPECT_TRUE(bus1 != nullptr);
+  CASE_EXPECT_TRUE(bus2 != nullptr);
+  if (bus1 && bus2) {
+    auto *up1 = bus1->get_upstream_endpoint();
+    auto *up2 = bus2->get_upstream_endpoint();
+    CASE_EXPECT_TRUE(up1 != nullptr);
+    CASE_EXPECT_TRUE(up2 != nullptr);
+    if (up1 && up2) {
+      CASE_EXPECT_EQ(up1->get_id(), up2->get_id());
+      CASE_EXPECT_EQ(apps.upstream.get_app_id(), up1->get_id());
+      CASE_MSG_INFO() << "B.8: node1 upstream=0x" << std::hex << up1->get_id() << ", node2 upstream=0x" << up2->get_id()
+                      << std::dec << '\n';
+    }
+  }
+
   // Phase 1: Inject discovery for all EXCEPT node2's listen address
   apps.inject_discovery_without_node2();
 
   // Setup partial topology (without node2's direct connection info)
-  auto bus1 = apps.node1.get_bus_node();
-  auto bus_up = apps.upstream.get_bus_node();
-  auto bus2 = apps.node2.get_bus_node();
-
   if (bus_up && bus_up->get_topology_registry()) {
     bus_up->get_topology_registry()->update_peer(apps.node1.get_app_id(), apps.upstream.get_app_id(), nullptr);
   }
@@ -1022,19 +1030,20 @@ CASE_TEST(atapp_direct_connect, direct_prefer_direct_wait_discovery) {
   apps.pump_until_direct_connected();
 
   // Set up receive callback on node2
-  apps.node2.set_evt_on_forward_request([&apps](atframework::atapp::app &,
-                                                const atframework::atapp::app::message_sender_t &sender,
-                                                const atframework::atapp::app::message_t &msg) {
+  apps.node2.set_evt_on_forward_request([](atframework::atapp::app &,
+                                           const atframework::atapp::app::message_sender_t &sender,
+                                           const atframework::atapp::app::message_t &msg) {
     g_direct_test_ctx.received_direct_source_ids.push_back(sender.direct_source_id);
-    ++g_direct_test_ctx.received_message_count;
     auto received = gsl::string_view{reinterpret_cast<const char *>(msg.data.data()), msg.data.size()};
-    CASE_MSG_INFO() << "B.9: node2 received: " << received << ", direct_source=0x" << std::hex
+    g_direct_test_ctx.received_messages.emplace_back(received.data(), received.size());
+    ++g_direct_test_ctx.received_message_count;
+    CASE_MSG_INFO() << "B.8: node2 received: " << received << ", direct_source=0x" << std::hex
                     << sender.direct_source_id << std::dec << '\n';
     return 0;
   });
 
   // Send message — should go via direct connection
-  char msg_data[] = "wait-discovery-B9";
+  char msg_data[] = "wait-discovery-B8";
   gsl::span<const unsigned char> msg_span{reinterpret_cast<const unsigned char *>(msg_data),
                                           static_cast<size_t>(strlen(msg_data))};
   uint64_t seq = 0;
@@ -1043,6 +1052,11 @@ CASE_TEST(atapp_direct_connect, direct_prefer_direct_wait_discovery) {
   apps.pump_until([&]() { return g_direct_test_ctx.received_message_count >= 1; });
 
   CASE_EXPECT_EQ(1, g_direct_test_ctx.received_message_count);
+
+  // Verify received data content
+  if (!g_direct_test_ctx.received_messages.empty()) {
+    CASE_EXPECT_EQ("wait-discovery-B8", g_direct_test_ctx.received_messages[0]);
+  }
 
   // Verify direct connection was used (direct_source_id = node1, not upstream)
   if (!g_direct_test_ctx.received_direct_source_ids.empty()) {
