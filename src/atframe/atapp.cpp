@@ -5281,7 +5281,8 @@ int app::send_last_command(ev_loop_t *ev_loop) {
     if (0 == UTIL_STRFUNC_STRNCASE_CMP("shm", parsed_addr.scheme.c_str(), 3)) {
       parsed_level = 5;
       is_sync_channel = true;
-    } else if (0 == UTIL_STRFUNC_STRNCASE_CMP("unix", parsed_addr.scheme.c_str(), 4)) {
+    } else if (0 == UTIL_STRFUNC_STRNCASE_CMP("unix", parsed_addr.scheme.c_str(), 4) ||
+               0 == UTIL_STRFUNC_STRNCASE_CMP("pipe", parsed_addr.scheme.c_str(), 4)) {
       parsed_level = 4;
     } else if (0 == UTIL_STRFUNC_STRNCASE_CMP("atcp", parsed_addr.scheme.c_str(), 4) ||
                0 == UTIL_STRFUNC_STRNCASE_CMP("ipv6", parsed_addr.scheme.c_str(), 4)) {
