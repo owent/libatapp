@@ -1,0 +1,52 @@
+# Copyright 2026 atframework
+# D group - topology change test: child node 1
+# Topology: node1(0x401) --proxy--> old_upstream(0x402) <--proxy-- target(0x404)
+atapp:
+  id: 0x00000401
+  id_mask: 8.8.8.8
+  name: "topo-test-node1"
+  type_id: 1
+  type_name: "topo-test"
+
+  bus:
+    listen: "ipv4://127.0.0.1:21901"
+    proxy: "ipv4://127.0.0.1:21902"
+    backlog: 256
+    access_token_max_number: 5
+    overwrite_listen_path: false
+    topology:
+      rule:
+        allow_direct_connection: false
+        require_same_upstream: false
+    first_idle_timeout: 3600s
+    ping_interval: 3600s
+    retry_interval: 3s
+    reconnect_start_interval: 2s
+    reconnect_max_interval: 16s
+    reconnect_max_try_times: 2
+    lost_topology_timeout: 32s
+    fault_tolerant: 3
+    message_size: 64KB
+    receive_buffer_size: 1MB
+    send_buffer_size: 1MB
+    send_buffer_number: 0
+  timer:
+    tick_interval: 8ms
+    stop_timeout: 3s
+    stop_interval: 256ms
+  etcd:
+    enable: false
+
+  log:
+    level: debug
+    category:
+      - name: default
+        prefix: "[Log %L][%F %T.%f][%s:%n(%C)]: "
+        stacktrace:
+          min: error
+          max: fatal
+        sink:
+          - type: stdout
+            level:
+              min: fatal
+              max: debug

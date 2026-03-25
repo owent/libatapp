@@ -1,0 +1,53 @@
+# Copyright 2026 atframework
+# D group - topology change test: new upstream
+# Takes over the relay role from old_upstream(0x402) on the SAME port (:21902).
+# Used in D.1-D.4: old_upstream goes offline, new_upstream starts on :21902.
+atapp:
+  id: 0x00000403
+  id_mask: 8.8.8.8
+  name: "topo-test-new-upstream"
+  type_id: 1
+  type_name: "topo-test"
+
+  bus:
+    listen: "ipv4://127.0.0.1:21902"
+    proxy: ""
+    backlog: 256
+    access_token_max_number: 5
+    overwrite_listen_path: false
+    topology:
+      rule:
+        allow_direct_connection: false
+        require_same_upstream: false
+    first_idle_timeout: 3600s
+    ping_interval: 3600s
+    retry_interval: 3s
+    reconnect_start_interval: 2s
+    reconnect_max_interval: 16s
+    reconnect_max_try_times: 2
+    lost_topology_timeout: 32s
+    fault_tolerant: 3
+    message_size: 64KB
+    receive_buffer_size: 1MB
+    send_buffer_size: 1MB
+    send_buffer_number: 0
+  timer:
+    tick_interval: 8ms
+    stop_timeout: 3s
+    stop_interval: 256ms
+  etcd:
+    enable: false
+
+  log:
+    level: debug
+    category:
+      - name: default
+        prefix: "[Log %L][%F %T.%f][%s:%n(%C)]: "
+        stacktrace:
+          min: error
+          max: fatal
+        sink:
+          - type: stdout
+            level:
+              min: fatal
+              max: debug
