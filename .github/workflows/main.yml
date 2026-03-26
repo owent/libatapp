@@ -20,17 +20,35 @@ jobs:
         run: |
           bash ci/do_ci.sh format ;
   unix_build: # job id, can be any string
-    name: Unix Build
+    name: Unix Build (${{ matrix.os }} / ${{ matrix.cc }} / ${{ matrix.configuration }})
     # This job runs on Linux
     strategy:
       matrix:
         include:
           - os: ubuntu-latest
             cc: gcc
+            configuration: Debug
+            run_tests: true
+          - os: ubuntu-latest
+            cc: gcc
+            configuration: RelWithDebInfo
+            run_tests: false
           - os: ubuntu-latest
             cc: clang-latest
+            configuration: Debug
+            run_tests: true
+          - os: ubuntu-latest
+            cc: clang-latest
+            configuration: RelWithDebInfo
+            run_tests: false
           - os: macos-latest
             cc: clang-latest
+            configuration: Debug
+            run_tests: true
+          - os: macos-latest
+            cc: clang-latest
+            configuration: RelWithDebInfo
+            run_tests: false
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -44,22 +62,31 @@ jobs:
           path: |
             third_party/install
           key: ${{ matrix.os }}-${{ matrix.cc }}-${{ hashFiles('.github/.cache-key') }}
-      - name: Build & Test
+      - name: Build${{ matrix.run_tests && ' & Test' || '' }}
         shell: bash
         env:
           USE_CC: ${{ matrix.cc }}
+          CONFIGURATION: ${{ matrix.configuration }}
         run: |
           # The OpenSSL config package in apple ci job is break
           if [ -e /opt/homebrew/lib/cmake/OpenSSL ]; then
             rm -rf /opt/homebrew/lib/cmake/OpenSSL || true
           fi
           if [[ "x$USE_CC" =~ xclang.* ]]; then
-            bash ci/do_ci.sh clang.test ;
+            if [[ "${{ matrix.run_tests }}" == "true" ]]; then
+              bash ci/do_ci.sh clang.test ;
+            else
+              bash ci/do_ci.sh clang.build ;
+            fi
           else
-            bash ci/do_ci.sh gcc.test ;
+            if [[ "${{ matrix.run_tests }}" == "true" ]]; then
+              bash ci/do_ci.sh gcc.test ;
+            else
+              bash ci/do_ci.sh gcc.build ;
+            fi
           fi
   vs2022_build: # job id, can be any string
-    name: "Visual Studio 2022 Build"
+    name: "Visual Studio 2022 Build (${{ matrix.build_shared_libs }} / ${{ matrix.configuration }})"
     strategy:
       matrix:
         include:
@@ -67,10 +94,26 @@ jobs:
             generator: "Visual Studio 17 2022"
             build_shared_libs: "ON"
             platform: x64
+            configuration: Debug
+            run_tests: true
+          - os: windows-latest
+            generator: "Visual Studio 17 2022"
+            build_shared_libs: "ON"
+            platform: x64
+            configuration: RelWithDebInfo
+            run_tests: false
           - os: windows-latest
             generator: "Visual Studio 17 2022"
             build_shared_libs: "OFF"
             platform: x64
+            configuration: Debug
+            run_tests: true
+          - os: windows-latest
+            generator: "Visual Studio 17 2022"
+            build_shared_libs: "OFF"
+            platform: x64
+            configuration: RelWithDebInfo
+            run_tests: false
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -85,15 +128,19 @@ jobs:
           path: |
             third_party/install
           key: ${{ matrix.os }}-shared-${{ matrix.build_shared_libs }}-${{ hashFiles('.github/.cache-key') }}
-      - name: Build & Test
+      - name: Build${{ matrix.run_tests && ' & Test' || '' }}
         shell: pwsh
         env:
           CMAKE_GENERATOR: ${{ matrix.generator }}
           CMAKE_PLATFORM: ${{ matrix.platform }}
           BUILD_SHARED_LIBS: ${{ matrix.build_shared_libs }}
-          CONFIGURATION: RelWithDebInfo
+          CONFIGURATION: ${{ matrix.configuration }}
         run: |
-          pwsh ci/do_ci.ps1 "msvc.2019+.test" ;
+          if ('${{ matrix.run_tests }}' -eq 'true') {
+            pwsh ci/do_ci.ps1 "msvc.2019+.test" ;
+          } else {
+            pwsh ci/do_ci.ps1 "msvc.2019+.build" ;
+          }
   # mingw_build: # job id, can be any string
   #   name: MinGW Build
   #   strategy:

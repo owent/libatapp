@@ -30,6 +30,8 @@
 
 namespace {
 
+#if !defined(NDEBUG)
+
 // Mirror of atbus_connection_handle_flags_t from atapp_connector_atbus.cpp (internal enum)
 static constexpr uint32_t kAtbusHandleFlagWaitForDiscoveryToConnect = 0x02;
 
@@ -173,6 +175,8 @@ static void setup_discovery_test_env(atframework::atapp::app &node1, atframework
   CASE_EXPECT_TRUE(upstream.mutable_endpoint(n1_disc));
   CASE_EXPECT_TRUE(upstream.mutable_endpoint(n2_disc));
 }
+
+#endif
 
 }  // namespace
 

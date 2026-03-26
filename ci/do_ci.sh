@@ -80,6 +80,11 @@ elif [[ "$1" == "gcc.test" ]]; then
   cd build_jobs_ci
   cmake --build . -j2 --config $CONFIGURATION || cmake --build . --config $CONFIGURATION
   ctest -VV . -C $CONFIGURATION -L libatapp.unit_test
+elif [[ "$1" == "gcc.build" ]]; then
+  bash cmake_dev.sh -lus -b $CONFIGURATION -r build_jobs_ci -c $USE_CC -- -DATBUS_MACRO_ABORT_ON_PROTECTED_ERROR=ON \
+    "-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_LOW_MEMORY_MODE=ON"
+  cd build_jobs_ci
+  cmake --build . -j2 --config $CONFIGURATION || cmake --build . --config $CONFIGURATION
 elif [[ "$1" == "codeql.configure" ]]; then
   bash cmake_dev.sh -l -b $CONFIGURATION -r build_jobs_ci -c $USE_CC -- -DATBUS_MACRO_ABORT_ON_PROTECTED_ERROR=ON \
     "-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_LOW_MEMORY_MODE=ON"
@@ -102,6 +107,11 @@ elif [[ "$1" == "clang.test" ]]; then
   cd build_jobs_ci
   cmake --build . -j2 --config $CONFIGURATION || cmake --build . --config $CONFIGURATION
   ctest -VV . -C $CONFIGURATION -L libatapp.unit_test
+elif [[ "$1" == "clang.build" ]]; then
+  bash cmake_dev.sh -lus -b $CONFIGURATION -r build_jobs_ci -c $USE_CC -- -DATBUS_MACRO_ABORT_ON_PROTECTED_ERROR=ON \
+    "-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_LOW_MEMORY_MODE=ON"
+  cd build_jobs_ci
+  cmake --build . -j2 --config $CONFIGURATION || cmake --build . --config $CONFIGURATION
 elif [[ "$1" == "msys2.mingw.test" ]]; then
   pacman -S --needed --noconfirm mingw-w64-x86_64-cmake mingw-w64-x86_64-make \
     mingw-w64-x86_64-curl mingw-w64-x86_64-wget mingw-w64-x86_64-perl \

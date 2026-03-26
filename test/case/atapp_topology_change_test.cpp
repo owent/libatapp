@@ -25,6 +25,8 @@
 
 namespace {
 
+#if !defined(NDEBUG)
+
 struct topo_test_context {
   int received_message_count = 0;
   int forward_response_count = 0;
@@ -193,6 +195,8 @@ static void create_3node_endpoints(atframework::atapp::app &node1, atframework::
   CASE_EXPECT_TRUE(target.mutable_endpoint(node1_disc));
   CASE_EXPECT_TRUE(target.mutable_endpoint(upstream_disc));
 }
+
+#endif
 
 }  // namespace
 
