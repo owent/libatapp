@@ -152,44 +152,68 @@ CASE_TEST(atapp_worker_pool, stop) {
   worker_pool_module->tick(std::chrono::system_clock::now());
 
   std::shared_ptr<std::atomic<int32_t>> counter = std::make_shared<std::atomic<int32_t>>(0);
-  CASE_EXPECT_EQ(0, worker_pool_module->spawn([counter](const atapp::worker_context&) {
+  std::shared_ptr<std::atomic<bool>> first_job_started = std::make_shared<std::atomic<bool>>(false);
+  std::shared_ptr<std::atomic<bool>> allow_first_job_finish = std::make_shared<std::atomic<bool>>(false);
+  std::shared_ptr<std::atomic<bool>> second_job_started = std::make_shared<std::atomic<bool>>(false);
+  CASE_EXPECT_EQ(
+      0, worker_pool_module->spawn([counter, first_job_started, allow_first_job_finish](const atapp::worker_context&) {
+        counter->fetch_add(1, std::memory_order_release);
+        first_job_started->store(true, std::memory_order_release);
+        int32_t wait_ms = 5000;
+        while (!allow_first_job_finish->load(std::memory_order_acquire) && wait_ms > 0) {
+          std::this_thread::sleep_for(std::chrono::milliseconds(10));
+          wait_ms -= 10;
+        }
+      }));
+  CASE_EXPECT_EQ(0, worker_pool_module->spawn([counter, second_job_started](const atapp::worker_context&) {
+    second_job_started->store(true, std::memory_order_release);
     counter->fetch_add(1, std::memory_order_release);
-    std::this_thread::sleep_for(std::chrono::seconds(2));
   }));
-  CASE_EXPECT_EQ(0, worker_pool_module->spawn([counter](const atapp::worker_context&) {
-    counter->fetch_add(1, std::memory_order_release);
-    std::this_thread::sleep_for(std::chrono::seconds(2));
-  }));
+
+  int32_t sleep_ms = 2000;
+  while (!first_job_started->load(std::memory_order_acquire) && sleep_ms > 0) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    sleep_ms -= 10;
+  }
+
+  CASE_EXPECT_TRUE(first_job_started->load(std::memory_order_acquire));
+  CASE_EXPECT_EQ(1, counter->load(std::memory_order_acquire));
+  CASE_EXPECT_FALSE(second_job_started->load(std::memory_order_acquire));
 
   CASE_EXPECT_EQ(1, worker_pool_module->get_configure_worker_except_count());
-  worker_pool_module->stop();
+  CASE_EXPECT_NE(0, worker_pool_module->stop());
   CASE_EXPECT_EQ(1, worker_pool_module->get_current_worker_count());
   CASE_EXPECT_EQ(0, worker_pool_module->get_configure_worker_except_count());
-  std::this_thread::sleep_for(std::chrono::milliseconds(32));
-  worker_pool_module->tick(std::chrono::system_clock::now());
+  allow_first_job_finish->store(true, std::memory_order_release);
 
-  int32_t sleep_ms = 2800;
+  sleep_ms = 2800;
   while (worker_pool_module->get_current_worker_count() > 0 && sleep_ms > 0) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    sleep_ms -= 100;
-    start_time = std::chrono::system_clock::now();
-    worker_pool_module->tick(start_time);
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    sleep_ms -= 10;
+    worker_pool_module->stop();
   }
 
   CASE_EXPECT_EQ(0, worker_pool_module->get_current_worker_count());
-  CASE_EXPECT_GT(2, counter->load(std::memory_order_acquire));
+  CASE_EXPECT_EQ(1, counter->load(std::memory_order_acquire));
+  CASE_EXPECT_FALSE(second_job_started->load(std::memory_order_acquire));
+  CASE_EXPECT_NE(0, worker_pool_module->stop());
 
   sleep_ms = 10000;
   while (counter->load(std::memory_order_acquire) < 2 && sleep_ms > 0) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    sleep_ms -= 100;
     start_time = std::chrono::system_clock::now();
     worker_pool_module->tick(start_time);
+    if (counter->load(std::memory_order_acquire) >= 2) {
+      break;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    sleep_ms -= 10;
   }
 
   CASE_EXPECT_GE(worker_pool_module->get_statistics_last_second_busy_cpu_time().count(), 0);
   CASE_EXPECT_GE(worker_pool_module->get_statistics_last_minute_busy_cpu_time().count(), 0);
+  CASE_EXPECT_TRUE(second_job_started->load(std::memory_order_acquire));
   CASE_EXPECT_EQ(2, counter->load(std::memory_order_acquire));
+  CASE_EXPECT_EQ(0, worker_pool_module->stop());
 }
 
 CASE_TEST(atapp_worker_pool, foreach_stable_workers) {
@@ -401,4 +425,3 @@ CASE_TEST(atapp_worker_pool, stop_tick) {
   tick_times_after = tick_times.load();
   CASE_EXPECT_LT(tick_times_after, tick_times_before + 2);
 }
-
