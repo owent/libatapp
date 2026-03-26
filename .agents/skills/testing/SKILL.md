@@ -40,21 +40,25 @@ Example (PowerShell):
 
 ## Test groups
 
-| Group                    | File                              | Tests | Requirements  | Description                             |
-| ------------------------ | --------------------------------- | ----- | ------------- | --------------------------------------- |
-| `atapp_setup`            | `atapp_setup_test.cpp`            | 1     | —             | Init timeout handling                   |
-| `atapp_message`          | `atapp_message_test.cpp`          | 2     | —             | Remote send + loopback                  |
-| `atapp_connector`        | `atapp_connector_test.cpp`        | 1     | —             | Address type classification             |
-| `atapp_direct_connect`   | `atapp_direct_connect_test.cpp`   | 9     | Debug build\* | Direct peer topology (B.1–B.9)          |
-| `atapp_upstream`         | `atapp_upstream_forward_test.cpp` | 7     | Debug build\* | Upstream proxy forwarding (A.1–A.7)     |
-| `atapp_discovery`        | `atapp_discovery_test.cpp`        | 12    | —             | Metadata, hash, round_robin, stress     |
-| `atapp_etcd_cluster`     | `atapp_etcd_cluster_test.cpp`     | 7     | etcd running  | etcd client operations                  |
-| `atapp_etcd_module`      | `atapp_etcd_module_test.cpp`      | 8     | etcd running  | etcd module integration                 |
-| `atapp_etcd_packer`      | `atapp_etcd_packer_test.cpp`      | 7     | —             | KV pack/unpack, base64, key range       |
-| `atapp_configure_loader` | `atapp_configure_loader_test.cpp` | 4     | —             | YAML/INI/env load, expression expansion |
-| `atapp_worker_pool`      | `atapp_worker_pool_test.cpp`      | 5     | —             | Spawn, stop, foreach, tick              |
+| Group                       | File                                 | Tests | Requirements  | Description                             |
+| --------------------------- | ------------------------------------ | ----- | ------------- | --------------------------------------- |
+| `atapp_setup`               | `atapp_setup_test.cpp`               | 1     | —             | Init timeout handling                   |
+| `atapp_message`             | `atapp_message_test.cpp`             | 2     | —             | Remote send + loopback                  |
+| `atapp_connector`           | `atapp_connector_test.cpp`           | 1     | —             | Address type classification             |
+| `atapp_upstream_forward`    | `atapp_upstream_forward_test.cpp`    | 8     | Debug build\* | Upstream proxy forwarding (A.1–A.8)     |
+| `atapp_direct_connect`      | `atapp_direct_connect_test.cpp`      | 8     | Debug build\* | Direct peer topology (B.1–B.8)          |
+| `atapp_downstream_send`     | `atapp_downstream_send_test.cpp`     | 4     | Debug build\* | Downstream send/pending (C.1–C.4)       |
+| `atapp_topology_change`     | `atapp_topology_change_test.cpp`     | 9     | Debug build\* | Topology change/recovery (D.1–D.9)      |
+| `atapp_discovery_reconnect` | `atapp_discovery_reconnect_test.cpp` | 5     | Debug build\* | Discovery reconnect logic (E.1–E.5)     |
+| `atapp_error_recovery`      | `atapp_error_recovery_test.cpp`      | 5     | Debug build\* | Error recovery + cascade (F.1–F.5)      |
+| `atapp_discovery`           | `atapp_discovery_test.cpp`           | 12    | —             | Metadata, hash, round_robin, stress     |
+| `atapp_etcd_cluster`        | `atapp_etcd_cluster_test.cpp`        | 18    | etcd running  | etcd client operations                  |
+| `atapp_etcd_module`         | `atapp_etcd_module_test.cpp`         | 20    | etcd running  | etcd module integration                 |
+| `atapp_etcd_packer`         | `atapp_etcd_packer_test.cpp`         | 7     | —             | KV pack/unpack, base64, key range       |
+| `atapp_configure`           | `atapp_configure_loader_test.cpp`    | 6     | —             | YAML/INI/env load, expression expansion |
+| `atapp_worker_pool`         | `atapp_worker_pool_test.cpp`         | 5     | —             | Spawn, stop, foreach, tick              |
 
-\* Many direct-connect and upstream tests use `set_sys_now()` for virtual time control, which is only available in Debug builds.
+\* Many multi-node tests (A–F groups) use `set_sys_now()` for virtual time control, which is only available in Debug builds.
 
 ### etcd Tests
 

@@ -1,0 +1,53 @@
+# Copyright 2026 atframework
+# E group - discovery lifecycle & reconnect test: node1 (E.4 variant)
+# start_interval=30s (far reconnect timer) and lost_topology_timeout=8s (near replacement)
+# to verify update_timer replacement when new timeout < old timeout
+atapp:
+  id: 0x00000501
+  id_mask: 8.8.8.8
+  name: "discovery-test-node1"
+  type_id: 1
+  type_name: "discovery-test"
+
+  bus:
+    listen: "ipv4://127.0.0.1:22001"
+    proxy: "ipv4://127.0.0.1:22003"
+    backlog: 256
+    access_token_max_number: 5
+    overwrite_listen_path: false
+    topology:
+      rule:
+        allow_direct_connection: true
+        require_same_upstream: false
+    first_idle_timeout: 3600s
+    ping_interval: 3600s
+    retry_interval: 3s
+    reconnect_start_interval: 30s
+    reconnect_max_interval: 60s
+    reconnect_max_try_times: 3
+    lost_topology_timeout: 8s
+    fault_tolerant: 3
+    message_size: 64KB
+    receive_buffer_size: 1MB
+    send_buffer_size: 1MB
+    send_buffer_number: 0
+  timer:
+    tick_interval: 8ms
+    stop_timeout: 3s
+    stop_interval: 256ms
+  etcd:
+    enable: false
+
+  log:
+    level: debug
+    category:
+      - name: default
+        prefix: "[Log %L][%F %T.%f][%s:%n(%C)]: "
+        stacktrace:
+          min: error
+          max: fatal
+        sink:
+          - type: stdout
+            level:
+              min: fatal
+              max: debug
