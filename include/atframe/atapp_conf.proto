@@ -554,8 +554,8 @@ message atapp_resource {
 
 message atapp_configure {
   // bus configure
-  string id = 101;       // maybe hex or a.b.c.d
-  string id_mask = 102;  // convert a.b.c.d -> id
+  string id = 101 [(atframework.atapp.protocol.CONFIGURE) = { enable_expression: true }];       // maybe hex or a.b.c.d
+  string id_mask = 102 [(atframework.atapp.protocol.CONFIGURE) = { enable_expression: true }];  // convert a.b.c.d -> id
   string name = 103 [(atframework.atapp.protocol.CONFIGURE) = { enable_expression: true }];
   uint64 type_id = 104;
   string type_name = 105 [(atframework.atapp.protocol.CONFIGURE) = { enable_expression: true }];

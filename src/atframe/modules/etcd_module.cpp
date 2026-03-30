@@ -552,8 +552,8 @@ LIBATAPP_MACRO_API int etcd_module::reload() {
     }
 
     startup_level = atfw::util::log::log_formatter::get_level_by_name(conf.log().startup_level());
-    if (startup_level <= atfw::util::log::log_level::kDisabled &&
-        atfw::util::log::log_formatter::get_level_by_name(etcd_log_conf.level()) <=
+    if (startup_level >= atfw::util::log::log_level::kDisabled &&
+        atfw::util::log::log_formatter::get_level_by_name(etcd_log_conf.level()) >=
             atfw::util::log::log_level::kDisabled) {
       break;
     }

@@ -4463,7 +4463,7 @@ int app::prog_option_handler_version(atfw::util::cli::callback_param /*params*/)
 
 int app::prog_option_handler_set_id(atfw::util::cli::callback_param params) {
   if (params.get_params_number() > 0) {
-    conf_.id_cmd = params[0]->to_string();
+    conf_.id_cmd = expand_environment_expression(params[0]->to_string());
   } else {
     atfw::util::cli::shell_stream ss(std::cerr);
     ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "-id require 1 parameter" << '\n';
@@ -4475,7 +4475,7 @@ int app::prog_option_handler_set_id(atfw::util::cli::callback_param params) {
 int app::prog_option_handler_set_id_mask(atfw::util::cli::callback_param params) {
   if (params.get_params_number() > 0) {
     conf_.id_mask.clear();
-    split_ids_by_string(params[0]->to_string(), conf_.id_mask);
+    split_ids_by_string(expand_environment_expression(params[0]->to_string()).c_str(), conf_.id_mask);
   } else {
     atfw::util::cli::shell_stream ss(std::cerr);
     ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "-id-mask require 1 parameter" << '\n';
@@ -4486,7 +4486,7 @@ int app::prog_option_handler_set_id_mask(atfw::util::cli::callback_param params)
 
 int app::prog_option_handler_set_conf_file(atfw::util::cli::callback_param params) {
   if (params.get_params_number() > 0) {
-    conf_.conf_file = params[0]->to_cpp_string();
+    conf_.conf_file = expand_environment_expression(params[0]->to_cpp_string());
   } else {
     atfw::util::cli::shell_stream ss(std::cerr);
     ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "-c, --conf, --config require 1 parameter"
@@ -4498,7 +4498,7 @@ int app::prog_option_handler_set_conf_file(atfw::util::cli::callback_param param
 
 int app::prog_option_handler_set_pid(atfw::util::cli::callback_param params) {
   if (params.get_params_number() > 0) {
-    conf_.pid_file = params[0]->to_cpp_string();
+    conf_.pid_file = expand_environment_expression(params[0]->to_cpp_string());
   } else {
     atfw::util::cli::shell_stream ss(std::cerr);
     ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "-p, --pid require 1 parameter" << '\n';
@@ -4514,14 +4514,14 @@ int app::prog_option_handler_upgrade_mode(atfw::util::cli::callback_param /*para
 
 int app::prog_option_handler_set_startup_log(atfw::util::cli::callback_param params) {
   for (atfw::util::cli::cmd_option_list::size_type i = 0; i < params.get_params_number(); ++i) {
-    conf_.startup_log.push_back(params[i]->to_cpp_string());
+    conf_.startup_log.push_back(expand_environment_expression(params[i]->to_cpp_string()));
   }
   return 0;
 }
 
 int app::prog_option_handler_set_startup_error_file(atfw::util::cli::callback_param params) {
   if (params.get_params_number() > 0) {
-    conf_.start_error_file = params[0]->to_cpp_string();
+    conf_.start_error_file = expand_environment_expression(params[0]->to_cpp_string());
   } else {
     atfw::util::cli::shell_stream ss(std::cerr);
     ss() << atfw::util::cli::shell_font_style::SHELL_FONT_COLOR_RED << "--startup-error-file require 1 parameter"
