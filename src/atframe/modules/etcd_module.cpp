@@ -105,7 +105,7 @@ static bool atapp_discovery_equal(const atapp::protocol::atapp_area &l, const at
     return false;
   }
 
-  return false;
+  return true;
 }
 
 static bool atapp_topology_equal(const atapp::protocol::atapp_topology_info &l,
@@ -137,7 +137,7 @@ static bool atapp_topology_equal(const atapp::protocol::atapp_topology_info &l,
   return true;
 }
 
-static bool topology_update_version(etcd_module::topology_storage_t storage, const etcd_data_version &new_version,
+static bool topology_update_version(etcd_module::topology_storage_t &storage, const etcd_data_version &new_version,
                                     bool upgrade) {
   bool ret = false;
   if (upgrade) {
@@ -892,11 +892,11 @@ LIBATAPP_MACRO_API int etcd_module::add_discovery_watcher_by_id(const discovery_
         convert_to_chrono(get_configure().watcher().request_timeout(), 3600000));
     internal_discovery_watcher_by_id_->set_conf_retry_interval(
         convert_to_chrono(get_configure().watcher().retry_interval(), 15000));
-    internal_discovery_watcher_by_name_->set_conf_get_request_timeout(
+    internal_discovery_watcher_by_id_->set_conf_get_request_timeout(
         convert_to_chrono(get_configure().watcher().get_request_timeout(), 180000));
-    internal_discovery_watcher_by_name_->set_conf_startup_random_delay_min(
+    internal_discovery_watcher_by_id_->set_conf_startup_random_delay_min(
         convert_to_chrono(get_configure().watcher().startup_random_delay_min(), 0));
-    internal_discovery_watcher_by_name_->set_conf_startup_random_delay_max(
+    internal_discovery_watcher_by_id_->set_conf_startup_random_delay_max(
         convert_to_chrono(get_configure().watcher().startup_random_delay_max(), 0));
     etcd_ctx_.add_watcher(internal_discovery_watcher_by_id_);
     LIBATAPP_MACRO_ETCD_CLUSTER_LOG_INFO(etcd_ctx_, "create etcd_watcher for by_id index {} success", watch_path);
