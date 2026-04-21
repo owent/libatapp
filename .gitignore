@@ -44,5 +44,6 @@
 /third_party/packages
 
 # build directorys
+/.cmake-toolset
 /build
 /build_jobs_*

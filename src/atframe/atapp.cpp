@@ -9,7 +9,6 @@
 
 #include <algorithm/crypto_cipher.h>
 #include <algorithm/murmur_hash.h>
-#include "memory/rc_ptr.h"
 
 #if defined(ATFRAMEWORK_UTILS_CRYPTO_USE_OPENSSL) || defined(ATFRAMEWORK_UTILS_CRYPTO_USE_LIBRESSL) || \
     defined(ATFRAMEWORK_UTILS_CRYPTO_USE_BORINGSSL)
@@ -20,6 +19,7 @@
 #include <common/file_system.h>
 #include <common/platform_compat.h>
 #include <common/string_oprs.h>
+#include <memory/rc_ptr.h>
 
 #include <cli/shell_font.h>
 #include <log/log_sink_file_backend.h>
@@ -32,6 +32,8 @@
 #include <assert.h>
 #include <signal.h>
 
+#include <algorithm>
+#include <cstring>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -2870,6 +2872,30 @@ int app::apply_configure() {
       conf_.origin.set_hostname(conf_.origin.metadata().name());
     } else if (!conf_.origin.runtime().status().pod_ip().empty()) {
       conf_.origin.set_hostname(conf_.origin.runtime().status().pod_ip());
+    } else if (!conf_.origin.runtime().status().pod_ips().empty()) {
+      const auto &pod_ips = conf_.origin.runtime().status().pod_ips();
+      size_t begin_pos = 0;
+      size_t end_pos = 1;
+      while (end_pos < pod_ips.size()) {
+        if (pod_ips[end_pos] == ',') {
+          auto trimed_str = atfw::util::string::trim(pod_ips.data() + begin_pos, end_pos - begin_pos);
+          if (trimed_str.second > 0) {
+            conf_.origin.set_hostname(trimed_str.first, trimed_str.second);
+            break;
+          }
+
+          begin_pos = end_pos + 1;
+        }
+        ++end_pos;
+      }
+
+      if (conf_.origin.hostname().empty() && begin_pos < pod_ips.size() && end_pos <= pod_ips.size() &&
+          end_pos > begin_pos) {
+        auto trimed_str = atfw::util::string::trim(pod_ips.data() + begin_pos, end_pos - begin_pos);
+        if (trimed_str.second > 0) {
+          conf_.origin.set_hostname(trimed_str.first, trimed_str.second);
+        }
+      }
     }
   }
 
