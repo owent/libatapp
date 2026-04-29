@@ -1,6 +1,6 @@
 ---
 name: libatapp-module-connector
-description: libatapp module system, connector architecture, endpoint lifecycle, connection handles, and message routing patterns. Use when writing modules, connectors, endpoint management, or multi-node tests.
+description: "Use when: writing libatapp modules, connectors, endpoint management, connection handles, message routing, suspend_stop logic, or multi-node tests."
 ---
 
 # Module System & Connector Architecture (libatapp)

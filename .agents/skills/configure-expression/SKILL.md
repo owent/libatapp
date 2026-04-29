@@ -1,6 +1,6 @@
 ---
 name: configure-expression
-description: Environment-variable expression expansion syntax for protobuf config fields annotated with enable_expression in libatapp.
+description: "Use when: editing libatapp enable_expression config fields, environment-variable expansion syntax, YAML/INI/env loading, or atapp_conf.proto config metadata."
 ---
 
 # Configuration Expression Expansion (libatapp)

@@ -1,11 +1,6 @@
-# libatapp — Claude Code Instructions
+# libatapp Claude Notes
+
+This file is a compatibility bridge. Keep shared guidance in `AGENTS.md`; keep repeatable workflows in `.agents/skills/`.
 
 @AGENTS.md
-
-## Skills (imported for inline reference)
-
-@.agents/skills/build/SKILL.md
-@.agents/skills/testing/SKILL.md
-@.agents/skills/configure-expression/SKILL.md
-@.agents/skills/libatapp-module-connector/SKILL.md
-@.agents/skills/libatapp-etcd-discovery/SKILL.md
+@.agents/skills/README.md

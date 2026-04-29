@@ -1,6 +1,6 @@
 ---
 name: libatapp-etcd-discovery
-description: etcd client, service discovery, topology management, keepalive, and watchers in libatapp. Use when working with etcd integration, discovery sets, node selection, or the etcd_module.
+description: "Use when: working on libatapp etcd integration, service discovery sets, topology management, keepalive actors, watchers, node selection, or etcd_module."
 ---
 
 # etcd Integration & Service Discovery (libatapp)

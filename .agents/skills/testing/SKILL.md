@@ -1,6 +1,6 @@
 ---
 name: testing
-description: Run and write unit tests for libatapp using the private test framework, including Windows DLL/PATH setup, test groups, multi-node test patterns, and debug-only time control.
+description: "Use when: running or writing libatapp unit tests, filtering private test cases, using multi-node/debug-time patterns, testing etcd, or fixing Windows DLL/PATH startup issues."
 ---
 
 # Unit testing (libatapp)
