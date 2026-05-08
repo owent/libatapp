@@ -16,7 +16,17 @@
 #include <string>
 #include <vector>
 
+#include <memory/rc_ptr.h>
+
 #include "atframe/etcdcli/etcd_def.h"
+
+namespace atframework {
+namespace atapp {
+namespace protocol {
+class atapp_etcd_watcher;
+}
+}  // namespace atapp
+}  // namespace atframework
 
 LIBATAPP_MACRO_NAMESPACE_BEGIN
 
@@ -41,6 +51,7 @@ class etcd_watcher {
 
   using ptr_t = std::shared_ptr<etcd_watcher>;
   using watch_event_fn_t = std::function<void(const etcd_response_header &header, const response_t &evt_data)>;
+  using watch_event_fn_t_ptr = std::unique_ptr<watch_event_fn_t>;
 
  private:
   struct constrict_helper_t {};
@@ -116,8 +127,12 @@ class etcd_watcher {
     return rpc_.startup_random_delay_max;
   }
 
+  LIBATAPP_MACRO_API void set_conf_from_protobuf(
+      const ::atframework::atapp::protocol::atapp_etcd_watcher &config) noexcept;
+
   // ====================== apis for events ==================
   ATFW_UTIL_FORCEINLINE void set_evt_handle(watch_event_fn_t &&fn) { evt_handle_ = std::move(fn); }
+  LIBATAPP_MACRO_API void set_evt_handle(watch_event_fn_t_ptr fn);
 
  private:
   void process();
