@@ -123,6 +123,22 @@ ATFW_UTIL_FORCEINLINE void protobuf_to_chrono_set_duration(std::chrono::duration
   out = protobuf_to_chrono_convert_duration<Rep, Period>(in);
 }
 
+template <class Rep, class Period>
+ATFW_UTIL_FORCEINLINE std::chrono::duration<Rep, Period> protobuf_to_chrono_convert_duration_with_default(
+    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &in, time_t default_value_ms) {
+    if (in.seconds() == 0 && in.nanos() == 0) {
+        // 注意：这里需要确保 default_value_ms 的单位转换正确，建议明确使用 duration_cast
+        return std::chrono::duration_cast<std::chrono::duration<Rep, Period>>(std::chrono::milliseconds(default_value_ms));
+    }
+    return protobuf_to_chrono_convert_duration<Rep, Period>(in);
+}
+
+template <class Duration>
+ATFW_UTIL_FORCEINLINE Duration protobuf_to_chrono_convert_duration_with_default(
+    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &in, time_t default_value_ms) {
+    return protobuf_to_chrono_convert_duration_with_default<typename Duration::rep, typename Duration::period>(in, default_value_ms);
+}
+
 template <class Clock, class Rep, class Period>
 ATFW_UTIL_FORCEINLINE std::chrono::time_point<Clock, std::chrono::duration<Rep, Period>>
 protobuf_to_chrono_convert_timepoint(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Timestamp &in) {
@@ -189,4 +205,3 @@ LIBATAPP_MACRO_API bool protobuf_equal(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::
 LIBATAPP_MACRO_API std::string expand_environment_expression(gsl::string_view input);
 
 LIBATAPP_MACRO_NAMESPACE_END
-

@@ -157,6 +157,10 @@ class etcd_module : public ::atframework::atapp::module_impl {
   LIBATAPP_MACRO_API void set_maybe_update_keepalive_discovery_area();
   LIBATAPP_MACRO_API void set_maybe_update_keepalive_discovery_metadata();
 
+  LIBATAPP_MACRO_API static bool check_keepalive_actor_start_success(
+      atframework::atapp::app *ATFW_UTIL_MACRO_NONNULL app,
+      gsl::span<const std::list<etcd_keepalive::ptr_t> *> keepalive_actors);
+
   LIBATAPP_MACRO_API const atfw::util::network::http_request::curl_m_bind_ptr_t &get_shared_curl_multi_context() const;
 
   LIBATAPP_MACRO_API std::string get_discovery_by_id_path() const;
@@ -181,6 +185,7 @@ class etcd_module : public ::atframework::atapp::module_impl {
 
   LIBATAPP_MACRO_API const atapp::protocol::atapp_etcd &get_configure() const;
   LIBATAPP_MACRO_API const std::string &get_configure_path() const;
+  LIBATAPP_MACRO_API static std::string generate_etcd_path(const std::string &path);
 
   LIBATAPP_MACRO_API atapp::etcd_keepalive::ptr_t add_keepalive_actor(std::string &val, const std::string &node_path);
 
@@ -215,6 +220,9 @@ class etcd_module : public ::atframework::atapp::module_impl {
   LIBATAPP_MACRO_API topology_snapshot_event_callback_handle_t
   add_on_topology_snapshot_loaded(const topology_snapshot_event_callback_t &fn);
   LIBATAPP_MACRO_API void remove_on_topology_snapshot_loaded(topology_snapshot_event_callback_handle_t &handle);
+
+  LIBATAPP_MACRO_API etcd_watcher::watch_event_fn_t_ptr create_discovery_watcher_callback_list_wrapper();
+  LIBATAPP_MACRO_API etcd_watcher::watch_event_fn_t_ptr create_topology_watcher_callback_list_wrapper();
 
  private:
   static bool unpack(node_info_t &out, const std::string &path, const std::string &json, bool reset_data);
