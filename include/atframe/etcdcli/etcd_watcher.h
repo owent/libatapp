@@ -16,8 +16,6 @@
 #include <string>
 #include <vector>
 
-#include <memory/rc_ptr.h>
-
 #include "atframe/etcdcli/etcd_def.h"
 
 namespace atframework {
