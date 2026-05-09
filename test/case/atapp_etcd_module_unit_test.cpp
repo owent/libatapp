@@ -747,3 +747,28 @@ CASE_TEST(atapp_etcd_module_unit, data_version_assignment) {
   CASE_EXPECT_EQ(20, v2.modify_revision);
   CASE_EXPECT_EQ(3, v2.version);
 }
+
+// ==================== generate_etcd_path tests ====================
+
+// ---- I.36 generate_etcd_path: empty path falls back to root ----
+CASE_TEST(atapp_etcd_module_unit, generate_etcd_path_empty) {
+  CASE_EXPECT_EQ(std::string("/"), atapp::etcd_module::generate_etcd_path(std::string()));
+}
+
+// ---- I.37 generate_etcd_path: append slash when separator missing ----
+CASE_TEST(atapp_etcd_module_unit, generate_etcd_path_append_slash) {
+  CASE_EXPECT_EQ(std::string("service/discovery/"),
+                 atapp::etcd_module::generate_etcd_path("service/discovery"));
+}
+
+// ---- I.38 generate_etcd_path: preserve trailing slash ----
+CASE_TEST(atapp_etcd_module_unit, generate_etcd_path_preserve_slash) {
+  CASE_EXPECT_EQ(std::string("service/discovery/"),
+                 atapp::etcd_module::generate_etcd_path("service/discovery/"));
+}
+
+// ---- I.39 generate_etcd_path: preserve trailing backslash ----
+CASE_TEST(atapp_etcd_module_unit, generate_etcd_path_preserve_backslash) {
+  CASE_EXPECT_EQ(std::string("service\\discovery\\"),
+                 atapp::etcd_module::generate_etcd_path("service\\discovery\\"));
+}

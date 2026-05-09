@@ -123,20 +123,21 @@ ATFW_UTIL_FORCEINLINE void protobuf_to_chrono_set_duration(std::chrono::duration
   out = protobuf_to_chrono_convert_duration<Rep, Period>(in);
 }
 
-template <class Rep, class Period>
+template <class Rep, class Period, class DefaultDuration>
 ATFW_UTIL_FORCEINLINE std::chrono::duration<Rep, Period> protobuf_to_chrono_convert_duration_with_default(
-    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &in, time_t default_value_ms) {
-    if (in.seconds() == 0 && in.nanos() == 0) {
-        // 注意：这里需要确保 default_value_ms 的单位转换正确，建议明确使用 duration_cast
-        return std::chrono::duration_cast<std::chrono::duration<Rep, Period>>(std::chrono::milliseconds(default_value_ms));
-    }
-    return protobuf_to_chrono_convert_duration<Rep, Period>(in);
+    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &in, DefaultDuration default_duration) {
+  if (in.seconds() == 0 && in.nanos() == 0) {
+    // 注意：这里需要确保 default_value_ms 的单位转换正确，建议明确使用 duration_cast
+    return std::chrono::duration_cast<std::chrono::duration<Rep, Period>>(default_duration);
+  }
+  return protobuf_to_chrono_convert_duration<Rep, Period>(in);
 }
 
-template <class Duration>
+template <class Duration, class DefaultDuration>
 ATFW_UTIL_FORCEINLINE Duration protobuf_to_chrono_convert_duration_with_default(
-    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &in, time_t default_value_ms) {
-    return protobuf_to_chrono_convert_duration_with_default<typename Duration::rep, typename Duration::period>(in, default_value_ms);
+    const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Duration &in, DefaultDuration default_duration) {
+  return protobuf_to_chrono_convert_duration_with_default<typename Duration::rep, typename Duration::period,
+                                                          DefaultDuration>(in, default_duration);
 }
 
 template <class Clock, class Rep, class Period>

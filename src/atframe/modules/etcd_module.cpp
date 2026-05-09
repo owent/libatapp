@@ -298,6 +298,10 @@ bool etcd_module::check_keepalive_actor_start_success(
   init_timer_data_type tick_timer_data;
   uv_timer_init(app->get_bus_node()->get_evloop(), &tick_timer);
   auto etcd_module = app->get_etcd_module();
+  if (etcd_module == nullptr) {
+    FWLOGERROR("etcd_module is null, can not check keepalive actors.");
+    return false;
+  }
   auto &etcd_ctx = etcd_module->get_raw_etcd_ctx();
 
   tick_timer_data.cluster = &etcd_ctx;
@@ -314,7 +318,7 @@ bool etcd_module::check_keepalive_actor_start_success(
 
   size_t keepalive_count = 0;
   for (const auto *keepalive_actor_list : keepalive_actors) {
-    if (keepalive_actor_list) {
+    if (keepalive_actor_list == nullptr) {
       keepalive_count += keepalive_actor_list->size();
     }
   }
@@ -598,34 +602,34 @@ LIBATAPP_MACRO_API int etcd_module::reload() {
   etcd_ctx_.set_conf_authorization(conf.authorization());
   etcd_ctx_.set_conf_http_request_timeout(
       protobuf_to_chrono_convert_duration_with_default<std::chrono::system_clock::duration>(conf.request().timeout(),
-                                                                                            10000));
+                                                                                             std::chrono::milliseconds(10000)));
   etcd_ctx_.set_conf_http_initialization_timeout(
       protobuf_to_chrono_convert_duration_with_default<std::chrono::system_clock::duration>(
-          conf.request().initialization_timeout(), 3000));
+          conf.request().initialization_timeout(), std::chrono::milliseconds(3000)));
   etcd_ctx_.set_conf_http_connect_timeout(
       protobuf_to_chrono_convert_duration_with_default<std::chrono::system_clock::duration>(
-          conf.request().connect_timeout(), 0));
+          conf.request().connect_timeout(), std::chrono::milliseconds(0)));
   etcd_ctx_.set_conf_dns_cache_timeout(
       protobuf_to_chrono_convert_duration_with_default<std::chrono::system_clock::duration>(
-          conf.request().dns_cache_timeout(), 0));
+          conf.request().dns_cache_timeout(), std::chrono::milliseconds(0)));
   etcd_ctx_.set_conf_dns_servers(conf.request().dns_servers());
   etcd_ctx_.set_conf_etcd_members_auto_update_hosts(conf.cluster().auto_update());
   etcd_ctx_.set_conf_etcd_members_update_interval(
       protobuf_to_chrono_convert_duration_with_default<std::chrono::system_clock::duration>(
-          conf.cluster().update_interval(), 300000));
+          conf.cluster().update_interval(), std::chrono::milliseconds(300000)));
   etcd_ctx_.set_conf_etcd_members_retry_interval(
       protobuf_to_chrono_convert_duration_with_default<std::chrono::system_clock::duration>(
-          conf.cluster().retry_interval(), 60000));
+          conf.cluster().retry_interval(), std::chrono::milliseconds(60000)));
 
   etcd_ctx_.set_conf_keepalive_timeout(
       protobuf_to_chrono_convert_duration_with_default<std::chrono::system_clock::duration>(conf.keepalive().timeout(),
-                                                                                            16000));
+                                                                                            std::chrono::milliseconds(16000)));
   etcd_ctx_.set_conf_keepalive_interval(
       protobuf_to_chrono_convert_duration_with_default<std::chrono::system_clock::duration>(conf.keepalive().ttl(),
-                                                                                            5000));
+                                                                                            std::chrono::milliseconds(5000)));
   etcd_ctx_.set_conf_keepalive_retry_interval(
       protobuf_to_chrono_convert_duration_with_default<std::chrono::system_clock::duration>(
-          conf.keepalive().retry_interval(), 3000));
+          conf.keepalive().retry_interval(), std::chrono::milliseconds(3000)));
 
   // HTTP
   if (!conf.http().user_agent().empty()) {

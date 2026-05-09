@@ -564,17 +564,17 @@ int etcd_watcher::libcurl_callback_on_watch_write(atfw::util::network::http_requ
 LIBATAPP_MACRO_API void etcd_watcher::set_conf_from_protobuf(
     const ::atframework::atapp::protocol::atapp_etcd_watcher &config) noexcept {
   set_conf_request_timeout(protobuf_to_chrono_convert_duration_with_default<std::chrono::system_clock::duration>(
-      config.request_timeout(), 3600000));
+      config.request_timeout(), std::chrono::milliseconds(3600000)));
   set_conf_retry_interval(protobuf_to_chrono_convert_duration_with_default<std::chrono::system_clock::duration>(
-      config.retry_interval(), 15000));
+      config.retry_interval(), std::chrono::milliseconds(15000)));
   set_conf_get_request_timeout(protobuf_to_chrono_convert_duration_with_default<std::chrono::system_clock::duration>(
-      config.get_request_timeout(), 180000));
+      config.get_request_timeout(), std::chrono::milliseconds(180000)));
   set_conf_startup_random_delay_min(
       protobuf_to_chrono_convert_duration_with_default<std::chrono::system_clock::duration>(
-          config.startup_random_delay_min(), 0));
+          config.startup_random_delay_min(), std::chrono::milliseconds(0)));
   set_conf_startup_random_delay_max(
       protobuf_to_chrono_convert_duration_with_default<std::chrono::system_clock::duration>(
-          config.startup_random_delay_max(), 0));
+          config.startup_random_delay_max(), std::chrono::milliseconds(0)));
 }
 
 LIBATAPP_MACRO_API void etcd_watcher::set_evt_handle(watch_event_fn_t_ptr fn) {
