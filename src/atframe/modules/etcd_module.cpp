@@ -318,7 +318,7 @@ bool etcd_module::check_keepalive_actor_start_success(
 
   size_t keepalive_count = 0;
   for (const auto *keepalive_actor_list : keepalive_actors) {
-    if (keepalive_actor_list == nullptr) {
+    if (keepalive_actor_list != nullptr) {
       keepalive_count += keepalive_actor_list->size();
     }
   }
@@ -330,7 +330,7 @@ bool etcd_module::check_keepalive_actor_start_success(
 
     size_t run_count = 0;
     // Check keepalives
-    for (auto *keepalive_actor_list : keepalive_actors) {
+    for (const auto *keepalive_actor_list : keepalive_actors) {
       if (keepalive_actor_list == nullptr) {
         continue;
       }
@@ -357,7 +357,7 @@ bool etcd_module::check_keepalive_actor_start_success(
     uv_run(app->get_bus_node()->get_evloop(), UV_RUN_ONCE);
 
     // 任意重试次数过多则失败退出
-    for (auto *keepalive_actor_list : keepalive_actors) {
+    for (const auto *keepalive_actor_list : keepalive_actors) {
       if (keepalive_actor_list == nullptr) {
         continue;
       }
@@ -385,7 +385,7 @@ bool etcd_module::check_keepalive_actor_start_success(
 
   if (std::chrono::system_clock::now() > tick_timer_data.timeout) {
     is_failed = true;
-    for (auto *keepalive_actor_list : keepalive_actors) {
+    for (const auto *keepalive_actor_list : keepalive_actors) {
       if (keepalive_actor_list == nullptr) {
         continue;
       }
@@ -601,8 +601,8 @@ LIBATAPP_MACRO_API int etcd_module::reload() {
 
   etcd_ctx_.set_conf_authorization(conf.authorization());
   etcd_ctx_.set_conf_http_request_timeout(
-      protobuf_to_chrono_convert_duration_with_default<std::chrono::system_clock::duration>(conf.request().timeout(),
-                                                                                             std::chrono::milliseconds(10000)));
+      protobuf_to_chrono_convert_duration_with_default<std::chrono::system_clock::duration>(
+          conf.request().timeout(), std::chrono::milliseconds(10000)));
   etcd_ctx_.set_conf_http_initialization_timeout(
       protobuf_to_chrono_convert_duration_with_default<std::chrono::system_clock::duration>(
           conf.request().initialization_timeout(), std::chrono::milliseconds(3000)));
@@ -622,11 +622,11 @@ LIBATAPP_MACRO_API int etcd_module::reload() {
           conf.cluster().retry_interval(), std::chrono::milliseconds(60000)));
 
   etcd_ctx_.set_conf_keepalive_timeout(
-      protobuf_to_chrono_convert_duration_with_default<std::chrono::system_clock::duration>(conf.keepalive().timeout(),
-                                                                                            std::chrono::milliseconds(16000)));
+      protobuf_to_chrono_convert_duration_with_default<std::chrono::system_clock::duration>(
+          conf.keepalive().timeout(), std::chrono::milliseconds(16000)));
   etcd_ctx_.set_conf_keepalive_interval(
-      protobuf_to_chrono_convert_duration_with_default<std::chrono::system_clock::duration>(conf.keepalive().ttl(),
-                                                                                            std::chrono::milliseconds(5000)));
+      protobuf_to_chrono_convert_duration_with_default<std::chrono::system_clock::duration>(
+          conf.keepalive().ttl(), std::chrono::milliseconds(5000)));
   etcd_ctx_.set_conf_keepalive_retry_interval(
       protobuf_to_chrono_convert_duration_with_default<std::chrono::system_clock::duration>(
           conf.keepalive().retry_interval(), std::chrono::milliseconds(3000)));
