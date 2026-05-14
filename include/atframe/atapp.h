@@ -5,6 +5,7 @@
 #pragma once
 
 #include <gsl/select-gsl.h>
+#include <nostd/nullability.h>
 
 #include <cli/cmd_option.h>
 #include <time/jiffies_timer.h>
@@ -750,7 +751,7 @@ class app {
   mode_t mode_;
   tick_timer_t tick_timer_;
   std::chrono::milliseconds tick_clock_granularity_;
-  jiffies_timer_t custom_timer_controller_;
+  atfw::util::nostd::nonnull<std::unique_ptr<jiffies_timer_t>> custom_timer_controller_;
 
   std::vector<module_ptr_t> modules_;
   std::unordered_map<std::string, log_sink_maker::log_reg_t> log_reg_;

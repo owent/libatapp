@@ -72,9 +72,9 @@ class atapp_connector_atbus : public atapp_connector_impl, public std::enable_sh
     bool exists = false;
     uint32_t flags = 0;
     uint32_t reconnect_retry_times = 0;
-    std::chrono::system_clock::time_point pending_timer_timeout{};
-    std::chrono::system_clock::time_point lost_topology_timeout{};
-    std::chrono::system_clock::time_point reconnect_next_timepoint{};
+    std::chrono::system_clock::time_point pending_timer_timeout = std::chrono::system_clock::from_time_t(0);
+    std::chrono::system_clock::time_point lost_topology_timeout = std::chrono::system_clock::from_time_t(0);
+    std::chrono::system_clock::time_point reconnect_next_timepoint = std::chrono::system_clock::from_time_t(0);
     bool timer_handle_expired = true;
     atbus::bus_id_t proxy_bus_id = 0;
     size_t proxy_for_count = 0;

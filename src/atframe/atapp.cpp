@@ -9,6 +9,7 @@
 
 #include <algorithm/crypto_cipher.h>
 #include <algorithm/murmur_hash.h>
+#include "gsl/select-gsl.h"
 
 #if defined(ATFRAMEWORK_UTILS_CRYPTO_USE_OPENSSL) || defined(ATFRAMEWORK_UTILS_CRYPTO_USE_LIBRESSL) || \
     defined(ATFRAMEWORK_UTILS_CRYPTO_USE_BORINGSSL)
@@ -383,7 +384,8 @@ LIBATAPP_MACRO_API app::app()
       ev_loop_(nullptr),
       flags_(0),
       mode_(mode_t::kCustom),
-      tick_clock_granularity_(std::chrono::milliseconds::zero()) {
+      tick_clock_granularity_(std::chrono::milliseconds::zero()),
+      custom_timer_controller_(gsl::make_unique<jiffies_timer_t>()) {
   if (nullptr == last_instance_) {
 #if defined(OPENSSL_VERSION_NUMBER)
 #  if OPENSSL_VERSION_NUMBER < 0x10100000L
@@ -599,7 +601,7 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
   // update time first
   atfw::util::time::time_utility::update();
   tick_timer_.last_tick_timepoint = get_sys_now();
-  custom_timer_controller_.init(get_custom_timer_tick(tick_timer_.last_tick_timepoint));
+  custom_timer_controller_->init(get_custom_timer_tick(tick_timer_.last_tick_timepoint));
 
   // step 1. bind default options
   // step 2. load options from cmd line
@@ -2737,7 +2739,7 @@ LIBATAPP_MACRO_API void app::setup_logger(atfw::util::log::log_wrapper &logger, 
 LIBATAPP_MACRO_API int app::add_custom_timer_with_system_clock(std::chrono::system_clock::duration delta,
                                                                jiffies_timer_handle_t &&fn, void *priv_data,
                                                                jiffies_timer_watcher_t *watcher) {
-  return custom_timer_controller_.add_timer(get_custom_timer_tick_offset(delta), std::move(fn), priv_data, watcher);
+  return custom_timer_controller_->add_timer(get_custom_timer_tick_offset(delta), std::move(fn), priv_data, watcher);
 }
 
 LIBATAPP_MACRO_API int app::add_custom_timer_with_system_clock(std::chrono::system_clock::time_point timeout_tp,
@@ -2749,11 +2751,11 @@ LIBATAPP_MACRO_API int app::add_custom_timer_with_system_clock(std::chrono::syst
   // get_max_tick_distance() and fail with EN_JTET_TIMEOUT_EXTENDED.
   auto sys_now = check_flag(flag_t::kInTick) ? tick_timer_.last_tick_timepoint : get_sys_now();
   if (timeout_tp <= sys_now) {
-    return custom_timer_controller_.add_timer(1, std::move(fn), priv_data, watcher);
+    return custom_timer_controller_->add_timer(1, std::move(fn), priv_data, watcher);
   }
 
-  return custom_timer_controller_.add_timer(get_custom_timer_tick_offset(timeout_tp - sys_now), std::move(fn),
-                                            priv_data, watcher);
+  return custom_timer_controller_->add_timer(get_custom_timer_tick_offset(timeout_tp - sys_now), std::move(fn),
+                                             priv_data, watcher);
 }
 
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
@@ -3224,10 +3226,10 @@ int32_t app::process_internal_events(const atfw::util::time::time_utility::raw_t
 
 int32_t app::process_custom_timers() {
   auto sys_now = check_flag(flag_t::kInTick) ? tick_timer_.last_tick_timepoint : get_sys_now();
-  int res = custom_timer_controller_.tick(get_custom_timer_tick(sys_now));
+  int res = custom_timer_controller_->tick(get_custom_timer_tick(sys_now));
   if (res == jiffies_timer_t::error_type_t::EN_JTET_NOT_INITED) {
-    custom_timer_controller_.init(get_custom_timer_tick(sys_now));
-    res = custom_timer_controller_.tick(get_custom_timer_tick(sys_now));
+    custom_timer_controller_->init(get_custom_timer_tick(sys_now));
+    res = custom_timer_controller_->tick(get_custom_timer_tick(sys_now));
   }
 
   if (res < 0) {
