@@ -334,8 +334,9 @@ CASE_TEST(atapp_direct_connect, direct_discovery_ready_connect_send) {
 
 // ============================================================
 // B.2: direct_discovery_missing_wait_then_send
-// Node2 discovery is delayed. node1 sends message first (pending),
-// then discovery arrives, connection established, message delivered.
+// Node2 discovery is delayed. node1 sends before discovery, so the first
+// message falls back to upstream forwarding. After discovery arrives,
+// direct connection is established and subsequent messages use the direct path.
 // ============================================================
 CASE_TEST(atapp_direct_connect, direct_discovery_missing_wait_then_send) {
   reset_direct_test_context();
@@ -397,7 +398,29 @@ CASE_TEST(atapp_direct_connect, direct_discovery_missing_wait_then_send) {
     return 0;
   });
 
-  // Phase 2: Node2 discovery arrives — inject and set up topology
+  // Send before node2 discovery arrives. Without discovery, send_message(app_id)
+  // falls back to atbus routing and relays through upstream.
+  char msg_data[] = "before-discovery-upstream-B2";
+  gsl::span<const unsigned char> msg_span{reinterpret_cast<const unsigned char *>(msg_data),
+                                          static_cast<size_t>(strlen(msg_data))};
+  uint64_t seq = 0;
+  CASE_EXPECT_EQ(0, apps.node1.send_message(apps.node2.get_app_id(), 100, msg_span, &seq));
+
+  // Fallback send does not create a direct endpoint on node1.
+  auto *ep_node2 = apps.node1.get_endpoint(apps.node2.get_app_id());
+  CASE_EXPECT_TRUE(ep_node2 == nullptr);
+
+  apps.pump_until([&]() { return g_direct_test_ctx.received_message_count >= 1; });
+
+  CASE_EXPECT_EQ(1, g_direct_test_ctx.received_message_count);
+  if (!g_direct_test_ctx.received_messages.empty()) {
+    CASE_EXPECT_EQ("before-discovery-upstream-B2", g_direct_test_ctx.received_messages[0]);
+  }
+  if (!g_direct_test_ctx.received_direct_source_ids.empty()) {
+    CASE_EXPECT_EQ(apps.upstream.get_app_id(), g_direct_test_ctx.received_direct_source_ids[0]);
+  }
+
+  // Phase 2: Node2 discovery arrives — inject and set up topology.
   apps.inject_node2_discovery_later();
 
   if (bus_up && bus_up->get_topology_registry()) {
@@ -419,56 +442,35 @@ CASE_TEST(atapp_direct_connect, direct_discovery_missing_wait_then_send) {
     n2_connector->update_topology_peer(apps.node1.get_app_id(), apps.upstream.get_app_id(), nullptr);
   }
 
-  // Create endpoints for node2 on all nodes
   CASE_EXPECT_TRUE(apps.node1.mutable_endpoint(apps.node2_discovery));
   CASE_EXPECT_TRUE(apps.upstream.mutable_endpoint(apps.node2_discovery));
   CASE_EXPECT_TRUE(apps.node2.mutable_endpoint(apps.node1_discovery));
   CASE_EXPECT_TRUE(apps.node2.mutable_endpoint(apps.upstream_discovery));
 
-  // Endpoint exists but direct connection not ready yet — send should go to pending queue
-  auto *ep_node2 = apps.node1.get_endpoint(apps.node2.get_app_id());
+  // Wait for direct connection, then send again and verify it uses the direct path.
+  apps.pump_until_direct_connected();
+
+  ep_node2 = apps.node1.get_endpoint(apps.node2.get_app_id());
   CASE_EXPECT_TRUE(ep_node2 != nullptr);
   if (ep_node2 != nullptr) {
-    CASE_EXPECT_TRUE(ep_node2->get_ready_connection_handle() == nullptr);
+    CASE_EXPECT_TRUE(ep_node2->get_ready_connection_handle() != nullptr);
   }
 
-  // Send message — should NOT be delivered immediately, goes to pending queue
-  char msg_data[] = "pending-before-connect-B2";
-  gsl::span<const unsigned char> msg_span{reinterpret_cast<const unsigned char *>(msg_data),
-                                          static_cast<size_t>(strlen(msg_data))};
-  uint64_t seq = 0;
-  apps.node1.send_message(apps.node2.get_app_id(), 100, msg_span, &seq);
+  char direct_msg_data[] = "after-discovery-direct-B2";
+  gsl::span<const unsigned char> direct_msg_span{reinterpret_cast<const unsigned char *>(direct_msg_data),
+                                                 static_cast<size_t>(strlen(direct_msg_data))};
+  CASE_EXPECT_EQ(0, apps.node1.send_message(apps.node2.get_app_id(), 101, direct_msg_span, &seq));
 
-  // Pump event loop a few rounds to rule out false negatives —
-  // ensure the message stays pending because there is no direct connection,
-  // not because IO events haven't been processed yet.
-  for (int i = 0; i < 64; ++i) {
-    apps.upstream.run_noblock();
-    apps.node1.run_noblock();
-    apps.node2.run_noblock();
+  apps.pump_until([&]() { return g_direct_test_ctx.received_message_count >= 2; });
+
+  CASE_EXPECT_EQ(2, g_direct_test_ctx.received_message_count);
+  if (g_direct_test_ctx.received_messages.size() >= 2) {
+    CASE_EXPECT_EQ("before-discovery-upstream-B2", g_direct_test_ctx.received_messages[0]);
+    CASE_EXPECT_EQ("after-discovery-direct-B2", g_direct_test_ctx.received_messages[1]);
   }
-
-  // Verify message is still NOT delivered after pumping
-  CASE_EXPECT_EQ(0, g_direct_test_ctx.received_message_count);
-
-  // Verify message is in pending queue
-  ep_node2 = apps.node1.get_endpoint(apps.node2.get_app_id());
-  if (ep_node2 != nullptr) {
-    CASE_EXPECT_GT(ep_node2->get_pending_message_count(), static_cast<size_t>(0));
-    CASE_MSG_INFO() << "B.2: pending_message_count=" << ep_node2->get_pending_message_count() << '\n';
-  }
-
-  // Wait for direct connection → pending message should be delivered
-  apps.pump_until_direct_connected();
-  apps.pump_until([&]() { return g_direct_test_ctx.received_message_count >= 1; });
-
-  CASE_EXPECT_EQ(1, g_direct_test_ctx.received_message_count);
-  if (!g_direct_test_ctx.received_messages.empty()) {
-    CASE_EXPECT_EQ("pending-before-connect-B2", g_direct_test_ctx.received_messages[0]);
-  }
-  // Verify data arrived via direct connection
-  if (!g_direct_test_ctx.received_direct_source_ids.empty()) {
-    CASE_EXPECT_EQ(apps.node1.get_app_id(), g_direct_test_ctx.received_direct_source_ids[0]);
+  if (g_direct_test_ctx.received_direct_source_ids.size() >= 2) {
+    CASE_EXPECT_EQ(apps.upstream.get_app_id(), g_direct_test_ctx.received_direct_source_ids[0]);
+    CASE_EXPECT_EQ(apps.node1.get_app_id(), g_direct_test_ctx.received_direct_source_ids[1]);
   }
 }
 
