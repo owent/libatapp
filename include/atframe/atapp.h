@@ -50,6 +50,7 @@ ATBUS_MACRO_NAMESPACE_END
 LIBATAPP_MACRO_NAMESPACE_BEGIN
 
 class etcd_module;
+class service_discovery_module;
 class worker_pool_module;
 class atapp_connector_atbus;
 class atapp_connector_loopback;
@@ -395,6 +396,9 @@ class app {
   LIBATAPP_MACRO_API void pack(atapp::protocol::atapp_discovery &out) const;
 
   LIBATAPP_MACRO_API const std::shared_ptr<::atframework::atapp::etcd_module> &get_etcd_module() const noexcept;
+
+  LIBATAPP_MACRO_API const std::shared_ptr<::atframework::atapp::service_discovery_module> &
+  get_service_discovery_module() const noexcept;
 
   LIBATAPP_MACRO_API const std::shared_ptr<::atframework::atapp::worker_pool_module> &get_worker_pool_module()
       const noexcept;
@@ -789,6 +793,7 @@ class app {
   // inner modules
   std::shared_ptr<::atframework::atapp::worker_pool_module> internal_module_worker_pool_;
   std::shared_ptr<::atframework::atapp::etcd_module> internal_module_etcd_;
+  std::shared_ptr<::atframework::atapp::service_discovery_module> internal_module_service_discovery_;
   etcd_discovery_set internal_empty_discovery_set_;
 
   // inner endpoints

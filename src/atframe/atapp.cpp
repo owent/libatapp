@@ -46,6 +46,7 @@
 
 #include "atframe/atapp_conf_rapidjson.h"
 #include "atframe/modules/etcd_module.h"
+#include "atframe/modules/service_discovery_module.h"
 #include "atframe/modules/worker_pool_module.h"
 
 #include "atframe/connectors/atapp_connector_atbus.h"
@@ -442,6 +443,8 @@ LIBATAPP_MACRO_API app::app()
   add_module(internal_module_worker_pool_);
   internal_module_etcd_ = std::make_shared<atapp::etcd_module>();
   add_module(internal_module_etcd_);
+  internal_module_service_discovery_ = std::make_shared<atapp::service_discovery_module>();
+  add_module(internal_module_service_discovery_);
 
   atapp_global_init_once();
 }
@@ -1199,9 +1202,9 @@ LIBATAPP_MACRO_API int app::reload() {
       }
     }
 
-    if (internal_module_etcd_) {
-      internal_module_etcd_->set_maybe_update_keepalive_topology_value();
-      internal_module_etcd_->set_maybe_update_keepalive_discovery_value();
+    if (internal_module_service_discovery_) {
+      internal_module_service_discovery_->set_maybe_update_keepalive_topology_value();
+      internal_module_service_discovery_->set_maybe_update_keepalive_discovery_value();
     }
   }
 
@@ -1358,9 +1361,9 @@ LIBATAPP_MACRO_API int app::tick() {
               (static_cast<float>(atfw::util::time::time_utility::MINITE_SECONDS) * 10000.0f),  // usec and add %
           max_rss.first, max_rss.second, ru_ixrss.first, ru_ixrss.second, ru_idrss.first, ru_idrss.second,
           ru_isrss.first, ru_isrss.second, last_usage.ru_majflt);
-      if (internal_module_etcd_) {
+      if (internal_module_service_discovery_) {
         const ::atframework::atapp::etcd_cluster::stats_t &current =
-            internal_module_etcd_->get_raw_etcd_ctx().get_stats();
+            internal_module_service_discovery_->get_raw_etcd_ctx().get_stats();
         FWLOGINFO(
             "\tetcd module(last minite): request count: {}, failed request: {}, continue failed: {}, success "
             "request: "
@@ -1385,8 +1388,8 @@ LIBATAPP_MACRO_API int app::tick() {
 #endif
     } else {
       uv_getrusage(&stats_.last_checkpoint_usage);
-      if (internal_module_etcd_) {
-        stats_.internal_etcd = internal_module_etcd_->get_raw_etcd_ctx().get_stats();
+      if (internal_module_service_discovery_) {
+        stats_.internal_etcd = internal_module_service_discovery_->get_raw_etcd_ctx().get_stats();
       }
     }
 
@@ -1663,8 +1666,8 @@ LIBATAPP_MACRO_API void app::set_api_version(gsl::string_view value) {
     return;
   }
 
-  if (internal_module_etcd_) {
-    internal_module_etcd_->set_maybe_update_keepalive_discovery_metadata();
+  if (internal_module_service_discovery_) {
+    internal_module_service_discovery_->set_maybe_update_keepalive_discovery_metadata();
   }
 
   conf_.metadata.set_api_version(value.data(), value.size());
@@ -1675,8 +1678,8 @@ LIBATAPP_MACRO_API void app::set_kind(gsl::string_view value) {
     return;
   }
 
-  if (internal_module_etcd_) {
-    internal_module_etcd_->set_maybe_update_keepalive_discovery_metadata();
+  if (internal_module_service_discovery_) {
+    internal_module_service_discovery_->set_maybe_update_keepalive_discovery_metadata();
   }
 
   conf_.metadata.set_kind(value.data(), value.size());
@@ -1687,8 +1690,8 @@ LIBATAPP_MACRO_API void app::set_group(gsl::string_view value) {
     return;
   }
 
-  if (internal_module_etcd_) {
-    internal_module_etcd_->set_maybe_update_keepalive_discovery_metadata();
+  if (internal_module_service_discovery_) {
+    internal_module_service_discovery_->set_maybe_update_keepalive_discovery_metadata();
   }
 
   conf_.metadata.set_group(value.data(), value.size());
@@ -1699,8 +1702,8 @@ LIBATAPP_MACRO_API void app::set_metadata_name(gsl::string_view value) {
     return;
   }
 
-  if (internal_module_etcd_) {
-    internal_module_etcd_->set_maybe_update_keepalive_discovery_metadata();
+  if (internal_module_service_discovery_) {
+    internal_module_service_discovery_->set_maybe_update_keepalive_discovery_metadata();
   }
 
   conf_.metadata.set_name(value.data(), value.size());
@@ -1712,8 +1715,8 @@ LIBATAPP_MACRO_API void app::set_metadata_namespace_name(gsl::string_view value)
     return;
   }
 
-  if (internal_module_etcd_) {
-    internal_module_etcd_->set_maybe_update_keepalive_discovery_metadata();
+  if (internal_module_service_discovery_) {
+    internal_module_service_discovery_->set_maybe_update_keepalive_discovery_metadata();
   }
 
   conf_.metadata.set_namespace_name(value.data(), value.size());
@@ -1724,8 +1727,8 @@ LIBATAPP_MACRO_API void app::set_metadata_uid(gsl::string_view value) {
     return;
   }
 
-  if (internal_module_etcd_) {
-    internal_module_etcd_->set_maybe_update_keepalive_discovery_metadata();
+  if (internal_module_service_discovery_) {
+    internal_module_service_discovery_->set_maybe_update_keepalive_discovery_metadata();
   }
 
   conf_.metadata.set_uid(value.data(), value.size());
@@ -1736,8 +1739,8 @@ LIBATAPP_MACRO_API void app::set_metadata_service_subset(gsl::string_view value)
     return;
   }
 
-  if (internal_module_etcd_) {
-    internal_module_etcd_->set_maybe_update_keepalive_discovery_metadata();
+  if (internal_module_service_discovery_) {
+    internal_module_service_discovery_->set_maybe_update_keepalive_discovery_metadata();
   }
 
   conf_.metadata.set_service_subset(value.data(), value.size());
@@ -1759,8 +1762,8 @@ LIBATAPP_MACRO_API void app::set_metadata_label(gsl::string_view key, gsl::strin
     return;
   }
 
-  if (internal_module_etcd_) {
-    internal_module_etcd_->set_maybe_update_keepalive_discovery_metadata();
+  if (internal_module_service_discovery_) {
+    internal_module_service_discovery_->set_maybe_update_keepalive_discovery_metadata();
   }
 
   (*labels)[key_string] = static_cast<std::string>(value);
@@ -1800,8 +1803,8 @@ LIBATAPP_MACRO_API int32_t app::get_runtime_stateful_pod_index() const noexcept 
 LIBATAPP_MACRO_API const atapp::protocol::atapp_area &app::get_area() const noexcept { return conf_.origin.area(); }
 
 LIBATAPP_MACRO_API atapp::protocol::atapp_area &app::mutable_area() {
-  if (internal_module_etcd_) {
-    internal_module_etcd_->set_maybe_update_keepalive_discovery_area();
+  if (internal_module_service_discovery_) {
+    internal_module_service_discovery_->set_maybe_update_keepalive_discovery_area();
   }
   return *conf_.origin.mutable_area();
 }
@@ -1883,14 +1886,19 @@ LIBATAPP_MACRO_API const std::shared_ptr<::atframework::atapp::etcd_module> &app
   return internal_module_etcd_;
 }
 
+LIBATAPP_MACRO_API const std::shared_ptr<::atframework::atapp::service_discovery_module> &
+app::get_service_discovery_module() const noexcept {
+  return internal_module_service_discovery_;
+}
+
 LIBATAPP_MACRO_API const std::shared_ptr<::atframework::atapp::worker_pool_module> &app::get_worker_pool_module()
     const noexcept {
   return internal_module_worker_pool_;
 }
 
 LIBATAPP_MACRO_API const etcd_discovery_set &app::get_global_discovery() const noexcept {
-  if (internal_module_etcd_) {
-    return internal_module_etcd_->get_global_discovery();
+  if (internal_module_service_discovery_) {
+    return internal_module_service_discovery_->get_global_discovery();
   }
 
   return internal_empty_discovery_set_;
@@ -1962,19 +1970,19 @@ LIBATAPP_MACRO_API uint32_t app::get_address_type(const std::string &address) co
 }
 
 LIBATAPP_MACRO_API etcd_discovery_node::ptr_t app::get_discovery_node_by_id(uint64_t id) const noexcept {
-  if (!internal_module_etcd_) {
+  if (!internal_module_service_discovery_) {
     return nullptr;
   }
 
-  return internal_module_etcd_->get_global_discovery().get_node_by_id(id);
+  return internal_module_service_discovery_->get_global_discovery().get_node_by_id(id);
 }
 
 LIBATAPP_MACRO_API etcd_discovery_node::ptr_t app::get_discovery_node_by_name(const std::string &name) const noexcept {
-  if (!internal_module_etcd_) {
+  if (!internal_module_service_discovery_) {
     return nullptr;
   }
 
-  return internal_module_etcd_->get_global_discovery().get_node_by_name(name);
+  return internal_module_service_discovery_->get_global_discovery().get_node_by_name(name);
 }
 
 LIBATAPP_MACRO_API void app::produce_tick_timer_compensation(std::chrono::system_clock::duration tick_cost) noexcept {
@@ -2065,11 +2073,12 @@ LIBATAPP_MACRO_API int32_t app::send_message(uint64_t target_node_id, int32_t ty
 
   // Try to create endpoint from discovery
   do {
-    if (!internal_module_etcd_) {
+    if (!internal_module_service_discovery_) {
       break;
     }
 
-    etcd_discovery_node::ptr_t node = internal_module_etcd_->get_global_discovery().get_node_by_id(target_node_id);
+    etcd_discovery_node::ptr_t node =
+        internal_module_service_discovery_->get_global_discovery().get_node_by_id(target_node_id);
     if (!node) {
       break;
     }
@@ -2125,11 +2134,12 @@ LIBATAPP_MACRO_API int32_t app::send_message(const std::string &target_node_name
   } while (false);
 
   // Try to create endpoint from discovery
-  if (!internal_module_etcd_) {
+  if (!internal_module_service_discovery_) {
     return EN_ATAPP_ERR_DISCOVERY_DISABLED;
   }
 
-  etcd_discovery_node::ptr_t node = internal_module_etcd_->get_global_discovery().get_node_by_name(target_node_name);
+  etcd_discovery_node::ptr_t node =
+      internal_module_service_discovery_->get_global_discovery().get_node_by_name(target_node_name);
   if (!node) {
     return EN_ATBUS_ERR_ATNODE_NOT_FOUND;
   }
@@ -2167,68 +2177,70 @@ LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(gsl::span<const 
                                                                 gsl::span<const unsigned char> data,
                                                                 uint64_t *msg_sequence,
                                                                 const atapp::protocol::atapp_metadata *metadata) {
-  if (!internal_module_etcd_) {
+  if (!internal_module_service_discovery_) {
     return EN_ATAPP_ERR_DISCOVERY_DISABLED;
   }
 
-  return send_message_by_consistent_hash(internal_module_etcd_->get_global_discovery(), hash_buf, type, data,
-                                         msg_sequence, metadata);
+  return send_message_by_consistent_hash(internal_module_service_discovery_->get_global_discovery(), hash_buf, type,
+                                         data, msg_sequence, metadata);
 }
 
 LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(uint64_t hash_key, int32_t type,
                                                                 gsl::span<const unsigned char> data,
                                                                 uint64_t *msg_sequence,
                                                                 const atapp::protocol::atapp_metadata *metadata) {
-  if (!internal_module_etcd_) {
+  if (!internal_module_service_discovery_) {
     return EN_ATAPP_ERR_DISCOVERY_DISABLED;
   }
 
-  return send_message_by_consistent_hash(internal_module_etcd_->get_global_discovery(), hash_key, type, data,
-                                         msg_sequence, metadata);
+  return send_message_by_consistent_hash(internal_module_service_discovery_->get_global_discovery(), hash_key, type,
+                                         data, msg_sequence, metadata);
 }
 
 LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(int64_t hash_key, int32_t type,
                                                                 gsl::span<const unsigned char> data,
                                                                 uint64_t *msg_sequence,
                                                                 const atapp::protocol::atapp_metadata *metadata) {
-  if (!internal_module_etcd_) {
+  if (!internal_module_service_discovery_) {
     return EN_ATAPP_ERR_DISCOVERY_DISABLED;
   }
 
-  return send_message_by_consistent_hash(internal_module_etcd_->get_global_discovery(), hash_key, type, data,
-                                         msg_sequence, metadata);
+  return send_message_by_consistent_hash(internal_module_service_discovery_->get_global_discovery(), hash_key, type,
+                                         data, msg_sequence, metadata);
 }
 
 LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(const std::string &hash_key, int32_t type,
                                                                 gsl::span<const unsigned char> data,
                                                                 uint64_t *msg_sequence,
                                                                 const atapp::protocol::atapp_metadata *metadata) {
-  if (!internal_module_etcd_) {
+  if (!internal_module_service_discovery_) {
     return EN_ATAPP_ERR_DISCOVERY_DISABLED;
   }
 
-  return send_message_by_consistent_hash(internal_module_etcd_->get_global_discovery(), hash_key, type, data,
-                                         msg_sequence, metadata);
+  return send_message_by_consistent_hash(internal_module_service_discovery_->get_global_discovery(), hash_key, type,
+                                         data, msg_sequence, metadata);
 }
 
 LIBATAPP_MACRO_API int32_t app::send_message_by_random(int32_t type, gsl::span<const unsigned char> data,
                                                        uint64_t *msg_sequence,
                                                        const atapp::protocol::atapp_metadata *metadata) {
-  if (!internal_module_etcd_) {
+  if (!internal_module_service_discovery_) {
     return EN_ATAPP_ERR_DISCOVERY_DISABLED;
   }
 
-  return send_message_by_random(internal_module_etcd_->get_global_discovery(), type, data, msg_sequence, metadata);
+  return send_message_by_random(internal_module_service_discovery_->get_global_discovery(), type, data, msg_sequence,
+                                metadata);
 }
 
 LIBATAPP_MACRO_API int32_t app::send_message_by_round_robin(int32_t type, gsl::span<const unsigned char> data,
                                                             uint64_t *msg_sequence,
                                                             const atapp::protocol::atapp_metadata *metadata) {
-  if (!internal_module_etcd_) {
+  if (!internal_module_service_discovery_) {
     return EN_ATAPP_ERR_DISCOVERY_DISABLED;
   }
 
-  return send_message_by_round_robin(internal_module_etcd_->get_global_discovery(), type, data, msg_sequence, metadata);
+  return send_message_by_round_robin(internal_module_service_discovery_->get_global_discovery(), type, data,
+                                     msg_sequence, metadata);
 }
 
 LIBATAPP_MACRO_API int32_t app::send_message_by_consistent_hash(const etcd_discovery_set &discovery_set,
@@ -3246,7 +3258,7 @@ atapp_endpoint::ptr_t app::auto_mutable_self_endpoint() {
 
   atapp::protocol::atapp_discovery self_discovery_info;
   pack(self_discovery_info);
-  self_discovery->copy_from(self_discovery_info, atapp::etcd_discovery_node::node_version());
+  self_discovery->copy_from(self_discovery_info, atapp::etcd_discovery_node::node_version(), 0);
 
   return mutable_endpoint(self_discovery);
 }
@@ -4794,7 +4806,7 @@ int app::command_handler_invalid(atfw::util::cli::callback_param params) {
 }
 
 int app::command_handler_disable_etcd(atfw::util::cli::callback_param params) {
-  if (!internal_module_etcd_) {
+  if (!internal_module_service_discovery_) {
     const char *msg = "Etcd module is not initialized, skip command.";
     FWLOGERROR("{}", msg);
     add_custom_command_rsp(params, msg);
@@ -4837,7 +4849,7 @@ int app::command_handler_enable_etcd(atfw::util::cli::callback_param params) {
 }
 
 int app::command_handler_list_discovery(atfw::util::cli::callback_param params) {
-  if (!internal_module_etcd_) {
+  if (!internal_module_service_discovery_) {
     const char *msg = "Etcd module not initialized.";
     add_custom_command_rsp(params, msg);
   } else {
@@ -4851,7 +4863,7 @@ int app::command_handler_list_discovery(atfw::util::cli::callback_param params) 
     }
 
     const std::vector<etcd_discovery_node::ptr_t> &nodes =
-        internal_module_etcd_->get_global_discovery().get_sorted_nodes();
+        internal_module_service_discovery_->get_global_discovery().get_sorted_nodes();
     for (size_t i = start_idx; i < nodes.size() && (0 == end_idx || i < end_idx); ++i) {
       if (!nodes[i]) {
         continue;

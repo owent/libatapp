@@ -45,6 +45,8 @@ atapp:
     stop_interval: 256ms
   etcd:
     enable: false
+  service_discovery_etcd:
+    enable: false
     hosts:
       - "http://127.0.0.1:2375"
     path: "/atapp/services/astf4g/"

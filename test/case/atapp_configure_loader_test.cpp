@@ -23,6 +23,9 @@ inline int unsetenv(const char *name) { return setenv(name, "", 1); }
 static void check_origin_configure(atframework::atapp::app &app, atapp::protocol::atapp_etcd sub_cfg,
                                    const atapp::configure_key_set &existed_app_keys,
                                    const atapp::configure_key_set &existed_etcd_keys) {
+  const auto &origin_common_etcd = app.get_origin_configure().etcd();
+  const auto &origin_service_discovery_etcd = app.get_origin_configure().service_discovery_etcd();
+
   CASE_EXPECT_EQ(app.get_id(), 0x1234);
   CASE_EXPECT_EQ(app.get_origin_configure().id_mask(), "8.8.8.8");
   CASE_EXPECT_EQ(app.convert_app_id_by_string("1.2.3.4"), 0x01020304);
@@ -50,17 +53,20 @@ static void check_origin_configure(atframework::atapp::app &app, atapp::protocol
   CASE_EXPECT_EQ(8, app.get_origin_configure().timer().message_timeout().seconds());
   CASE_EXPECT_EQ(10, app.get_origin_configure().timer().initialize_timeout().seconds());
 
-  CASE_EXPECT_EQ(3, app.get_origin_configure().etcd().hosts_size());
-  CASE_EXPECT_EQ("http://127.0.0.1:2375", app.get_origin_configure().etcd().hosts(0));
-  CASE_EXPECT_EQ("http://127.0.0.1:2376", app.get_origin_configure().etcd().hosts(1));
-  CASE_EXPECT_EQ("http://127.0.0.1:2377", app.get_origin_configure().etcd().hosts(2));
-  CASE_EXPECT_EQ("/atapp/services/astf4g/", app.get_origin_configure().etcd().path());
-  CASE_EXPECT_EQ("", app.get_origin_configure().etcd().authorization());
-  CASE_EXPECT_EQ(0, app.get_origin_configure().etcd().init().tick_interval().seconds());
-  CASE_EXPECT_EQ(16000000, app.get_origin_configure().etcd().init().tick_interval().nanos());
-  CASE_EXPECT_EQ(10, app.get_origin_configure().etcd().init().timeout().seconds());
-  CASE_EXPECT_EQ(0, app.get_origin_configure().etcd().init().timeout().nanos());
-  CASE_EXPECT_TRUE(app.get_origin_configure().etcd().cluster().auto_update());
+  CASE_EXPECT_FALSE(origin_common_etcd.enable());
+  CASE_EXPECT_EQ(origin_common_etcd.enable(), sub_cfg.enable());
+  CASE_EXPECT_EQ(origin_service_discovery_etcd.enable(), sub_cfg.enable());
+  CASE_EXPECT_EQ(3, origin_service_discovery_etcd.hosts_size());
+  CASE_EXPECT_EQ("http://127.0.0.1:2375", origin_service_discovery_etcd.hosts(0));
+  CASE_EXPECT_EQ("http://127.0.0.1:2376", origin_service_discovery_etcd.hosts(1));
+  CASE_EXPECT_EQ("http://127.0.0.1:2377", origin_service_discovery_etcd.hosts(2));
+  CASE_EXPECT_EQ("/atapp/services/astf4g/", origin_service_discovery_etcd.path());
+  CASE_EXPECT_EQ("", origin_service_discovery_etcd.authorization());
+  CASE_EXPECT_EQ(0, origin_service_discovery_etcd.init().tick_interval().seconds());
+  CASE_EXPECT_EQ(16000000, origin_service_discovery_etcd.init().tick_interval().nanos());
+  CASE_EXPECT_EQ(10, origin_service_discovery_etcd.init().timeout().seconds());
+  CASE_EXPECT_EQ(0, origin_service_discovery_etcd.init().timeout().nanos());
+  CASE_EXPECT_TRUE(origin_service_discovery_etcd.cluster().auto_update());
 
   CASE_EXPECT_EQ(3, sub_cfg.hosts_size());
   if (3 == sub_cfg.hosts_size()) {
@@ -226,7 +232,7 @@ CASE_TEST(atapp_configure, load_yaml) {
   atapp::protocol::atapp_configure app_cfg;
   app.parse_configures_into(app_cfg, "atapp", "", &existed_app_keys);
   atapp::protocol::atapp_etcd etcd_cfg;
-  app.parse_configures_into(etcd_cfg, "atapp.etcd", "", &existed_etcd_keys);
+  app.parse_configures_into(etcd_cfg, "atapp.service_discovery_etcd", "", &existed_etcd_keys);
   check_origin_configure(app, etcd_cfg, existed_app_keys, existed_etcd_keys);
 
   atapp::protocol::atapp_log app_log;
@@ -258,7 +264,7 @@ CASE_TEST(atapp_configure, load_conf) {
   atapp::protocol::atapp_configure app_cfg;
   app.parse_configures_into(app_cfg, "atapp", "", &existed_app_keys);
   atapp::protocol::atapp_etcd etcd_cfg;
-  app.parse_configures_into(etcd_cfg, "atapp.etcd", "", &existed_etcd_keys);
+  app.parse_configures_into(etcd_cfg, "atapp.service_discovery_etcd", "", &existed_etcd_keys);
   check_origin_configure(app, etcd_cfg, existed_app_keys, existed_etcd_keys);
 
   atapp::protocol::atapp_log app_log;
@@ -311,7 +317,8 @@ CASE_TEST(atapp_configure, load_environment) {
   atapp::protocol::atapp_configure app_cfg;
   app.parse_configures_into(app_cfg, "atapp", "ATAPP", &existed_app_keys);
   atapp::protocol::atapp_etcd etcd_cfg;
-  app.parse_configures_into(etcd_cfg, "atapp.etcd", "ATAPP_ETCD", &existed_etcd_keys);
+  app.parse_configures_into(etcd_cfg, "atapp.service_discovery_etcd", "ATAPP_SERVICE_DISCOVERY_ETCD",
+                            &existed_etcd_keys);
   check_origin_configure(app, etcd_cfg, existed_app_keys, existed_etcd_keys);
 
   atapp::protocol::atapp_log app_log;

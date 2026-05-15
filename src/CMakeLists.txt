@@ -23,6 +23,7 @@ set(PROJECT_LIBATAPP_SRC_LIST
     "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/etcdcli/etcd_packer.h"
     "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/etcdcli/etcd_watcher.h"
     "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/modules/etcd_module.h"
+    "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/modules/service_discovery_module.h"
     "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/modules/worker_context.h"
     "${PROJECT_LIBATAPP_ROOT_INC_DIR}/atframe/modules/worker_pool_module.h"
     "${CMAKE_CURRENT_LIST_DIR}/atframe/atapp.cpp"
@@ -40,6 +41,7 @@ set(PROJECT_LIBATAPP_SRC_LIST
     "${CMAKE_CURRENT_LIST_DIR}/atframe/etcdcli/etcd_packer.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/atframe/etcdcli/etcd_watcher.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/atframe/modules/etcd_module.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/atframe/modules/service_discovery_module.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/atframe/modules/worker_pool_module.cpp")
 
 source_group(TREE "${PROJECT_SOURCE_DIR}" FILES ${PROJECT_LIBATAPP_SRC_LIST})

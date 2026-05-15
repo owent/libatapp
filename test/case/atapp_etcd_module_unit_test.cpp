@@ -3,10 +3,11 @@
 //
 // Tests cover:
 //   1. atapp_area comparison semantics (atapp_discovery_equal logic)
-//   2. topology_storage_t version update semantics (topology_update_version logic)
+//   2. atapp::service_discovery_module::topology_storage_t version update semantics (topology_update_version logic)
 //   3. etcd_module pack/unpack round-trip for topology_info_t and node_info_t
 
 #include <atframe/modules/etcd_module.h>
+#include <atframe/modules/service_discovery_module.h>
 
 #include <atframe/etcdcli/etcd_def.h>
 
@@ -53,7 +54,7 @@ static bool test_atapp_area_equal(const atapp::protocol::atapp_area &l, const at
 }
 
 // Replicates the topology_update_version logic to verify by-reference semantics
-static bool test_topology_update_version(atapp::etcd_module::topology_storage_t &storage,
+static bool test_topology_update_version(atapp::service_discovery_module::topology_storage_t &storage,
                                          const atapp::etcd_data_version &new_version, bool upgrade) {
   bool ret = false;
   if (upgrade) {
@@ -238,7 +239,7 @@ CASE_TEST(atapp_etcd_module_unit, area_symmetric) {
 
 // ---- I.12 version update: upgrade with higher create_revision ----
 CASE_TEST(atapp_etcd_module_unit, version_upgrade_create_revision) {
-  atapp::etcd_module::topology_storage_t storage;
+  atapp::service_discovery_module::topology_storage_t storage;
   storage.version.create_revision = 10;
   storage.version.modify_revision = 20;
   storage.version.version = 1;
@@ -257,7 +258,7 @@ CASE_TEST(atapp_etcd_module_unit, version_upgrade_create_revision) {
 
 // ---- I.13 version update: upgrade with higher modify_revision ----
 CASE_TEST(atapp_etcd_module_unit, version_upgrade_modify_revision) {
-  atapp::etcd_module::topology_storage_t storage;
+  atapp::service_discovery_module::topology_storage_t storage;
   storage.version.create_revision = 10;
   storage.version.modify_revision = 20;
   storage.version.version = 1;
@@ -277,7 +278,7 @@ CASE_TEST(atapp_etcd_module_unit, version_upgrade_modify_revision) {
 
 // ---- I.14 version update: upgrade with higher version only ----
 CASE_TEST(atapp_etcd_module_unit, version_upgrade_version_only) {
-  atapp::etcd_module::topology_storage_t storage;
+  atapp::service_discovery_module::topology_storage_t storage;
   storage.version.create_revision = 10;
   storage.version.modify_revision = 20;
   storage.version.version = 1;
@@ -295,7 +296,7 @@ CASE_TEST(atapp_etcd_module_unit, version_upgrade_version_only) {
 
 // ---- I.15 version update: upgrade with no changes (all equal) ----
 CASE_TEST(atapp_etcd_module_unit, version_upgrade_no_change) {
-  atapp::etcd_module::topology_storage_t storage;
+  atapp::service_discovery_module::topology_storage_t storage;
   storage.version.create_revision = 10;
   storage.version.modify_revision = 20;
   storage.version.version = 3;
@@ -315,7 +316,7 @@ CASE_TEST(atapp_etcd_module_unit, version_upgrade_no_change) {
 
 // ---- I.16 version update: upgrade with lower values (no update) ----
 CASE_TEST(atapp_etcd_module_unit, version_upgrade_lower_values) {
-  atapp::etcd_module::topology_storage_t storage;
+  atapp::service_discovery_module::topology_storage_t storage;
   storage.version.create_revision = 10;
   storage.version.modify_revision = 20;
   storage.version.version = 3;
@@ -336,7 +337,7 @@ CASE_TEST(atapp_etcd_module_unit, version_upgrade_lower_values) {
 
 // ---- I.17 version update: non-upgrade (overwrite) mode ----
 CASE_TEST(atapp_etcd_module_unit, version_overwrite_mode) {
-  atapp::etcd_module::topology_storage_t storage;
+  atapp::service_discovery_module::topology_storage_t storage;
   storage.version.create_revision = 100;
   storage.version.modify_revision = 200;
   storage.version.version = 50;
@@ -357,7 +358,7 @@ CASE_TEST(atapp_etcd_module_unit, version_overwrite_mode) {
 
 // ---- I.18 version update: upgrade with mixed higher/lower ----
 CASE_TEST(atapp_etcd_module_unit, version_upgrade_mixed) {
-  atapp::etcd_module::topology_storage_t storage;
+  atapp::service_discovery_module::topology_storage_t storage;
   storage.version.create_revision = 10;
   storage.version.modify_revision = 20;
   storage.version.version = 3;
@@ -382,9 +383,10 @@ CASE_TEST(atapp_etcd_module_unit, version_upgrade_mixed) {
 // This directly validates the fix: passing by value would NOT update the caller's storage
 CASE_TEST(atapp_etcd_module_unit, version_update_by_reference) {
   // Simulate the map lookup pattern from update_internal_watcher_event
-  std::unordered_map<uint64_t, atapp::etcd_module::topology_storage_t> topology_map;
+  std::unordered_map<uint64_t, atapp::service_discovery_module::topology_storage_t> topology_map;
 
-  atapp::etcd_module::topology_storage_t initial;
+  atapp::service_discovery_module::topology_storage_t initial;
+  initial.context_ptr = 0;
   initial.version.create_revision = 1;
   initial.version.modify_revision = 1;
   initial.version.version = 1;
@@ -411,7 +413,7 @@ CASE_TEST(atapp_etcd_module_unit, version_update_by_reference) {
 
 // ---- I.20 version update: multiple sequential upgrades ----
 CASE_TEST(atapp_etcd_module_unit, version_sequential_upgrades) {
-  atapp::etcd_module::topology_storage_t storage;
+  atapp::service_discovery_module::topology_storage_t storage;
   storage.version.create_revision = 0;
   storage.version.modify_revision = 0;
   storage.version.version = 0;
@@ -454,7 +456,7 @@ CASE_TEST(atapp_etcd_module_unit, version_sequential_upgrades) {
 
 // ---- I.21 version update: zero-initialized storage ----
 CASE_TEST(atapp_etcd_module_unit, version_upgrade_from_zero) {
-  atapp::etcd_module::topology_storage_t storage;
+  atapp::service_discovery_module::topology_storage_t storage;
   // Default construction leaves version at 0,0,0
 
   CASE_EXPECT_EQ(0, storage.version.create_revision);
@@ -634,13 +636,13 @@ CASE_TEST(atapp_etcd_module_unit, topology_equal_ignores_extra_fields) {
   CASE_EXPECT_TRUE(test_atapp_topology_equal(a, b));
 }
 
-// ==================== topology_storage_t map interaction tests ====================
+// ==================== atapp::service_discovery_module::topology_storage_t map interaction tests ====================
 // These tests verify the fix for topology_update_version being called
 // with storage from a map iterator, ensuring updates propagate.
 
 // ---- I.31 map-based version tracking: insert and upgrade ----
 CASE_TEST(atapp_etcd_module_unit, topology_map_insert_and_upgrade) {
-  std::unordered_map<uint64_t, atapp::etcd_module::topology_storage_t> topology_map;
+  std::unordered_map<uint64_t, atapp::service_discovery_module::topology_storage_t> topology_map;
 
   // Insert initial entry
   auto info = atfw::util::memory::make_strong_rc<atapp::protocol::atapp_topology_info>();
@@ -648,7 +650,8 @@ CASE_TEST(atapp_etcd_module_unit, topology_map_insert_and_upgrade) {
   info->set_name("server-100");
   info->set_upstream_id(1);
 
-  atapp::etcd_module::topology_storage_t entry;
+  atapp::service_discovery_module::topology_storage_t entry;
+  entry.context_ptr = 0;
   entry.info = info;
   entry.version.create_revision = 1;
   entry.version.modify_revision = 1;
@@ -677,12 +680,13 @@ CASE_TEST(atapp_etcd_module_unit, topology_map_insert_and_upgrade) {
 
 // ---- I.32 map-based version tracking: multiple entries independent ----
 CASE_TEST(atapp_etcd_module_unit, topology_map_multiple_entries) {
-  std::unordered_map<uint64_t, atapp::etcd_module::topology_storage_t> topology_map;
+  std::unordered_map<uint64_t, atapp::service_discovery_module::topology_storage_t> topology_map;
 
   for (uint64_t i = 1; i <= 3; ++i) {
-    atapp::etcd_module::topology_storage_t entry;
+    atapp::service_discovery_module::topology_storage_t entry;
     entry.info = atfw::util::memory::make_strong_rc<atapp::protocol::atapp_topology_info>();
     entry.info->set_id(i);
+    entry.context_ptr = 0;
     entry.version.create_revision = static_cast<int64_t>(i);
     entry.version.modify_revision = static_cast<int64_t>(i);
     entry.version.version = 1;
@@ -757,18 +761,15 @@ CASE_TEST(atapp_etcd_module_unit, generate_etcd_path_empty) {
 
 // ---- I.37 generate_etcd_path: append slash when separator missing ----
 CASE_TEST(atapp_etcd_module_unit, generate_etcd_path_append_slash) {
-  CASE_EXPECT_EQ(std::string("service/discovery/"),
-                 atapp::etcd_module::generate_etcd_path("service/discovery"));
+  CASE_EXPECT_EQ(std::string("service/discovery/"), atapp::etcd_module::generate_etcd_path("service/discovery"));
 }
 
 // ---- I.38 generate_etcd_path: preserve trailing slash ----
 CASE_TEST(atapp_etcd_module_unit, generate_etcd_path_preserve_slash) {
-  CASE_EXPECT_EQ(std::string("service/discovery/"),
-                 atapp::etcd_module::generate_etcd_path("service/discovery/"));
+  CASE_EXPECT_EQ(std::string("service/discovery/"), atapp::etcd_module::generate_etcd_path("service/discovery/"));
 }
 
 // ---- I.39 generate_etcd_path: preserve trailing backslash ----
 CASE_TEST(atapp_etcd_module_unit, generate_etcd_path_preserve_backslash) {
-  CASE_EXPECT_EQ(std::string("service\\discovery\\"),
-                 atapp::etcd_module::generate_etcd_path("service\\discovery\\"));
+  CASE_EXPECT_EQ(std::string("service\\discovery\\"), atapp::etcd_module::generate_etcd_path("service\\discovery\\"));
 }

@@ -435,6 +435,10 @@ message atapp_etcd_watcher {
   google.protobuf.Duration startup_random_delay_max = 105 [(atapp.protocol.CONFIGURE) = { default_value: "0s" }];
 }
 
+message atapp_etcd_common {
+  bool enable = 1;
+}
+
 message atapp_etcd {
   bool enable = 1;
   repeated string hosts = 2 [(atframework.atapp.protocol.CONFIGURE) = { enable_expression: true }];
@@ -576,7 +580,8 @@ message atapp_configure {
 
   atbus_configure bus = 301;
 
-  atapp_etcd etcd = 401;
+  atapp_etcd_common etcd = 401;
+  atapp_etcd service_discovery_etcd = 402;
 
   atapp_worker_pool worker_pool = 501;
 }

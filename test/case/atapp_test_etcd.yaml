@@ -30,6 +30,8 @@ atapp:
     stop_interval: 256ms
   etcd:
     enable: true
+  service_discovery_etcd:
+    enable: true
     hosts:
       - "${ATAPP_UNIT_TEST_ETCD_HOST:-http://127.0.0.1:12379}"
     path: "/atapp/unit-test/libatapp"
