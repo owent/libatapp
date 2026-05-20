@@ -279,6 +279,8 @@ class UTIL_SYMBOL_LOCAL worker_pool_module::worker : public std::enable_shared_f
   worker_tick_action_container_type tick_handles_;
   std::recursive_mutex tick_handle_lock_;
   std::atomic<std::chrono::microseconds::rep> current_tick_interval_us_;
+  std::atomic<std::chrono::microseconds::rep> current_tick_second_busy_us_;
+  std::atomic<std::chrono::microseconds::rep> current_tick_second_waited_us_;
 
   std::atomic<std::chrono::microseconds::rep> cpu_time_busy_us_;
   std::atomic<std::chrono::microseconds::rep> cpu_time_sleep_us_;
@@ -299,6 +301,7 @@ struct UTIL_SYMBOL_LOCAL worker_pool_module::worker_set {
 
   std::atomic<int64_t> configure_tick_min_interval_microseconds;
   std::atomic<int64_t> configure_tick_max_interval_microseconds;
+  std::atomic<int64_t> configure_tick_preserve_microseconds_in_second;
 
   std::recursive_mutex worker_lock;
   std::vector<std::shared_ptr<worker>> workers;
@@ -453,6 +456,9 @@ void worker_pool_module::worker::start(const std::shared_ptr<worker>& self, cons
       }
 
       // Maybe sleep until timeout or next event
+      self->current_tick_second_busy_us_.fetch_add(
+          std::chrono::duration_cast<std::chrono::microseconds>(busy_end_time - start_time).count(),
+          std::memory_order_release);
       if (busy_end_time - start_time < tick_interval) {
         std::unique_lock<std::mutex> lk_cv(self->waker_lock_);
 
@@ -464,6 +470,33 @@ void worker_pool_module::worker::start(const std::shared_ptr<worker>& self, cons
         if (sleep_end_time > busy_end_time) {
           auto sleep_rep =
               std::chrono::duration_cast<std::chrono::microseconds>(sleep_end_time - busy_end_time).count();
+          self->cpu_time_sleep_us_.fetch_add(sleep_rep, std::memory_order_release);
+          self->current_tick_second_waited_us_.fetch_add(sleep_rep, std::memory_order_release);
+        }
+      }
+
+      if (self->current_tick_second_busy_us_.load(std::memory_order_acquire) +
+              self->current_tick_second_waited_us_.load(std::memory_order_acquire) >=
+          1000000) {
+        self->current_tick_second_busy_us_.store(0, std::memory_order_release);
+        self->current_tick_second_waited_us_.store(0, std::memory_order_release);
+
+        auto wait_preserve_us =
+            self->get_owner().configure_tick_preserve_microseconds_in_second.load(std::memory_order_acquire);
+        if (wait_preserve_us <= 0) {
+          wait_preserve_us = 8000;
+        }
+
+        std::chrono::system_clock::time_point preserve_sleep_start = std::chrono::system_clock::now();
+        std::unique_lock<std::mutex> lk_cv(self->waker_lock_);
+        self->status_.store(static_cast<uint8_t>(worker_status::kSleeping), std::memory_order_release);
+        self->waker_cv_.wait_for(lk_cv, std::chrono::microseconds(wait_preserve_us));
+        self->status_.store(static_cast<uint8_t>(worker_status::kRunning), std::memory_order_release);
+
+        std::chrono::system_clock::time_point sleep_end_time = std::chrono::system_clock::now();
+        if (sleep_end_time > preserve_sleep_start) {
+          auto sleep_rep =
+              std::chrono::duration_cast<std::chrono::microseconds>(sleep_end_time - preserve_sleep_start).count();
           self->cpu_time_sleep_us_.fetch_add(sleep_rep, std::memory_order_release);
         }
       }
@@ -578,6 +611,7 @@ worker_pool_module::worker_set::worker_set()
   current_expect_workers.store(2, std::memory_order_release);
   configure_tick_min_interval_microseconds.store(4, std::memory_order_release);
   configure_tick_max_interval_microseconds.store(128, std::memory_order_release);
+  configure_tick_preserve_microseconds_in_second.store(8000, std::memory_order_release);
 }
 
 LIBATAPP_MACRO_API worker_pool_module::worker_pool_module()
