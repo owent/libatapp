@@ -356,6 +356,9 @@ worker_pool_module::worker::worker(worker_pool_module::worker_set& owner, uint32
     current_tick_interval_us_.store(4000, std::memory_order_release);
   }
 
+  current_tick_second_busy_us_.store(0, std::memory_order_release);
+  current_tick_second_waited_us_.store(0, std::memory_order_release);
+
   cpu_time_busy_us_.store(0, std::memory_order_release);
   cpu_time_sleep_us_.store(0, std::memory_order_release);
   cpu_time_last_second_busy_us_.store(0, std::memory_order_release);
