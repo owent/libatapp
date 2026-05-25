@@ -10,6 +10,7 @@
 #include <atframe/connectors/atapp_endpoint.h>
 
 #include <limits>
+#include <memory>
 #include "atframe/atapp_common_types.h"
 
 #ifdef max
@@ -225,7 +226,7 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::push_forward_message(int32_t type, ui
   }
 
   // Success to add to pending
-  pending_message_.push_back(pending_message_t());
+  pending_message_.emplace_back();
   pending_message_t &msg = pending_message_.back();
   msg.type = type;
   msg.message_sequence = msg_sequence;
@@ -234,7 +235,7 @@ LIBATAPP_MACRO_API int32_t atapp_endpoint::push_forward_message(int32_t type, ui
   msg.expired_timepoint += owner_->get_configure_message_timeout();
   memcpy(msg.data.data(), data.data(), data.size());
   if (nullptr != metadata) {
-    msg.metadata.reset(new atapp::protocol::atapp_metadata());
+    msg.metadata = gsl::make_unique<atapp::protocol::atapp_metadata>();
     if (msg.metadata) {
       *msg.metadata = *metadata;
     }

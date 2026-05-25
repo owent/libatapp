@@ -45,6 +45,7 @@
 #endif
 
 #include "atframe/atapp_conf_rapidjson.h"
+#include "atframe/atapp_windows_minidump.h"
 #include "atframe/modules/etcd_module.h"
 #include "atframe/modules/worker_pool_module.h"
 
@@ -533,6 +534,8 @@ LIBATAPP_MACRO_API app::~app() {
 
   // finally events
   app_evt_on_finally();
+
+  cleanup_windows_minidump();
 
   // close timer
   close_timer(tick_timer_.tick_timer);
@@ -2994,6 +2997,9 @@ int app::apply_configure() {
 
   // atbus configure
   apply_atbus_configure(conf_.bus_conf, conf_.origin.bus());
+
+  // windows minidump configure
+  setup_windows_minidump(conf_.origin.debug(), conf_.origin.name());
 
   return 0;
 }  // namespace atapp

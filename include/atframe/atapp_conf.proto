@@ -552,6 +552,20 @@ message atapp_resource {
   atapp_resource_group requests = 2;
 }
 
+enum atapp_debug_windows_minidump_mode {
+  ATAPP_DEBUG_WINDOWS_MINIDUMP_MODE_MINI = 0 [(ENUMVALUE) = { alias_name: "mini" case_sensitive: false }];
+  ATAPP_DEBUG_WINDOWS_MINIDUMP_MODE_WITH_DATA_SEGS = 1
+      [(ENUMVALUE) = { alias_name: "with_data_segs" case_sensitive: false }];
+  ATAPP_DEBUG_WINDOWS_MINIDUMP_MODE_WITH_FULL_MEMORY = 2
+      [(ENUMVALUE) = { alias_name: "full_memory" case_sensitive: false }];
+}
+
+message atapp_debug {
+  string windows_minidump_path = 1 [(atframework.atapp.protocol.CONFIGURE) = { enable_expression: true }];
+  atapp_debug_windows_minidump_mode windows_minidump_mode = 2
+      [(atframework.atapp.protocol.CONFIGURE) = { enable_expression: true }];
+}
+
 message atapp_configure {
   // bus configure
   string id = 101 [(atframework.atapp.protocol.CONFIGURE) = { enable_expression: true }];       // maybe hex or a.b.c.d
@@ -565,6 +579,7 @@ message atapp_configure {
   //   https://kubernetes.io/zh-cn/docs/concepts/workloads/pods/downward-api/#available-fields
   atapp_metadata metadata = 107;
   atapp_runtime runtime = 108;
+  atapp_debug debug = 109;
 
   string hostname = 121 [(atframework.atapp.protocol.CONFIGURE) = { enable_expression: true }];
   // The same identity means the same instance of a app.
