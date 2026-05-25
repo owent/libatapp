@@ -501,6 +501,7 @@ void worker_pool_module::worker::start(const std::shared_ptr<worker>& self, cons
           auto sleep_rep =
               std::chrono::duration_cast<std::chrono::microseconds>(sleep_end_time - preserve_sleep_start).count();
           self->cpu_time_sleep_us_.fetch_add(sleep_rep, std::memory_order_release);
+          self->current_tick_second_waited_us_.fetch_add(sleep_rep, std::memory_order_release);
         }
       }
     }
@@ -643,6 +644,13 @@ LIBATAPP_MACRO_API int worker_pool_module::reload() {
       tick_interval = 4000;
     }
     worker_set_->configure_tick_min_interval_microseconds.store(tick_interval, std::memory_order_release);
+
+    int64_t preserve_interval =
+        (cfg.tick_preserve_interval().nanos() / 1000) + (cfg.tick_preserve_interval().seconds() * 1000000);
+    if (preserve_interval < 1000) {
+      preserve_interval = 8000;
+    }
+    worker_set_->configure_tick_preserve_microseconds_in_second.store(preserve_interval, std::memory_order_release);
   }
 
   if (scaling_configure_) {
