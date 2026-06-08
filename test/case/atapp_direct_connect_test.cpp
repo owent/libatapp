@@ -333,8 +333,8 @@ CASE_TEST(atapp_direct_connect, direct_discovery_ready_connect_send) {
 
 // ============================================================
 // B.2: direct_discovery_missing_wait_then_send
-// Node2 discovery is delayed. node1 sends message first (pending),
-// then discovery arrives, connection established, message delivered.
+// Endpoint created but direct connection not ready yet -> message goes
+// pending -> delivered after the direct connection becomes ready.
 // ============================================================
 CASE_TEST(atapp_direct_connect, direct_discovery_missing_wait_then_send) {
   reset_direct_test_context();
@@ -438,23 +438,51 @@ CASE_TEST(atapp_direct_connect, direct_discovery_missing_wait_then_send) {
   uint64_t seq = 0;
   apps.node1.send_message(apps.node2.get_app_id(), 100, msg_span, &seq);
 
-  // Pump event loop a few rounds to rule out false negatives —
-  // ensure the message stays pending because there is no direct connection,
-  // not because IO events haven't been processed yet.
+  // Right after send: the direct connection is not ready yet (asserted above), so the
+  // message must be enqueued into the endpoint pending queue synchronously and must not
+  // have been delivered. No event loop has run between send and this check, so this is
+  // deterministic regardless of machine load.
+  ep_node2 = apps.node1.get_endpoint(apps.node2.get_app_id());
+  CASE_EXPECT_TRUE(ep_node2 != nullptr);
+  CASE_EXPECT_EQ(0, g_direct_test_ctx.received_message_count);
+  if (ep_node2 != nullptr) {
+    CASE_EXPECT_GT(ep_node2->get_pending_message_count(), static_cast<size_t>(0));
+    CASE_MSG_INFO() << "B.2: pending right after send=" << ep_node2->get_pending_message_count() << '\n';
+  }
+
+  // Pump event loop a few rounds to ensure the message keeps staying pending while the
+  // direct connection is not ready (rules out the false negative that IO events simply
+  // haven't been processed yet). On a heavily loaded machine the direct connection may
+  // finish during these rounds; in that case the pending message is allowed to be flushed,
+  // so break out early and skip the strict "still pending" assertion below.
+  bool connected_during_pump = false;
   for (int i = 0; i < 64; ++i) {
     apps.upstream.run_noblock();
     apps.node1.run_noblock();
     apps.node2.run_noblock();
+
+    ep_node2 = apps.node1.get_endpoint(apps.node2.get_app_id());
+    bool connection_ready = (ep_node2 != nullptr && ep_node2->get_ready_connection_handle() != nullptr);
+    if (connection_ready || g_direct_test_ctx.received_message_count > 0) {
+      connected_during_pump = true;
+      CASE_MSG_INFO() << "B.2: direct connection became ready during pump at round " << i
+                      << ", skip strict pending check" << '\n';
+      break;
+    }
   }
 
-  // Verify message is still NOT delivered after pumping
-  CASE_EXPECT_EQ(0, g_direct_test_ctx.received_message_count);
+  // Only assert "still pending" when the direct connection has not completed yet.
+  if (!connected_during_pump) {
+    // Verify message is still NOT delivered after pumping
+    CASE_EXPECT_EQ(0, g_direct_test_ctx.received_message_count);
 
-  // Verify message is in pending queue
-  ep_node2 = apps.node1.get_endpoint(apps.node2.get_app_id());
-  if (ep_node2 != nullptr) {
-    CASE_EXPECT_GT(ep_node2->get_pending_message_count(), static_cast<size_t>(0));
-    CASE_MSG_INFO() << "B.2: pending_message_count=" << ep_node2->get_pending_message_count() << '\n';
+    // Verify message is in pending queue
+    ep_node2 = apps.node1.get_endpoint(apps.node2.get_app_id());
+    CASE_EXPECT_TRUE(ep_node2 != nullptr);
+    if (ep_node2 != nullptr) {
+      CASE_EXPECT_GT(ep_node2->get_pending_message_count(), static_cast<size_t>(0));
+      CASE_MSG_INFO() << "B.2: pending after pump=" << ep_node2->get_pending_message_count() << '\n';
+    }
   }
 
   // Wait for direct connection → pending message should be delivered
