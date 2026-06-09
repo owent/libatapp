@@ -3,6 +3,7 @@
 
 #include <atframe/atapp.h>
 #include <atframe/modules/etcd_module.h>
+#include <atframe/modules/service_discovery_module.h>
 
 #include <atframe/etcdcli/etcd_cluster.h>
 #include <atframe/etcdcli/etcd_keepalive.h>
@@ -222,13 +223,7 @@ CASE_TEST(atapp_etcd_cluster, cluster_init_and_connect) {  // NOLINT
   const char *args[] = {"app1", "-c", setup.conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args, nullptr));
 
-  auto etcd_mod = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod);
-  if (!etcd_mod) {
-    return;
-  }
-
-  auto &cluster = etcd_mod->get_raw_etcd_ctx();
+  auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   // Cluster should be available after init
   CASE_EXPECT_TRUE(cluster.is_available());
@@ -257,13 +252,7 @@ CASE_TEST(atapp_etcd_cluster, cluster_member_list_discovery) {
   const char *args[] = {"app1", "-c", setup.conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args, nullptr));
 
-  auto etcd_mod = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod);
-  if (!etcd_mod) {
-    return;
-  }
-
-  auto &cluster = etcd_mod->get_raw_etcd_ctx();
+  auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
   run_apps_noblock(apps, 16);
@@ -295,13 +284,7 @@ CASE_TEST(atapp_etcd_cluster, cluster_lease_grant_and_keepalive) {
   const char *args[] = {"app1", "-c", setup.conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args, nullptr));
 
-  auto etcd_mod = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod);
-  if (!etcd_mod) {
-    return;
-  }
-
-  auto &cluster = etcd_mod->get_raw_etcd_ctx();
+  auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
   run_apps_noblock(apps, 16);
@@ -332,13 +315,7 @@ CASE_TEST(atapp_etcd_cluster, cluster_close_revoke_lease) {
   const char *args[] = {"app1", "-c", setup.conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args, nullptr));
 
-  auto etcd_mod = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod);
-  if (!etcd_mod) {
-    return;
-  }
-
-  auto &cluster = etcd_mod->get_raw_etcd_ctx();
+  auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
   run_apps_noblock(apps, 16);
@@ -390,13 +367,7 @@ CASE_TEST(atapp_etcd_cluster, cluster_stats_tracking) {
   const char *args[] = {"app1", "-c", setup.conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args, nullptr));
 
-  auto etcd_mod = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod);
-  if (!etcd_mod) {
-    return;
-  }
-
-  auto &cluster = etcd_mod->get_raw_etcd_ctx();
+  auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
   run_apps_noblock(apps, 32);
@@ -424,13 +395,7 @@ CASE_TEST(atapp_etcd_cluster, cluster_event_up_down_callbacks) {
   const char *args[] = {"app1", "-c", setup.conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args, nullptr));
 
-  auto etcd_mod = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod);
-  if (!etcd_mod) {
-    return;
-  }
-
-  auto &cluster = etcd_mod->get_raw_etcd_ctx();
+  auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   int up_count = 0;
   int down_count = 0;
@@ -472,13 +437,7 @@ CASE_TEST(atapp_etcd_cluster, keepalive_set_value_and_read) {
   const char *args[] = {"app1", "-c", setup.conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args, nullptr));
 
-  auto etcd_mod = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod);
-  if (!etcd_mod) {
-    return;
-  }
-
-  auto &cluster = etcd_mod->get_raw_etcd_ctx();
+  auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
   run_apps_noblock(apps, 16);
@@ -524,13 +483,7 @@ CASE_TEST(atapp_etcd_cluster, keepalive_update_value) {
   const char *args[] = {"app1", "-c", setup.conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args, nullptr));
 
-  auto etcd_mod = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod);
-  if (!etcd_mod) {
-    return;
-  }
-
-  auto &cluster = etcd_mod->get_raw_etcd_ctx();
+  auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
   run_apps_noblock(apps, 16);
@@ -583,13 +536,7 @@ CASE_TEST(atapp_etcd_cluster, keepalive_lease_binding) {
   const char *args[] = {"app1", "-c", setup.conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args, nullptr));
 
-  auto etcd_mod = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod);
-  if (!etcd_mod) {
-    return;
-  }
-
-  auto &cluster = etcd_mod->get_raw_etcd_ctx();
+  auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
   run_apps_noblock(apps, 16);
@@ -640,13 +587,7 @@ CASE_TEST(atapp_etcd_cluster, keepalive_checker_conflict) {
   const char *args[] = {"app1", "-c", setup.conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args, nullptr));
 
-  auto etcd_mod = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod);
-  if (!etcd_mod) {
-    return;
-  }
-
-  auto &cluster = etcd_mod->get_raw_etcd_ctx();
+  auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
   run_apps_noblock(apps, 16);
@@ -700,13 +641,7 @@ CASE_TEST(atapp_etcd_cluster, keepalive_checker_same_identity) {
   const char *args[] = {"app1", "-c", setup.conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args, nullptr));
 
-  auto etcd_mod = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod);
-  if (!etcd_mod) {
-    return;
-  }
-
-  auto &cluster = etcd_mod->get_raw_etcd_ctx();
+  auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
   run_apps_noblock(apps, 16);
@@ -757,13 +692,7 @@ CASE_TEST(atapp_etcd_cluster, keepalive_remove_and_readd) {
   const char *args[] = {"app1", "-c", setup.conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args, nullptr));
 
-  auto etcd_mod = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod);
-  if (!etcd_mod) {
-    return;
-  }
-
-  auto &cluster = etcd_mod->get_raw_etcd_ctx();
+  auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
   run_apps_noblock(apps, 16);
@@ -824,13 +753,7 @@ CASE_TEST(atapp_etcd_cluster, watcher_initial_snapshot) {
   const char *args[] = {"app1", "-c", setup.conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args, nullptr));
 
-  auto etcd_mod = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod);
-  if (!etcd_mod) {
-    return;
-  }
-
-  auto &cluster = etcd_mod->get_raw_etcd_ctx();
+  auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
   run_apps_noblock(apps, 16);
@@ -893,13 +816,7 @@ CASE_TEST(atapp_etcd_cluster, watcher_put_event) {
   const char *args[] = {"app1", "-c", setup.conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args, nullptr));
 
-  auto etcd_mod = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod);
-  if (!etcd_mod) {
-    return;
-  }
-
-  auto &cluster = etcd_mod->get_raw_etcd_ctx();
+  auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
   run_apps_noblock(apps, 16);
@@ -970,13 +887,7 @@ CASE_TEST(atapp_etcd_cluster, watcher_delete_event) {
   const char *args[] = {"app1", "-c", setup.conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args, nullptr));
 
-  auto etcd_mod = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod);
-  if (!etcd_mod) {
-    return;
-  }
-
-  auto &cluster = etcd_mod->get_raw_etcd_ctx();
+  auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
   run_apps_noblock(apps, 16);
@@ -1048,13 +959,7 @@ CASE_TEST(atapp_etcd_cluster, watcher_prefix_range) {
   const char *args[] = {"app1", "-c", setup.conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args, nullptr));
 
-  auto etcd_mod = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod);
-  if (!etcd_mod) {
-    return;
-  }
-
-  auto &cluster = etcd_mod->get_raw_etcd_ctx();
+  auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
   run_apps_noblock(apps, 16);
@@ -1134,13 +1039,7 @@ CASE_TEST(atapp_etcd_cluster, watcher_reconnect_after_timeout) {
   const char *args[] = {"app1", "-c", setup.conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args, nullptr));
 
-  auto etcd_mod = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod);
-  if (!etcd_mod) {
-    return;
-  }
-
-  auto &cluster = etcd_mod->get_raw_etcd_ctx();
+  auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
   run_apps_noblock(apps, 16);
@@ -1225,13 +1124,7 @@ CASE_TEST(atapp_etcd_cluster, watcher_revision_continuity) {
   const char *args[] = {"app1", "-c", setup.conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args, nullptr));
 
-  auto etcd_mod = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod);
-  if (!etcd_mod) {
-    return;
-  }
-
-  auto &cluster = etcd_mod->get_raw_etcd_ctx();
+  auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
   run_apps_noblock(apps, 16);

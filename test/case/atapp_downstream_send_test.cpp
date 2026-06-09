@@ -7,6 +7,7 @@
 #include <atframe/atapp.h>
 #include <atframe/connectors/atapp_connector_atbus.h>
 #include <atframe/modules/etcd_module.h>
+#include <atframe/modules/service_discovery_module.h>
 #include <detail/libatbus_error.h>
 
 #include <common/file_system.h>
@@ -113,16 +114,16 @@ struct downstream_two_node_apps {
     {
       atapp::protocol::atapp_discovery info;
       upstream.pack(info);
-      upstream_discovery->copy_from(info, atapp::etcd_discovery_node::node_version());
+      upstream_discovery->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
     }
     {
       atapp::protocol::atapp_discovery info;
       downstream.pack(info);
-      downstream_discovery->copy_from(info, atapp::etcd_discovery_node::node_version());
+      downstream_discovery->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
     }
 
-    auto &up_gd = upstream.get_etcd_module()->get_global_discovery();
-    auto &down_gd = downstream.get_etcd_module()->get_global_discovery();
+    auto &up_gd = upstream.get_service_discovery_module()->get_global_discovery();
+    auto &down_gd = downstream.get_service_discovery_module()->get_global_discovery();
 
     up_gd.add_node(upstream_discovery);
     up_gd.add_node(downstream_discovery);
@@ -137,11 +138,11 @@ struct downstream_two_node_apps {
     {
       atapp::protocol::atapp_discovery info;
       upstream.pack(info);
-      upstream_discovery->copy_from(info, atapp::etcd_discovery_node::node_version());
+      upstream_discovery->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
     }
 
-    auto &up_gd = upstream.get_etcd_module()->get_global_discovery();
-    auto &down_gd = downstream.get_etcd_module()->get_global_discovery();
+    auto &up_gd = upstream.get_service_discovery_module()->get_global_discovery();
+    auto &down_gd = downstream.get_service_discovery_module()->get_global_discovery();
 
     up_gd.add_node(upstream_discovery);
     down_gd.add_node(upstream_discovery);
@@ -152,11 +153,11 @@ struct downstream_two_node_apps {
     {
       atapp::protocol::atapp_discovery info;
       downstream.pack(info);
-      downstream_discovery->copy_from(info, atapp::etcd_discovery_node::node_version());
+      downstream_discovery->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
     }
 
-    auto &up_gd = upstream.get_etcd_module()->get_global_discovery();
-    auto &down_gd = downstream.get_etcd_module()->get_global_discovery();
+    auto &up_gd = upstream.get_service_discovery_module()->get_global_discovery();
+    auto &down_gd = downstream.get_service_discovery_module()->get_global_discovery();
 
     up_gd.add_node(downstream_discovery);
     down_gd.add_node(downstream_discovery);
@@ -226,17 +227,17 @@ CASE_TEST(atapp_downstream_send, downstream_not_connected_pending) {
   {
     atapp::protocol::atapp_discovery info;
     apps.upstream.pack(info);
-    apps.upstream_discovery->copy_from(info, atapp::etcd_discovery_node::node_version());
+    apps.upstream_discovery->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
   }
   {
     atapp::protocol::atapp_discovery info;
     apps.downstream.pack(info);
-    apps.downstream_discovery->copy_from(info, atapp::etcd_discovery_node::node_version());
+    apps.downstream_discovery->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
   }
 
   // Inject upstream discovery on both sides
-  auto &up_gd = apps.upstream.get_etcd_module()->get_global_discovery();
-  auto &down_gd = apps.downstream.get_etcd_module()->get_global_discovery();
+  auto &up_gd = apps.upstream.get_service_discovery_module()->get_global_discovery();
+  auto &down_gd = apps.downstream.get_service_discovery_module()->get_global_discovery();
   up_gd.add_node(apps.upstream_discovery);
   down_gd.add_node(apps.upstream_discovery);
 

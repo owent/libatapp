@@ -3,6 +3,7 @@
 
 #include <atframe/atapp.h>
 #include <atframe/modules/etcd_module.h>
+#include <atframe/modules/service_discovery_module.h>
 
 #include <atframe/etcdcli/etcd_cluster.h>
 #include <atframe/etcdcli/etcd_discovery.h>
@@ -103,23 +104,22 @@ CASE_TEST(atapp_etcd_module, init_and_ready) {
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args, nullptr));
 
   // After init, etcd module should be enabled and the cluster should be available
-  auto etcd_mod = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod);
-  if (!etcd_mod) {
+  auto discovery_module = app1.get_service_discovery_module();
+  CASE_EXPECT_TRUE(!!discovery_module);
+  if (!discovery_module) {
     return;
   }
 
-  CASE_EXPECT_TRUE(etcd_mod->is_etcd_enabled());
-  CASE_EXPECT_TRUE(etcd_mod->get_raw_etcd_ctx().is_available());
+  CASE_EXPECT_TRUE(discovery_module->get_raw_etcd_ctx().is_available());
 
   // Tick a few times to ensure stable state
   std::vector<atframework::atapp::app *> apps = {&app1};
   run_apps_noblock(apps, 32);
 
-  CASE_EXPECT_TRUE(etcd_mod->get_raw_etcd_ctx().is_available());
-  CASE_EXPECT_NE(0, static_cast<int64_t>(etcd_mod->get_raw_etcd_ctx().get_lease()));
+  CASE_EXPECT_TRUE(discovery_module->get_raw_etcd_ctx().is_available());
+  CASE_EXPECT_NE(0, static_cast<int64_t>(discovery_module->get_raw_etcd_ctx().get_lease()));
 
-  CASE_MSG_INFO() << "etcd lease: " << etcd_mod->get_raw_etcd_ctx().get_lease() << '\n';
+  CASE_MSG_INFO() << "etcd lease: " << discovery_module->get_raw_etcd_ctx().get_lease() << '\n';
 }
 
 // ============================================================
@@ -144,14 +144,14 @@ CASE_TEST(atapp_etcd_module, keepalive_paths) {
   const char *args[] = {"app1", "-c", conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args, nullptr));
 
-  auto etcd_mod = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod);
-  if (!etcd_mod) {
+  auto discovery_module = app1.get_service_discovery_module();
+  CASE_EXPECT_TRUE(!!discovery_module);
+  if (!discovery_module) {
     return;
   }
 
   // Check by_id path
-  std::string by_id_path = etcd_mod->get_discovery_by_id_path();
+  std::string by_id_path = discovery_module->get_discovery_by_id_path(app1, discovery_module->get_configure_path());
   CASE_EXPECT_FALSE(by_id_path.empty());
   CASE_MSG_INFO() << "by_id_path: " << by_id_path << '\n';
   // Should contain "by_id" and the app name
@@ -159,14 +159,14 @@ CASE_TEST(atapp_etcd_module, keepalive_paths) {
   CASE_EXPECT_NE(std::string::npos, by_id_path.find(app1.get_app_name()));
 
   // Check by_name path
-  std::string by_name_path = etcd_mod->get_discovery_by_name_path();
+  std::string by_name_path = discovery_module->get_discovery_by_name_path(app1, discovery_module->get_configure_path());
   CASE_EXPECT_FALSE(by_name_path.empty());
   CASE_MSG_INFO() << "by_name_path: " << by_name_path << '\n';
   CASE_EXPECT_NE(std::string::npos, by_name_path.find("by_name"));
   CASE_EXPECT_NE(std::string::npos, by_name_path.find(app1.get_app_name()));
 
   // Check topology path
-  std::string topology_path = etcd_mod->get_topology_path();
+  std::string topology_path = discovery_module->get_topology_path(app1, discovery_module->get_configure_path());
   CASE_EXPECT_FALSE(topology_path.empty());
   CASE_MSG_INFO() << "topology_path: " << topology_path << '\n';
   CASE_EXPECT_NE(std::string::npos, topology_path.find("topology"));
@@ -195,16 +195,16 @@ CASE_TEST(atapp_etcd_module, watcher_paths) {
   const char *args[] = {"app1", "-c", conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args, nullptr));
 
-  auto etcd_mod = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod);
-  if (!etcd_mod) {
+  auto discovery_module = app1.get_service_discovery_module();
+  CASE_EXPECT_TRUE(!!discovery_module);
+  if (!discovery_module) {
     return;
   }
 
   // Watcher paths should be prefix paths (without node-specific suffix)
-  std::string by_id_watcher = etcd_mod->get_discovery_by_id_watcher_path();
-  std::string by_name_watcher = etcd_mod->get_discovery_by_name_watcher_path();
-  std::string topology_watcher = etcd_mod->get_topology_watcher_path();
+  std::string by_id_watcher = discovery_module->get_discovery_by_id_watcher_path(app1, discovery_module->get_configure_path());
+  std::string by_name_watcher = discovery_module->get_discovery_by_name_watcher_path(app1, discovery_module->get_configure_path());
+  std::string topology_watcher = discovery_module->get_topology_watcher_path(app1, discovery_module->get_configure_path());
 
   CASE_EXPECT_FALSE(by_id_watcher.empty());
   CASE_EXPECT_FALSE(by_name_watcher.empty());
@@ -220,9 +220,9 @@ CASE_TEST(atapp_etcd_module, watcher_paths) {
 
   // Watcher paths should NOT contain the app name (they watch the whole prefix)
   // The keepalive paths should be longer (have the app-specific suffix)
-  CASE_EXPECT_LT(by_id_watcher.size(), etcd_mod->get_discovery_by_id_path().size());
-  CASE_EXPECT_LT(by_name_watcher.size(), etcd_mod->get_discovery_by_name_path().size());
-  CASE_EXPECT_LT(topology_watcher.size(), etcd_mod->get_topology_path().size());
+  CASE_EXPECT_LT(by_id_watcher.size(), discovery_module->get_discovery_by_id_path(app1, discovery_module->get_configure_path()).size());
+  CASE_EXPECT_LT(by_name_watcher.size(), discovery_module->get_discovery_by_name_path(app1, discovery_module->get_configure_path()).size());
+  CASE_EXPECT_LT(topology_watcher.size(), discovery_module->get_topology_path(app1, discovery_module->get_configure_path()).size());
 }
 
 // ============================================================
@@ -247,23 +247,23 @@ CASE_TEST(atapp_etcd_module, topology_registration) {
   const char *args[] = {"app1", "-c", conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args, nullptr));
 
-  auto etcd_mod = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod);
-  if (!etcd_mod) {
+  auto discovery_module = app1.get_service_discovery_module();
+  CASE_EXPECT_TRUE(!!discovery_module);
+  if (!discovery_module) {
     return;
   }
 
   // Tick to let watcher events come in
   std::vector<atframework::atapp::app *> apps = {&app1};
 
-  bool has_topology = run_apps_until(apps, [&etcd_mod, &app1]() {
-    const auto &topo_set = etcd_mod->get_topology_info_set();
+  bool has_topology = run_apps_until(apps, [&discovery_module, &app1]() {
+    const auto &topo_set = discovery_module->get_topology_info_set();
     return topo_set.find(app1.get_id()) != topo_set.end();
   });
 
   CASE_EXPECT_TRUE(has_topology);
   if (has_topology) {
-    const auto &topo_set = etcd_mod->get_topology_info_set();
+    const auto &topo_set = discovery_module->get_topology_info_set();
     auto it = topo_set.find(app1.get_id());
     CASE_EXPECT_TRUE(it != topo_set.end());
     if (it != topo_set.end()) {
@@ -299,17 +299,17 @@ CASE_TEST(atapp_etcd_module, discovery_snapshot) {
   const char *args[] = {"app1", "-c", conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args, nullptr));
 
-  auto etcd_mod = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod);
-  if (!etcd_mod) {
+  auto discovery_module = app1.get_service_discovery_module();
+  CASE_EXPECT_TRUE(!!discovery_module);
+  if (!discovery_module) {
     return;
   }
 
   std::vector<atframework::atapp::app *> apps = {&app1};
-  bool has_snapshot = run_apps_until(apps, [&etcd_mod]() { return etcd_mod->has_discovery_snapshot(); });
+  bool has_snapshot = run_apps_until(apps, [&discovery_module]() { return discovery_module->has_discovery_snapshot(); });
 
   CASE_EXPECT_TRUE(has_snapshot);
-  CASE_MSG_INFO() << "has_discovery_snapshot: " << (etcd_mod->has_discovery_snapshot() ? "true" : "false") << '\n';
+  CASE_MSG_INFO() << "has_discovery_snapshot: " << (discovery_module->has_discovery_snapshot() ? "true" : "false") << '\n';
 }
 
 // ============================================================
@@ -334,17 +334,17 @@ CASE_TEST(atapp_etcd_module, topology_snapshot) {
   const char *args[] = {"app1", "-c", conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args, nullptr));
 
-  auto etcd_mod = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod);
-  if (!etcd_mod) {
+  auto discovery_module = app1.get_service_discovery_module();
+  CASE_EXPECT_TRUE(!!discovery_module);
+  if (!discovery_module) {
     return;
   }
 
   std::vector<atframework::atapp::app *> apps = {&app1};
-  bool has_snapshot = run_apps_until(apps, [&etcd_mod]() { return etcd_mod->has_topology_snapshot(); });
+  bool has_snapshot = run_apps_until(apps, [&discovery_module]() { return discovery_module->has_topology_snapshot(); });
 
   CASE_EXPECT_TRUE(has_snapshot);
-  CASE_MSG_INFO() << "has_topology_snapshot: " << (etcd_mod->has_topology_snapshot() ? "true" : "false") << '\n';
+  CASE_MSG_INFO() << "has_topology_snapshot: " << (discovery_module->has_topology_snapshot() ? "true" : "false") << '\n';
 }
 
 // ============================================================
@@ -374,25 +374,25 @@ CASE_TEST(atapp_etcd_module, discovery_registration) {
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args1, nullptr));
   CASE_EXPECT_EQ(0, app2.init(nullptr, 4, args2, nullptr));
 
-  auto etcd_mod1 = app1.get_etcd_module();
-  auto etcd_mod2 = app2.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod1);
-  CASE_EXPECT_TRUE(!!etcd_mod2);
-  if (!etcd_mod1 || !etcd_mod2) {
+  auto discovery_module1 = app1.get_service_discovery_module();
+  auto discovery_module2 = app2.get_service_discovery_module();
+  CASE_EXPECT_TRUE(!!discovery_module1);
+  CASE_EXPECT_TRUE(!!discovery_module2);
+  if (!discovery_module1 || !discovery_module2) {
     return;
   }
 
   std::vector<atframework::atapp::app *> apps = {&app1, &app2};
 
   // Wait for node1 to discover node2 through etcd watcher events
-  bool node1_found_node2 = run_apps_until(apps, [&etcd_mod1, &app2]() {
-    auto node = etcd_mod1->get_global_discovery().get_node_by_id(app2.get_id());
+  bool node1_found_node2 = run_apps_until(apps, [&discovery_module1, &app2]() {
+    auto node = discovery_module1->get_global_discovery().get_node_by_id(app2.get_id());
     return !!node;
   });
 
   CASE_EXPECT_TRUE(node1_found_node2);
   if (node1_found_node2) {
-    auto node = etcd_mod1->get_global_discovery().get_node_by_id(app2.get_id());
+    auto node = discovery_module1->get_global_discovery().get_node_by_id(app2.get_id());
     CASE_EXPECT_TRUE(!!node);
     if (node) {
       CASE_EXPECT_EQ(app2.get_id(), node->get_discovery_info().id());
@@ -403,14 +403,14 @@ CASE_TEST(atapp_etcd_module, discovery_registration) {
   }
 
   // Also check node2 discovers node1
-  bool node2_found_node1 = run_apps_until(apps, [&etcd_mod2, &app1]() {
-    auto node = etcd_mod2->get_global_discovery().get_node_by_id(app1.get_id());
+  bool node2_found_node1 = run_apps_until(apps, [&discovery_module2, &app1]() {
+    auto node = discovery_module2->get_global_discovery().get_node_by_id(app1.get_id());
     return !!node;
   });
 
   CASE_EXPECT_TRUE(node2_found_node1);
   if (node2_found_node1) {
-    auto node = etcd_mod2->get_global_discovery().get_node_by_id(app1.get_id());
+    auto node = discovery_module2->get_global_discovery().get_node_by_id(app1.get_id());
     CASE_EXPECT_TRUE(!!node);
     if (node) {
       CASE_EXPECT_EQ(app1.get_id(), node->get_discovery_info().id());
@@ -420,7 +420,7 @@ CASE_TEST(atapp_etcd_module, discovery_registration) {
 
   // Also verify by_name lookup works
   {
-    auto node_by_name = etcd_mod1->get_global_discovery().get_node_by_name(app2.get_app_name());
+    auto node_by_name = discovery_module1->get_global_discovery().get_node_by_name(app2.get_app_name());
     CASE_EXPECT_TRUE(!!node_by_name);
     if (node_by_name) {
       CASE_EXPECT_EQ(app2.get_app_name(), node_by_name->get_discovery_info().name());
@@ -453,20 +453,20 @@ CASE_TEST(atapp_etcd_module, discovery_event_callback) {
   const char *args1[] = {"app1", "-c", conf_path_1.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args1, nullptr));
 
-  auto etcd_mod1 = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod1);
-  if (!etcd_mod1) {
+  auto discovery_module1 = app1.get_service_discovery_module();
+  CASE_EXPECT_TRUE(!!discovery_module1);
+  if (!discovery_module1) {
     return;
   }
 
   // Register discovery event callback on node1
   int discovery_callback_count = 0;
   atapp::etcd_discovery_node::ptr_t last_discovery_node;
-  atapp::etcd_module::node_action_t last_action = atapp::etcd_module::node_action_t::kUnknown;
+  atapp::service_discovery_module::node_action_t last_action = atapp::service_discovery_module::node_action_t::kUnknown;
 
-  auto handle = etcd_mod1->add_on_node_discovery_event(
-      [&discovery_callback_count, &last_discovery_node, &last_action](atapp::etcd_module::node_action_t action,
-                                                                      const atapp::etcd_discovery_node::ptr_t &node) {
+  auto handle = discovery_module1->add_on_node_discovery_event(
+      [&discovery_callback_count, &last_discovery_node, &last_action](
+          atapp::service_discovery_module::node_action_t action, const atapp::etcd_discovery_node::ptr_t &node) {
         ++discovery_callback_count;
         last_action = action;
         last_discovery_node = node;
@@ -474,12 +474,12 @@ CASE_TEST(atapp_etcd_module, discovery_event_callback) {
 
   // Wait for snapshot to complete first
   std::vector<atframework::atapp::app *> apps1 = {&app1};
-  run_apps_until(apps1, [&etcd_mod1]() { return etcd_mod1->has_discovery_snapshot(); });
+  run_apps_until(apps1, [&discovery_module1]() { return discovery_module1->has_discovery_snapshot(); });
 
   // Reset after snapshot to ignore self-registration events
   int baseline_discovery = discovery_callback_count;
   last_discovery_node.reset();
-  last_action = atapp::etcd_module::node_action_t::kUnknown;
+  last_action = atapp::service_discovery_module::node_action_t::kUnknown;
 
   // Now start node2
   atframework::atapp::app app2;
@@ -497,7 +497,7 @@ CASE_TEST(atapp_etcd_module, discovery_event_callback) {
   CASE_EXPECT_GT(discovery_callback_count, baseline_discovery);
   CASE_EXPECT_TRUE(!!last_discovery_node);
   // Verify action is kPut (new node registration), not kDelete
-  CASE_EXPECT_EQ(static_cast<int>(atapp::etcd_module::node_action_t::kPut), static_cast<int>(last_action));
+  CASE_EXPECT_EQ(static_cast<int>(atapp::service_discovery_module::node_action_t::kPut), static_cast<int>(last_action));
 
   if (last_discovery_node) {
     // Verify the discovered node's data matches app2
@@ -511,7 +511,7 @@ CASE_TEST(atapp_etcd_module, discovery_event_callback) {
   }
 
   // Cleanup
-  etcd_mod1->remove_on_node_event(handle);
+  discovery_module1->remove_on_node_event(handle);
 }
 
 // ============================================================
@@ -538,34 +538,34 @@ CASE_TEST(atapp_etcd_module, discovery_event_remove_callback) {
   const char *args1[] = {"app1", "-c", conf_path_1.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args1, nullptr));
 
-  auto etcd_mod1 = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod1);
-  if (!etcd_mod1) {
+  auto discovery_module1 = app1.get_service_discovery_module();
+  CASE_EXPECT_TRUE(!!discovery_module1);
+  if (!discovery_module1) {
     return;
   }
 
   // Register and immediately remove the callback
   int removed_callback_count = 0;
-  auto handle = etcd_mod1->add_on_node_discovery_event(
-      [&removed_callback_count](atapp::etcd_module::node_action_t, const atapp::etcd_discovery_node::ptr_t &) {
-        ++removed_callback_count;
-      });
+  auto handle = discovery_module1->add_on_node_discovery_event(
+      [&removed_callback_count](atapp::service_discovery_module::node_action_t,
+                                const atapp::etcd_discovery_node::ptr_t &) { ++removed_callback_count; });
 
-  etcd_mod1->remove_on_node_event(handle);
+  discovery_module1->remove_on_node_event(handle);
   int removed_baseline = removed_callback_count;
 
   // Register a second callback that should still fire (only count kPut to avoid kDelete noise)
   int active_callback_count = 0;
-  auto active_handle = etcd_mod1->add_on_node_discovery_event(
-      [&active_callback_count](atapp::etcd_module::node_action_t action, const atapp::etcd_discovery_node::ptr_t &) {
-        if (action == atapp::etcd_module::node_action_t::kPut) {
+  auto active_handle = discovery_module1->add_on_node_discovery_event(
+      [&active_callback_count](atapp::service_discovery_module::node_action_t action,
+                               const atapp::etcd_discovery_node::ptr_t &) {
+        if (action == atapp::service_discovery_module::node_action_t::kPut) {
           ++active_callback_count;
         }
       });
 
   // Wait for snapshot, then start node2
   std::vector<atframework::atapp::app *> apps1 = {&app1};
-  run_apps_until(apps1, [&etcd_mod1]() { return etcd_mod1->has_discovery_snapshot(); });
+  run_apps_until(apps1, [&discovery_module1]() { return discovery_module1->has_discovery_snapshot(); });
 
   atframework::atapp::app app2;
   const char *args2[] = {"app2", "-c", conf_path_2.c_str(), "start"};
@@ -583,7 +583,7 @@ CASE_TEST(atapp_etcd_module, discovery_event_remove_callback) {
                   << ", active_callback_count: " << active_callback_count << '\n';
 
   // Cleanup
-  etcd_mod1->remove_on_node_event(active_handle);
+  discovery_module1->remove_on_node_event(active_handle);
 }
 
 // ============================================================
@@ -610,9 +610,9 @@ CASE_TEST(atapp_etcd_module, discovery_event_multi_callbacks) {
   const char *args1[] = {"app1", "-c", conf_path_1.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args1, nullptr));
 
-  auto etcd_mod1 = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod1);
-  if (!etcd_mod1) {
+  auto discovery_module1 = app1.get_service_discovery_module();
+  CASE_EXPECT_TRUE(!!discovery_module1);
+  if (!discovery_module1) {
     return;
   }
 
@@ -623,34 +623,36 @@ CASE_TEST(atapp_etcd_module, discovery_event_multi_callbacks) {
   int cb3_count = 0;
   atapp::etcd_discovery_node::ptr_t last_cb1_node;
 
-  auto h1 = etcd_mod1->add_on_node_discovery_event(
-      [&cb1_count, &call_order, &last_cb1_node](atapp::etcd_module::node_action_t action,
+  auto h1 = discovery_module1->add_on_node_discovery_event(
+      [&cb1_count, &call_order, &last_cb1_node](atapp::service_discovery_module::node_action_t action,
                                                 const atapp::etcd_discovery_node::ptr_t &node) {
-        if (action == atapp::etcd_module::node_action_t::kPut) {
+        if (action == atapp::service_discovery_module::node_action_t::kPut) {
           ++cb1_count;
           call_order.push_back(1);
           last_cb1_node = node;
         }
       });
 
-  auto h2 = etcd_mod1->add_on_node_discovery_event(
-      [&cb2_count, &call_order](atapp::etcd_module::node_action_t action, const atapp::etcd_discovery_node::ptr_t &) {
-        if (action == atapp::etcd_module::node_action_t::kPut) {
+  auto h2 = discovery_module1->add_on_node_discovery_event(
+      [&cb2_count, &call_order](atapp::service_discovery_module::node_action_t action,
+                                const atapp::etcd_discovery_node::ptr_t &) {
+        if (action == atapp::service_discovery_module::node_action_t::kPut) {
           ++cb2_count;
           call_order.push_back(2);
         }
       });
 
-  auto h3 = etcd_mod1->add_on_node_discovery_event(
-      [&cb3_count, &call_order](atapp::etcd_module::node_action_t action, const atapp::etcd_discovery_node::ptr_t &) {
-        if (action == atapp::etcd_module::node_action_t::kPut) {
+  auto h3 = discovery_module1->add_on_node_discovery_event(
+      [&cb3_count, &call_order](atapp::service_discovery_module::node_action_t action,
+                                const atapp::etcd_discovery_node::ptr_t &) {
+        if (action == atapp::service_discovery_module::node_action_t::kPut) {
           ++cb3_count;
           call_order.push_back(3);
         }
       });
 
   std::vector<atframework::atapp::app *> apps1 = {&app1};
-  run_apps_until(apps1, [&etcd_mod1]() { return etcd_mod1->has_discovery_snapshot(); });
+  run_apps_until(apps1, [&discovery_module1]() { return discovery_module1->has_discovery_snapshot(); });
 
   atframework::atapp::app app2;
   const char *args2[] = {"app2", "-c", conf_path_2.c_str(), "start"};
@@ -683,9 +685,9 @@ CASE_TEST(atapp_etcd_module, discovery_event_multi_callbacks) {
   }
 
   // Cleanup
-  etcd_mod1->remove_on_node_event(h1);
-  etcd_mod1->remove_on_node_event(h2);
-  etcd_mod1->remove_on_node_event(h3);
+  discovery_module1->remove_on_node_event(h1);
+  discovery_module1->remove_on_node_event(h2);
+  discovery_module1->remove_on_node_event(h3);
 }
 
 // ============================================================
@@ -712,31 +714,33 @@ CASE_TEST(atapp_etcd_module, topology_event_callback) {
   const char *args1[] = {"app1", "-c", conf_path_1.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args1, nullptr));
 
-  auto etcd_mod1 = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod1);
-  if (!etcd_mod1) {
+  auto discovery_module1 = app1.get_service_discovery_module();
+  CASE_EXPECT_TRUE(!!discovery_module1);
+  if (!discovery_module1) {
     return;
   }
 
   // Register topology event callback
   int topology_callback_count = 0;
-  atapp::etcd_module::atapp_topology_info_ptr_t last_topology_info;
-  atapp::etcd_module::topology_action_t last_topology_action = atapp::etcd_watch_event::kDelete;
+  atapp::service_discovery_module::atapp_topology_info_ptr_t last_topology_info;
+  atapp::service_discovery_module::topology_action_t last_topology_action = atapp::etcd_watch_event::kDelete;
   atapp::etcd_data_version last_version{};
+  std::list<uint64_t> topology_id_history;
 
-  auto handle = etcd_mod1->add_on_topology_info_event(
-      [&topology_callback_count, &last_topology_info, &last_topology_action, &last_version](
-          atapp::etcd_module::topology_action_t action, const atapp::etcd_module::atapp_topology_info_ptr_t &info,
-          const atapp::etcd_data_version &ver) {
+  auto handle = discovery_module1->add_on_topology_info_event(
+      [&topology_callback_count, &last_topology_info, &last_topology_action, &last_version, &topology_id_history](
+          atapp::service_discovery_module::topology_action_t action,
+          const atapp::service_discovery_module::atapp_topology_info_ptr_t &info, const atapp::etcd_data_version &ver) {
         ++topology_callback_count;
         last_topology_action = action;
         last_topology_info = info;
         last_version = ver;
+        topology_id_history.push_back(info ? info->id() : 0);
       });
 
   // Wait for snapshot to load
   std::vector<atframework::atapp::app *> apps1 = {&app1};
-  run_apps_until(apps1, [&etcd_mod1]() { return etcd_mod1->has_topology_snapshot(); });
+  run_apps_until(apps1, [&discovery_module1]() { return discovery_module1->has_topology_snapshot(); });
 
   // Record baseline count (self-registration may fire)
   int baseline_count = topology_callback_count;
@@ -765,10 +769,13 @@ CASE_TEST(atapp_etcd_module, topology_event_callback) {
                     << " id=" << last_topology_info->id() << " name=" << last_topology_info->name()
                     << " version.create_revision=" << last_version.create_revision
                     << " version.modify_revision=" << last_version.modify_revision << '\n';
+    for (const auto &id : topology_id_history) {
+      CASE_MSG_INFO() << "topology id in callback history: " << id << '\n';
+    }
   }
 
   // Cleanup
-  etcd_mod1->remove_on_topology_info_event(handle);
+  discovery_module1->remove_on_topology_info_event(handle);
 }
 
 // ============================================================
@@ -795,27 +802,27 @@ CASE_TEST(atapp_etcd_module, topology_event_remove_callback) {
   const char *args1[] = {"app1", "-c", conf_path_1.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args1, nullptr));
 
-  auto etcd_mod1 = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod1);
-  if (!etcd_mod1) {
+  auto discovery_module1 = app1.get_service_discovery_module();
+  CASE_EXPECT_TRUE(!!discovery_module1);
+  if (!discovery_module1) {
     return;
   }
 
   // Register and remove topology callback
   int removed_callback_count = 0;
-  auto removed_handle = etcd_mod1->add_on_topology_info_event(
-      [&removed_callback_count](atapp::etcd_module::topology_action_t,
-                                const atapp::etcd_module::atapp_topology_info_ptr_t &,
+  auto removed_handle = discovery_module1->add_on_topology_info_event(
+      [&removed_callback_count](atapp::service_discovery_module::topology_action_t,
+                                const atapp::service_discovery_module::atapp_topology_info_ptr_t &,
                                 const atapp::etcd_data_version &) { ++removed_callback_count; });
 
-  etcd_mod1->remove_on_topology_info_event(removed_handle);
+  discovery_module1->remove_on_topology_info_event(removed_handle);
   int removed_baseline = removed_callback_count;
 
   // Register active callback (only count kPut to avoid kDelete noise)
   int active_callback_count = 0;
-  auto active_handle = etcd_mod1->add_on_topology_info_event(
-      [&active_callback_count](atapp::etcd_module::topology_action_t action,
-                               const atapp::etcd_module::atapp_topology_info_ptr_t &,
+  auto active_handle = discovery_module1->add_on_topology_info_event(
+      [&active_callback_count](atapp::service_discovery_module::topology_action_t action,
+                               const atapp::service_discovery_module::atapp_topology_info_ptr_t &,
                                const atapp::etcd_data_version &) {
         if (action == atapp::etcd_watch_event::kPut) {
           ++active_callback_count;
@@ -824,7 +831,7 @@ CASE_TEST(atapp_etcd_module, topology_event_remove_callback) {
 
   // Wait for snapshot
   std::vector<atframework::atapp::app *> apps1 = {&app1};
-  run_apps_until(apps1, [&etcd_mod1]() { return etcd_mod1->has_topology_snapshot(); });
+  run_apps_until(apps1, [&discovery_module1]() { return discovery_module1->has_topology_snapshot(); });
 
   int baseline_active = active_callback_count;
 
@@ -845,7 +852,7 @@ CASE_TEST(atapp_etcd_module, topology_event_remove_callback) {
                   << ", active_topology_callback_count: " << active_callback_count << '\n';
 
   // Cleanup
-  etcd_mod1->remove_on_topology_info_event(active_handle);
+  discovery_module1->remove_on_topology_info_event(active_handle);
 }
 
 // ============================================================
@@ -872,22 +879,22 @@ CASE_TEST(atapp_etcd_module, topology_event_multi_callbacks) {
   const char *args1[] = {"app1", "-c", conf_path_1.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args1, nullptr));
 
-  auto etcd_mod1 = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod1);
-  if (!etcd_mod1) {
+  auto discovery_module1 = app1.get_service_discovery_module();
+  CASE_EXPECT_TRUE(!!discovery_module1);
+  if (!discovery_module1) {
     return;
   }
 
   // Register multiple topology callbacks (only count kPut events)
   int cb1_count = 0;
   int cb2_count = 0;
-  atapp::etcd_module::atapp_topology_info_ptr_t last_cb1_info;
+  atapp::service_discovery_module::atapp_topology_info_ptr_t last_cb1_info;
   atapp::etcd_data_version last_cb1_version{};
 
-  auto h1 = etcd_mod1->add_on_topology_info_event(
-      [&cb1_count, &last_cb1_info, &last_cb1_version](atapp::etcd_module::topology_action_t action,
-                                                      const atapp::etcd_module::atapp_topology_info_ptr_t &info,
-                                                      const atapp::etcd_data_version &ver) {
+  auto h1 = discovery_module1->add_on_topology_info_event(
+      [&cb1_count, &last_cb1_info, &last_cb1_version](
+          atapp::service_discovery_module::topology_action_t action,
+          const atapp::service_discovery_module::atapp_topology_info_ptr_t &info, const atapp::etcd_data_version &ver) {
         if (action == atapp::etcd_watch_event::kPut) {
           ++cb1_count;
           last_cb1_info = info;
@@ -895,17 +902,18 @@ CASE_TEST(atapp_etcd_module, topology_event_multi_callbacks) {
         }
       });
 
-  auto h2 = etcd_mod1->add_on_topology_info_event([&cb2_count](atapp::etcd_module::topology_action_t action,
-                                                               const atapp::etcd_module::atapp_topology_info_ptr_t &,
-                                                               const atapp::etcd_data_version &) {
-    if (action == atapp::etcd_watch_event::kPut) {
-      ++cb2_count;
-    }
-  });
+  auto h2 = discovery_module1->add_on_topology_info_event(
+      [&cb2_count](atapp::service_discovery_module::topology_action_t action,
+                   const atapp::service_discovery_module::atapp_topology_info_ptr_t &,
+                   const atapp::etcd_data_version &) {
+        if (action == atapp::etcd_watch_event::kPut) {
+          ++cb2_count;
+        }
+      });
 
   // Wait for snapshot
   std::vector<atframework::atapp::app *> apps1 = {&app1};
-  run_apps_until(apps1, [&etcd_mod1]() { return etcd_mod1->has_topology_snapshot(); });
+  run_apps_until(apps1, [&discovery_module1]() { return discovery_module1->has_topology_snapshot(); });
 
   int baseline1 = cb1_count;
   int baseline2 = cb2_count;
@@ -937,8 +945,8 @@ CASE_TEST(atapp_etcd_module, topology_event_multi_callbacks) {
                   << '\n';
 
   // Cleanup
-  etcd_mod1->remove_on_topology_info_event(h1);
-  etcd_mod1->remove_on_topology_info_event(h2);
+  discovery_module1->remove_on_topology_info_event(h1);
+  discovery_module1->remove_on_topology_info_event(h2);
 }
 
 // ============================================================
@@ -968,25 +976,25 @@ CASE_TEST(atapp_etcd_module, multi_node_topology_update) {
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args1, nullptr));
   CASE_EXPECT_EQ(0, app2.init(nullptr, 4, args2, nullptr));
 
-  auto etcd_mod1 = app1.get_etcd_module();
-  auto etcd_mod2 = app2.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod1);
-  CASE_EXPECT_TRUE(!!etcd_mod2);
-  if (!etcd_mod1 || !etcd_mod2) {
+  auto discovery_module1 = app1.get_service_discovery_module();
+  auto discovery_module2 = app2.get_service_discovery_module();
+  CASE_EXPECT_TRUE(!!discovery_module1);
+  CASE_EXPECT_TRUE(!!discovery_module2);
+  if (!discovery_module1 || !discovery_module2) {
     return;
   }
 
   std::vector<atframework::atapp::app *> apps = {&app1, &app2};
 
   // Wait for node1 to see node2's topology
-  bool node1_has_node2_topo = run_apps_until(apps, [&etcd_mod1, &app2]() {
-    const auto &topo = etcd_mod1->get_topology_info_set();
+  bool node1_has_node2_topo = run_apps_until(apps, [&discovery_module1, &app2]() {
+    const auto &topo = discovery_module1->get_topology_info_set();
     return topo.find(app2.get_id()) != topo.end();
   });
 
   CASE_EXPECT_TRUE(node1_has_node2_topo);
   if (node1_has_node2_topo) {
-    const auto &topo = etcd_mod1->get_topology_info_set();
+    const auto &topo = discovery_module1->get_topology_info_set();
     auto it = topo.find(app2.get_id());
     CASE_EXPECT_TRUE(it != topo.end());
     if (it != topo.end() && it->second.info) {
@@ -996,14 +1004,14 @@ CASE_TEST(atapp_etcd_module, multi_node_topology_update) {
   }
 
   // Check node2 sees node1's topology
-  bool node2_has_node1_topo = run_apps_until(apps, [&etcd_mod2, &app1]() {
-    const auto &topo = etcd_mod2->get_topology_info_set();
+  bool node2_has_node1_topo = run_apps_until(apps, [&discovery_module2, &app1]() {
+    const auto &topo = discovery_module2->get_topology_info_set();
     return topo.find(app1.get_id()) != topo.end();
   });
 
   CASE_EXPECT_TRUE(node2_has_node1_topo);
   if (node2_has_node1_topo) {
-    const auto &topo = etcd_mod2->get_topology_info_set();
+    const auto &topo = discovery_module2->get_topology_info_set();
     auto it = topo.find(app1.get_id());
     CASE_EXPECT_TRUE(it != topo.end());
     if (it != topo.end() && it->second.info) {
@@ -1037,33 +1045,31 @@ CASE_TEST(atapp_etcd_module, discovery_event_delete) {
   const char *args1[] = {"app1", "-c", conf_path_1.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args1, nullptr));
 
-  auto etcd_mod1 = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod1);
-  if (!etcd_mod1) {
+  auto discovery_module1 = app1.get_service_discovery_module();
+  CASE_EXPECT_TRUE(!!discovery_module1);
+  if (!discovery_module1) {
     return;
   }
 
   // Track discovery events
   int put_count = 0;
   int delete_count = 0;
-  atapp::etcd_module::node_action_t last_action = atapp::etcd_module::node_action_t::kUnknown;
+  atapp::service_discovery_module::node_action_t last_action = atapp::service_discovery_module::node_action_t::kUnknown;
   atapp::etcd_discovery_node::ptr_t last_delete_node;
   // Track app2-specific put event to avoid self-registration/refresh noise
-  uint64_t app2_id = 0;
   std::string app2_name;
-  bool got_app2_put = false;
-  atapp::etcd_discovery_node::ptr_t app2_put_node;
+  uint64_t app2_id = 0;
+  std::map<uint64_t, atapp::etcd_discovery_node::ptr_t> id_node_map;
 
-  auto handle = etcd_mod1->add_on_node_discovery_event(
-      [&](atapp::etcd_module::node_action_t action, const atapp::etcd_discovery_node::ptr_t &node) {
+  auto handle = discovery_module1->add_on_node_discovery_event(
+      [&](atapp::service_discovery_module::node_action_t action, const atapp::etcd_discovery_node::ptr_t &node) {
         last_action = action;
-        if (action == atapp::etcd_module::node_action_t::kPut) {
+        if (action == atapp::service_discovery_module::node_action_t::kPut) {
           ++put_count;
-          if (node && app2_id != 0 && node->get_discovery_info().id() == app2_id) {
-            got_app2_put = true;
-            app2_put_node = node;
+          if (node) {
+            id_node_map[node->get_discovery_info().id()] = node;
           }
-        } else if (action == atapp::etcd_module::node_action_t::kDelete) {
+        } else if (action == atapp::service_discovery_module::node_action_t::kDelete) {
           ++delete_count;
           last_delete_node = node;
         }
@@ -1071,7 +1077,7 @@ CASE_TEST(atapp_etcd_module, discovery_event_delete) {
 
   // Wait for snapshot on node1
   std::vector<atframework::atapp::app *> apps1 = {&app1};
-  run_apps_until(apps1, [&etcd_mod1]() { return etcd_mod1->has_discovery_snapshot(); });
+  run_apps_until(apps1, [&discovery_module1]() { return discovery_module1->has_discovery_snapshot(); });
 
   // Start node2 and wait for kPut event for app2 specifically
   {
@@ -1081,26 +1087,26 @@ CASE_TEST(atapp_etcd_module, discovery_event_delete) {
     app2_id = app2.get_id();
     app2_name = app2.get_app_name();
 
-    auto etcd_mod2 = app2.get_etcd_module();
-    CASE_EXPECT_TRUE(!!etcd_mod2);
-    if (!etcd_mod2) {
-      etcd_mod1->remove_on_node_event(handle);
+    auto discovery_module2 = app2.get_service_discovery_module();
+    CASE_EXPECT_TRUE(!!discovery_module2);
+    if (!discovery_module2) {
+      discovery_module1->remove_on_node_event(handle);
       return;
     }
 
     std::vector<atframework::atapp::app *> apps = {&app1, &app2};
-    bool got_put = run_apps_until(apps, [&got_app2_put]() { return got_app2_put; });
+    bool got_put = run_apps_until(apps, [&id_node_map, app2_id]() { return id_node_map.count(app2_id) > 0; });
     CASE_EXPECT_TRUE(got_put);
     // Verify the put event contains node2's data
-    CASE_EXPECT_TRUE(!!app2_put_node);
-    if (app2_put_node) {
-      CASE_EXPECT_EQ(app2_id, app2_put_node->get_discovery_info().id());
-      CASE_EXPECT_EQ(app2_name, app2_put_node->get_discovery_info().name());
+    CASE_EXPECT_TRUE(!!(id_node_map.count(app2_id) > 0));
+    if (id_node_map.count(app2_id) > 0) {
+      CASE_EXPECT_EQ(app2_id, id_node_map[app2_id]->get_discovery_info().id());
+      CASE_EXPECT_EQ(app2_name, id_node_map[app2_id]->get_discovery_info().name());
     }
     CASE_MSG_INFO() << "discovery_event_delete: got kPut, put_count=" << put_count << '\n';
 
     // Now stop node2's etcd module to revoke its lease, triggering kDelete
-    etcd_mod2->stop();
+    discovery_module2->stop();
 
     // Tick both apps to process the close/revoke HTTP request
     run_apps_noblock(apps, 30);
@@ -1113,7 +1119,8 @@ CASE_TEST(atapp_etcd_module, discovery_event_delete) {
   CASE_EXPECT_TRUE(got_delete);
   CASE_EXPECT_GT(delete_count, 0);
   // Verify the last action was indeed kDelete, not kPut
-  CASE_EXPECT_EQ(static_cast<int>(atapp::etcd_module::node_action_t::kDelete), static_cast<int>(last_action));
+  CASE_EXPECT_EQ(static_cast<int>(atapp::service_discovery_module::node_action_t::kDelete),
+                 static_cast<int>(last_action));
   // Verify the deleted node's identity matches app2
   CASE_EXPECT_TRUE(!!last_delete_node);
   if (last_delete_node) {
@@ -1123,7 +1130,7 @@ CASE_TEST(atapp_etcd_module, discovery_event_delete) {
                   << " last_action=" << static_cast<int>(last_action) << '\n';
 
   // Cleanup
-  etcd_mod1->remove_on_node_event(handle);
+  discovery_module1->remove_on_node_event(handle);
 }
 
 // ============================================================
@@ -1150,42 +1157,40 @@ CASE_TEST(atapp_etcd_module, topology_event_delete) {
   const char *args1[] = {"app1", "-c", conf_path_1.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args1, nullptr));
 
-  auto etcd_mod1 = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod1);
-  if (!etcd_mod1) {
+  auto discovery_module1 = app1.get_service_discovery_module();
+  CASE_EXPECT_TRUE(!!discovery_module1);
+  if (!discovery_module1) {
     return;
   }
 
   // Track topology events
   int put_count = 0;
   int delete_count = 0;
-  atapp::etcd_module::topology_action_t last_topo_action = atapp::etcd_watch_event::kPut;
-  atapp::etcd_module::atapp_topology_info_ptr_t last_delete_info;
+  atapp::service_discovery_module::topology_action_t last_topo_action = atapp::etcd_watch_event::kPut;
+  atapp::service_discovery_module::atapp_topology_info_ptr_t last_delete_info;
   // Track app2-specific put event to avoid self-registration/refresh noise
-  uint64_t app2_id = 0;
   std::string app2_name;
-  bool got_app2_topo_put = false;
-  atapp::etcd_module::atapp_topology_info_ptr_t app2_put_info;
+  uint64_t app2_id = 0;
+  std::map<uint64_t, atapp::service_discovery_module::atapp_topology_info_ptr_t> topo_info_set;
 
-  auto handle = etcd_mod1->add_on_topology_info_event([&](atapp::etcd_module::topology_action_t action,
-                                                          const atapp::etcd_module::atapp_topology_info_ptr_t &info,
-                                                          const atapp::etcd_data_version &) {
-    last_topo_action = action;
-    if (action == atapp::etcd_watch_event::kPut) {
-      ++put_count;
-      if (info && app2_id != 0 && info->id() == app2_id) {
-        got_app2_topo_put = true;
-        app2_put_info = info;
-      }
-    } else if (action == atapp::etcd_watch_event::kDelete) {
-      ++delete_count;
-      last_delete_info = info;
-    }
-  });
+  auto handle = discovery_module1->add_on_topology_info_event(
+      [&](atapp::service_discovery_module::topology_action_t action,
+          const atapp::service_discovery_module::atapp_topology_info_ptr_t &info, const atapp::etcd_data_version &) {
+        last_topo_action = action;
+        if (action == atapp::etcd_watch_event::kPut) {
+          ++put_count;
+          if (info) {
+            topo_info_set[info->id()] = info;
+          }
+        } else if (action == atapp::etcd_watch_event::kDelete) {
+          ++delete_count;
+          last_delete_info = info;
+        }
+      });
 
   // Wait for snapshot on node1
   std::vector<atframework::atapp::app *> apps1 = {&app1};
-  run_apps_until(apps1, [&etcd_mod1]() { return etcd_mod1->has_topology_snapshot(); });
+  run_apps_until(apps1, [&discovery_module1]() { return discovery_module1->has_topology_snapshot(); });
 
   // Start node2 and wait for kPut event for app2 specifically
   {
@@ -1195,26 +1200,26 @@ CASE_TEST(atapp_etcd_module, topology_event_delete) {
     app2_id = app2.get_id();
     app2_name = app2.get_app_name();
 
-    auto etcd_mod2 = app2.get_etcd_module();
-    CASE_EXPECT_TRUE(!!etcd_mod2);
-    if (!etcd_mod2) {
-      etcd_mod1->remove_on_topology_info_event(handle);
+    auto discovery_module2 = app2.get_service_discovery_module();
+    CASE_EXPECT_TRUE(!!discovery_module2);
+    if (!discovery_module2) {
+      discovery_module1->remove_on_topology_info_event(handle);
       return;
     }
 
     std::vector<atframework::atapp::app *> apps = {&app1, &app2};
-    bool got_put = run_apps_until(apps, [&got_app2_topo_put]() { return got_app2_topo_put; });
+    bool got_put = run_apps_until(apps, [&topo_info_set, &app2_id]() { return topo_info_set.count(app2_id) > 0; });
     CASE_EXPECT_TRUE(got_put);
     // Verify the put event contains node2's data
-    CASE_EXPECT_TRUE(!!app2_put_info);
-    if (app2_put_info) {
-      CASE_EXPECT_EQ(app2_id, app2_put_info->id());
-      CASE_EXPECT_EQ(app2_name, app2_put_info->name());
+    CASE_EXPECT_TRUE(!!(topo_info_set.count(app2_id) > 0));
+    if (topo_info_set.count(app2_id) > 0) {
+      CASE_EXPECT_EQ(app2_id, topo_info_set[app2_id]->id());
+      CASE_EXPECT_EQ(app2_name, topo_info_set[app2_id]->name());
     }
     CASE_MSG_INFO() << "topology_event_delete: got kPut, put_count=" << put_count << '\n';
 
     // Stop node2's etcd module to revoke its lease
-    etcd_mod2->stop();
+    discovery_module2->stop();
     run_apps_noblock(apps, 30);
   }
 
@@ -1234,7 +1239,7 @@ CASE_TEST(atapp_etcd_module, topology_event_delete) {
                   << " last_action=" << static_cast<int>(last_topo_action) << '\n';
 
   // Cleanup
-  etcd_mod1->remove_on_topology_info_event(handle);
+  discovery_module1->remove_on_topology_info_event(handle);
 }
 
 // ============================================================
@@ -1259,36 +1264,36 @@ CASE_TEST(atapp_etcd_module, stop_revoke_lease) {
   const char *args[] = {"app", "-c", conf_path.c_str(), "start"};
   CASE_EXPECT_EQ(0, app.init(nullptr, 4, args, nullptr));
 
-  auto etcd_mod = app.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod);
-  if (!etcd_mod) {
+  auto discovery_mod = app.get_service_discovery_module();
+  CASE_EXPECT_TRUE(!!discovery_mod);
+  if (!discovery_mod) {
     return;
   }
 
   // Wait for module to be ready and get a lease
   std::vector<atframework::atapp::app *> apps = {&app};
-  bool ready = run_apps_until(apps, [&etcd_mod]() { return etcd_mod->get_raw_etcd_ctx().is_available(); });
+  bool ready = run_apps_until(apps, [&discovery_mod]() { return discovery_mod->get_raw_etcd_ctx().is_available(); });
   CASE_EXPECT_TRUE(ready);
 
-  int64_t lease_before = etcd_mod->get_raw_etcd_ctx().get_lease();
+  int64_t lease_before = discovery_mod->get_raw_etcd_ctx().get_lease();
   CASE_EXPECT_NE(0, lease_before);
   CASE_MSG_INFO() << "stop_revoke_lease: lease before stop = " << lease_before << '\n';
 
   // Stop the etcd module - this should revoke the lease
-  etcd_mod->stop();
+  discovery_mod->stop();
 
   // Tick to process the close/revoke request
   bool stopped = run_apps_until(
       apps,
-      [&etcd_mod]() {
+      [&discovery_mod]() {
         // After stop completes, the context should no longer be available
-        return !etcd_mod->get_raw_etcd_ctx().is_available();
+        return !discovery_mod->get_raw_etcd_ctx().is_available();
       },
       std::chrono::seconds(10));
 
   CASE_EXPECT_TRUE(stopped);
   CASE_MSG_INFO() << "stop_revoke_lease: etcd ctx available after stop = "
-                  << (etcd_mod->get_raw_etcd_ctx().is_available() ? "true" : "false") << '\n';
+                  << (discovery_mod->get_raw_etcd_ctx().is_available() ? "true" : "false") << '\n';
 }
 
 // ============================================================
@@ -1315,53 +1320,52 @@ CASE_TEST(atapp_etcd_module, multi_node_discovery_put_event) {
   const char *args1[] = {"app1", "-c", conf_path_1.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args1, nullptr));
 
-  auto etcd_mod1 = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod1);
-  if (!etcd_mod1) {
+  auto discovery_module1 = app1.get_service_discovery_module();
+  CASE_EXPECT_TRUE(!!discovery_module1);
+  if (!discovery_module1) {
     return;
   }
 
   // Wait for snapshot
   std::vector<atframework::atapp::app *> apps1 = {&app1};
-  run_apps_until(apps1, [&etcd_mod1]() { return etcd_mod1->has_discovery_snapshot(); });
+  run_apps_until(apps1, [&discovery_module1]() { return discovery_module1->has_discovery_snapshot(); });
+
+  // Register callback to track kPut events specifically for node2's ID
+  uint64_t target_id = 0;
+  std::set<uint64_t> got_put_id;
+  int put_event_count = 0;
+  auto handle = discovery_module1->add_on_node_discovery_event(
+      [&got_put_id, &put_event_count](atapp::service_discovery_module::node_action_t action,
+                                      const atapp::etcd_discovery_node::ptr_t &node) {
+        if (action == atapp::service_discovery_module::node_action_t::kPut && node) {
+          ++put_event_count;
+          got_put_id.insert(node->get_discovery_info().id());
+        }
+      });
 
   // Start node2
   atframework::atapp::app app2;
   const char *args2[] = {"app2", "-c", conf_path_2.c_str(), "start"};
   CASE_EXPECT_EQ(0, app2.init(nullptr, 4, args2, nullptr));
-
-  // Register callback to track kPut events specifically for node2's ID
-  uint64_t target_id = app2.get_id();
-  bool got_node2_put = false;
-  int put_event_count = 0;
-  auto handle = etcd_mod1->add_on_node_discovery_event(
-      [&got_node2_put, &put_event_count, target_id](atapp::etcd_module::node_action_t action,
-                                                    const atapp::etcd_discovery_node::ptr_t &node) {
-        if (action == atapp::etcd_module::node_action_t::kPut && node) {
-          ++put_event_count;
-          if (node->get_discovery_info().id() == target_id) {
-            got_node2_put = true;
-          }
-        }
-      });
+  target_id = app2.get_id();
 
   std::vector<atframework::atapp::app *> apps = {&app1, &app2};
 
   // Wait for node1 to receive node2's discovery kPut event
-  bool success = run_apps_until(apps, [&got_node2_put]() { return got_node2_put; });
+  bool success = run_apps_until(apps, [&got_put_id, target_id]() { return got_put_id.count(target_id) > 0; });
   CASE_EXPECT_TRUE(success);
-  CASE_EXPECT_TRUE(got_node2_put);
+  CASE_EXPECT_TRUE(got_put_id.count(target_id) > 0);
   CASE_EXPECT_GT(put_event_count, 0);
 
   // Also verify global_discovery contains node2
-  auto node = etcd_mod1->get_global_discovery().get_node_by_id(app2.get_id());
+  auto node = discovery_module1->get_global_discovery().get_node_by_id(app2.get_id());
   CASE_EXPECT_TRUE(!!node);
 
   CASE_MSG_INFO() << "multi_node_discovery_put_event: put_count=" << put_event_count
-                  << " got_node2=" << (got_node2_put ? "true" : "false") << '\n';
+                  << " got_put_id=" << (got_put_id.count(target_id) > 0 ? "true" : "false") << '\n';
 
   // Cleanup
-  etcd_mod1->remove_on_node_event(handle);
+  discovery_module1->remove_on_node_event(handle);
 }
 
 // ============================================================
@@ -1388,9 +1392,9 @@ CASE_TEST(atapp_etcd_module, multi_node_discovery_delete_event) {
   const char *args1[] = {"app1", "-c", conf_path_1.c_str(), "start"};
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args1, nullptr));
 
-  auto etcd_mod1 = app1.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod1);
-  if (!etcd_mod1) {
+  auto discovery_module1 = app1.get_service_discovery_module();
+  CASE_EXPECT_TRUE(!!discovery_module1);
+  if (!discovery_module1) {
     return;
   }
 
@@ -1399,10 +1403,10 @@ CASE_TEST(atapp_etcd_module, multi_node_discovery_delete_event) {
   // Register callback to verify we receive a kDelete action (not just node disappearing)
   int delete_event_count = 0;
   uint64_t delete_event_node_id = 0;
-  auto handle = etcd_mod1->add_on_node_discovery_event(
-      [&delete_event_count, &delete_event_node_id](atapp::etcd_module::node_action_t action,
+  auto handle = discovery_module1->add_on_node_discovery_event(
+      [&delete_event_count, &delete_event_node_id](atapp::service_discovery_module::node_action_t action,
                                                    const atapp::etcd_discovery_node::ptr_t &node) {
-        if (action == atapp::etcd_module::node_action_t::kDelete && node) {
+        if (action == atapp::service_discovery_module::node_action_t::kDelete && node) {
           ++delete_event_count;
           delete_event_node_id = node->get_discovery_info().id();
         }
@@ -1415,10 +1419,10 @@ CASE_TEST(atapp_etcd_module, multi_node_discovery_delete_event) {
     CASE_EXPECT_EQ(0, app2.init(nullptr, 4, args2, nullptr));
     app2_id = app2.get_id();
 
-    auto etcd_mod2 = app2.get_etcd_module();
-    CASE_EXPECT_TRUE(!!etcd_mod2);
-    if (!etcd_mod2) {
-      etcd_mod1->remove_on_node_event(handle);
+    auto discovery_module2 = app2.get_service_discovery_module();
+    CASE_EXPECT_TRUE(!!discovery_module2);
+    if (!discovery_module2) {
+      discovery_module1->remove_on_node_event(handle);
       return;
     }
 
@@ -1426,19 +1430,19 @@ CASE_TEST(atapp_etcd_module, multi_node_discovery_delete_event) {
 
     // Wait for node1 to discover node2
     bool found = run_apps_until(
-        apps, [&etcd_mod1, app2_id]() { return !!etcd_mod1->get_global_discovery().get_node_by_id(app2_id); });
+        apps, [&discovery_module1, app2_id]() { return !!discovery_module1->get_global_discovery().get_node_by_id(app2_id); });
     CASE_EXPECT_TRUE(found);
     CASE_MSG_INFO() << "multi_node_discovery_delete: node1 found node2, id=" << app2_id << '\n';
 
     // Stop node2's etcd module to revoke lease
-    etcd_mod2->stop();
+    discovery_module2->stop();
     run_apps_noblock(apps, 30);
   }
 
   // Continue ticking app1 - node2 should disappear from global_discovery
   std::vector<atframework::atapp::app *> apps1 = {&app1};
   bool node2_gone = run_apps_until(
-      apps1, [&etcd_mod1, app2_id]() { return !etcd_mod1->get_global_discovery().get_node_by_id(app2_id); },
+      apps1, [&discovery_module1, app2_id]() { return !discovery_module1->get_global_discovery().get_node_by_id(app2_id); },
       std::chrono::seconds(20));
 
   CASE_EXPECT_TRUE(node2_gone);
@@ -1451,7 +1455,7 @@ CASE_TEST(atapp_etcd_module, multi_node_discovery_delete_event) {
                   << " delete_node_id=" << delete_event_node_id << '\n';
 
   // Cleanup
-  etcd_mod1->remove_on_node_event(handle);
+  discovery_module1->remove_on_node_event(handle);
 }
 
 // ============================================================
@@ -1484,51 +1488,34 @@ CASE_TEST(atapp_etcd_module, multi_node_custom_data) {
   CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args1, nullptr));
   CASE_EXPECT_EQ(0, app2.init(nullptr, 4, args2, nullptr));
 
-  auto etcd_mod1 = app1.get_etcd_module();
-  auto etcd_mod2 = app2.get_etcd_module();
-  CASE_EXPECT_TRUE(!!etcd_mod1);
-  CASE_EXPECT_TRUE(!!etcd_mod2);
-  if (!etcd_mod1 || !etcd_mod2) {
+  auto discovery1 = app1.get_service_discovery_module();
+  auto discovery2 = app2.get_service_discovery_module();
+  CASE_EXPECT_TRUE(!!discovery1);
+  CASE_EXPECT_TRUE(!!discovery2);
+  if (!discovery1 || !discovery2) {
     return;
   }
 
   std::vector<atframework::atapp::app *> apps = {&app1, &app2};
 
   // Wait for mutual discovery
-  bool mutual_discovery = run_apps_until(apps, [&etcd_mod1, &etcd_mod2, &app1, &app2]() {
-    return !!etcd_mod1->get_global_discovery().get_node_by_id(app2.get_id()) &&
-           !!etcd_mod2->get_global_discovery().get_node_by_id(app1.get_id());
+  bool mutual_discovery = run_apps_until(apps, [&discovery1, &discovery2, &app1, &app2]() {
+    return !!discovery1->get_global_discovery().get_node_by_id(app2.get_id()) &&
+           !!discovery2->get_global_discovery().get_node_by_id(app1.get_id());
   });
   CASE_EXPECT_TRUE(mutual_discovery);
 
-  // Verify set/get custom_data API works locally
-  const std::string custom_data_value = "test-custom-data-12345";
-  CASE_EXPECT_TRUE(etcd_mod1->get_conf_custom_data().empty());
-
-  etcd_mod1->set_conf_custom_data(custom_data_value);
-  CASE_EXPECT_EQ(custom_data_value, etcd_mod1->get_conf_custom_data());
-
   // Trigger the keepalive discovery value update flag
-  etcd_mod1->set_maybe_update_keepalive_discovery_value();
+  discovery1->set_maybe_update_keepalive_discovery_value();
 
   // Tick to process the update
   run_apps_noblock(apps, 10);
 
-  // Verify custom_data is still set after ticking
-  CASE_EXPECT_EQ(custom_data_value, etcd_mod1->get_conf_custom_data());
-
   // Verify the discovery value was refreshed (node2 should still see node1 - the update
   // triggers a keepalive value regeneration, though custom_data is not packed into it
   // since app::pack() currently has custom_data commented out)
-  auto node = etcd_mod2->get_global_discovery().get_node_by_id(app1.get_id());
+  auto node = discovery2->get_global_discovery().get_node_by_id(app1.get_id());
   CASE_EXPECT_TRUE(!!node);
-
-  // Verify custom_data can be updated and cleared
-  etcd_mod1->set_conf_custom_data("updated-data");
-  CASE_EXPECT_EQ("updated-data", etcd_mod1->get_conf_custom_data());
-
-  etcd_mod1->set_conf_custom_data("");
-  CASE_EXPECT_TRUE(etcd_mod1->get_conf_custom_data().empty());
 
   CASE_MSG_INFO() << "multi_node_custom_data: local set/get API verified" << '\n';
 }

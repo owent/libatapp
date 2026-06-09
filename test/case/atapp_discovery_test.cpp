@@ -31,7 +31,7 @@ atapp::etcd_discovery_set::ptr_t create_discovery_set() {
     fake_version.version = 1;
     fake_info.set_id(static_cast<uint64_t>(i));
     fake_info.set_name(atfw::util::string::format("node-{}", i));
-    node->copy_from(fake_info, fake_version);
+    node->copy_from(fake_info, fake_version, 0);
 
     ret->add_node(node);
   }
@@ -142,7 +142,7 @@ CASE_TEST(atapp_discovery, get_discovery_by_metadata) {
   test_node_version.create_revision = 1;
   test_node_version.modify_revision = 2;
   test_node_version.version = 3;
-  node1->copy_from(discovery_data, test_node_version);
+  node1->copy_from(discovery_data, test_node_version, 0);
   CASE_EXPECT_EQ(1, node1->get_version().create_revision);
   CASE_EXPECT_EQ(2, node1->get_version().modify_revision);
   CASE_EXPECT_EQ(3, node1->get_version().version);
@@ -152,14 +152,14 @@ CASE_TEST(atapp_discovery, get_discovery_by_metadata) {
   discovery_data.set_name("node2");
   discovery_data.set_identity("node-dient-2");
   (*discovery_data.mutable_metadata()->mutable_labels())["selector"] = "s2";
-  node2->copy_from(discovery_data, test_node_version);
+  node2->copy_from(discovery_data, test_node_version, 0);
 
   etcd_discovery_node::ptr_t node3 = atfw::util::memory::make_strong_rc<etcd_discovery_node>();
   discovery_data.set_id(3);
   discovery_data.set_name("node3");
   discovery_data.set_identity("node-dient-3");
   (*discovery_data.mutable_metadata()->mutable_labels())["selector"] = "s3";
-  node3->copy_from(discovery_data, test_node_version);
+  node3->copy_from(discovery_data, test_node_version, 0);
 
   discovery_set->add_node(node1);
   discovery_set->add_node(node2);
@@ -424,7 +424,7 @@ CASE_TEST(atapp_discovery, discovery_node_version_update) {
   info_v1.set_id(100);
   info_v1.set_name("node-100");
   info_v1.set_type_name("old-type");
-  node_v1->copy_from(info_v1, ver_v1);
+  node_v1->copy_from(info_v1, ver_v1, 0);
   discovery_set->add_node(node_v1);
 
   auto found = discovery_set->get_node_by_id(100);
@@ -441,7 +441,7 @@ CASE_TEST(atapp_discovery, discovery_node_version_update) {
   info_v2.set_id(100);
   info_v2.set_name("node-100");
   info_v2.set_type_name("new-type");
-  node_v2->copy_from(info_v2, ver_v2);
+  node_v2->copy_from(info_v2, ver_v2, 0);
   discovery_set->add_node(node_v2);
 
   found = discovery_set->get_node_by_id(100);
@@ -460,7 +460,7 @@ CASE_TEST(atapp_discovery, discovery_node_version_stale_skip) {
   ver.version = 3;
   info.set_id(200);
   info.set_name("node-200");
-  node->copy_from(info, ver);
+  node->copy_from(info, ver, 0);
 
   CASE_EXPECT_EQ(20, node->get_version().modify_revision);
   CASE_EXPECT_EQ(3, node->get_version().version);
@@ -470,7 +470,7 @@ CASE_TEST(atapp_discovery, discovery_node_version_stale_skip) {
   stale_ver.create_revision = 5;
   stale_ver.modify_revision = 15;  // lower than current 20
   stale_ver.version = 1;           // lower than current 3
-  node->update_version(stale_ver, true);
+  node->update_version(stale_ver, true, 0);
 
   // Version fields should NOT have decreased
   CASE_EXPECT_EQ(10, node->get_version().create_revision);
@@ -482,7 +482,7 @@ CASE_TEST(atapp_discovery, discovery_node_version_stale_skip) {
   newer_ver.create_revision = 10;
   newer_ver.modify_revision = 30;
   newer_ver.version = 5;
-  node->update_version(newer_ver, true);
+  node->update_version(newer_ver, true, 0);
 
   CASE_EXPECT_EQ(30, node->get_version().modify_revision);
   CASE_EXPECT_EQ(5, node->get_version().version);
@@ -506,7 +506,7 @@ CASE_TEST(atapp_discovery, discovery_add_remove_stress) {
     fake_version.version = 1;
     fake_info.set_id(static_cast<uint64_t>(i + 1));
     fake_info.set_name(atfw::util::string::format("stress-node-{}", i));
-    node->copy_from(fake_info, fake_version);
+    node->copy_from(fake_info, fake_version, 0);
     discovery_set->add_node(node);
     nodes.push_back(node);
   }
@@ -572,7 +572,7 @@ CASE_TEST(atapp_discovery, discovery_node_ingress_round_robin) {
   auto *gw3 = fake_info.add_gateways();
   gw3->set_address("ipv4://10.0.0.3:8003");
 
-  node->copy_from(fake_info, fake_version);
+  node->copy_from(fake_info, fake_version, 0);
 
   CASE_EXPECT_EQ(3, node->get_ingress_size());
 
@@ -597,7 +597,7 @@ CASE_TEST(atapp_discovery, discovery_node_ingress_round_robin) {
   info_no_gw.set_id(301);
   info_no_gw.set_name("listen-node");
   info_no_gw.add_listen("ipv6://[::1]:9000");
-  node2->copy_from(info_no_gw, fake_version);
+  node2->copy_from(info_no_gw, fake_version, 0);
 
   CASE_EXPECT_EQ(1, node2->get_ingress_size());
   const auto &ingress = node2->next_ingress_gateway();

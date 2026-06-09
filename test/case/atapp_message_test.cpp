@@ -2,6 +2,7 @@
 
 #include <atframe/atapp.h>
 #include <atframe/modules/etcd_module.h>
+#include <atframe/modules/service_discovery_module.h>
 
 #include <common/file_system.h>
 
@@ -71,19 +72,19 @@ CASE_TEST(atapp_message, send_message_remote) {
   {
     atapp::protocol::atapp_discovery app2_discovery_info;
     app2.pack(app2_discovery_info);
-    app2_discovery->copy_from(app2_discovery_info, atapp::etcd_discovery_node::node_version());
+    app2_discovery->copy_from(app2_discovery_info, atapp::etcd_discovery_node::node_version(), 0);
   }
 
   {
     // Mutable app1 in app2 to get name of remote node
     atapp::protocol::atapp_discovery app1_discovery_info;
     app1.pack(app1_discovery_info);
-    app1_discovery->copy_from(app1_discovery_info, atapp::etcd_discovery_node::node_version());
+    app1_discovery->copy_from(app1_discovery_info, atapp::etcd_discovery_node::node_version(), 0);
   }
-  app1.get_etcd_module()->get_global_discovery().add_node(app1_discovery);
-  app2.get_etcd_module()->get_global_discovery().add_node(app1_discovery);
-  app1.get_etcd_module()->get_global_discovery().add_node(app2_discovery);
-  app2.get_etcd_module()->get_global_discovery().add_node(app2_discovery);
+  app1.get_service_discovery_module()->get_global_discovery().add_node(app1_discovery);
+  app2.get_service_discovery_module()->get_global_discovery().add_node(app1_discovery);
+  app1.get_service_discovery_module()->get_global_discovery().add_node(app2_discovery);
+  app2.get_service_discovery_module()->get_global_discovery().add_node(app2_discovery);
 
   CASE_EXPECT_TRUE(app1.mutable_endpoint(app2_discovery));
   CASE_EXPECT_TRUE(app2.mutable_endpoint(app1_discovery));
@@ -186,7 +187,7 @@ CASE_TEST(atapp_message, send_message_loopback) {
   auto self_discovery = atfw::util::memory::make_strong_rc<atapp::etcd_discovery_node>();
   atapp::protocol::atapp_discovery self_discovery_info;
   app1.pack(self_discovery_info);
-  self_discovery->copy_from(self_discovery_info, atapp::etcd_discovery_node::node_version());
+  self_discovery->copy_from(self_discovery_info, atapp::etcd_discovery_node::node_version(), 0);
   CASE_EXPECT_TRUE(app1.mutable_endpoint(self_discovery));
 
   now = atfw::util::time::time_utility::sys_now();

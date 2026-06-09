@@ -256,7 +256,7 @@ static bool node_equal(const etcd_discovery_node::ptr_t &l, const etcd_discovery
 
 }  // namespace
 
-LIBATAPP_MACRO_API etcd_discovery_node::etcd_discovery_node() : name_hash_(0, 0), ingress_index_(0) {
+LIBATAPP_MACRO_API etcd_discovery_node::etcd_discovery_node() : context_ptr_(0), name_hash_(0, 0), ingress_index_(0) {
   private_data_ptr_ = nullptr;
   private_data_u64_ = 0;
   private_data_uptr_ = 0;
@@ -269,17 +269,19 @@ LIBATAPP_MACRO_API etcd_discovery_node::~etcd_discovery_node() {
 }
 
 LIBATAPP_MACRO_API void etcd_discovery_node::copy_from(const atapp::protocol::atapp_discovery &input,
-                                                       const node_version &version) {
+                                                       const node_version &version, uintptr_t context_ptr) {
   node_info_.CopyFrom(input);
 
   name_hash_ = consistent_hash_calc(
       gsl::span<const unsigned char>{reinterpret_cast<const unsigned char *>(input.name().data()), input.name().size()},
       LIBATAPP_MACRO_HASH_MAGIC_NUMBER);
 
+  context_ptr_ = context_ptr;
+
   node_version_ = version;
 }
 
-LIBATAPP_MACRO_API void etcd_discovery_node::update_version(const node_version &version, bool upgrade) {
+LIBATAPP_MACRO_API void etcd_discovery_node::update_version(const node_version &version, bool upgrade, uintptr_t context_ptr) {
   if (upgrade) {
     if (version.create_revision > node_version_.create_revision) {
       node_version_.create_revision = version.create_revision;
@@ -297,6 +299,7 @@ LIBATAPP_MACRO_API void etcd_discovery_node::update_version(const node_version &
   } else {
     node_version_ = version;
   }
+  context_ptr_ = context_ptr;
 }
 
 LIBATAPP_MACRO_API void etcd_discovery_node::copy_to(atapp::protocol::atapp_discovery &output) const {
