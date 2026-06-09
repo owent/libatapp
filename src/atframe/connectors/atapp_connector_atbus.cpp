@@ -15,7 +15,7 @@
 
 #include <atframe/atapp.h>
 #include <atframe/atapp_common_types.h>
-#include <atframe/modules/etcd_module.h>
+#include <atframe/modules/service_discovery_module.h>
 
 LIBATAPP_MACRO_NAMESPACE_BEGIN
 
@@ -132,8 +132,8 @@ LIBATAPP_MACRO_API void atapp_connector_atbus::reload() noexcept {
     }
 
     // etcd update topology data to notify other nodes
-    if (get_owner()->get_etcd_module()) {
-      get_owner()->get_etcd_module()->set_maybe_update_keepalive_topology_value();
+    if (get_owner()->get_service_discovery_module()) {
+      get_owner()->get_service_discovery_module()->set_maybe_update_keepalive_topology_value();
     }
   }
 

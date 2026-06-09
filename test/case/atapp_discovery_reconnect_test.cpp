@@ -13,6 +13,7 @@
 #include <atframe/atapp.h>
 #include <atframe/connectors/atapp_connector_atbus.h>
 #include <atframe/modules/etcd_module.h>
+#include <atframe/modules/service_discovery_module.h>
 #include <detail/libatbus_error.h>
 
 #include <common/file_system.h>
@@ -145,17 +146,17 @@ static void setup_discovery_test_env(atframework::atapp::app &node1, atframework
   {
     atapp::protocol::atapp_discovery info;
     node1.pack(info);
-    n1_disc->copy_from(info, atapp::etcd_discovery_node::node_version());
+    n1_disc->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
   }
   {
     atapp::protocol::atapp_discovery info;
     node2.pack(info);
-    n2_disc->copy_from(info, atapp::etcd_discovery_node::node_version());
+    n2_disc->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
   }
   {
     atapp::protocol::atapp_discovery info;
     upstream.pack(info);
-    up_disc->copy_from(info, atapp::etcd_discovery_node::node_version());
+    up_disc->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
   }
 
   // Add discovery to all apps
@@ -163,7 +164,7 @@ static void setup_discovery_test_env(atframework::atapp::app &node1, atframework
   atfw::util::memory::strong_rc_ptr<atapp::etcd_discovery_node> discs[] = {n1_disc, n2_disc, up_disc};
   for (auto *app : apps) {
     for (auto &disc : discs) {
-      app->get_etcd_module()->get_global_discovery().add_node(disc);
+      app->get_service_discovery_module()->get_global_discovery().add_node(disc);
     }
   }
 
@@ -262,7 +263,7 @@ CASE_TEST(atapp_discovery_reconnect, discovery_delete_then_put_reconnect) {
   }
 
   // Step 2: Remove node2's discovery so update_topology_peer can't find it
-  node1.get_etcd_module()->get_global_discovery().remove_node(n2_disc);
+  node1.get_service_discovery_module()->get_global_discovery().remove_node(n2_disc);
 
   // Step 3: update_topology_peer(upstream=0) unbinds the re-bound proxy (proxy_bus_id→0),
   // then: no bus endpoint, no discovery → set_handle_waiting_discovery → kWaitForDiscoveryToConnect SET
@@ -276,7 +277,7 @@ CASE_TEST(atapp_discovery_reconnect, discovery_delete_then_put_reconnect) {
 
   // ---- Phase 3: Resume via kPut event ----
   // Re-add discovery and fire kPut → resume_handle_discovery clears flag and reconnects
-  node1.get_etcd_module()->get_global_discovery().add_node(n2_disc);
+  node1.get_service_discovery_module()->get_global_discovery().add_node(n2_disc);
   n1_conn->on_discovery_event(atframework::atapp::etcd_discovery_action_t::kPut, n2_disc);
 
   // Verify kWaitForDiscoveryToConnect IS cleared after kPut
@@ -365,7 +366,7 @@ CASE_TEST(atapp_discovery_reconnect, discovery_missing_reconnect_count_accumulat
   CASE_EXPECT_TRUE(n1_conn->is_connection_handle_ready(node2.get_app_id()));
 
   // Remove node2 discovery from node1 so reconnect can't find it
-  node1.get_etcd_module()->get_global_discovery().remove_node(n2_disc);
+  node1.get_service_discovery_module()->get_global_discovery().remove_node(n2_disc);
 
   // Force handle into non-ready state using debug setter — this also starts reconnect timer
   // (set_handle_unready_by_bus_id calls set_handle_unready + setup_reconnect_timer)
@@ -461,7 +462,7 @@ CASE_TEST(atapp_discovery_reconnect, reconnect_exponential_backoff) {
   CASE_EXPECT_TRUE(n1_conn->is_connection_handle_ready(node2.get_app_id()));
 
   // Remove node2 discovery so reconnects will fail
-  node1.get_etcd_module()->get_global_discovery().remove_node(n2_disc);
+  node1.get_service_discovery_module()->get_global_discovery().remove_node(n2_disc);
 
   // Capture now BEFORE set_handle_unready_by_bus_id
   auto now = atframework::atapp::app::get_sys_now();

@@ -8,6 +8,7 @@
 #include <atframe/atapp.h>
 #include <atframe/connectors/atapp_connector_atbus.h>
 #include <atframe/modules/etcd_module.h>
+#include <atframe/modules/service_discovery_module.h>
 #include <detail/libatbus_error.h>
 
 #include <common/file_system.h>
@@ -160,24 +161,24 @@ static void inject_3node_discovery(atframework::atapp::app &node1, atframework::
   {
     atapp::protocol::atapp_discovery info;
     node1.pack(info);
-    node1_disc->copy_from(info, atapp::etcd_discovery_node::node_version());
+    node1_disc->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
   }
   {
     atapp::protocol::atapp_discovery info;
     old_upstream.pack(info);
-    upstream_disc->copy_from(info, atapp::etcd_discovery_node::node_version());
+    upstream_disc->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
   }
   {
     atapp::protocol::atapp_discovery info;
     target.pack(info);
-    target_disc->copy_from(info, atapp::etcd_discovery_node::node_version());
+    target_disc->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
   }
 
   atframework::atapp::app *apps[] = {&node1, &old_upstream, &target};
   atfw::util::memory::strong_rc_ptr<atapp::etcd_discovery_node> discs[] = {node1_disc, upstream_disc, target_disc};
   for (auto *app : apps) {
     for (auto &disc : discs) {
-      app->get_etcd_module()->get_global_discovery().add_node(disc);
+      app->get_service_discovery_module()->get_global_discovery().add_node(disc);
     }
   }
 }
@@ -296,25 +297,25 @@ CASE_TEST(atapp_topology_change, topology_change_new_upstream_not_connected) {
   {
     atapp::protocol::atapp_discovery info;
     new_upstream.pack(info);
-    new_up_disc->copy_from(info, atapp::etcd_discovery_node::node_version());
+    new_up_disc->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
   }
   {
     atapp::protocol::atapp_discovery info;
     node1.pack(info);
-    node1_disc2->copy_from(info, atapp::etcd_discovery_node::node_version());
+    node1_disc2->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
   }
   {
     atapp::protocol::atapp_discovery info;
     target.pack(info);
-    target_disc2->copy_from(info, atapp::etcd_discovery_node::node_version());
+    target_disc2->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
   }
 
   // Inject discovery on all nodes
-  node1.get_etcd_module()->get_global_discovery().add_node(new_up_disc);
-  target.get_etcd_module()->get_global_discovery().add_node(new_up_disc);
-  new_upstream.get_etcd_module()->get_global_discovery().add_node(new_up_disc);
-  new_upstream.get_etcd_module()->get_global_discovery().add_node(node1_disc2);
-  new_upstream.get_etcd_module()->get_global_discovery().add_node(target_disc2);
+  node1.get_service_discovery_module()->get_global_discovery().add_node(new_up_disc);
+  target.get_service_discovery_module()->get_global_discovery().add_node(new_up_disc);
+  new_upstream.get_service_discovery_module()->get_global_discovery().add_node(new_up_disc);
+  new_upstream.get_service_discovery_module()->get_global_discovery().add_node(node1_disc2);
+  new_upstream.get_service_discovery_module()->get_global_discovery().add_node(target_disc2);
 
   // Update bus topology registries for new upstream
   auto bus1 = node1.get_bus_node();
@@ -507,24 +508,24 @@ CASE_TEST(atapp_topology_change, topology_change_new_upstream_already_connected)
   {
     atapp::protocol::atapp_discovery info;
     new_upstream.pack(info);
-    new_up_disc->copy_from(info, atapp::etcd_discovery_node::node_version());
+    new_up_disc->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
   }
   {
     atapp::protocol::atapp_discovery info;
     node1.pack(info);
-    node1_disc2->copy_from(info, atapp::etcd_discovery_node::node_version());
+    node1_disc2->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
   }
   {
     atapp::protocol::atapp_discovery info;
     target.pack(info);
-    target_disc2->copy_from(info, atapp::etcd_discovery_node::node_version());
+    target_disc2->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
   }
 
-  node1.get_etcd_module()->get_global_discovery().add_node(new_up_disc);
-  target.get_etcd_module()->get_global_discovery().add_node(new_up_disc);
-  new_upstream.get_etcd_module()->get_global_discovery().add_node(new_up_disc);
-  new_upstream.get_etcd_module()->get_global_discovery().add_node(node1_disc2);
-  new_upstream.get_etcd_module()->get_global_discovery().add_node(target_disc2);
+  node1.get_service_discovery_module()->get_global_discovery().add_node(new_up_disc);
+  target.get_service_discovery_module()->get_global_discovery().add_node(new_up_disc);
+  new_upstream.get_service_discovery_module()->get_global_discovery().add_node(new_up_disc);
+  new_upstream.get_service_discovery_module()->get_global_discovery().add_node(node1_disc2);
+  new_upstream.get_service_discovery_module()->get_global_discovery().add_node(target_disc2);
 
   // Update bus topology registries
   auto bus1 = node1.get_bus_node();
@@ -744,25 +745,25 @@ CASE_TEST(atapp_topology_change, topology_change_discovery_missing_then_arrive) 
   {
     atapp::protocol::atapp_discovery info;
     new_upstream.pack(info);
-    new_up_disc->copy_from(info, atapp::etcd_discovery_node::node_version());
+    new_up_disc->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
   }
   {
     atapp::protocol::atapp_discovery info;
     node1.pack(info);
-    node1_disc2->copy_from(info, atapp::etcd_discovery_node::node_version());
+    node1_disc2->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
   }
   {
     atapp::protocol::atapp_discovery info;
     target.pack(info);
-    target_disc2->copy_from(info, atapp::etcd_discovery_node::node_version());
+    target_disc2->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
   }
 
   // Inject discovery for new_upstream on all nodes
-  node1.get_etcd_module()->get_global_discovery().add_node(new_up_disc);
-  target.get_etcd_module()->get_global_discovery().add_node(new_up_disc);
-  new_upstream.get_etcd_module()->get_global_discovery().add_node(new_up_disc);
-  new_upstream.get_etcd_module()->get_global_discovery().add_node(node1_disc2);
-  new_upstream.get_etcd_module()->get_global_discovery().add_node(target_disc2);
+  node1.get_service_discovery_module()->get_global_discovery().add_node(new_up_disc);
+  target.get_service_discovery_module()->get_global_discovery().add_node(new_up_disc);
+  new_upstream.get_service_discovery_module()->get_global_discovery().add_node(new_up_disc);
+  new_upstream.get_service_discovery_module()->get_global_discovery().add_node(node1_disc2);
+  new_upstream.get_service_discovery_module()->get_global_discovery().add_node(target_disc2);
 
   // Create endpoints for new_upstream
   CASE_EXPECT_TRUE(node1.mutable_endpoint(new_up_disc));

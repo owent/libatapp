@@ -13,6 +13,7 @@
 #include <atframe/atapp.h>
 #include <atframe/connectors/atapp_connector_atbus.h>
 #include <atframe/modules/etcd_module.h>
+#include <atframe/modules/service_discovery_module.h>
 #include <detail/libatbus_error.h>
 
 #include <common/file_system.h>
@@ -146,17 +147,17 @@ static void setup_recovery_test_env(atframework::atapp::app &node1, atframework:
   {
     atapp::protocol::atapp_discovery info;
     node1.pack(info);
-    n1_disc->copy_from(info, atapp::etcd_discovery_node::node_version());
+    n1_disc->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
   }
   {
     atapp::protocol::atapp_discovery info;
     proxy_node.pack(info);
-    proxy_disc->copy_from(info, atapp::etcd_discovery_node::node_version());
+    proxy_disc->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
   }
   {
     atapp::protocol::atapp_discovery info;
     downstream.pack(info);
-    down_disc->copy_from(info, atapp::etcd_discovery_node::node_version());
+    down_disc->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
   }
 
   // Add discovery to all apps
@@ -164,7 +165,7 @@ static void setup_recovery_test_env(atframework::atapp::app &node1, atframework:
   atfw::util::memory::strong_rc_ptr<atapp::etcd_discovery_node> discs[] = {n1_disc, proxy_disc, down_disc};
   for (auto *app : apps) {
     for (auto &disc : discs) {
-      app->get_etcd_module()->get_global_discovery().add_node(disc);
+      app->get_service_discovery_module()->get_global_discovery().add_node(disc);
     }
   }
 
@@ -234,17 +235,17 @@ CASE_TEST(atapp_error_recovery, send_fail_reconnect_then_success) {
   {
     atapp::protocol::atapp_discovery info;
     node1.pack(info);
-    n1_disc->copy_from(info, atapp::etcd_discovery_node::node_version());
+    n1_disc->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
   }
   {
     atapp::protocol::atapp_discovery info;
     node2.pack(info);
-    n2_disc->copy_from(info, atapp::etcd_discovery_node::node_version());
+    n2_disc->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
   }
   {
     atapp::protocol::atapp_discovery info;
     upstream.pack(info);
-    up_disc->copy_from(info, atapp::etcd_discovery_node::node_version());
+    up_disc->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
   }
 
   // Add discovery to all apps
@@ -252,7 +253,7 @@ CASE_TEST(atapp_error_recovery, send_fail_reconnect_then_success) {
   atfw::util::memory::strong_rc_ptr<atapp::etcd_discovery_node> discs[] = {n1_disc, n2_disc, up_disc};
   for (auto *app : apps) {
     for (auto &disc : discs) {
-      app->get_etcd_module()->get_global_discovery().add_node(disc);
+      app->get_service_discovery_module()->get_global_discovery().add_node(disc);
     }
   }
 
