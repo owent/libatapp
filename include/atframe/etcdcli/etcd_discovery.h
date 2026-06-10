@@ -50,11 +50,11 @@ class etcd_discovery_node {
   ATFW_UTIL_FORCEINLINE const node_version &get_version() const noexcept { return node_version_; }
 
   LIBATAPP_MACRO_API void copy_from(const atapp::protocol::atapp_discovery &input, const node_version &version,
-                                    uintptr_t context_ptr);
-  LIBATAPP_MACRO_API void update_version(const node_version &version, bool upgrade, uintptr_t context_ptr);
+                                    uintptr_t context_addr);
+  LIBATAPP_MACRO_API void update_version(const node_version &version, bool upgrade);
   LIBATAPP_MACRO_API void copy_to(atapp::protocol::atapp_discovery &output) const;
   LIBATAPP_MACRO_API void copy_key_to(atapp::protocol::atapp_discovery &output) const;
-  LIBATAPP_MACRO_API uintptr_t get_context_ptr() const noexcept { return context_ptr_; }
+  LIBATAPP_MACRO_API uintptr_t get_context_addr() const noexcept { return context_addr_; }
 
   ATFW_UTIL_FORCEINLINE const std::pair<uint64_t, uint64_t> &get_name_hash() const noexcept { return name_hash_; }
 
@@ -80,7 +80,7 @@ class etcd_discovery_node {
  private:
   atapp::protocol::atapp_discovery node_info_;
   node_version node_version_;
-  uintptr_t context_ptr_;
+  uintptr_t context_addr_;
 
   std::pair<uint64_t, uint64_t> name_hash_;
   union {

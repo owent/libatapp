@@ -506,8 +506,11 @@ int etcd_module::http_callback_on_etcd_closed(atfw::util::network::http_request 
   }
 
   self->reset();
-
   LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(self->cluster_, "Etcd revoke lease finished");
+
+  if (self->atapp_ != nullptr) {
+    self->atapp_->stop();
+  }
   return 0;
 }
 

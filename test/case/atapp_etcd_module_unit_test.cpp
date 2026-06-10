@@ -386,7 +386,7 @@ CASE_TEST(atapp_etcd_module_unit, version_update_by_reference) {
   std::unordered_map<uint64_t, atapp::service_discovery_module::topology_storage_t> topology_map;
 
   atapp::service_discovery_module::topology_storage_t initial;
-  initial.context_ptr = 0;
+  initial.context_addr = 0;
   initial.version.create_revision = 1;
   initial.version.modify_revision = 1;
   initial.version.version = 1;
@@ -651,7 +651,7 @@ CASE_TEST(atapp_etcd_module_unit, topology_map_insert_and_upgrade) {
   info->set_upstream_id(1);
 
   atapp::service_discovery_module::topology_storage_t entry;
-  entry.context_ptr = 0;
+  entry.context_addr = 0;
   entry.info = info;
   entry.version.create_revision = 1;
   entry.version.modify_revision = 1;
@@ -686,7 +686,7 @@ CASE_TEST(atapp_etcd_module_unit, topology_map_multiple_entries) {
     atapp::service_discovery_module::topology_storage_t entry;
     entry.info = atfw::util::memory::make_strong_rc<atapp::protocol::atapp_topology_info>();
     entry.info->set_id(i);
-    entry.context_ptr = 0;
+    entry.context_addr = 0;
     entry.version.create_revision = static_cast<int64_t>(i);
     entry.version.modify_revision = static_cast<int64_t>(i);
     entry.version.version = 1;

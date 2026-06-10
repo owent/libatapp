@@ -30,7 +30,7 @@ class service_discovery_module : public ::atframework::atapp::module_impl {
 
   struct LIBATAPP_MACRO_API_HEAD_ONLY node_info_t {
     atapp::protocol::atapp_discovery node_discovery;
-    uintptr_t context_ptr = 0;
+    uintptr_t context_addr = 0;
     node_action_t action;
   };
 
@@ -72,7 +72,7 @@ class service_discovery_module : public ::atframework::atapp::module_impl {
 
   struct LIBATAPP_MACRO_API_HEAD_ONLY topology_storage_t {
     atapp_topology_info_ptr_t info;
-    uintptr_t context_ptr = 0;
+    uintptr_t context_addr = 0;
     etcd_data_version version;
   };
 
@@ -128,6 +128,7 @@ class service_discovery_module : public ::atframework::atapp::module_impl {
                                   const atapp::protocol::atapp_log *ATFW_UTIL_MACRO_NULLABLE log_conf);
     LIBATAPP_MACRO_API int stop();
     LIBATAPP_MACRO_API void tick();
+    LIBATAPP_MACRO_API void reset();
 
    public:
     LIBATAPP_MACRO_API etcd_module &get_etcd_module();
@@ -158,6 +159,7 @@ class service_discovery_module : public ::atframework::atapp::module_impl {
   LIBATAPP_MACRO_API int stop() override;
   LIBATAPP_MACRO_API int reload() override;
   LIBATAPP_MACRO_API int tick() override;
+  LIBATAPP_MACRO_API int timeout() override;
 
  public:
   LIBATAPP_MACRO_API bool is_discovery_enabled() const;
@@ -181,26 +183,40 @@ class service_discovery_module : public ::atframework::atapp::module_impl {
   LIBATAPP_MACRO_API static std::string get_topology_watcher_path(atframework::atapp::app &app,
                                                                   const std::string &path);
 
-  LIBATAPP_MACRO_API int init_service_discovery_keepalives_watchers(service_discovery_cluster_context &context);
+  LIBATAPP_MACRO_API int init_service_discovery_keepalives_watchers(
+      ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context);
 
-  LIBATAPP_MACRO_API static int init_discovery_watcher_by_id(atframework::atapp::app &app,
-                                                             service_discovery_cluster_context &context);
-  LIBATAPP_MACRO_API static int init_discovery_watcher_by_name(atframework::atapp::app &app,
-                                                               service_discovery_cluster_context &context);
-  LIBATAPP_MACRO_API static int init_topology_watcher(atframework::atapp::app &app,
-                                                      service_discovery_cluster_context &context);
-  LIBATAPP_MACRO_API static int init_discovery_keepalive_by_id(atframework::atapp::app &app,
-                                                               service_discovery_cluster_context &context,
-                                                               std::string &value);
-  LIBATAPP_MACRO_API static int init_discovery_keepalive_by_name(atframework::atapp::app &app,
-                                                                 service_discovery_cluster_context &context,
-                                                                 std::string &value);
-  LIBATAPP_MACRO_API static int init_topology_keepalive(atframework::atapp::app &app,
-                                                        service_discovery_cluster_context &context, std::string &value);
+  LIBATAPP_MACRO_API static int init_discovery_watcher_by_id(
+      atframework::atapp::app &app,
+      ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context);
+  LIBATAPP_MACRO_API static int init_discovery_watcher_by_name(
+      atframework::atapp::app &app,
+      ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context);
+  LIBATAPP_MACRO_API static int init_topology_watcher(
+      atframework::atapp::app &app,
+      ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context);
+  LIBATAPP_MACRO_API static int init_discovery_keepalive_by_id(
+      atframework::atapp::app &app,
+      ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context, std::string &value);
+  LIBATAPP_MACRO_API static int init_discovery_keepalive_by_name(
+      atframework::atapp::app &app,
+      ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context, std::string &value);
+  LIBATAPP_MACRO_API static int init_topology_keepalive(
+      atframework::atapp::app &app,
+      ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context, std::string &value);
 
-  LIBATAPP_MACRO_API int add_discovery_watcher_by_id_callback(const discovery_watcher_list_callback_t &fn);
-  LIBATAPP_MACRO_API int add_discovery_watcher_by_name_callback(const discovery_watcher_list_callback_t &fn);
-  LIBATAPP_MACRO_API int add_topology_watcher_callback(const topology_watcher_list_callback_t &fn);
+  LIBATAPP_MACRO_API static int add_discovery_watcher_by_id_callback(
+      atframework::atapp::app &app,
+      ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context,
+      const discovery_watcher_list_callback_t &fn);
+  LIBATAPP_MACRO_API static int add_discovery_watcher_by_name_callback(
+      atframework::atapp::app &app,
+      ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context,
+      const discovery_watcher_list_callback_t &fn);
+  LIBATAPP_MACRO_API static int add_topology_watcher_callback(
+      atframework::atapp::app &app,
+      ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context,
+      const topology_watcher_list_callback_t &fn);
 
   LIBATAPP_MACRO_API const ::atframework::atapp::etcd_cluster &get_raw_etcd_ctx() const;
   LIBATAPP_MACRO_API ::atframework::atapp::etcd_cluster &get_raw_etcd_ctx();
@@ -213,16 +229,17 @@ class service_discovery_module : public ::atframework::atapp::module_impl {
   LIBATAPP_MACRO_API const atapp::protocol::atapp_etcd &get_configure() const;
   LIBATAPP_MACRO_API const std::string &get_configure_path();
 
-  LIBATAPP_MACRO_API static atapp::etcd_keepalive::ptr_t add_keepalive_actor(atframework::atapp::app &app,
-                                                                             service_discovery_cluster_context &context,
-                                                                             std::string &val,
-                                                                             const std::string &node_path);
+  LIBATAPP_MACRO_API static atapp::etcd_keepalive::ptr_t add_keepalive_actor(
+      atframework::atapp::app &app,
+      ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context, std::string &val,
+      const std::string &node_path);
   LIBATAPP_MACRO_API atapp::etcd_keepalive::ptr_t add_keepalive_actor(atframework::atapp::app &app, std::string &val,
                                                                       const std::string &node_path);
 
-  LIBATAPP_MACRO_API static bool remove_keepalive_actor(atframework::atapp::app &app,
-                                                        service_discovery_cluster_context &context,
-                                                        const atapp::etcd_keepalive::ptr_t &keepalive);
+  LIBATAPP_MACRO_API static bool remove_keepalive_actor(
+      atframework::atapp::app &app,
+      ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context,
+      const atapp::etcd_keepalive::ptr_t &keepalive);
   LIBATAPP_MACRO_API bool remove_keepalive_actor(atframework::atapp::app &app,
                                                  const atapp::etcd_keepalive::ptr_t &keepalive);
 
@@ -257,9 +274,9 @@ class service_discovery_module : public ::atframework::atapp::module_impl {
   LIBATAPP_MACRO_API void remove_on_topology_snapshot_loaded(topology_snapshot_event_callback_handle_t &handle);
 
   LIBATAPP_MACRO_API etcd_watcher::watch_event_fn_t_ptr create_discovery_watcher_callback_list_wrapper(
-      service_discovery_cluster_context &context);
+      ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context);
   LIBATAPP_MACRO_API etcd_watcher::watch_event_fn_t_ptr create_topology_watcher_callback_list_wrapper(
-      service_discovery_cluster_context &context);
+      ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context);
 
  private:
   static bool unpack(node_info_t &out, const std::string &path, const std::string &json, bool reset_data);
@@ -277,7 +294,7 @@ class service_discovery_module : public ::atframework::atapp::module_impl {
 
  private:
   bool discovery_enabled_;
-  service_discovery_cluster_context cluster_context_;
+  ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> cluster_context_;
 
   bool maybe_update_internal_keepalive_topology_value_;
   bool maybe_update_internal_keepalive_discovery_value_;

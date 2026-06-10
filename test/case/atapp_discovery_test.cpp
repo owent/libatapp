@@ -470,7 +470,7 @@ CASE_TEST(atapp_discovery, discovery_node_version_stale_skip) {
   stale_ver.create_revision = 5;
   stale_ver.modify_revision = 15;  // lower than current 20
   stale_ver.version = 1;           // lower than current 3
-  node->update_version(stale_ver, true, 0);
+  node->update_version(stale_ver, true);
 
   // Version fields should NOT have decreased
   CASE_EXPECT_EQ(10, node->get_version().create_revision);
@@ -482,7 +482,7 @@ CASE_TEST(atapp_discovery, discovery_node_version_stale_skip) {
   newer_ver.create_revision = 10;
   newer_ver.modify_revision = 30;
   newer_ver.version = 5;
-  node->update_version(newer_ver, true, 0);
+  node->update_version(newer_ver, true);
 
   CASE_EXPECT_EQ(30, node->get_version().modify_revision);
   CASE_EXPECT_EQ(5, node->get_version().version);
