@@ -17,6 +17,8 @@
 #include <cstdlib>
 #include <memory>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "frame/test_macros.h"
@@ -202,9 +204,12 @@ CASE_TEST(atapp_etcd_module, watcher_paths) {
   }
 
   // Watcher paths should be prefix paths (without node-specific suffix)
-  std::string by_id_watcher = discovery_module->get_discovery_by_id_watcher_path(app1, discovery_module->get_configure_path());
-  std::string by_name_watcher = discovery_module->get_discovery_by_name_watcher_path(app1, discovery_module->get_configure_path());
-  std::string topology_watcher = discovery_module->get_topology_watcher_path(app1, discovery_module->get_configure_path());
+  std::string by_id_watcher =
+      discovery_module->get_discovery_by_id_watcher_path(app1, discovery_module->get_configure_path());
+  std::string by_name_watcher =
+      discovery_module->get_discovery_by_name_watcher_path(app1, discovery_module->get_configure_path());
+  std::string topology_watcher =
+      discovery_module->get_topology_watcher_path(app1, discovery_module->get_configure_path());
 
   CASE_EXPECT_FALSE(by_id_watcher.empty());
   CASE_EXPECT_FALSE(by_name_watcher.empty());
@@ -220,9 +225,12 @@ CASE_TEST(atapp_etcd_module, watcher_paths) {
 
   // Watcher paths should NOT contain the app name (they watch the whole prefix)
   // The keepalive paths should be longer (have the app-specific suffix)
-  CASE_EXPECT_LT(by_id_watcher.size(), discovery_module->get_discovery_by_id_path(app1, discovery_module->get_configure_path()).size());
-  CASE_EXPECT_LT(by_name_watcher.size(), discovery_module->get_discovery_by_name_path(app1, discovery_module->get_configure_path()).size());
-  CASE_EXPECT_LT(topology_watcher.size(), discovery_module->get_topology_path(app1, discovery_module->get_configure_path()).size());
+  CASE_EXPECT_LT(by_id_watcher.size(),
+                 discovery_module->get_discovery_by_id_path(app1, discovery_module->get_configure_path()).size());
+  CASE_EXPECT_LT(by_name_watcher.size(),
+                 discovery_module->get_discovery_by_name_path(app1, discovery_module->get_configure_path()).size());
+  CASE_EXPECT_LT(topology_watcher.size(),
+                 discovery_module->get_topology_path(app1, discovery_module->get_configure_path()).size());
 }
 
 // ============================================================
@@ -306,10 +314,12 @@ CASE_TEST(atapp_etcd_module, discovery_snapshot) {
   }
 
   std::vector<atframework::atapp::app *> apps = {&app1};
-  bool has_snapshot = run_apps_until(apps, [&discovery_module]() { return discovery_module->has_discovery_snapshot(); });
+  bool has_snapshot =
+      run_apps_until(apps, [&discovery_module]() { return discovery_module->has_discovery_snapshot(); });
 
   CASE_EXPECT_TRUE(has_snapshot);
-  CASE_MSG_INFO() << "has_discovery_snapshot: " << (discovery_module->has_discovery_snapshot() ? "true" : "false") << '\n';
+  CASE_MSG_INFO() << "has_discovery_snapshot: " << (discovery_module->has_discovery_snapshot() ? "true" : "false")
+                  << '\n';
 }
 
 // ============================================================
@@ -344,7 +354,8 @@ CASE_TEST(atapp_etcd_module, topology_snapshot) {
   bool has_snapshot = run_apps_until(apps, [&discovery_module]() { return discovery_module->has_topology_snapshot(); });
 
   CASE_EXPECT_TRUE(has_snapshot);
-  CASE_MSG_INFO() << "has_topology_snapshot: " << (discovery_module->has_topology_snapshot() ? "true" : "false") << '\n';
+  CASE_MSG_INFO() << "has_topology_snapshot: " << (discovery_module->has_topology_snapshot() ? "true" : "false")
+                  << '\n';
 }
 
 // ============================================================
@@ -1059,7 +1070,7 @@ CASE_TEST(atapp_etcd_module, discovery_event_delete) {
   // Track app2-specific put event to avoid self-registration/refresh noise
   std::string app2_name;
   uint64_t app2_id = 0;
-  std::map<uint64_t, atapp::etcd_discovery_node::ptr_t> id_node_map;
+  std::unordered_map<uint64_t, atapp::etcd_discovery_node::ptr_t> id_node_map;
 
   auto handle = discovery_module1->add_on_node_discovery_event(
       [&](atapp::service_discovery_module::node_action_t action, const atapp::etcd_discovery_node::ptr_t &node) {
@@ -1098,7 +1109,7 @@ CASE_TEST(atapp_etcd_module, discovery_event_delete) {
     bool got_put = run_apps_until(apps, [&id_node_map, app2_id]() { return id_node_map.count(app2_id) > 0; });
     CASE_EXPECT_TRUE(got_put);
     // Verify the put event contains node2's data
-    CASE_EXPECT_TRUE(!!(id_node_map.count(app2_id) > 0));
+    CASE_EXPECT_TRUE(id_node_map.count(app2_id) > 0);
     if (id_node_map.count(app2_id) > 0) {
       CASE_EXPECT_EQ(app2_id, id_node_map[app2_id]->get_discovery_info().id());
       CASE_EXPECT_EQ(app2_name, id_node_map[app2_id]->get_discovery_info().name());
@@ -1171,7 +1182,7 @@ CASE_TEST(atapp_etcd_module, topology_event_delete) {
   // Track app2-specific put event to avoid self-registration/refresh noise
   std::string app2_name;
   uint64_t app2_id = 0;
-  std::map<uint64_t, atapp::service_discovery_module::atapp_topology_info_ptr_t> topo_info_set;
+  std::unordered_map<uint64_t, atapp::service_discovery_module::atapp_topology_info_ptr_t> topo_info_set;
 
   auto handle = discovery_module1->add_on_topology_info_event(
       [&](atapp::service_discovery_module::topology_action_t action,
@@ -1211,7 +1222,7 @@ CASE_TEST(atapp_etcd_module, topology_event_delete) {
     bool got_put = run_apps_until(apps, [&topo_info_set, &app2_id]() { return topo_info_set.count(app2_id) > 0; });
     CASE_EXPECT_TRUE(got_put);
     // Verify the put event contains node2's data
-    CASE_EXPECT_TRUE(!!(topo_info_set.count(app2_id) > 0));
+    CASE_EXPECT_TRUE(topo_info_set.count(app2_id) > 0);
     if (topo_info_set.count(app2_id) > 0) {
       CASE_EXPECT_EQ(app2_id, topo_info_set[app2_id]->id());
       CASE_EXPECT_EQ(app2_name, topo_info_set[app2_id]->name());
@@ -1332,7 +1343,7 @@ CASE_TEST(atapp_etcd_module, multi_node_discovery_put_event) {
 
   // Register callback to track kPut events specifically for node2's ID
   uint64_t target_id = 0;
-  std::set<uint64_t> got_put_id;
+  std::unordered_set<uint64_t> got_put_id;
   int put_event_count = 0;
   auto handle = discovery_module1->add_on_node_discovery_event(
       [&got_put_id, &put_event_count](atapp::service_discovery_module::node_action_t action,
@@ -1429,8 +1440,9 @@ CASE_TEST(atapp_etcd_module, multi_node_discovery_delete_event) {
     std::vector<atframework::atapp::app *> apps = {&app1, &app2};
 
     // Wait for node1 to discover node2
-    bool found = run_apps_until(
-        apps, [&discovery_module1, app2_id]() { return !!discovery_module1->get_global_discovery().get_node_by_id(app2_id); });
+    bool found = run_apps_until(apps, [&discovery_module1, app2_id]() {
+      return !!discovery_module1->get_global_discovery().get_node_by_id(app2_id);
+    });
     CASE_EXPECT_TRUE(found);
     CASE_MSG_INFO() << "multi_node_discovery_delete: node1 found node2, id=" << app2_id << '\n';
 
@@ -1442,7 +1454,8 @@ CASE_TEST(atapp_etcd_module, multi_node_discovery_delete_event) {
   // Continue ticking app1 - node2 should disappear from global_discovery
   std::vector<atframework::atapp::app *> apps1 = {&app1};
   bool node2_gone = run_apps_until(
-      apps1, [&discovery_module1, app2_id]() { return !discovery_module1->get_global_discovery().get_node_by_id(app2_id); },
+      apps1,
+      [&discovery_module1, app2_id]() { return !discovery_module1->get_global_discovery().get_node_by_id(app2_id); },
       std::chrono::seconds(20));
 
   CASE_EXPECT_TRUE(node2_gone);
@@ -1518,4 +1531,217 @@ CASE_TEST(atapp_etcd_module, multi_node_custom_data) {
   CASE_EXPECT_TRUE(!!node);
 
   CASE_MSG_INFO() << "multi_node_custom_data: local set/get API verified" << '\n';
+}
+
+// ============================================================
+// I.5.5: tick_keepalive_updates
+//   Regression guard: verifies that service_discovery_module::tick() calls
+//   update_keepalive_topology_value() (unconditionally) and
+//   update_keepalive_discovery_value() (when etcd is kRunning).
+//
+//   If these calls are removed from tick() during a refactor, this test will fail:
+//   - Topology keepalive actors will not receive runtime value updates
+//   - Discovery metadata changes (e.g. kind) will not propagate to etcd
+// ============================================================
+CASE_TEST(atapp_etcd_module, tick_keepalive_updates) {
+  if (!is_etcd_available()) {
+    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << "etcd is not available at " << get_etcd_host() << ", skip this test"
+                    << '\n';
+    return;
+  }
+
+  std::string conf_path_base;
+  atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
+  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_module_node1.yaml";
+  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_module_node2.yaml";
+
+  if (!atfw::util::file_system::is_exist(conf_path_1.c_str()) ||
+      !atfw::util::file_system::is_exist(conf_path_2.c_str())) {
+    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << "etcd node config not found, skip this test" << '\n';
+    return;
+  }
+
+  atframework::atapp::app app1;
+  atframework::atapp::app app2;
+  const char *args1[] = {"app1", "-c", conf_path_1.c_str(), "start"};
+  const char *args2[] = {"app2", "-c", conf_path_2.c_str(), "start"};
+  CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args1, nullptr));
+  CASE_EXPECT_EQ(0, app2.init(nullptr, 4, args2, nullptr));
+
+  auto discovery1 = app1.get_service_discovery_module();
+  auto discovery2 = app2.get_service_discovery_module();
+  CASE_EXPECT_TRUE(!!discovery1);
+  CASE_EXPECT_TRUE(!!discovery2);
+  if (!discovery1 || !discovery2) {
+    return;
+  }
+
+  std::vector<atframework::atapp::app *> apps = {&app1, &app2};
+
+  // Phase 1: Wait for mutual discovery (initial registration via init_service_discovery_keepalives_watchers)
+  bool mutual_discovery = run_apps_until(apps, [&discovery1, &discovery2, &app1, &app2]() {
+    return !!discovery1->get_global_discovery().get_node_by_id(app2.get_id()) &&
+           !!discovery2->get_global_discovery().get_node_by_id(app1.get_id());
+  });
+  CASE_EXPECT_TRUE(mutual_discovery);
+
+  // Phase 2: Verify topology data was published via keepalive
+  // update_keepalive_topology_value() packs app topology and pushes it to etcd through keepalive actors.
+  // The initial call happens in init, but tick() must continue calling it for runtime topology updates.
+  {
+    const auto &topo_set = discovery2->get_topology_info_set();
+    auto topo_it = topo_set.find(app1.get_id());
+    CASE_EXPECT_TRUE(topo_it != topo_set.end());
+    if (topo_it != topo_set.end()) {
+      CASE_EXPECT_TRUE(!!topo_it->second.info);
+      if (topo_it->second.info) {
+        CASE_EXPECT_EQ(app1.get_id(), topo_it->second.info->id());
+        CASE_EXPECT_EQ(app1.get_app_name(), topo_it->second.info->name());
+        CASE_MSG_INFO() << "tick_keepalive_updates: topology id=" << topo_it->second.info->id()
+                        << " name=" << topo_it->second.info->name() << '\n';
+      }
+    }
+  }
+
+  // Phase 3: Change app1's kind to trigger a discovery metadata update
+  // set_kind() internally calls set_maybe_update_keepalive_discovery_metadata(),
+  // setting the flag that update_keepalive_discovery_value() must process in tick().
+  // If update_keepalive_discovery_value() is removed from tick(), the new kind
+  // will never be pushed to etcd and app2 will never see the change.
+  CASE_EXPECT_NE(std::string("test_kind_tick_verify"), app1.get_metadata().kind());
+  app1.set_kind("test_kind_tick_verify");
+
+  // Phase 4: Tick and wait for the discovery metadata change to propagate
+  bool kind_updated = run_apps_until(apps, [&discovery2, &app1]() {
+    auto node = discovery2->get_global_discovery().get_node_by_id(app1.get_id());
+    if (!node) {
+      return false;
+    }
+    return node->get_discovery_info().metadata().kind() == "test_kind_tick_verify";
+  });
+  CASE_EXPECT_TRUE(kind_updated);
+
+  CASE_MSG_INFO() << "tick_keepalive_updates: mutual_discovery=" << (mutual_discovery ? "true" : "false")
+                  << " kind_updated=" << (kind_updated ? "true" : "false") << '\n';
+}
+
+// ============================================================
+// I.5.6: multi_context_snapshot_isolation
+// 多context下节点迁移
+// app1 app2 首先在同一etcd path内
+// app2 下线后在另一节点上线
+// 验证是否可以看见上线的节点，并且下线的节点被删除
+// ============================================================
+CASE_TEST(atapp_etcd_module, multi_context_snapshot_isolation) {
+  if (!is_etcd_available()) {
+    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << "etcd is not available at " << get_etcd_host() << ", skip this test"
+                    << '\n';
+    return;
+  }
+
+  std::string conf_path_base;
+  atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
+  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_module_node1.yaml";
+  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_module_node2.yaml";
+  std::string conf_path_3 = conf_path_base + "/atapp_test_etcd_module_multi_context_node2.yaml";
+
+  if (!atfw::util::file_system::is_exist(conf_path_1.c_str()) ||
+      !atfw::util::file_system::is_exist(conf_path_2.c_str()) ||
+      !atfw::util::file_system::is_exist(conf_path_3.c_str())) {
+    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << "etcd node config not found, skip this test" << '\n';
+    return;
+  }
+
+  atframework::atapp::app app1;
+  const char *args1[] = {"app1", "-c", conf_path_1.c_str(), "start"};
+  CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args1, nullptr));
+
+  auto discovery1 = app1.get_service_discovery_module();
+  CASE_EXPECT_TRUE(!!discovery1);
+  if (!discovery1) {
+    return;
+  }
+
+  uint64_t app2_id = 0;
+  {
+    atframework::atapp::app app2;
+    const char *args2[] = {"app2", "-c", conf_path_2.c_str(), "start"};
+    CASE_EXPECT_EQ(0, app2.init(nullptr, 4, args2, nullptr));
+    auto discovery2 = app2.get_service_discovery_module();
+    CASE_EXPECT_TRUE(!!discovery2);
+    if (!discovery2) {
+      return;
+    }
+
+    std::vector<atframework::atapp::app *> apps = {&app1, &app2};
+
+    // Phase 1: Wait for mutual discovery via the default context
+    bool mutual_discovery = run_apps_until(apps, [&discovery1, &discovery2, &app1, &app2]() {
+      return discovery1->get_global_discovery().get_node_by_id(app2.get_id()) &&
+             discovery2->get_global_discovery().get_node_by_id(app1.get_id());
+    });
+    CASE_EXPECT_TRUE(mutual_discovery);
+    if (!mutual_discovery) {
+      return;
+    }
+    app2_id = app2.get_id();
+  }
+
+  std::vector<atframework::atapp::app *> apps = {&app1};
+  // Phase 2: 下线节点
+  run_apps_until(apps, [&discovery1, app2_id]() {
+    if (!discovery1->get_global_discovery().get_node_by_id(app2_id)) {
+      return true;
+    }
+    return false;
+  });
+  CASE_EXPECT_TRUE(!discovery1->get_global_discovery().get_node_by_id(app2_id));
+  if (discovery1->get_global_discovery().get_node_by_id(app2_id) != nullptr) {
+    return;
+  }
+
+  // Phase 3: 上线节点到新的context
+  atframework::atapp::app app3;
+  const char *args3[] = {"app3", "-c", conf_path_3.c_str(), "start"};
+  CASE_EXPECT_EQ(0, app3.init(nullptr, 4, args3, nullptr));
+  auto discovery3 = app3.get_service_discovery_module();
+  CASE_EXPECT_TRUE(!!discovery3);
+  if (!discovery3) {
+    return;
+  }
+
+  // Phase 4: app1接入新节点 context
+  auto service_discovery_context =
+      std::make_shared<atframework::atapp::service_discovery_module::service_discovery_cluster_context>();
+  int ret = service_discovery_context->init(app1, discovery3->get_configure(), nullptr);
+  CASE_EXPECT_TRUE(ret == 0);
+  if (ret != 0) {
+    return;
+  }
+
+  ret = discovery1->init_service_discovery_keepalives_watchers(service_discovery_context);
+  CASE_EXPECT_TRUE(ret == 0);
+  if (ret != 0) {
+    return;
+  }
+  bool success = service_discovery_context->check_keepalive_actor_start_success();
+  CASE_EXPECT_TRUE(success);
+  if (!success) {
+    return;
+  }
+
+  // Phase 5: 等待发现app3
+  apps = {&app1, &app3};
+  bool mutual_discovery = run_apps_until(apps, [&discovery1, &discovery3, &app1, &app3]() {
+    return !!discovery1->get_global_discovery().get_node_by_id(app3.get_id()) &&
+           !!discovery3->get_global_discovery().get_node_by_id(app1.get_id());
+  });
+  CASE_EXPECT_TRUE(mutual_discovery);
+  if (!mutual_discovery) {
+    return;
+  }
+  CASE_EXPECT_TRUE(!!discovery1->get_global_discovery().get_node_by_id(app3.get_id()));
+  CASE_EXPECT_TRUE(!!discovery1->get_global_discovery().get_node_by_id(app1.get_id()));
+  CASE_EXPECT_TRUE(!!discovery3->get_global_discovery().get_node_by_id(app1.get_id()));
+  CASE_EXPECT_TRUE(!!discovery3->get_global_discovery().get_node_by_id(app3.get_id()));
 }

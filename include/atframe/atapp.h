@@ -54,7 +54,7 @@ class service_discovery_module;
 class worker_pool_module;
 class atapp_connector_atbus;
 class atapp_connector_loopback;
-struct curl_multi_guard_type;
+struct LIBATAPP_MACRO_API curl_multi_guard_type;
 
 class app {
  public:

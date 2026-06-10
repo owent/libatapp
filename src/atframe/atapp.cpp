@@ -325,21 +325,24 @@ static std::chrono::system_clock::duration &atapp_get_sys_now_offset() {
 
 }  // namespace
 
-struct ATFW_UTIL_SYMBOL_LOCAL curl_multi_guard_type {
+struct LIBATAPP_MACRO_API curl_multi_guard_type {
   curl_multi_guard_type() { init_result = curl_global_init(CURL_GLOBAL_ALL); }
   ~curl_multi_guard_type() {
-    if (init_result == 0) {
+    if (init_result == CURLE_OK) {
       curl_global_cleanup();
     }
   }
   int init_result;
 };
+
+namespace {
 static std::shared_ptr<curl_multi_guard_type> create_curl_multi_guard() {
   std::shared_ptr<curl_multi_guard_type> guard = std::make_shared<curl_multi_guard_type>();
-  if (guard->init_result != 0) {
+  if (guard->init_result != CURLE_OK) {
     return nullptr;
   }
   return guard;
+}
 }
 
 LIBATAPP_MACRO_API app::message_t::message_t() : type(0), message_sequence(0), metadata(nullptr) {}
