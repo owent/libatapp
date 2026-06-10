@@ -31,6 +31,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <list>
 
 #if defined(max)
 #  undef max
@@ -127,7 +128,7 @@ static bool topology_update_version(service_discovery_module::topology_storage_t
 
 struct ATFW_UTIL_SYMBOL_LOCAL service_discovery_module::topology_watcher_callback_list_wrapper_t {
   service_discovery_module *ATFW_UTIL_MACRO_NONNULL mod;
-  ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> ctx;
+  std::weak_ptr<service_discovery_cluster_context> ctx;
 
   std::recursive_mutex *ATFW_UTIL_MACRO_NULLABLE callback_lock;
   std::list<topology_watcher_list_callback_t> *ATFW_UTIL_MACRO_NULLABLE callbacks;
@@ -135,10 +136,11 @@ struct ATFW_UTIL_SYMBOL_LOCAL service_discovery_module::topology_watcher_callbac
   bool has_insert_snapshot_index;
 
   topology_watcher_callback_list_wrapper_t(
-      service_discovery_module &m, ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> c,
-      int64_t index);
+      service_discovery_module &m,
+      const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &c, int64_t index);
   topology_watcher_callback_list_wrapper_t(
-      service_discovery_module &m, ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> c,
+      service_discovery_module &m,
+      const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &c,
       std::recursive_mutex &lock, std::list<topology_watcher_list_callback_t> &cbks, int64_t index);
   ~topology_watcher_callback_list_wrapper_t();
   void operator()(const ::atframework::atapp::etcd_response_header &header,
@@ -147,7 +149,7 @@ struct ATFW_UTIL_SYMBOL_LOCAL service_discovery_module::topology_watcher_callbac
 
 struct ATFW_UTIL_SYMBOL_LOCAL service_discovery_module::discovery_watcher_callback_list_wrapper_t {
   service_discovery_module *ATFW_UTIL_MACRO_NONNULL mod;
-  ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> ctx;
+  std::weak_ptr<service_discovery_cluster_context> ctx;
 
   std::recursive_mutex *ATFW_UTIL_MACRO_NULLABLE callback_lock;
   std::list<discovery_watcher_list_callback_t> *ATFW_UTIL_MACRO_NULLABLE callbacks;
@@ -155,10 +157,11 @@ struct ATFW_UTIL_SYMBOL_LOCAL service_discovery_module::discovery_watcher_callba
   bool has_insert_snapshot_index;
 
   discovery_watcher_callback_list_wrapper_t(
-      service_discovery_module &m, ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> c,
-      int64_t index);
+      service_discovery_module &m,
+      const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &c, int64_t index);
   discovery_watcher_callback_list_wrapper_t(
-      service_discovery_module &m, ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> c,
+      service_discovery_module &m,
+      const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &c,
       std::recursive_mutex &lock, std::list<discovery_watcher_list_callback_t> &cbks, int64_t index);
   ~discovery_watcher_callback_list_wrapper_t();
   void operator()(const ::atframework::atapp::etcd_response_header &header,
@@ -227,6 +230,18 @@ LIBATAPP_MACRO_API int service_discovery_module::init() {
     return ret;
   }
 
+  for (const auto &config : get_app()->get_origin_configure().external_discovery()) {
+    if (!config.enable()) {
+      continue;
+    }
+    auto external_cluster_context = std::make_shared<service_discovery_cluster_context>();
+    ret = external_cluster_context->init(*get_app(), config, nullptr);
+    if (ret < 0) {
+      return ret;
+    }
+    external_cluster_contexts_.push_back(std::move(external_cluster_context));
+  }
+
   if (!is_discovery_enabled()) {
     return 0;
   }
@@ -248,6 +263,25 @@ LIBATAPP_MACRO_API int service_discovery_module::init() {
     return -1;
   }
 
+  for (const auto &external_cluster_context : external_cluster_contexts_) {
+    ret = init_service_discovery_keepalives(external_cluster_context);
+    if (ret < 0) {
+      stop();
+      return ret;
+    }
+
+    ret = init_service_discovery_watchers(external_cluster_context);
+    if (ret < 0) {
+      stop();
+      return ret;
+    }
+
+    if (!external_cluster_context->check_keepalive_actor_start_success()) {
+      stop();
+      return -1;
+    }
+  }
+
   return 0;
 }
 
@@ -258,14 +292,27 @@ LIBATAPP_MACRO_API const char *ATFW_UTIL_MACRO_NONNULL service_discovery_module:
 LIBATAPP_MACRO_API service_discovery_module::service_discovery_cluster_context::service_discovery_cluster_context()
     : data_(std::make_shared<service_discovery_cluster_context_data>()) {}
 
-LIBATAPP_MACRO_API int service_discovery_module::stop() { return cluster_context_->stop(); }
+LIBATAPP_MACRO_API int service_discovery_module::stop() {
+  int ret = cluster_context_->stop();
+  for (const auto &external_cluster_context : external_cluster_contexts_) {
+    int ext_ret = external_cluster_context->stop();
+    if (ext_ret != 0) {
+      ret = ext_ret;
+    }
+  }
+  return ret;
+}
 
 LIBATAPP_MACRO_API int service_discovery_module::reload() {
+  // FIXME reload 不支持external cluster context的热更新，后续可以考虑增加这个功能
   return cluster_context_->reload(get_app()->get_origin_configure().etcd(), nullptr);
 }
 
 LIBATAPP_MACRO_API int service_discovery_module::tick() {
   cluster_context_->tick();
+  for (const auto &external_cluster_context : external_cluster_contexts_) {
+    external_cluster_context->tick();
+  }
 
   update_keepalive_topology_value();
   if (cluster_context_->get_etcd_module().get_etcd_cluster().check_flag(etcd_cluster::flag_t::kRunning)) {
@@ -277,6 +324,9 @@ LIBATAPP_MACRO_API int service_discovery_module::tick() {
 
 LIBATAPP_MACRO_API int service_discovery_module::timeout() {
   cluster_context_->reset();
+  for (const auto &external_cluster_context : external_cluster_contexts_) {
+    external_cluster_context->reset();
+  }
   return 0;
 }
 
@@ -296,13 +346,31 @@ LIBATAPP_MACRO_API void service_discovery_module::enable_discovery() {
   int ret = init_service_discovery_keepalives(cluster_context_);
   if (ret < 0) {
     discovery_enabled_ = false;
-    cluster_context_->reset_internal_watchers_and_keepalives();
+    reset_context_internal_watchers_and_keepalives();
+    return;
   }
 
   ret = init_service_discovery_watchers(cluster_context_);
   if (ret < 0) {
     discovery_enabled_ = false;
-    cluster_context_->reset_internal_watchers_and_keepalives();
+    reset_context_internal_watchers_and_keepalives();
+    return;
+  }
+
+  for (const auto &external_cluster_context : external_cluster_contexts_) {
+    ret = init_service_discovery_keepalives(external_cluster_context);
+    if (ret < 0) {
+      discovery_enabled_ = false;
+      reset_context_internal_watchers_and_keepalives();
+      return;
+    }
+
+    ret = init_service_discovery_watchers(external_cluster_context);
+    if (ret < 0) {
+      discovery_enabled_ = false;
+      reset_context_internal_watchers_and_keepalives();
+      return;
+    }
   }
 }
 
@@ -311,7 +379,14 @@ LIBATAPP_MACRO_API void service_discovery_module::disable_discovery() {
     return;
   }
   discovery_enabled_ = false;
+  reset_context_internal_watchers_and_keepalives();
+}
+
+LIBATAPP_MACRO_API void service_discovery_module::reset_context_internal_watchers_and_keepalives() {
   cluster_context_->reset_internal_watchers_and_keepalives();
+  for (const auto &external_cluster_context : external_cluster_contexts_) {
+    external_cluster_context->reset_internal_watchers_and_keepalives();
+  }
 }
 
 void service_discovery_module::update_keepalive_topology_value() {
@@ -392,48 +467,52 @@ void service_discovery_module::update_keepalive_discovery_value() {
 }
 
 LIBATAPP_MACRO_API int service_discovery_module::init_service_discovery_keepalives(
-    ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context) {
+    const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &context) {
   // 先刷新topology数据，后刷新discovery数据，以保证策略路由变化时已获取到最新的topology信息
   update_keepalive_topology_value();
   update_keepalive_discovery_value();
 
   atframework::atapp::app &app = *get_app();
 
-  int ret = init_topology_keepalive(app, context, internal_keepalive_topology_value_);
-  if (ret < 0) {
-    return ret;
-  }
-  ret = init_discovery_keepalive_by_id(app, context, internal_keepalive_discovery_value_);
-  if (ret < 0) {
-    return ret;
-  }
-  ret = init_discovery_keepalive_by_name(app, context, internal_keepalive_discovery_value_);
-  if (ret < 0) {
-    return ret;
+  if (context->get_etcd_module().get_configure().keepalive().enabled()) {
+    int ret = init_topology_keepalive(app, context, internal_keepalive_topology_value_);
+    if (ret < 0) {
+      return ret;
+    }
+    ret = init_discovery_keepalive_by_id(app, context, internal_keepalive_discovery_value_);
+    if (ret < 0) {
+      return ret;
+    }
+    ret = init_discovery_keepalive_by_name(app, context, internal_keepalive_discovery_value_);
+    if (ret < 0) {
+      return ret;
+    }
   }
 
   return 0;
 }
 
 LIBATAPP_MACRO_API int service_discovery_module::init_service_discovery_watchers(
-    ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context) {
+    const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &context) {
   // 先刷新topology数据，后刷新discovery数据，以保证策略路由变化时已获取到最新的topology信息
   update_keepalive_topology_value();
   update_keepalive_discovery_value();
 
   atframework::atapp::app &app = *get_app();
 
-  int ret = add_topology_watcher_callback(app, context, nullptr);
-  if (ret < 0) {
-    return ret;
-  }
-  ret = add_discovery_watcher_by_id_callback(app, context, nullptr);
-  if (ret < 0) {
-    return ret;
-  }
-  ret = add_discovery_watcher_by_name_callback(app, context, nullptr);
-  if (ret < 0) {
-    return ret;
+  if (context->get_etcd_module().get_configure().watcher().enabled()) {
+    int ret = add_topology_watcher_callback(app, context, nullptr);
+    if (ret < 0) {
+      return ret;
+    }
+    ret = add_discovery_watcher_by_id_callback(app, context, nullptr);
+    if (ret < 0) {
+      return ret;
+    }
+    ret = add_discovery_watcher_by_name_callback(app, context, nullptr);
+    if (ret < 0) {
+      return ret;
+    }
   }
 
   return 0;
@@ -441,7 +520,8 @@ LIBATAPP_MACRO_API int service_discovery_module::init_service_discovery_watchers
 
 LIBATAPP_MACRO_API int service_discovery_module::init_discovery_keepalive_by_id(
     atframework::atapp::app &app,
-    ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context, std::string &value) {
+    const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &context,
+    std::string &value) {
   atapp::etcd_keepalive::ptr_t actor = add_keepalive_actor(
       app, context, value, get_discovery_by_id_path(app, context->etcd_module_.get_configure_path()));
   if (!actor) {
@@ -460,7 +540,8 @@ LIBATAPP_MACRO_API int service_discovery_module::init_discovery_keepalive_by_id(
 
 LIBATAPP_MACRO_API int service_discovery_module::init_discovery_keepalive_by_name(
     atframework::atapp::app &app,
-    ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context, std::string &value) {
+    const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &context,
+    std::string &value) {
   atapp::etcd_keepalive::ptr_t actor = add_keepalive_actor(
       app, context, value, get_discovery_by_name_path(app, context->etcd_module_.get_configure_path()));
   if (!actor) {
@@ -479,7 +560,8 @@ LIBATAPP_MACRO_API int service_discovery_module::init_discovery_keepalive_by_nam
 
 LIBATAPP_MACRO_API int service_discovery_module::init_topology_keepalive(
     atframework::atapp::app &app,
-    ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context, std::string &value) {
+    const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &context,
+    std::string &value) {
   atapp::etcd_keepalive::ptr_t actor =
       add_keepalive_actor(app, context, value, get_topology_path(app, context->etcd_module_.get_configure_path()));
   if (!actor) {
@@ -543,7 +625,7 @@ LIBATAPP_MACRO_API std::string service_discovery_module::get_topology_watcher_pa
 
 LIBATAPP_MACRO_API int service_discovery_module::init_discovery_watcher_by_id(
     ATFW_EXPLICIT_UNUSED_ATTR atframework::atapp::app &app,
-    ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context) {
+    const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &context) {
   if (!context->data_->internal_discovery_watcher_by_id_) {
     std::string watch_path =
         LOG_WRAPPER_FWAPI_FORMAT("{}{}", context->etcd_module_.get_configure_path(), ETCD_MODULE_BY_ID_DIR);
@@ -572,7 +654,7 @@ LIBATAPP_MACRO_API int service_discovery_module::init_discovery_watcher_by_id(
 
 LIBATAPP_MACRO_API int service_discovery_module::init_discovery_watcher_by_name(
     ATFW_EXPLICIT_UNUSED_ATTR atframework::atapp::app &app,
-    ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context) {
+    const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &context) {
   if (!context->data_->internal_discovery_watcher_by_name_) {
     // generate watch data
     std::string watch_path =
@@ -602,7 +684,7 @@ LIBATAPP_MACRO_API int service_discovery_module::init_discovery_watcher_by_name(
 
 LIBATAPP_MACRO_API int service_discovery_module::init_topology_watcher(
     ATFW_EXPLICIT_UNUSED_ATTR atframework::atapp::app &app,
-    ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context) {
+    const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &context) {
   if (!context->data_->internal_topology_watcher_) {
     // generate watch data
     std::string watch_path =
@@ -693,7 +775,7 @@ LIBATAPP_MACRO_API void service_discovery_module::service_discovery_cluster_cont
 
 LIBATAPP_MACRO_API int service_discovery_module::add_discovery_watcher_by_id_callback(
     atframework::atapp::app &app,
-    ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context,
+    const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &context,
     const discovery_watcher_list_callback_t &fn) {
   int ret = init_discovery_watcher_by_id(app, context);
   if (ret < 0) {
@@ -705,7 +787,7 @@ LIBATAPP_MACRO_API int service_discovery_module::add_discovery_watcher_by_id_cal
 
 LIBATAPP_MACRO_API int service_discovery_module::add_discovery_watcher_by_name_callback(
     atframework::atapp::app &app,
-    ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context,
+    const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &context,
     const discovery_watcher_list_callback_t &fn) {
   int ret = init_discovery_watcher_by_name(app, context);
   if (ret < 0) {
@@ -717,7 +799,7 @@ LIBATAPP_MACRO_API int service_discovery_module::add_discovery_watcher_by_name_c
 
 LIBATAPP_MACRO_API int service_discovery_module::add_topology_watcher_callback(
     atframework::atapp::app &app,
-    ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context,
+    const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &context,
     const topology_watcher_list_callback_t &fn) {
   int ret = init_topology_watcher(app, context);
   if (ret < 0) {
@@ -754,7 +836,7 @@ LIBATAPP_MACRO_API const std::string &service_discovery_module::get_configure_pa
 
 LIBATAPP_MACRO_API atapp::etcd_keepalive::ptr_t service_discovery_module::add_keepalive_actor(
     atframework::atapp::app &app,
-    ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context, std::string &val,
+    const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &context, std::string &val,
     const std::string &node_path) {
   atapp::etcd_keepalive::ptr_t ret;
 
@@ -787,7 +869,7 @@ LIBATAPP_MACRO_API atapp::etcd_keepalive::ptr_t service_discovery_module::add_ke
 
 LIBATAPP_MACRO_API bool service_discovery_module::remove_keepalive_actor(
     ATFW_EXPLICIT_UNUSED_ATTR atframework::atapp::app &app,
-    ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context,
+    const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &context,
     const atapp::etcd_keepalive::ptr_t &keepalive) {
   if (!keepalive) {
     return false;
@@ -952,13 +1034,13 @@ LIBATAPP_MACRO_API void service_discovery_module::remove_on_topology_snapshot_lo
 
 LIBATAPP_MACRO_API etcd_watcher::watch_event_fn_t_ptr
 service_discovery_module::create_discovery_watcher_callback_list_wrapper(
-    ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context) {
+    const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &context) {
   return std::make_unique<etcd_watcher::watch_event_fn_t>(discovery_watcher_callback_list_wrapper_t(
       *this, context, ++context->data_->discovery_watcher_snapshot_index_allocator_));
 }
 LIBATAPP_MACRO_API etcd_watcher::watch_event_fn_t_ptr
 service_discovery_module::create_topology_watcher_callback_list_wrapper(
-    ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context) {
+    const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &context) {
   return std::make_unique<etcd_watcher::watch_event_fn_t>(topology_watcher_callback_list_wrapper_t(
       *this, context, ++context->data_->topology_watcher_snapshot_index_allocator_));
 }
@@ -1160,8 +1242,8 @@ void service_discovery_module::watcher_internal_access_t::cleanup_old_topology_p
 }
 
 service_discovery_module::discovery_watcher_callback_list_wrapper_t::discovery_watcher_callback_list_wrapper_t(
-    service_discovery_module &m, ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> c,
-    int64_t index)
+    service_discovery_module &m,
+    const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &c, int64_t index)
     : mod(&m),
       ctx(c),
       callback_lock(nullptr),
@@ -1170,7 +1252,8 @@ service_discovery_module::discovery_watcher_callback_list_wrapper_t::discovery_w
       has_insert_snapshot_index(false) {}
 
 service_discovery_module::discovery_watcher_callback_list_wrapper_t::discovery_watcher_callback_list_wrapper_t(
-    service_discovery_module &m, ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> c,
+    service_discovery_module &m,
+    const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &c,
     std::recursive_mutex &lock, std::list<discovery_watcher_list_callback_t> &cbks, int64_t index)
     : mod(&m),
       ctx(c),
@@ -1180,8 +1263,8 @@ service_discovery_module::discovery_watcher_callback_list_wrapper_t::discovery_w
       has_insert_snapshot_index(false) {}
 
 service_discovery_module::discovery_watcher_callback_list_wrapper_t::~discovery_watcher_callback_list_wrapper_t() {
-  if (nullptr != ctx && 0 != snapshot_index && has_insert_snapshot_index) {
-    ctx->data_->discovery_watcher_snapshot_index_.erase(snapshot_index);
+  if (!ctx.expired() && 0 != snapshot_index && has_insert_snapshot_index) {
+    ctx.lock()->data_->discovery_watcher_snapshot_index_.erase(snapshot_index);
   }
 }
 
@@ -1191,19 +1274,23 @@ void service_discovery_module::discovery_watcher_callback_list_wrapper_t::operat
   if (nullptr == mod) {
     return;
   }
-  ctx->data_->last_etcd_event_discovery_header_ = header;
+  if (ctx.expired()) {
+    return;
+  }
+  auto ctx_locked = ctx.lock();
+  ctx_locked->data_->last_etcd_event_discovery_header_ = header;
 
   bool enable_snapshot = body.snapshot && 0 != snapshot_index;
   if (enable_snapshot) {
     if (!has_insert_snapshot_index) {
-      ctx->data_->discovery_watcher_snapshot_index_.insert(snapshot_index);
+      ctx_locked->data_->discovery_watcher_snapshot_index_.insert(snapshot_index);
       has_insert_snapshot_index = true;
     }
 
     // We just accept the earliest watcher as snapshot notifier.
     // So just enable by_id or by_name when initializing and they will has the smallest index.
-    if (!ctx->data_->discovery_watcher_snapshot_index_.empty() &&
-        *ctx->data_->discovery_watcher_snapshot_index_.begin() != snapshot_index) {
+    if (!ctx_locked->data_->discovery_watcher_snapshot_index_.empty() &&
+        *ctx_locked->data_->discovery_watcher_snapshot_index_.begin() != snapshot_index) {
       enable_snapshot = false;
     }
   }
@@ -1227,7 +1314,7 @@ void service_discovery_module::discovery_watcher_callback_list_wrapper_t::operat
   for (size_t i = 0; i < body.events.size(); ++i) {
     const ::atframework::atapp::etcd_watcher::event_t &evt_data = body.events[i];
     node_info_t node;
-    node.context_addr = reinterpret_cast<uintptr_t>(ctx.get());
+    node.context_addr = reinterpret_cast<uintptr_t>(ctx_locked.get());
     etcd_discovery_node::node_version current_node_version;
 
     unpack(node, evt_data.kv.key.empty() ? evt_data.prev_kv.key : evt_data.kv.key,
@@ -1272,7 +1359,7 @@ void service_discovery_module::discovery_watcher_callback_list_wrapper_t::operat
 
   // cleanup old nodes when receive snapshot response
   if (enable_snapshot) {
-    service_discovery_module::watcher_internal_access_t::cleanup_old_nodes(*mod, *ctx, old_names, old_ids);
+    service_discovery_module::watcher_internal_access_t::cleanup_old_nodes(*mod, *ctx_locked, old_names, old_ids);
 
     for (auto iter = mod->discovery_on_snapshot_loaded_callbacks_.begin();
          iter != mod->discovery_on_snapshot_loaded_callbacks_.end();) {
@@ -1286,8 +1373,8 @@ void service_discovery_module::discovery_watcher_callback_list_wrapper_t::operat
 }
 
 service_discovery_module::topology_watcher_callback_list_wrapper_t::topology_watcher_callback_list_wrapper_t(
-    service_discovery_module &m, ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> c,
-    int64_t index)
+    service_discovery_module &m,
+    const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &c, int64_t index)
     : mod(&m),
       ctx(c),
       callback_lock(nullptr),
@@ -1296,7 +1383,8 @@ service_discovery_module::topology_watcher_callback_list_wrapper_t::topology_wat
       has_insert_snapshot_index(false) {}
 
 service_discovery_module::topology_watcher_callback_list_wrapper_t::topology_watcher_callback_list_wrapper_t(
-    service_discovery_module &m, ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> c,
+    service_discovery_module &m,
+    const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &c,
     std::recursive_mutex &lock, std::list<topology_watcher_list_callback_t> &cbks, int64_t index)
     : mod(&m),
       ctx(c),
@@ -1306,8 +1394,8 @@ service_discovery_module::topology_watcher_callback_list_wrapper_t::topology_wat
       has_insert_snapshot_index(false) {}
 
 service_discovery_module::topology_watcher_callback_list_wrapper_t::~topology_watcher_callback_list_wrapper_t() {
-  if (nullptr != ctx && 0 != snapshot_index && has_insert_snapshot_index) {
-    ctx->data_->topology_watcher_snapshot_index_.erase(snapshot_index);
+  if (!ctx.expired() && 0 != snapshot_index && has_insert_snapshot_index) {
+    ctx.lock()->data_->topology_watcher_snapshot_index_.erase(snapshot_index);
   }
 }
 
@@ -1317,19 +1405,23 @@ void service_discovery_module::topology_watcher_callback_list_wrapper_t::operato
   if (nullptr == mod) {
     return;
   }
-  ctx->data_->last_etcd_event_topology_header_ = header;
+  if (ctx.expired()) {
+    return;
+  }
+  auto ctx_locked = ctx.lock();
+  ctx_locked->data_->last_etcd_event_topology_header_ = header;
 
   bool enable_snapshot = body.snapshot && 0 != snapshot_index;
   if (enable_snapshot) {
     if (!has_insert_snapshot_index) {
-      ctx->data_->topology_watcher_snapshot_index_.insert(snapshot_index);
+      ctx_locked->data_->topology_watcher_snapshot_index_.insert(snapshot_index);
       has_insert_snapshot_index = true;
     }
 
     // We just accept the earliest watcher as snapshot notifier.
     // So just enable by_id or by_name when initializing and they will has the smallest index.
-    if (!ctx->data_->topology_watcher_snapshot_index_.empty() &&
-        *ctx->data_->topology_watcher_snapshot_index_.begin() != snapshot_index) {
+    if (!ctx_locked->data_->topology_watcher_snapshot_index_.empty() &&
+        *ctx_locked->data_->topology_watcher_snapshot_index_.begin() != snapshot_index) {
       enable_snapshot = false;
     }
   }
@@ -1352,7 +1444,7 @@ void service_discovery_module::topology_watcher_callback_list_wrapper_t::operato
   for (size_t i = 0; i < body.events.size(); ++i) {
     const ::atframework::atapp::etcd_watcher::event_t &evt_data = body.events[i];
     topology_info_t topology_info;
-    topology_info.storage.context_addr = reinterpret_cast<uintptr_t>(ctx.get());
+    topology_info.storage.context_addr = reinterpret_cast<uintptr_t>(ctx_locked.get());
 
     unpack(topology_info, evt_data.kv.key.empty() ? evt_data.prev_kv.key : evt_data.kv.key,
            evt_data.kv.value.empty() ? evt_data.prev_kv.value : evt_data.kv.value, true);
@@ -1392,7 +1484,7 @@ void service_discovery_module::topology_watcher_callback_list_wrapper_t::operato
 
   // cleanup old nodes when receive snapshot response
   if (enable_snapshot) {
-    service_discovery_module::watcher_internal_access_t::cleanup_old_topology_peers(*mod, *ctx, old_ids);
+    service_discovery_module::watcher_internal_access_t::cleanup_old_topology_peers(*mod, *ctx_locked, old_ids);
 
     for (auto iter = mod->topology_on_snapshot_loaded_callbacks_.begin();
          iter != mod->topology_on_snapshot_loaded_callbacks_.end();) {
@@ -1420,8 +1512,8 @@ bool service_discovery_module::update_internal_watcher_event(node_info_t &node,
           // 只有相同 context 才进行处理
           LIBATAPP_MACRO_ETCD_CLUSTER_LOG_WARNING(
               cluster_context_->etcd_module_.get_etcd_cluster(),
-              "try to delete node with same id but different context, ignore it. node id: %lu, node name: %s, node "
-              "context: %p, local cache context: %p",
+              "try to delete node with same id but different context, ignore it. node id: {}, node name: {}, node "
+              "context: {}, local cache context: {}",
               node.node_discovery.id(), node.node_discovery.name().c_str(), reinterpret_cast<void *>(node.context_addr),
               reinterpret_cast<void *>(local_cache_by_id->get_context_addr()));
           return false;
@@ -1437,8 +1529,8 @@ bool service_discovery_module::update_internal_watcher_event(node_info_t &node,
           // 只有相同 context 才进行处理
           LIBATAPP_MACRO_ETCD_CLUSTER_LOG_WARNING(
               cluster_context_->etcd_module_.get_etcd_cluster(),
-              "try to delete node with same id but different context, ignore it. node id: %lu, node name: %s, node "
-              "context: %p, local cache context: %p",
+              "try to delete node with same id but different context, ignore it. node id: {}, node name: {}, node "
+              "context: {}, local cache context: {}",
               node.node_discovery.id(), node.node_discovery.name().c_str(), reinterpret_cast<void *>(node.context_addr),
               reinterpret_cast<void *>(local_cache_by_id->get_context_addr()));
           return false;
@@ -1467,8 +1559,8 @@ bool service_discovery_module::update_internal_watcher_event(node_info_t &node,
           // 只有相同 context 才进行处理
           LIBATAPP_MACRO_ETCD_CLUSTER_LOG_WARNING(
               cluster_context_->etcd_module_.get_etcd_cluster(),
-              "try to delete node with same id but different context, ignore it. node id: %lu, node name: %s, node "
-              "context: %p, local cache context: %p",
+              "try to delete node with same id but different context, ignore it. node id: {}, node name: {}, node "
+              "context: {}, local cache context: {}",
               node.node_discovery.id(), node.node_discovery.name().c_str(), reinterpret_cast<void *>(node.context_addr),
               reinterpret_cast<void *>(local_cache_by_id->get_context_addr()));
           local_cache_by_id = nullptr;
@@ -1483,8 +1575,8 @@ bool service_discovery_module::update_internal_watcher_event(node_info_t &node,
           // 只有相同 context 才进行处理
           LIBATAPP_MACRO_ETCD_CLUSTER_LOG_WARNING(
               cluster_context_->etcd_module_.get_etcd_cluster(),
-              "try to delete node with same name but different context, ignore it. node id: %lu, node name: %s, node "
-              "context: %p, local cache context: %p",
+              "try to delete node with same name but different context, ignore it. node id: {}, node name: {}, node "
+              "context: {}, local cache context: {}",
               node.node_discovery.id(), node.node_discovery.name().c_str(), reinterpret_cast<void *>(node.context_addr),
               reinterpret_cast<void *>(local_cache_by_name->get_context_addr()));
           local_cache_by_name = nullptr;
@@ -1603,7 +1695,7 @@ bool service_discovery_module::update_internal_watcher_event(topology_info_t &to
         // 已存在的节点不属于当前 context，视为过期或乱序事件，不触发回调
         LIBATAPP_MACRO_ETCD_CLUSTER_LOG_WARNING(
             cluster_context_->etcd_module_.get_etcd_cluster(),
-            "Received topology event with id %lu from context %p, but current context is %p, ignore it",
+            "Received topology event with id {} from context {}, but current context is {}, ignore it",
             topology_info.storage.info->id(), (void *)topology_info.storage.context_addr,
             (void *)local_cache_iter->second.context_addr);
         return false;

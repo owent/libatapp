@@ -1701,6 +1701,105 @@ CASE_TEST(atapp_etcd_module, multi_context_snapshot_isolation) {
   }
 
   // Phase 3: 上线节点到新的context
+  std::weak_ptr<atapp::service_discovery_module::service_discovery_cluster_context> weak_context;
+  {
+    atframework::atapp::app app3;
+    const char *args3[] = {"app3", "-c", conf_path_3.c_str(), "start"};
+    CASE_EXPECT_EQ(0, app3.init(nullptr, 4, args3, nullptr));
+    auto discovery3 = app3.get_service_discovery_module();
+    CASE_EXPECT_TRUE(!!discovery3);
+    if (!discovery3) {
+      return;
+    }
+
+    // Phase 4: app1接入新节点 context
+    auto service_discovery_context =
+        std::make_shared<atframework::atapp::service_discovery_module::service_discovery_cluster_context>();
+    weak_context = service_discovery_context;
+    int ret = service_discovery_context->init(app1, discovery3->get_configure(), nullptr);
+    CASE_EXPECT_TRUE(ret == 0);
+    if (ret != 0) {
+      return;
+    }
+
+    ret = discovery1->init_service_discovery_keepalives(service_discovery_context);
+    CASE_EXPECT_TRUE(ret == 0);
+    if (ret != 0) {
+      return;
+    }
+    ret = discovery1->init_service_discovery_watchers(service_discovery_context);
+    CASE_EXPECT_TRUE(ret == 0);
+    if (ret != 0) {
+      return;
+    }
+    bool success = service_discovery_context->check_keepalive_actor_start_success();
+    CASE_EXPECT_TRUE(success);
+    if (!success) {
+      return;
+    }
+
+    // Phase 5: 等待发现app3
+    apps = {&app1, &app3};
+    bool mutual_discovery = run_apps_until(apps, [&discovery1, &discovery3, &app1, &app3]() {
+      return !!discovery1->get_global_discovery().get_node_by_id(app3.get_id()) &&
+             !!discovery3->get_global_discovery().get_node_by_id(app1.get_id());
+    });
+    CASE_EXPECT_TRUE(mutual_discovery);
+    if (!mutual_discovery) {
+      return;
+    }
+    CASE_EXPECT_TRUE(!!discovery1->get_global_discovery().get_node_by_id(app3.get_id()));
+    CASE_EXPECT_TRUE(!!discovery1->get_global_discovery().get_node_by_id(app1.get_id()));
+    CASE_EXPECT_TRUE(!!discovery3->get_global_discovery().get_node_by_id(app1.get_id()));
+    CASE_EXPECT_TRUE(!!discovery3->get_global_discovery().get_node_by_id(app3.get_id()));
+  }
+  // Phase 6 检查泄露
+  CASE_EXPECT_TRUE(weak_context.expired());
+}
+
+// ============================================================
+// I.5.7: diff_context_snapshot_isolation
+// 验证 context 冲突时不会被替换
+// ============================================================
+CASE_TEST(atapp_etcd_module, diff_context_snapshot_isolation) {
+  if (!is_etcd_available()) {
+    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << "etcd is not available at " << get_etcd_host() << ", skip this test"
+                    << '\n';
+    return;
+  }
+
+  std::string conf_path_base;
+  atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
+  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_module_node1.yaml";
+  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_module_multi_context_node2.yaml";
+  std::string conf_path_3 = conf_path_base + "/atapp_test_etcd_module_multi_context_node3.yaml";
+
+  if (!atfw::util::file_system::is_exist(conf_path_1.c_str()) ||
+      !atfw::util::file_system::is_exist(conf_path_2.c_str()) ||
+      !atfw::util::file_system::is_exist(conf_path_3.c_str())) {
+    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << "etcd node config not found, skip this test" << '\n';
+    return;
+  }
+
+  atframework::atapp::app app1;
+  const char *args1[] = {"app1", "-c", conf_path_1.c_str(), "start"};
+  CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args1, nullptr));
+
+  auto discovery1 = app1.get_service_discovery_module();
+  CASE_EXPECT_TRUE(!!discovery1);
+  if (!discovery1) {
+    return;
+  }
+
+  atframework::atapp::app app2;
+  const char *args2[] = {"app2", "-c", conf_path_2.c_str(), "start"};
+  CASE_EXPECT_EQ(0, app2.init(nullptr, 4, args2, nullptr));
+  auto discovery2 = app2.get_service_discovery_module();
+  CASE_EXPECT_TRUE(!!discovery2);
+  if (!discovery2) {
+    return;
+  }
+
   atframework::atapp::app app3;
   const char *args3[] = {"app3", "-c", conf_path_3.c_str(), "start"};
   CASE_EXPECT_EQ(0, app3.init(nullptr, 4, args3, nullptr));
@@ -1710,43 +1809,212 @@ CASE_TEST(atapp_etcd_module, multi_context_snapshot_isolation) {
     return;
   }
 
-  // Phase 4: app1接入新节点 context
-  auto service_discovery_context =
+  auto service_discovery_context_a =
       std::make_shared<atframework::atapp::service_discovery_module::service_discovery_cluster_context>();
-  int ret = service_discovery_context->init(app1, discovery3->get_configure(), nullptr);
+  int ret = service_discovery_context_a->init(app1, discovery2->get_configure(), nullptr);
   CASE_EXPECT_TRUE(ret == 0);
   if (ret != 0) {
     return;
   }
 
-  ret = discovery1->init_service_discovery_keepalives(service_discovery_context);
+  ret = discovery1->init_service_discovery_watchers(service_discovery_context_a);
   CASE_EXPECT_TRUE(ret == 0);
   if (ret != 0) {
     return;
   }
-  ret = discovery1->init_service_discovery_watchers(service_discovery_context);
-  CASE_EXPECT_TRUE(ret == 0);
-  if (ret != 0) {
-    return;
-  }
-  bool success = service_discovery_context->check_keepalive_actor_start_success();
+  bool success = service_discovery_context_a->check_keepalive_actor_start_success();
   CASE_EXPECT_TRUE(success);
   if (!success) {
     return;
   }
 
-  // Phase 5: 等待发现app3
-  apps = {&app1, &app3};
-  bool mutual_discovery = run_apps_until(apps, [&discovery1, &discovery3, &app1, &app3]() {
-    return !!discovery1->get_global_discovery().get_node_by_id(app3.get_id()) &&
-           !!discovery3->get_global_discovery().get_node_by_id(app1.get_id());
-  });
+  auto service_discovery_context_b =
+      std::make_shared<atframework::atapp::service_discovery_module::service_discovery_cluster_context>();
+  ret = service_discovery_context_b->init(app1, discovery3->get_configure(), nullptr);
+  CASE_EXPECT_TRUE(ret == 0);
+  if (ret != 0) {
+    return;
+  }
+
+  ret = discovery1->init_service_discovery_watchers(service_discovery_context_b);
+  CASE_EXPECT_TRUE(ret == 0);
+  if (ret != 0) {
+    return;
+  }
+  success = service_discovery_context_b->check_keepalive_actor_start_success();
+  CASE_EXPECT_TRUE(success);
+  if (!success) {
+    return;
+  }
+
+  // Phase 5: 等待发现并检查是否为app2的listener地址（如果app3覆盖了app2的snapshot，则会看到app3的地址）
+  std::vector<atframework::atapp::app *> apps = {&app1, &app2, &app3};
+  bool mutual_discovery = run_apps_until(
+      apps, [&discovery1, &app2]() { return !!discovery1->get_global_discovery().get_node_by_id(app2.get_id()); });
   CASE_EXPECT_TRUE(mutual_discovery);
   if (!mutual_discovery) {
     return;
   }
-  CASE_EXPECT_TRUE(!!discovery1->get_global_discovery().get_node_by_id(app3.get_id()));
-  CASE_EXPECT_TRUE(!!discovery1->get_global_discovery().get_node_by_id(app1.get_id()));
-  CASE_EXPECT_TRUE(!!discovery3->get_global_discovery().get_node_by_id(app1.get_id()));
-  CASE_EXPECT_TRUE(!!discovery3->get_global_discovery().get_node_by_id(app3.get_id()));
+  auto node = discovery1->get_global_discovery().get_node_by_id(app2.get_id());
+  CASE_EXPECT_TRUE(!!node);
+  if (!node) {
+    return;
+  }
+  CASE_EXPECT_TRUE(*node->get_discovery_info().listen().begin() == "ipv4://127.0.0.1:22302");
+}
+
+// ============================================================
+// I.5.8: external_discovery_mutual_with_self
+//   Scenario 1: Both apps see each other AND themselves.
+//
+//   Config:
+//     app1: default pathA (watcher ✓, keepalive ✓)
+//           external pathB (watcher ✗, keepalive ✓)
+//     app2: default pathB (watcher ✓, keepalive ✓)
+//           external pathA (watcher ✗, keepalive ✓)
+//
+//   app1 keepalives on both pathA and pathB, but only watches pathA.
+//   app2 keepalives on both pathA and pathB, but only watches pathB.
+//
+//   Since both apps keepalive on both paths:
+//     - app1 watches pathA → sees app1 (keepalive on pathA) + app2 (keepalive on pathA via external)
+//     - app2 watches pathB → sees app1 (keepalive on pathB via external) + app2 (keepalive on pathB)
+//   Both apps see each other AND themselves.
+// ============================================================
+CASE_TEST(atapp_etcd_module, external_discovery_mutual_with_self) {
+  if (!is_etcd_available()) {
+    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << "etcd is not available at " << get_etcd_host() << ", skip this test"
+                    << '\n';
+    return;
+  }
+
+  std::string conf_path_base;
+  atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
+  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_module_ext_disc_node1a.yaml";
+  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_module_ext_disc_node1b.yaml";
+
+  if (!atfw::util::file_system::is_exist(conf_path_1.c_str()) ||
+      !atfw::util::file_system::is_exist(conf_path_2.c_str())) {
+    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << "etcd external discovery config not found, skip this test" << '\n';
+    return;
+  }
+
+  atframework::atapp::app app1;
+  atframework::atapp::app app2;
+  const char *args1[] = {"app1", "-c", conf_path_1.c_str(), "start"};
+  const char *args2[] = {"app2", "-c", conf_path_2.c_str(), "start"};
+  CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args1, nullptr));
+  CASE_EXPECT_EQ(0, app2.init(nullptr, 4, args2, nullptr));
+
+  auto discovery1 = app1.get_service_discovery_module();
+  auto discovery2 = app2.get_service_discovery_module();
+  CASE_EXPECT_TRUE(!!discovery1);
+  CASE_EXPECT_TRUE(!!discovery2);
+  if (!discovery1 || !discovery2) {
+    return;
+  }
+
+  std::vector<atframework::atapp::app *> apps = {&app1, &app2};
+
+  // Wait for both apps to see each other
+  bool mutual = run_apps_until(apps, [&discovery1, &discovery2, &app1, &app2]() {
+    return !!discovery1->get_global_discovery().get_node_by_id(app2.get_id()) &&
+           !!discovery2->get_global_discovery().get_node_by_id(app1.get_id());
+  });
+  CASE_EXPECT_TRUE(mutual);
+
+  // Both apps should also see themselves
+  // app1 keeps alive on pathA (default) and pathB (external). app1 watches pathA → sees itself.
+  // app2 keeps alive on pathB (default) and pathA (external). app2 watches pathB → sees itself.
+  bool app1_sees_self = run_apps_until(
+      apps, [&discovery1, &app1]() { return !!discovery1->get_global_discovery().get_node_by_id(app1.get_id()); });
+  CASE_EXPECT_TRUE(app1_sees_self);
+
+  bool app2_sees_self = run_apps_until(
+      apps, [&discovery2, &app2]() { return !!discovery2->get_global_discovery().get_node_by_id(app2.get_id()); });
+  CASE_EXPECT_TRUE(app2_sees_self);
+
+  CASE_MSG_INFO() << "external_discovery_mutual_with_self: mutual=" << (mutual ? "true" : "false")
+                  << " app1_self=" << (app1_sees_self ? "true" : "false")
+                  << " app2_self=" << (app2_sees_self ? "true" : "false") << '\n';
+}
+
+// ============================================================
+// I.5.9: external_discovery_cross_only
+//   Scenario 2: Both apps see only the other, NOT themselves.
+//
+//   Config:
+//     app1: default pathA (watcher ✗, keepalive ✓)
+//           external pathB (watcher ✓, keepalive ✗)
+//     app2: default pathB (watcher ✗, keepalive ✓)
+//           external pathA (watcher ✓, keepalive ✗)
+//
+//   app1 keepalives on pathA only, but watches pathB only.
+//   app2 keepalives on pathB only, but watches pathA only.
+//
+//   Since keepalive and watcher are on different paths:
+//     - app1 watches pathB → sees app2 (keepalive on pathB) but NOT app1 (no keepalive on pathB)
+//     - app2 watches pathA → sees app1 (keepalive on pathA) but NOT app2 (no keepalive on pathA)
+//   Both apps see only the other, not themselves.
+// ============================================================
+CASE_TEST(atapp_etcd_module, external_discovery_cross_only) {
+  if (!is_etcd_available()) {
+    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << "etcd is not available at " << get_etcd_host() << ", skip this test"
+                    << '\n';
+    return;
+  }
+
+  std::string conf_path_base;
+  atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
+  std::string conf_path_1 = conf_path_base + "/atapp_test_etcd_module_ext_disc_node2a.yaml";
+  std::string conf_path_2 = conf_path_base + "/atapp_test_etcd_module_ext_disc_node2b.yaml";
+
+  if (!atfw::util::file_system::is_exist(conf_path_1.c_str()) ||
+      !atfw::util::file_system::is_exist(conf_path_2.c_str())) {
+    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << "etcd external discovery config not found, skip this test" << '\n';
+    return;
+  }
+
+  atframework::atapp::app app1;
+  atframework::atapp::app app2;
+  const char *args1[] = {"app1", "-c", conf_path_1.c_str(), "start"};
+  const char *args2[] = {"app2", "-c", conf_path_2.c_str(), "start"};
+  CASE_EXPECT_EQ(0, app1.init(nullptr, 4, args1, nullptr));
+  CASE_EXPECT_EQ(0, app2.init(nullptr, 4, args2, nullptr));
+
+  auto discovery1 = app1.get_service_discovery_module();
+  auto discovery2 = app2.get_service_discovery_module();
+  CASE_EXPECT_TRUE(!!discovery1);
+  CASE_EXPECT_TRUE(!!discovery2);
+  if (!discovery1 || !discovery2) {
+    return;
+  }
+
+  std::vector<atframework::atapp::app *> apps = {&app1, &app2};
+
+  // Wait for cross-discovery: app1 sees app2, app2 sees app1
+  bool cross_discovery = run_apps_until(apps, [&discovery1, &discovery2, &app1, &app2]() {
+    return !!discovery1->get_global_discovery().get_node_by_id(app2.get_id()) &&
+           !!discovery2->get_global_discovery().get_node_by_id(app1.get_id());
+  });
+  CASE_EXPECT_TRUE(cross_discovery);
+
+  // Give extra ticks to ensure snapshots are fully processed
+  run_apps_noblock(apps, 32);
+
+  // app1 should NOT see itself (keepalives on pathA, but watches pathB)
+  auto app1_self = discovery1->get_global_discovery().get_node_by_id(app1.get_id());
+  CASE_EXPECT_TRUE(!app1_self);
+
+  // app2 should NOT see itself (keepalives on pathB, but watches pathA)
+  auto app2_self = discovery2->get_global_discovery().get_node_by_id(app2.get_id());
+  CASE_EXPECT_TRUE(!app2_self);
+
+  // Both should still see each other
+  CASE_EXPECT_TRUE(!!discovery1->get_global_discovery().get_node_by_id(app2.get_id()));
+  CASE_EXPECT_TRUE(!!discovery2->get_global_discovery().get_node_by_id(app1.get_id()));
+
+  CASE_MSG_INFO() << "external_discovery_cross_only: cross=" << (cross_discovery ? "true" : "false")
+                  << " app1_self=" << (app1_self ? "found" : "null") << " app2_self=" << (app2_self ? "found" : "null")
+                  << '\n';
 }

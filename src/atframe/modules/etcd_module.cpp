@@ -30,6 +30,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <list>
 
 #if defined(max)
 #  undef max
@@ -108,6 +109,7 @@ LIBATAPP_MACRO_API int etcd_module::reload(const atapp::protocol::atapp_etcd &co
   if (atapp_ == nullptr) {
     return 0;
   }
+  // FIXME 现在不支持动态开关 etcd 功能
   if (!init_ || is_etcd_enabled()) {
     load_cluster_conf(conf, log_conf);
   }
