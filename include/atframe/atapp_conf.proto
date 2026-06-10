@@ -408,9 +408,10 @@ message atapp_etcd_cluster {
 }
 
 message atapp_etcd_keepalive {
-  google.protobuf.Duration timeout = 1 [(atapp.protocol.CONFIGURE) = { default_value: "31s" }];
-  google.protobuf.Duration ttl = 2 [(atapp.protocol.CONFIGURE) = { default_value: "10s" }];
-  google.protobuf.Duration retry_interval = 3 [(atapp.protocol.CONFIGURE) = { default_value: "3s" }];
+  bool enabled = 1 [(atapp.protocol.CONFIGURE) = { default_value: "true" }];
+  google.protobuf.Duration timeout = 101 [(atapp.protocol.CONFIGURE) = { default_value: "31s" }];
+  google.protobuf.Duration ttl = 102 [(atapp.protocol.CONFIGURE) = { default_value: "10s" }];
+  google.protobuf.Duration retry_interval = 103 [(atapp.protocol.CONFIGURE) = { default_value: "3s" }];
 }
 
 message atapp_etcd_request {
@@ -428,6 +429,7 @@ message atapp_etcd_init {
 }
 
 message atapp_etcd_watcher {
+  bool enabled = 1 [(atapp.protocol.CONFIGURE) = { default_value: "true" }];
   google.protobuf.Duration retry_interval = 101 [(atapp.protocol.CONFIGURE) = { default_value: "15s" }];
   google.protobuf.Duration request_timeout = 102 [(atapp.protocol.CONFIGURE) = { default_value: "30m" }];
   google.protobuf.Duration get_request_timeout = 103 [(atapp.protocol.CONFIGURE) = { default_value: "3m" }];
@@ -593,6 +595,7 @@ message atapp_configure {
   atbus_configure bus = 301;
 
   atapp_etcd etcd = 401;
+  repeated atapp_etcd external_discovery = 402;
 
   atapp_worker_pool worker_pool = 501;
 }

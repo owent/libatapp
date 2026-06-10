@@ -39,6 +39,9 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <unordered_set>
+#include <utility>
+#include <list>
 #if !(defined(ATFRAMEWORK_UTILS_THREAD_TLS_USE_PTHREAD) && ATFRAMEWORK_UTILS_THREAD_TLS_USE_PTHREAD) && \
     __cplusplus >= 201103L
 #  include <mutex>
@@ -332,18 +335,23 @@ struct LIBATAPP_MACRO_API curl_multi_guard_type {
       curl_global_cleanup();
     }
   }
+  curl_multi_guard_type(const curl_multi_guard_type &) = delete;
+  curl_multi_guard_type &operator=(const curl_multi_guard_type &) = delete;
   int init_result;
 };
 
 namespace {
 static std::shared_ptr<curl_multi_guard_type> create_curl_multi_guard() {
-  std::shared_ptr<curl_multi_guard_type> guard = std::make_shared<curl_multi_guard_type>();
-  if (guard->init_result != CURLE_OK) {
-    return nullptr;
-  }
+  static std::shared_ptr<curl_multi_guard_type> guard = []() -> std::shared_ptr<curl_multi_guard_type> {
+    auto g = std::make_shared<curl_multi_guard_type>();
+    if (g->init_result != 0) {
+      return nullptr;
+    }
+    return g;
+  }();
   return guard;
 }
-}
+}  // namespace
 
 LIBATAPP_MACRO_API app::message_t::message_t() : type(0), message_sequence(0), metadata(nullptr) {}
 LIBATAPP_MACRO_API app::message_t::~message_t() {}
