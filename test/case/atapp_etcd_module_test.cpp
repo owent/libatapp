@@ -1719,7 +1719,12 @@ CASE_TEST(atapp_etcd_module, multi_context_snapshot_isolation) {
     return;
   }
 
-  ret = discovery1->init_service_discovery_keepalives_watchers(service_discovery_context);
+  ret = discovery1->init_service_discovery_keepalives(service_discovery_context);
+  CASE_EXPECT_TRUE(ret == 0);
+  if (ret != 0) {
+    return;
+  }
+  ret = discovery1->init_service_discovery_watchers(service_discovery_context);
   CASE_EXPECT_TRUE(ret == 0);
   if (ret != 0) {
     return;

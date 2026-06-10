@@ -81,6 +81,7 @@ static void init_timer_closed_callback(uv_handle_t *handle) {
 
 LIBATAPP_MACRO_API etcd_module::etcd_module()
     : enable_(false),
+      init_(false),
       atapp_(nullptr),
       tick_interval_(std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::milliseconds(128))) {
   tick_next_timepoint_ = app::get_sys_now();
@@ -90,6 +91,7 @@ LIBATAPP_MACRO_API etcd_module::~etcd_module() { reset(); }
 
 LIBATAPP_MACRO_API int etcd_module::init(atframework::atapp::app &app, const atapp::protocol::atapp_etcd &conf,
                                          const atapp::protocol::atapp_log *ATFW_UTIL_MACRO_NULLABLE log_conf) {
+  init_ = true;
   atapp_ = &app;
   load_cluster_conf(conf, log_conf);
   if (cluster_.get_conf_hosts().empty()) {
@@ -106,7 +108,7 @@ LIBATAPP_MACRO_API int etcd_module::reload(const atapp::protocol::atapp_etcd &co
   if (atapp_ == nullptr) {
     return 0;
   }
-  if (is_etcd_enabled()) {
+  if (!init_ || is_etcd_enabled()) {
     load_cluster_conf(conf, log_conf);
   }
   return 0;
