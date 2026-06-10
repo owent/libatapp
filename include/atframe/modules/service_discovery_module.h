@@ -183,7 +183,9 @@ class service_discovery_module : public ::atframework::atapp::module_impl {
   LIBATAPP_MACRO_API static std::string get_topology_watcher_path(atframework::atapp::app &app,
                                                                   const std::string &path);
 
-  LIBATAPP_MACRO_API int init_service_discovery_keepalives_watchers(
+  LIBATAPP_MACRO_API int init_service_discovery_keepalives(
+      ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context);
+  LIBATAPP_MACRO_API int init_service_discovery_watchers(
       ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context);
 
   LIBATAPP_MACRO_API static int init_discovery_watcher_by_id(

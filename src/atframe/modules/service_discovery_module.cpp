@@ -231,7 +231,13 @@ LIBATAPP_MACRO_API int service_discovery_module::init() {
     return 0;
   }
 
-  ret = init_service_discovery_keepalives_watchers(cluster_context_);
+  ret = init_service_discovery_keepalives(cluster_context_);
+  if (ret < 0) {
+    stop();
+    return ret;
+  }
+
+  ret = init_service_discovery_watchers(cluster_context_);
   if (ret < 0) {
     stop();
     return ret;
@@ -287,7 +293,13 @@ LIBATAPP_MACRO_API void service_discovery_module::enable_discovery() {
     return;
   }
 
-  int ret = init_service_discovery_keepalives_watchers(cluster_context_);
+  int ret = init_service_discovery_keepalives(cluster_context_);
+  if (ret < 0) {
+    discovery_enabled_ = false;
+    cluster_context_->reset_internal_watchers_and_keepalives();
+  }
+
+  ret = init_service_discovery_watchers(cluster_context_);
   if (ret < 0) {
     discovery_enabled_ = false;
     cluster_context_->reset_internal_watchers_and_keepalives();
@@ -379,7 +391,7 @@ void service_discovery_module::update_keepalive_discovery_value() {
   }
 }
 
-LIBATAPP_MACRO_API int service_discovery_module::init_service_discovery_keepalives_watchers(
+LIBATAPP_MACRO_API int service_discovery_module::init_service_discovery_keepalives(
     ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context) {
   // 先刷新topology数据，后刷新discovery数据，以保证策略路由变化时已获取到最新的topology信息
   update_keepalive_topology_value();
@@ -400,7 +412,18 @@ LIBATAPP_MACRO_API int service_discovery_module::init_service_discovery_keepaliv
     return ret;
   }
 
-  ret = add_topology_watcher_callback(app, context, nullptr);
+  return 0;
+}
+
+LIBATAPP_MACRO_API int service_discovery_module::init_service_discovery_watchers(
+    ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> context) {
+  // 先刷新topology数据，后刷新discovery数据，以保证策略路由变化时已获取到最新的topology信息
+  update_keepalive_topology_value();
+  update_keepalive_discovery_value();
+
+  atframework::atapp::app &app = *get_app();
+
+  int ret = add_topology_watcher_callback(app, context, nullptr);
   if (ret < 0) {
     return ret;
   }
