@@ -1722,19 +1722,9 @@ CASE_TEST(atapp_etcd_module, multi_context_snapshot_isolation) {
       return;
     }
 
-    ret = discovery1->init_service_discovery_keepalives(service_discovery_context);
+    ret = discovery1->init_service_discovery_keepalives_watchers(service_discovery_context);
     CASE_EXPECT_TRUE(ret == 0);
     if (ret != 0) {
-      return;
-    }
-    ret = discovery1->init_service_discovery_watchers(service_discovery_context);
-    CASE_EXPECT_TRUE(ret == 0);
-    if (ret != 0) {
-      return;
-    }
-    bool success = service_discovery_context->check_keepalive_actor_start_success();
-    CASE_EXPECT_TRUE(success);
-    if (!success) {
       return;
     }
 
@@ -1811,39 +1801,33 @@ CASE_TEST(atapp_etcd_module, diff_context_snapshot_isolation) {
 
   auto service_discovery_context_a =
       std::make_shared<atframework::atapp::service_discovery_module::service_discovery_cluster_context>();
-  int ret = service_discovery_context_a->init(app1, discovery2->get_configure(), nullptr);
+  auto context_a_conf = discovery2->get_configure();
+  context_a_conf.mutable_keepalive()->set_enabled(false);  // 禁止keepalive以避免覆盖app2的snapshot
+  int ret = service_discovery_context_a->init(app1, context_a_conf, nullptr);
   CASE_EXPECT_TRUE(ret == 0);
   if (ret != 0) {
     return;
   }
 
-  ret = discovery1->init_service_discovery_watchers(service_discovery_context_a);
+  ret = discovery1->init_service_discovery_keepalives_watchers(service_discovery_context_a);
   CASE_EXPECT_TRUE(ret == 0);
   if (ret != 0) {
-    return;
-  }
-  bool success = service_discovery_context_a->check_keepalive_actor_start_success();
-  CASE_EXPECT_TRUE(success);
-  if (!success) {
     return;
   }
 
   auto service_discovery_context_b =
       std::make_shared<atframework::atapp::service_discovery_module::service_discovery_cluster_context>();
-  ret = service_discovery_context_b->init(app1, discovery3->get_configure(), nullptr);
+  auto context_b_conf = discovery3->get_configure();
+  context_b_conf.mutable_keepalive()->set_enabled(false);  // 禁止keepalive以避免覆盖app3的snapshot
+  ret = service_discovery_context_b->init(app1, context_b_conf, nullptr);
   CASE_EXPECT_TRUE(ret == 0);
   if (ret != 0) {
     return;
   }
 
-  ret = discovery1->init_service_discovery_watchers(service_discovery_context_b);
+  ret = discovery1->init_service_discovery_keepalives_watchers(service_discovery_context_b);
   CASE_EXPECT_TRUE(ret == 0);
   if (ret != 0) {
-    return;
-  }
-  success = service_discovery_context_b->check_keepalive_actor_start_success();
-  CASE_EXPECT_TRUE(success);
-  if (!success) {
     return;
   }
 

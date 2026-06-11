@@ -184,10 +184,8 @@ class service_discovery_module : public ::atframework::atapp::module_impl {
                                                                   const std::string &path);
 
   LIBATAPP_MACRO_API void reset_context_internal_watchers_and_keepalives();
-  LIBATAPP_MACRO_API int init_service_discovery_keepalives(
-      const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &context);
-  LIBATAPP_MACRO_API int init_service_discovery_watchers(
-      const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &context);
+  LIBATAPP_MACRO_API int init_service_discovery_keepalives_watchers(
+      const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &context, bool check_keepalive_actor_start_success = true);
 
   LIBATAPP_MACRO_API static int init_discovery_watcher_by_id(
       atframework::atapp::app &app,
@@ -300,6 +298,8 @@ class service_discovery_module : public ::atframework::atapp::module_impl {
 
  private:
   bool discovery_enabled_;
+  bool discovery_keepalives_watchers_inited_;
+
   ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> cluster_context_;
   std::list<::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>>>
       external_cluster_contexts_;
@@ -330,5 +330,8 @@ class service_discovery_module : public ::atframework::atapp::module_impl {
 
   mutable std::recursive_mutex topology_info_event_lock_;
   topology_info_event_callback_list_t topology_info_event_callbacks_;
+
+  atfw::util::time::time_utility::raw_time_t tick_next_timepoint_;
+  std::chrono::system_clock::duration tick_interval_;
 };
 LIBATAPP_MACRO_NAMESPACE_END

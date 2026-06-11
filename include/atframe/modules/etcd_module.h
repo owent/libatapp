@@ -37,6 +37,7 @@ class etcd_module {
   LIBATAPP_MACRO_API void reset();
   LIBATAPP_MACRO_API int tick();
 
+  LIBATAPP_MACRO_API bool is_cluster_closing() const { return cluster_.check_flag(etcd_cluster::flag_t::kClosing); }
  public:
   LIBATAPP_MACRO_API atapp::etcd_cluster &get_etcd_cluster();
   LIBATAPP_MACRO_API const atapp::etcd_cluster &get_etcd_cluster() const;
@@ -56,7 +57,7 @@ class etcd_module {
                          const atapp::protocol::atapp_log *ATFW_UTIL_MACRO_NULLABLE log_conf = nullptr);
 
   bool enable_;
-  bool init_;
+  bool load_conf_;
   atfw::util::network::http_request::ptr_t cleanup_request_;
 
   atframework::atapp::app *ATFW_UTIL_MACRO_NULLABLE atapp_;
@@ -65,7 +66,5 @@ class etcd_module {
   // Config
   std::string conf_path_cache_;
   atapp::protocol::atapp_etcd conf_cache_;
-  atfw::util::time::time_utility::raw_time_t tick_next_timepoint_;
-  std::chrono::system_clock::duration tick_interval_;
 };
 LIBATAPP_MACRO_NAMESPACE_END

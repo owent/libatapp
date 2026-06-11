@@ -25,13 +25,13 @@
 #include <atframe/modules/etcd_module.h>
 
 #include <algorithm>
+#include <list>
 #include <memory>
 #include <set>
 #include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
-#include <list>
 
 #if defined(max)
 #  undef max
@@ -218,11 +218,15 @@ struct ATFW_UTIL_SYMBOL_LOCAL service_discovery_module::service_discovery_cluste
 LIBATAPP_MACRO_API
 service_discovery_module::service_discovery_module()
     : discovery_enabled_(true),
+      discovery_keepalives_watchers_inited_(false),
       cluster_context_(std::make_shared<service_discovery_cluster_context>()),
       maybe_update_internal_keepalive_topology_value_(true),
       maybe_update_internal_keepalive_discovery_value_(true),
       maybe_update_internal_keepalive_discovery_area_(false),
-      maybe_update_internal_keepalive_discovery_metadata_(false) {}
+      maybe_update_internal_keepalive_discovery_metadata_(false),
+      tick_interval_(std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::milliseconds(128))) {
+  tick_next_timepoint_ = app::get_sys_now();
+}
 
 LIBATAPP_MACRO_API int service_discovery_module::init() {
   int ret = cluster_context_->init(*get_app(), get_app()->get_origin_configure().etcd(), nullptr);
@@ -231,56 +235,35 @@ LIBATAPP_MACRO_API int service_discovery_module::init() {
   }
 
   for (const auto &config : get_app()->get_origin_configure().external_discovery()) {
-    if (!config.enable()) {
-      continue;
-    }
     auto external_cluster_context = std::make_shared<service_discovery_cluster_context>();
     ret = external_cluster_context->init(*get_app(), config, nullptr);
     if (ret < 0) {
       return ret;
     }
+    if (!external_cluster_context->get_etcd_module().is_etcd_enabled()) {
+      continue;
+    }
     external_cluster_contexts_.push_back(std::move(external_cluster_context));
   }
 
-  if (!is_discovery_enabled()) {
+  if (!cluster_context_->get_etcd_module().is_etcd_enabled()) {
     return 0;
   }
 
-  ret = init_service_discovery_keepalives(cluster_context_);
+  ret = init_service_discovery_keepalives_watchers(cluster_context_);
   if (ret < 0) {
     stop();
     return ret;
-  }
-
-  ret = init_service_discovery_watchers(cluster_context_);
-  if (ret < 0) {
-    stop();
-    return ret;
-  }
-
-  if (!cluster_context_->check_keepalive_actor_start_success()) {
-    stop();
-    return -1;
   }
 
   for (const auto &external_cluster_context : external_cluster_contexts_) {
-    ret = init_service_discovery_keepalives(external_cluster_context);
+    ret = init_service_discovery_keepalives_watchers(external_cluster_context);
     if (ret < 0) {
       stop();
       return ret;
-    }
-
-    ret = init_service_discovery_watchers(external_cluster_context);
-    if (ret < 0) {
-      stop();
-      return ret;
-    }
-
-    if (!external_cluster_context->check_keepalive_actor_start_success()) {
-      stop();
-      return -1;
     }
   }
+  discovery_keepalives_watchers_inited_ = true;
 
   return 0;
 }
@@ -300,18 +283,60 @@ LIBATAPP_MACRO_API int service_discovery_module::stop() {
       ret = ext_ret;
     }
   }
+  discovery_keepalives_watchers_inited_ = false;
   return ret;
 }
 
 LIBATAPP_MACRO_API int service_discovery_module::reload() {
+  tick_interval_ = std::chrono::duration_cast<std::chrono::system_clock::duration>(
+      std::chrono::seconds(get_app()->get_origin_configure().etcd().init().tick_interval().seconds()) +
+      std::chrono::nanoseconds(get_app()->get_origin_configure().etcd().init().tick_interval().nanos()));
+  if (tick_interval_ < std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::milliseconds(32))) {
+    tick_interval_ = std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::milliseconds(128));
+  }
+
   // FIXME reload 不支持external cluster context的热更新，后续可以考虑增加这个功能
   return cluster_context_->reload(get_app()->get_origin_configure().etcd(), nullptr);
 }
 
 LIBATAPP_MACRO_API int service_discovery_module::tick() {
-  cluster_context_->tick();
+  // Slow down the tick interval of etcd module, it require http request which is very slow compared to atbus
+  if (tick_next_timepoint_ >= get_app()->get_last_tick_time()) {
+    return 0;
+  }
+  tick_next_timepoint_ = get_app()->get_last_tick_time() + tick_interval_;
+
+  bool discovery_keepalives_watchers_inited = discovery_keepalives_watchers_inited_;
+  {
+    cluster_context_->tick();
+    if (!cluster_context_->get_etcd_module().is_cluster_closing()) {
+      // 不是正在关闭状态
+      if (discovery_enabled_ && !discovery_keepalives_watchers_inited) {
+        init_service_discovery_keepalives_watchers(cluster_context_, false);
+        discovery_keepalives_watchers_inited_ = true;
+      }
+      if (!discovery_enabled_ && discovery_keepalives_watchers_inited) {
+        // 不是正在关闭状态但不需要 discovery 了
+        cluster_context_->reset_internal_watchers_and_keepalives();
+        discovery_keepalives_watchers_inited_ = false;
+      }
+    }
+  }
+
   for (const auto &external_cluster_context : external_cluster_contexts_) {
     external_cluster_context->tick();
+    if (!external_cluster_context->get_etcd_module().is_cluster_closing()) {
+      // 不是正在关闭状态
+      if (discovery_enabled_ && !discovery_keepalives_watchers_inited) {
+        init_service_discovery_keepalives_watchers(external_cluster_context, false);
+        discovery_keepalives_watchers_inited_ = true;
+      }
+      if (!discovery_enabled_ && discovery_keepalives_watchers_inited) {
+        // 不是正在关闭状态但不需要 discovery 了
+        external_cluster_context->reset_internal_watchers_and_keepalives();
+        discovery_keepalives_watchers_inited_ = false;
+      }
+    }
   }
 
   update_keepalive_topology_value();
@@ -339,39 +364,6 @@ LIBATAPP_MACRO_API void service_discovery_module::enable_discovery() {
     return;
   }
   discovery_enabled_ = true;
-  if (!is_discovery_enabled()) {
-    return;
-  }
-
-  int ret = init_service_discovery_keepalives(cluster_context_);
-  if (ret < 0) {
-    discovery_enabled_ = false;
-    reset_context_internal_watchers_and_keepalives();
-    return;
-  }
-
-  ret = init_service_discovery_watchers(cluster_context_);
-  if (ret < 0) {
-    discovery_enabled_ = false;
-    reset_context_internal_watchers_and_keepalives();
-    return;
-  }
-
-  for (const auto &external_cluster_context : external_cluster_contexts_) {
-    ret = init_service_discovery_keepalives(external_cluster_context);
-    if (ret < 0) {
-      discovery_enabled_ = false;
-      reset_context_internal_watchers_and_keepalives();
-      return;
-    }
-
-    ret = init_service_discovery_watchers(external_cluster_context);
-    if (ret < 0) {
-      discovery_enabled_ = false;
-      reset_context_internal_watchers_and_keepalives();
-      return;
-    }
-  }
 }
 
 LIBATAPP_MACRO_API void service_discovery_module::disable_discovery() {
@@ -379,7 +371,6 @@ LIBATAPP_MACRO_API void service_discovery_module::disable_discovery() {
     return;
   }
   discovery_enabled_ = false;
-  reset_context_internal_watchers_and_keepalives();
 }
 
 LIBATAPP_MACRO_API void service_discovery_module::reset_context_internal_watchers_and_keepalives() {
@@ -387,6 +378,7 @@ LIBATAPP_MACRO_API void service_discovery_module::reset_context_internal_watcher
   for (const auto &external_cluster_context : external_cluster_contexts_) {
     external_cluster_context->reset_internal_watchers_and_keepalives();
   }
+  discovery_keepalives_watchers_inited_ = false;
 }
 
 void service_discovery_module::update_keepalive_topology_value() {
@@ -414,6 +406,15 @@ void service_discovery_module::update_keepalive_topology_value() {
          iter != cluster_context_->data_->internal_topology_keepalive_actors_.end(); ++iter) {
       if (*iter) {
         (*iter)->set_value(internal_keepalive_topology_value_);
+      }
+    }
+    for (const auto &external_cluster_context : external_cluster_contexts_) {
+      for (std::list<etcd_keepalive::ptr_t>::iterator iter =
+               external_cluster_context->data_->internal_topology_keepalive_actors_.begin();
+           iter != external_cluster_context->data_->internal_topology_keepalive_actors_.end(); ++iter) {
+        if (*iter) {
+          (*iter)->set_value(internal_keepalive_topology_value_);
+        }
       }
     }
   }
@@ -463,59 +464,63 @@ void service_discovery_module::update_keepalive_discovery_value() {
         (*iter)->set_value(internal_keepalive_discovery_value_);
       }
     }
+    for (const auto &external_cluster_context : external_cluster_contexts_) {
+      for (std::list<etcd_keepalive::ptr_t>::iterator iter =
+               external_cluster_context->data_->internal_discovery_keepalive_actors_.begin();
+           iter != external_cluster_context->data_->internal_discovery_keepalive_actors_.end(); ++iter) {
+        if (*iter) {
+          (*iter)->set_value(internal_keepalive_discovery_value_);
+        }
+      }
+    }
   }
 }
 
-LIBATAPP_MACRO_API int service_discovery_module::init_service_discovery_keepalives(
-    const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &context) {
+LIBATAPP_MACRO_API int service_discovery_module::init_service_discovery_keepalives_watchers(
+    const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &context,
+    bool check_keepalive_actor_start_success) {
   // 先刷新topology数据，后刷新discovery数据，以保证策略路由变化时已获取到最新的topology信息
   update_keepalive_topology_value();
   update_keepalive_discovery_value();
 
-  atframework::atapp::app &app = *get_app();
+  int ret = 0;
 
+  atframework::atapp::app &app = *get_app();
   if (context->get_etcd_module().get_configure().keepalive().enabled()) {
-    int ret = init_topology_keepalive(app, context, internal_keepalive_topology_value_);
-    if (ret < 0) {
-      return ret;
+    int result = init_topology_keepalive(app, context, internal_keepalive_topology_value_);
+    if (result < 0) {
+      ret = result;
     }
-    ret = init_discovery_keepalive_by_id(app, context, internal_keepalive_discovery_value_);
-    if (ret < 0) {
-      return ret;
+    result = init_discovery_keepalive_by_id(app, context, internal_keepalive_discovery_value_);
+    if (result < 0) {
+      ret = result;
     }
-    ret = init_discovery_keepalive_by_name(app, context, internal_keepalive_discovery_value_);
-    if (ret < 0) {
-      return ret;
+    result = init_discovery_keepalive_by_name(app, context, internal_keepalive_discovery_value_);
+    if (result < 0) {
+      ret = result;
     }
   }
-
-  return 0;
-}
-
-LIBATAPP_MACRO_API int service_discovery_module::init_service_discovery_watchers(
-    const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &context) {
-  // 先刷新topology数据，后刷新discovery数据，以保证策略路由变化时已获取到最新的topology信息
-  update_keepalive_topology_value();
-  update_keepalive_discovery_value();
-
-  atframework::atapp::app &app = *get_app();
 
   if (context->get_etcd_module().get_configure().watcher().enabled()) {
-    int ret = add_topology_watcher_callback(app, context, nullptr);
-    if (ret < 0) {
-      return ret;
+    int result = add_topology_watcher_callback(app, context, nullptr);
+    if (result < 0) {
+      ret = result;
     }
-    ret = add_discovery_watcher_by_id_callback(app, context, nullptr);
-    if (ret < 0) {
-      return ret;
+    result = add_discovery_watcher_by_id_callback(app, context, nullptr);
+    if (result < 0) {
+      ret = result;
     }
-    ret = add_discovery_watcher_by_name_callback(app, context, nullptr);
-    if (ret < 0) {
-      return ret;
+    result = add_discovery_watcher_by_name_callback(app, context, nullptr);
+    if (result < 0) {
+      ret = result;
     }
   }
 
-  return 0;
+  if (ret == 0 && check_keepalive_actor_start_success && !context->check_keepalive_actor_start_success()) {
+    return -1;
+  }
+
+  return ret;
 }
 
 LIBATAPP_MACRO_API int service_discovery_module::init_discovery_keepalive_by_id(
@@ -1554,39 +1559,43 @@ bool service_discovery_module::update_internal_watcher_event(node_info_t &node,
     }
   } else {
     if (node_action_t::kDelete == node.action) {
-      if (local_cache_by_id) {
-        if (local_cache_by_id->get_context_addr() != node.context_addr) {
-          // 只有相同 context 才进行处理
-          LIBATAPP_MACRO_ETCD_CLUSTER_LOG_WARNING(
-              cluster_context_->etcd_module_.get_etcd_cluster(),
-              "try to delete node with same id but different context, ignore it. node id: {}, node name: {}, node "
-              "context: {}, local cache context: {}",
-              node.node_discovery.id(), node.node_discovery.name().c_str(), reinterpret_cast<void *>(node.context_addr),
-              reinterpret_cast<void *>(local_cache_by_id->get_context_addr()));
-          local_cache_by_id = nullptr;
-        } else {
+      // 有一个节点 context 匹配则都删除
+      // 都不匹配则无视
+      if ((local_cache_by_id && local_cache_by_id->get_context_addr() == node.context_addr) ||
+          (local_cache_by_name && local_cache_by_name->get_context_addr() == node.context_addr)) {
+        if (local_cache_by_id) {
+          if (local_cache_by_id->get_context_addr() != node.context_addr) {
+            // 只有相同 context 才进行处理
+            LIBATAPP_MACRO_ETCD_CLUSTER_LOG_WARNING(
+                cluster_context_->etcd_module_.get_etcd_cluster(),
+                "try to delete node with same id but different context. node id: {}, node name: {}, node "
+                "context: {}, local cache context: {}",
+                node.node_discovery.id(), node.node_discovery.name().c_str(),
+                reinterpret_cast<void *>(node.context_addr),
+                reinterpret_cast<void *>(local_cache_by_id->get_context_addr()));
+          }
           local_cache_by_id->update_version(version, true);
           global_discovery_.remove_node(local_cache_by_id);
           has_event = true;
         }
-      }
-      if (local_cache_by_name) {
-        if (local_cache_by_name->get_context_addr() != node.context_addr) {
-          // 只有相同 context 才进行处理
-          LIBATAPP_MACRO_ETCD_CLUSTER_LOG_WARNING(
-              cluster_context_->etcd_module_.get_etcd_cluster(),
-              "try to delete node with same name but different context, ignore it. node id: {}, node name: {}, node "
-              "context: {}, local cache context: {}",
-              node.node_discovery.id(), node.node_discovery.name().c_str(), reinterpret_cast<void *>(node.context_addr),
-              reinterpret_cast<void *>(local_cache_by_name->get_context_addr()));
-          local_cache_by_name = nullptr;
-        } else {
+        if (local_cache_by_name) {
+          if (local_cache_by_name->get_context_addr() != node.context_addr) {
+            // 只有相同 context 才进行处理
+            LIBATAPP_MACRO_ETCD_CLUSTER_LOG_WARNING(
+                cluster_context_->etcd_module_.get_etcd_cluster(),
+                "try to delete node with same name but different context. node id: {}, node name: {}, node "
+                "context: {}, local cache context: {}",
+                node.node_discovery.id(), node.node_discovery.name().c_str(),
+                reinterpret_cast<void *>(node.context_addr),
+                reinterpret_cast<void *>(local_cache_by_name->get_context_addr()));
+          }
           local_cache_by_name->update_version(version, true);
           global_discovery_.remove_node(local_cache_by_name);
           has_event = true;
         }
       }
     } else {
+      // 有一个匹配或都不存在则更新/添加
       if ((!local_cache_by_id && 0 != node.node_discovery.id()) ||
           (!local_cache_by_name && !node.node_discovery.name().empty())) {
         has_event = true;
