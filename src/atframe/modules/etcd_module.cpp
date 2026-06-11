@@ -25,12 +25,12 @@
 #include <atframe/etcdcli/etcd_watcher.h>
 
 #include <algorithm>
+#include <list>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
-#include <list>
 
 #if defined(max)
 #  undef max
@@ -80,26 +80,18 @@ static void init_timer_closed_callback(uv_handle_t *handle) {
 
 }  // namespace
 
-LIBATAPP_MACRO_API etcd_module::etcd_module()
-    : enable_(false),
-      init_(false),
-      atapp_(nullptr),
-      tick_interval_(std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::milliseconds(128))) {
-  tick_next_timepoint_ = app::get_sys_now();
-}
+LIBATAPP_MACRO_API etcd_module::etcd_module() : enable_(false), load_conf_(false), atapp_(nullptr) {}
 
 LIBATAPP_MACRO_API etcd_module::~etcd_module() { reset(); }
 
 LIBATAPP_MACRO_API int etcd_module::init(atframework::atapp::app &app, const atapp::protocol::atapp_etcd &conf,
                                          const atapp::protocol::atapp_log *ATFW_UTIL_MACRO_NULLABLE log_conf) {
-  init_ = true;
   atapp_ = &app;
   load_cluster_conf(conf, log_conf);
-  if (cluster_.get_conf_hosts().empty()) {
-    FWLOGINFO("cluster is disabled");
-  }
   if (is_etcd_enabled()) {
     cluster_.init(atapp_->get_shared_curl_multi_context());
+  } else {
+    FWLOGINFO("cluster is disabled");
   }
   return 0;
 }
@@ -109,10 +101,7 @@ LIBATAPP_MACRO_API int etcd_module::reload(const atapp::protocol::atapp_etcd &co
   if (atapp_ == nullptr) {
     return 0;
   }
-  // FIXME 现在不支持动态开关 etcd 功能
-  if (!init_ || is_etcd_enabled()) {
-    load_cluster_conf(conf, log_conf);
-  }
+  load_cluster_conf(conf, log_conf);
   return 0;
 }
 
@@ -260,14 +249,18 @@ LIBATAPP_MACRO_API int etcd_module::tick() {
     return 0;
   }
 
-  // Slow down the tick interval of etcd module, it require http request which is very slow compared to atbus
-  if (tick_next_timepoint_ >= atapp_->get_last_tick_time()) {
-    return 0;
-  }
-  tick_next_timepoint_ = atapp_->get_last_tick_time() + tick_interval_;
-
   if (!is_etcd_enabled()) {
     return 0;
+  }
+
+  // previous closing not finished, wait for it
+  if (cleanup_request_ || atapp_->is_closing()) {
+    return cluster_.tick();
+  }
+
+  // first startup when reloaded
+  if (cluster_.check_flag(etcd_cluster::flag_t::kClosing)) {
+    cluster_.init(atapp_->get_shared_curl_multi_context());
   }
 
   return cluster_.tick();
@@ -303,6 +296,15 @@ LIBATAPP_MACRO_API int etcd_module::stop() {
 
 void etcd_module::load_cluster_conf(const atapp::protocol::atapp_etcd &conf,
                                     const atapp::protocol::atapp_log *ATFW_UTIL_MACRO_NULLABLE log_conf) {
+  // 不支持动态关闭 etcd 功能
+  if (is_etcd_enabled() && (!conf.enable() || conf.hosts_size() == 0)) {
+    LIBATAPP_MACRO_ETCD_CLUSTER_LOG_WARNING(
+        cluster_,
+        "etcd cluster is disabled by new configure, but it's enabled by old configure, dynamic disable is not "
+        "supported, please restart app to apply the new configure.");
+    return;
+  }
+
   // load configure
   conf_cache_ = conf;
   enable_ = conf.enable();
@@ -479,13 +481,6 @@ void etcd_module::load_cluster_conf(const atapp::protocol::atapp_etcd &conf,
 
   if (!conf.ssl().ssl_cipher_list_tls13().empty()) {
     cluster_.set_conf_ssl_cipher_list_tls13(conf.ssl().ssl_cipher_list_tls13());
-  }
-
-  tick_interval_ = std::chrono::duration_cast<std::chrono::system_clock::duration>(
-      std::chrono::seconds(conf.init().tick_interval().seconds()) +
-      std::chrono::nanoseconds(conf.init().tick_interval().nanos()));
-  if (tick_interval_ < std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::milliseconds(32))) {
-    tick_interval_ = std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::milliseconds(128));
   }
 }
 
