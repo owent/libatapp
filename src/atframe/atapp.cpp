@@ -564,7 +564,6 @@ LIBATAPP_MACRO_API app::~app() {
   if (curl_multi_) {
     atfw::util::network::http_request::destroy_curl_multi(curl_multi_);
   }
-  curl_multi_guard_ = nullptr;
 
   // finally events
   app_evt_on_finally();
@@ -4155,7 +4154,6 @@ int app::setup_curl_multi() {
   atfw::util::network::http_request::create_curl_multi(get_bus_node()->get_evloop(), curl_multi_);
   if (!curl_multi_) {
     FWLOGERROR("create curl multi instance failed.");
-    curl_multi_guard_ = nullptr;
     return -1;
   }
   return 0;
