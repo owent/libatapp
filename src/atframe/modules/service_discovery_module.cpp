@@ -1279,10 +1279,10 @@ void service_discovery_module::discovery_watcher_callback_list_wrapper_t::operat
   if (nullptr == mod) {
     return;
   }
-  if (ctx.expired()) {
+  auto ctx_locked = ctx.lock();
+  if (ctx_locked == nullptr) {
     return;
   }
-  auto ctx_locked = ctx.lock();
   ctx_locked->data_->last_etcd_event_discovery_header_ = header;
 
   bool enable_snapshot = body.snapshot && 0 != snapshot_index;
@@ -1410,10 +1410,10 @@ void service_discovery_module::topology_watcher_callback_list_wrapper_t::operato
   if (nullptr == mod) {
     return;
   }
-  if (ctx.expired()) {
+  auto ctx_locked = ctx.lock();
+  if (ctx_locked == nullptr) {
     return;
   }
-  auto ctx_locked = ctx.lock();
   ctx_locked->data_->last_etcd_event_topology_header_ = header;
 
   bool enable_snapshot = body.snapshot && 0 != snapshot_index;
