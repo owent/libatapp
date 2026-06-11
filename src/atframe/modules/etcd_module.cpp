@@ -80,7 +80,7 @@ static void init_timer_closed_callback(uv_handle_t *handle) {
 
 }  // namespace
 
-LIBATAPP_MACRO_API etcd_module::etcd_module() : enable_(false), load_conf_(false), atapp_(nullptr) {}
+LIBATAPP_MACRO_API etcd_module::etcd_module() : enable_(false), atapp_(nullptr) {}
 
 LIBATAPP_MACRO_API etcd_module::~etcd_module() { reset(); }
 

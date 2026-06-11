@@ -57,7 +57,6 @@ class etcd_module {
                          const atapp::protocol::atapp_log *ATFW_UTIL_MACRO_NULLABLE log_conf = nullptr);
 
   bool enable_;
-  bool load_conf_;
   atfw::util::network::http_request::ptr_t cleanup_request_;
 
   atframework::atapp::app *ATFW_UTIL_MACRO_NULLABLE atapp_;
