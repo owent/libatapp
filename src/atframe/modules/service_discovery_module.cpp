@@ -1268,8 +1268,9 @@ service_discovery_module::discovery_watcher_callback_list_wrapper_t::discovery_w
       has_insert_snapshot_index(false) {}
 
 service_discovery_module::discovery_watcher_callback_list_wrapper_t::~discovery_watcher_callback_list_wrapper_t() {
-  if (!ctx.expired() && 0 != snapshot_index && has_insert_snapshot_index) {
-    ctx.lock()->data_->discovery_watcher_snapshot_index_.erase(snapshot_index);
+  auto ctx_locked = ctx.lock();
+  if (ctx_locked && 0 != snapshot_index && has_insert_snapshot_index) {
+    ctx_locked->data_->discovery_watcher_snapshot_index_.erase(snapshot_index);
   }
 }
 
@@ -1399,8 +1400,9 @@ service_discovery_module::topology_watcher_callback_list_wrapper_t::topology_wat
       has_insert_snapshot_index(false) {}
 
 service_discovery_module::topology_watcher_callback_list_wrapper_t::~topology_watcher_callback_list_wrapper_t() {
-  if (!ctx.expired() && 0 != snapshot_index && has_insert_snapshot_index) {
-    ctx.lock()->data_->topology_watcher_snapshot_index_.erase(snapshot_index);
+  auto ctx_locked = ctx.lock();
+  if (ctx_locked && 0 != snapshot_index && has_insert_snapshot_index) {
+    ctx_locked->data_->topology_watcher_snapshot_index_.erase(snapshot_index);
   }
 }
 
@@ -1534,7 +1536,7 @@ bool service_discovery_module::update_internal_watcher_event(node_info_t &node,
           // 只有相同 context 才进行处理
           LIBATAPP_MACRO_ETCD_CLUSTER_LOG_WARNING(
               cluster_context_->etcd_module_.get_etcd_cluster(),
-              "try to delete node with same id but different context, ignore it. node id: {}, node name: {}, node "
+              "try to update node with same id but different context, ignore it. node id: {}, node name: {}, node "
               "context: {}, local cache context: {}",
               node.node_discovery.id(), node.node_discovery.name().c_str(), reinterpret_cast<void *>(node.context_addr),
               reinterpret_cast<void *>(local_cache_by_id->get_context_addr()));
