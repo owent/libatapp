@@ -1521,8 +1521,9 @@ bool service_discovery_module::update_internal_watcher_event(node_info_t &node,
               cluster_context_->etcd_module_.get_etcd_cluster(),
               "try to delete node with same id but different context, ignore it. node id: {}, node name: {}, node "
               "context: {}, local cache context: {}",
-              node.node_discovery.id(), node.node_discovery.name().c_str(), reinterpret_cast<void *>(node.context_addr),
-              reinterpret_cast<void *>(local_cache_by_id->get_context_addr()));
+              node.node_discovery.id(), node.node_discovery.name().c_str(),
+              reinterpret_cast<void *>(node.context_addr),                       // NOLINT(performance-no-int-to-ptr)
+              reinterpret_cast<void *>(local_cache_by_id->get_context_addr()));  // NOLINT(performance-no-int-to-ptr)
           return false;
         }
         local_cache_by_id->update_version(version, true);
@@ -1538,8 +1539,9 @@ bool service_discovery_module::update_internal_watcher_event(node_info_t &node,
               cluster_context_->etcd_module_.get_etcd_cluster(),
               "try to update node with same id but different context, ignore it. node id: {}, node name: {}, node "
               "context: {}, local cache context: {}",
-              node.node_discovery.id(), node.node_discovery.name().c_str(), reinterpret_cast<void *>(node.context_addr),
-              reinterpret_cast<void *>(local_cache_by_id->get_context_addr()));
+              node.node_discovery.id(), node.node_discovery.name().c_str(),
+              reinterpret_cast<void *>(node.context_addr),                       // NOLINT(performance-no-int-to-ptr)
+              reinterpret_cast<void *>(local_cache_by_id->get_context_addr()));  // NOLINT(performance-no-int-to-ptr)
           return false;
         }
         if (protobuf_equal(local_cache_by_id->get_discovery_info(), node.node_discovery)) {
@@ -1573,8 +1575,8 @@ bool service_discovery_module::update_internal_watcher_event(node_info_t &node,
                 "try to delete node with same id but different context. node id: {}, node name: {}, node "
                 "context: {}, local cache context: {}",
                 node.node_discovery.id(), node.node_discovery.name().c_str(),
-                reinterpret_cast<void *>(node.context_addr),
-                reinterpret_cast<void *>(local_cache_by_id->get_context_addr()));
+                reinterpret_cast<void *>(node.context_addr),                       // NOLINT(performance-no-int-to-ptr)
+                reinterpret_cast<void *>(local_cache_by_id->get_context_addr()));  // NOLINT(performance-no-int-to-ptr)
           }
           local_cache_by_id->update_version(version, true);
           global_discovery_.remove_node(local_cache_by_id);
@@ -1588,8 +1590,9 @@ bool service_discovery_module::update_internal_watcher_event(node_info_t &node,
                 "try to delete node with same name but different context. node id: {}, node name: {}, node "
                 "context: {}, local cache context: {}",
                 node.node_discovery.id(), node.node_discovery.name().c_str(),
-                reinterpret_cast<void *>(node.context_addr),
-                reinterpret_cast<void *>(local_cache_by_name->get_context_addr()));
+                reinterpret_cast<void *>(node.context_addr),  // NOLINT(performance-no-int-to-ptr)
+                reinterpret_cast<void *>(
+                    local_cache_by_name->get_context_addr()));  // NOLINT(performance-no-int-to-ptr)
           }
           local_cache_by_name->update_version(version, true);
           global_discovery_.remove_node(local_cache_by_name);
@@ -1707,8 +1710,9 @@ bool service_discovery_module::update_internal_watcher_event(topology_info_t &to
         LIBATAPP_MACRO_ETCD_CLUSTER_LOG_WARNING(
             cluster_context_->etcd_module_.get_etcd_cluster(),
             "Received topology event with id {} from context {}, but current context is {}, ignore it",
-            topology_info.storage.info->id(), (void *)topology_info.storage.context_addr,
-            (void *)local_cache_iter->second.context_addr);
+            topology_info.storage.info->id(),
+            reinterpret_cast<void *>(topology_info.storage.context_addr),      // NOLINT(performance-no-int-to-ptr)
+            reinterpret_cast<void *>(local_cache_iter->second.context_addr));  // NOLINT(performance-no-int-to-ptr)
         return false;
       }
 
