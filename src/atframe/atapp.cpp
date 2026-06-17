@@ -4151,7 +4151,7 @@ int app::setup_curl_multi() {
   multi_options.ev_loop = get_bus_node()->get_evloop();
   // Share DNS cache, connection, TLS sessions and etc.
   atfw::util::network::http_request::create_curl_share(share_options, multi_options.share_context);
-  atfw::util::network::http_request::create_curl_multi(get_bus_node()->get_evloop(), curl_multi_);
+  atfw::util::network::http_request::create_curl_multi(multi_options, curl_multi_);
   if (!curl_multi_) {
     FWLOGERROR("create curl multi instance failed.");
     return -1;
@@ -4864,16 +4864,16 @@ int app::command_handler_invalid(atfw::util::cli::callback_param params) {
 
 int app::command_handler_disable_discovery(atfw::util::cli::callback_param params) {
   if (!internal_module_service_discovery_) {
-    const char *msg = "Etcd module is not initialized, skip command.";
+    const char *msg = "Service discovery module not initialized, skip command.";
     FWLOGERROR("{}", msg);
     add_custom_command_rsp(params, msg);
   } else if (internal_module_service_discovery_->is_discovery_enabled()) {
     internal_module_service_discovery_->disable_discovery();
-    const char *msg = "Etcd context is disabled now.";
+    const char *msg = "Service discovery context is disabled now.";
     FWLOGINFO("{}", msg);
     add_custom_command_rsp(params, msg);
   } else {
-    const char *msg = "Etcd context is already disabled, skip command.";
+    const char *msg = "Service discovery context is already disabled, skip command.";
     FWLOGERROR("{}", msg);
     add_custom_command_rsp(params, msg);
   }
@@ -4882,21 +4882,21 @@ int app::command_handler_disable_discovery(atfw::util::cli::callback_param param
 
 int app::command_handler_enable_discovery(atfw::util::cli::callback_param params) {
   if (!internal_module_service_discovery_) {
-    const char *msg = "Etcd module not initialized, skip command.";
+    const char *msg = "Service discovery module not initialized, skip command.";
     FWLOGERROR("{}", msg);
     add_custom_command_rsp(params, msg);
   } else if (internal_module_service_discovery_->is_discovery_enabled()) {
-    const char *msg = "Etcd context is already enabled, skip command.";
+    const char *msg = "Service discovery context is already enabled, skip command.";
     FWLOGERROR("{}", msg);
     add_custom_command_rsp(params, msg);
   } else {
     internal_module_service_discovery_->enable_discovery();
     if (internal_module_service_discovery_->is_discovery_enabled()) {
-      const char *msg = "Etcd context is enabled now.";
+      const char *msg = "Service discovery context is enabled now.";
       FWLOGINFO("{}", msg);
       add_custom_command_rsp(params, msg);
     } else {
-      const char *msg = "Etcd context can not be enabled, maybe need configure etcd.hosts.";
+      const char *msg = "Service discovery context can not be enabled, maybe need configure etcd.hosts.";
       FWLOGERROR("{}", msg);
       add_custom_command_rsp(params, msg);
     }
