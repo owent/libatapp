@@ -238,6 +238,7 @@ LIBATAPP_MACRO_API int service_discovery_module::init() {
     auto external_cluster_context = std::make_shared<service_discovery_cluster_context>();
     ret = external_cluster_context->init(*get_app(), config, nullptr);
     if (ret < 0) {
+      stop();
       return ret;
     }
     if (!external_cluster_context->get_etcd_module().is_etcd_enabled()) {
@@ -276,12 +277,21 @@ LIBATAPP_MACRO_API service_discovery_module::service_discovery_cluster_context::
     : data_(std::make_shared<service_discovery_cluster_context_data>()) {}
 
 LIBATAPP_MACRO_API int service_discovery_module::stop() {
-  int ret = cluster_context_->stop();
-  for (const auto &external_cluster_context : external_cluster_contexts_) {
-    int ext_ret = external_cluster_context->stop();
+  int ret = 0;
+  // 逆序Stop
+  for (auto iter = external_cluster_contexts_.rbegin(); iter != external_cluster_contexts_.rend(); ++iter) {
+    int ext_ret = (*iter)->stop();
     if (ext_ret != 0) {
       ret = ext_ret;
+    } else {
+      (*iter)->reset();
     }
+  }
+  int ext_ret = cluster_context_->stop();
+  if (ext_ret != 0) {
+    ret = ext_ret;
+  } else {
+    cluster_context_->reset();
   }
   discovery_keepalives_watchers_inited_ = false;
   return ret;
@@ -371,14 +381,6 @@ LIBATAPP_MACRO_API void service_discovery_module::disable_discovery() {
     return;
   }
   discovery_enabled_ = false;
-}
-
-LIBATAPP_MACRO_API void service_discovery_module::reset_context_internal_watchers_and_keepalives() {
-  cluster_context_->reset_internal_watchers_and_keepalives();
-  for (const auto &external_cluster_context : external_cluster_contexts_) {
-    external_cluster_context->reset_internal_watchers_and_keepalives();
-  }
-  discovery_keepalives_watchers_inited_ = false;
 }
 
 void service_discovery_module::update_keepalive_topology_value() {
@@ -1590,8 +1592,8 @@ bool service_discovery_module::update_internal_watcher_event(node_info_t &node,
                 "try to delete node with same name but different context. node id: {}, node name: {}, node "
                 "context: {}, local cache context: {}",
                 node.node_discovery.id(), node.node_discovery.name().c_str(),
-                reinterpret_cast<void *>(node.context_addr),  // NOLINT(performance-no-int-to-ptr)
-                reinterpret_cast<void *>(
+                reinterpret_cast<void *>(node.context_addr),    // NOLINT(performance-no-int-to-ptr)
+                reinterpret_cast<void *>(                       // NOLINT(performance-no-int-to-ptr)
                     local_cache_by_name->get_context_addr()));  // NOLINT(performance-no-int-to-ptr)
           }
           local_cache_by_name->update_version(version, true);
