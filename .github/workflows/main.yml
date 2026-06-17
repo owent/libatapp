@@ -85,31 +85,31 @@ jobs:
               bash ci/do_ci.sh gcc.build ;
             fi
           fi
-  vs2022_build: # job id, can be any string
-    name: "Visual Studio 2022 Build (${{ matrix.build_shared_libs }} / ${{ matrix.configuration }})"
+  vs2026_build: # job id, can be any string
+    name: "Visual Studio 2026 Build (${{ matrix.build_shared_libs }} / ${{ matrix.configuration }})"
     strategy:
       matrix:
         include:
           - os: windows-latest
-            generator: "Visual Studio 17 2022"
+            generator: "Visual Studio 18 2026"
             build_shared_libs: "ON"
             platform: x64
             configuration: Debug
             run_tests: true
           - os: windows-latest
-            generator: "Visual Studio 17 2022"
+            generator: "Visual Studio 18 2026"
             build_shared_libs: "ON"
             platform: x64
             configuration: RelWithDebInfo
             run_tests: false
           - os: windows-latest
-            generator: "Visual Studio 17 2022"
+            generator: "Visual Studio 18 2026"
             build_shared_libs: "OFF"
             platform: x64
             configuration: Debug
             run_tests: true
           - os: windows-latest
-            generator: "Visual Studio 17 2022"
+            generator: "Visual Studio 18 2026"
             build_shared_libs: "OFF"
             platform: x64
             configuration: RelWithDebInfo

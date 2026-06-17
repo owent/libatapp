@@ -19,10 +19,10 @@
 
 | Target System | Toolchain          | Note                  |
 | ------------- | ------------------ | --------------------- |
-| Linux         | GCC                |
+| Linux         | GCC                |                       |
 | Linux         | Clang              | With libc++           |
-| Windows       | Visual Studio 2022 | Dynamic linking       |
-| Windows       | Visual Studio 2022 | Static linking        |
+| Windows       | Visual Studio 2026 | Dynamic linking       |
+| Windows       | Visual Studio 2026 | Static linking        |
 | macOS         | AppleClang         | With libc++           |
 
 ## 依赖
