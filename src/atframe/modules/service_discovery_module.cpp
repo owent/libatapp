@@ -305,7 +305,7 @@ LIBATAPP_MACRO_API int service_discovery_module::reload() {
     tick_interval_ = std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::milliseconds(128));
   }
 
-  // FIXME reload 不支持external cluster context的热更新，后续可以考虑增加这个功能
+  // TODO(yousongyang) reload 不支持external cluster context的热更新，注意回收lease和错误重试流程
   return cluster_context_->reload(get_app()->get_origin_configure().etcd(), nullptr);
 }
 
@@ -999,6 +999,10 @@ LIBATAPP_MACRO_API void service_discovery_module::remove_on_discovery_snapshot_l
   handle = discovery_on_snapshot_loaded_callbacks_.end();
 }
 
+// TODO(yousongyang): 如果现在要支持多个cluster，状态类接口也需要支持external cluster
+// has_discovery_snapshot
+// has_topology_snapshot
+
 LIBATAPP_MACRO_API bool service_discovery_module::has_topology_snapshot() const noexcept {
   return !cluster_context_->data_->topology_watcher_snapshot_index_.empty();
 }
@@ -1162,6 +1166,9 @@ void service_discovery_module::pack(const atapp::protocol::atapp_topology_info &
 }
 
 namespace {
+// TODO(yousongyang): 索引优化
+// _collect_old_nodes和_collect_old_topology_peers可以只采集对应的service_discovery_cluster_context的数据
+// 加一层按 service_discovery_cluster_context 的索引？避免某些接口全量扫描筛选
 static void _collect_old_nodes(service_discovery_module &mod, etcd_discovery_set::node_by_name_type &old_names,
                                etcd_discovery_set::node_by_id_type &old_ids) {
   old_ids.reserve(mod.get_global_discovery().get_sorted_nodes().size());
@@ -1219,6 +1226,9 @@ void service_discovery_module::watcher_internal_access_t::cleanup_old_nodes(
 }
 
 namespace {
+// TODO(yousongyang): 索引优化
+// _collect_old_nodes和_collect_old_topology_peers可以只采集对应的service_discovery_cluster_context的数据
+// 加一层按 service_discovery_cluster_context 的索引？避免某些接口全量扫描筛选
 static void _collect_old_topology_peers(
     service_discovery_module &mod,
     std::unordered_map<uint64_t, service_discovery_module::topology_storage_t> &old_ids) {
@@ -1594,9 +1604,9 @@ bool service_discovery_module::update_internal_watcher_event(node_info_t &node,
                 "try to delete node with same name but different context. node id: {}, node name: {}, node "
                 "context: {}, local cache context: {}",
                 node.node_discovery.id(), node.node_discovery.name().c_str(),
-                reinterpret_cast<void *>(node.context_addr),    // NOLINT(performance-no-int-to-ptr)
-                reinterpret_cast<void *>(                       // NOLINT(performance-no-int-to-ptr)
-                    local_cache_by_name->get_context_addr()));  // NOLINT(performance-no-int-to-ptr)
+                reinterpret_cast<void *>(node.context_addr),  // NOLINT(performance-no-int-to-ptr)
+                reinterpret_cast<void *>(                     // NOLINT(performance-no-int-to-ptr)
+                    local_cache_by_name->get_context_addr()));
           }
           local_cache_by_name->update_version(version, true);
           global_discovery_.remove_node(local_cache_by_name);

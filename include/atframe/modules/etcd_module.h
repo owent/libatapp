@@ -37,8 +37,8 @@ class etcd_module {
   LIBATAPP_MACRO_API void reset();
   LIBATAPP_MACRO_API int tick();
 
-  LIBATAPP_MACRO_API bool is_cluster_closing() const { return cluster_.check_flag(etcd_cluster::flag_t::kClosing); }
-  LIBATAPP_MACRO_API bool is_cluster_init() const { return cluster_init_; }
+  ATFW_UTIL_FORCEINLINE bool is_cluster_closing() const { return cluster_.check_flag(etcd_cluster::flag_t::kClosing); }
+  ATFW_UTIL_FORCEINLINE bool is_cluster_init() const { return cluster_init_; }
 
  public:
   LIBATAPP_MACRO_API atapp::etcd_cluster &get_etcd_cluster();
