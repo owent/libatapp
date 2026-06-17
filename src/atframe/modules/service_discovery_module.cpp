@@ -319,8 +319,9 @@ LIBATAPP_MACRO_API int service_discovery_module::tick() {
   bool discovery_keepalives_watchers_inited = discovery_keepalives_watchers_inited_;
   {
     cluster_context_->tick();
-    if (!cluster_context_->get_etcd_module().is_cluster_closing()) {
-      // 不是正在关闭状态
+    if (cluster_context_->get_etcd_module().is_cluster_init() &&
+        !cluster_context_->get_etcd_module().is_cluster_closing()) {
+      // 初始化过且不是正在关闭状态
       if (discovery_enabled_ && !discovery_keepalives_watchers_inited) {
         init_service_discovery_keepalives_watchers(cluster_context_, false);
         discovery_keepalives_watchers_inited_ = true;
@@ -335,8 +336,9 @@ LIBATAPP_MACRO_API int service_discovery_module::tick() {
 
   for (const auto &external_cluster_context : external_cluster_contexts_) {
     external_cluster_context->tick();
-    if (!external_cluster_context->get_etcd_module().is_cluster_closing()) {
-      // 不是正在关闭状态
+    if (cluster_context_->get_etcd_module().is_cluster_init() &&
+        !cluster_context_->get_etcd_module().is_cluster_closing()) {
+      // 初始化过且不是正在关闭状态
       if (discovery_enabled_ && !discovery_keepalives_watchers_inited) {
         init_service_discovery_keepalives_watchers(external_cluster_context, false);
         discovery_keepalives_watchers_inited_ = true;

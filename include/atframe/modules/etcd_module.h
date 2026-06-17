@@ -38,6 +38,8 @@ class etcd_module {
   LIBATAPP_MACRO_API int tick();
 
   LIBATAPP_MACRO_API bool is_cluster_closing() const { return cluster_.check_flag(etcd_cluster::flag_t::kClosing); }
+  LIBATAPP_MACRO_API bool is_cluster_init() const { return cluster_init_; }
+
  public:
   LIBATAPP_MACRO_API atapp::etcd_cluster &get_etcd_cluster();
   LIBATAPP_MACRO_API const atapp::etcd_cluster &get_etcd_cluster() const;
@@ -60,6 +62,7 @@ class etcd_module {
   atfw::util::network::http_request::ptr_t cleanup_request_;
 
   atframework::atapp::app *ATFW_UTIL_MACRO_NULLABLE atapp_;
+  bool cluster_init_;
   atapp::etcd_cluster cluster_;
 
   // Config

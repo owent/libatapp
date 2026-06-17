@@ -80,7 +80,7 @@ static void init_timer_closed_callback(uv_handle_t *handle) {
 
 }  // namespace
 
-LIBATAPP_MACRO_API etcd_module::etcd_module() : enable_(false), atapp_(nullptr) {}
+LIBATAPP_MACRO_API etcd_module::etcd_module() : enable_(false), atapp_(nullptr), cluster_init_(false) {}
 
 LIBATAPP_MACRO_API etcd_module::~etcd_module() { reset(); }
 
@@ -90,6 +90,7 @@ LIBATAPP_MACRO_API int etcd_module::init(atframework::atapp::app &app, const ata
   load_cluster_conf(conf, log_conf);
   if (is_etcd_enabled()) {
     cluster_.init(atapp_->get_shared_curl_multi_context());
+    cluster_init_ = true;
   } else {
     FWLOGINFO("cluster is disabled");
   }
@@ -115,6 +116,7 @@ LIBATAPP_MACRO_API void etcd_module::reset() {
     cleanup_request_.reset();
   }
   cluster_.reset();
+  cluster_init_ = false;
 }
 
 LIBATAPP_MACRO_API bool etcd_module::check_keepalive_actor_start_success(
@@ -259,7 +261,7 @@ LIBATAPP_MACRO_API int etcd_module::tick() {
   }
 
   // first startup when reloaded
-  if (cluster_.check_flag(etcd_cluster::flag_t::kClosing)) {
+  if (!is_cluster_init()) {
     cluster_.init(atapp_->get_shared_curl_multi_context());
   }
 
@@ -505,6 +507,7 @@ int etcd_module::http_callback_on_etcd_closed(atfw::util::network::http_request 
   }
 
   self->cleanup_request_.reset();
+  self->cluster_init_ = false;
   LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(self->cluster_, "Etcd revoke lease finished");
 
   if (self->atapp_ != nullptr) {
