@@ -253,6 +253,7 @@ LIBATAPP_MACRO_API int service_discovery_module::init() {
 
   ret = init_service_discovery_keepalives_watchers(cluster_context_);
   if (ret < 0) {
+    // TODO(yousongyang) init 失败stop不会tick 之后要手动tick 或者变为接管的 init_failed_cleanup 模式
     stop();
     return ret;
   }
@@ -264,6 +265,8 @@ LIBATAPP_MACRO_API int service_discovery_module::init() {
       return ret;
     }
   }
+
+  // TODO(yousongyang) init_service_discovery_keepalives_watchers 内会等待success事件，可能会比较慢，需要优化成一批等待
   discovery_keepalives_watchers_inited_ = true;
 
   return 0;
