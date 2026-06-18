@@ -137,4 +137,10 @@ LIBATAPP_MACRO_API bool module_impl::check_suspend_stop() {
   return true;
 }
 
+LIBATAPP_MACRO_API int module_impl::init_failed_stop() { return 0; }
+
+LIBATAPP_MACRO_API int module_impl::init_failed_timeout() { return 0; }
+
+LIBATAPP_MACRO_API void module_impl::init_failed_cleanup() {}
+
 LIBATAPP_MACRO_NAMESPACE_END

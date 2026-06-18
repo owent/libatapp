@@ -23,6 +23,7 @@ LIBATAPP_MACRO_NAMESPACE_BEGIN
 class app;
 struct app_conf;
 
+// NOLINTNEXTLINE(cppcoreguidelines-virtual-class-destructor)
 class LIBATAPP_MACRO_API_SYMBOL_VISIBLE module_impl {
  protected:
   LIBATAPP_MACRO_API module_impl();
@@ -179,6 +180,30 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE module_impl {
   LIBATAPP_MACRO_API bool deactive();
 
   LIBATAPP_MACRO_API bool check_suspend_stop();
+
+  /**
+   * @brief Just like stop, but it only be called after init failed because stop() will not be called if init failed, so
+   * this function is used to check if the module is in stop suspend state after init failed
+   * @return if can't be stoped immadiately, return > 0, if there is a error, return < 0, otherwise 0
+   * @note This callback may be called more than once, when the first return <= 0, this function will not be called
+   * again.
+   */
+  LIBATAPP_MACRO_API virtual int init_failed_stop();
+
+  /**
+   * @brief Just like timeout, but it only be called after init failed because timeout() will not be called if init
+   * failed, so this function is used to check if the module is in timeout state after init failed
+   * @note This callback be called if the module can not be stopped even in a long time.
+   *       After this event, all module and atapp will be forced stopped.
+   */
+  LIBATAPP_MACRO_API virtual int init_failed_timeout();
+
+  /**
+   * @brief Just like cleanup, but it only be called after init failed because cleanup() will not be called if init
+   * failed, so this function is used to cleanup resource after init failed
+   * @note This callback only will be call once after all module stopped
+   */
+  LIBATAPP_MACRO_API virtual void init_failed_cleanup();
 
  private:
   bool enabled_;

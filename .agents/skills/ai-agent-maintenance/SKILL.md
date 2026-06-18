@@ -10,6 +10,8 @@ Use this skill when updating AI-agent guidance for this repository or subproject
 ## Required Outcomes
 
 - Deeply research the current prompt/skill layout and current AI-agent customization practices before editing.
+- Ground changes in real project artifacts, existing task traces, and official docs; avoid generic best-practice text
+  that does not change agent behavior in this repository.
 - Keep always-on guidance compact, actionable, and non-redundant.
 - Keep temporary-artifact guidance consistent: AI-created scratch files and script/log output should go in ignored build
   subdirectories, not repository roots.
@@ -17,6 +19,8 @@ Use this skill when updating AI-agent guidance for this repository or subproject
   Windsurf, Antigravity, OpenClaw/Hermes-style skills, and OpenCode where the repository intentionally supports them.
 - Keep this repository's AI surfaces independently maintainable; do not require parent, sibling, or vendored-submodule
   prompt files for `libatapp` guidance to make sense.
+- Use progressive disclosure: keep frontmatter descriptions concise, keep `SKILL.md` bodies focused on procedures,
+  gotchas, and validation, and move rarely needed detail to sibling files with explicit load conditions.
 - Re-check and record official source URLs whenever compatibility behavior, skill locations, or frontmatter semantics
   are changed.
 - Merge improvements into existing prompt and skill content; do not leave old versions, migration notes, changelog notes,
@@ -61,12 +65,18 @@ Use this skill when updating AI-agent guidance for this repository or subproject
 
 3. **Write compact, discoverable skills**
    - Keep skill folder names and frontmatter `name` values identical; use lowercase hyphenated names.
-   - Quote descriptions that contain colons and start them with `Use when:` plus concrete trigger words.
-   - Front-load the most important trigger phrases; some tools truncate skill descriptions in listings.
-   - Keep each `SKILL.md` focused. Move bulky examples, scripts, or reference material into sibling files when needed.
+   - Quote descriptions that contain colons and start them with `Use when:` plus concrete user-intent trigger words.
+   - Front-load the most important trigger phrases; descriptions are the primary trigger surface and may be truncated in
+     listings.
+   - Prefer procedures, gotchas, and validation loops over broad declarations. Provide a clear default path and mention
+     alternatives only when they materially change the work.
+   - Keep each `SKILL.md` focused. Move bulky examples, scripts, or reference material into sibling files when needed,
+     and say exactly when to load them.
 
 4. **Validate before finishing**
    - Check markdown/frontmatter diagnostics for changed prompt and skill files.
+   - Confirm each changed skill's `name` matches its folder, `description` still says when to use it, and no bridge file
+     has grown into a duplicate skill body.
    - Run a scoped whitespace check for changed prompt and skill files.
    - Re-read representative files to ensure bridge files stay thin and skill routing points to the current skill.
    - For nested Git repositories, run status and whitespace checks from each affected repository root.
@@ -79,6 +89,8 @@ Use this skill when updating AI-agent guidance for this repository or subproject
 
 - AGENTS.md guidance: <https://agents.md/>
 - Agent Skills specification and best practices: <https://agentskills.io/specification>
+- Agent Skills creator practices: <https://agentskills.io/skill-creation/best-practices>
+- Agent Skills description tuning: <https://agentskills.io/skill-creation/optimizing-descriptions>
 - VS Code Copilot custom instructions and skills: <https://code.visualstudio.com/docs/copilot/customization/overview>
 - Claude Code memory and skills: <https://docs.anthropic.com/claude-code/>
 - MCP security and tool design: <https://modelcontextprotocol.io/docs/>

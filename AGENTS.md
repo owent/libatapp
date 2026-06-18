@@ -25,6 +25,8 @@ discovery, connector-based routing, worker pools, and libatbus integration.
 - When creating AI scratch files or asking scripts to emit temporary data/logs, use a subdirectory inside an ignored
    build tree (prefer `build/_agent_tmp/` or an existing `build_jobs_*/_agent_tmp/`) so `.gitignore` covers it; never
    write temporary artifacts to the repository root.
+- Before running CMake configure/build/test commands, inspect the active workspace `.vscode/settings.json` when present
+  and align with its generator, configure settings, build directory conventions, and parallel-job settings.
 - Read the matching `.agents/skills/*/SKILL.md` before build, test, config-expression, connector, module, or etcd work.
 - `include/atframe/atapp_conf.proto` is the config source of truth; generated outputs should normally be regenerated,
   not edited by hand.
@@ -34,10 +36,14 @@ discovery, connector-based routing, worker pools, and libatbus integration.
 
 1. **Namespaces**: `atframework::atapp` for library code; `atframework::atapp::protocol` for protobuf types.
 2. **Include guards**: use `#pragma once`.
-3. **Naming**: classes/functions use `snake_case`; constants use `UPPER_SNAKE_CASE`; type aliases often use `*_t`.
-4. **Error handling**: return `int` / `int32_t` error codes (`0` success, negative error).
-5. **Logging**: use FWLOG macros (`FWLOGINFO`, `FWLOGERROR`, etc.).
-6. **Anonymous namespace + static**: in `.cpp` files, file-local functions should be inside an anonymous namespace **and**
+3. **Header code**: any function, method, friend, or operator body written in a header must use
+   `ATFW_UTIL_FORCEINLINE`; avoid plain `inline` for project code unless matching generated or third-party code.
+4. **Exported ABI**: interfaces declared with `LIBATAPP_MACRO_API` or other `*_API` export macros must be implemented in
+   `.cpp` files, not headers, so ABI stays stable across compilers and build options.
+5. **Naming**: classes/functions use `snake_case`; constants use `UPPER_SNAKE_CASE`; type aliases often use `*_t`.
+6. **Error handling**: return `int` / `int32_t` error codes (`0` success, negative error).
+7. **Logging**: use FWLOG macros (`FWLOGINFO`, `FWLOGERROR`, etc.).
+8. **Anonymous namespace + static**: in `.cpp` files, file-local functions should be inside an anonymous namespace **and**
    keep the `static` keyword.
 
    ```cpp

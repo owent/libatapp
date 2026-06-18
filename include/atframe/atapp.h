@@ -696,6 +696,8 @@ class app {
                                                   const atbus::connection *, app_id_t,
                                                   gsl::span<gsl::span<const unsigned char>>, uint64_t);
 
+  void init_failed_cleanup(size_t inited_mod_idx, size_t init_failed_mod_idx);
+
   void app_evt_on_finally();
 
   LIBATAPP_MACRO_API void add_connector_inner(const std::shared_ptr<atapp_connector_impl> &connector);

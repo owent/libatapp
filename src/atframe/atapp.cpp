@@ -9,6 +9,8 @@
 
 #include <algorithm/crypto_cipher.h>
 #include <algorithm/murmur_hash.h>
+#include <iterator>
+#include "atframe/atapp_conf.h"
 #include "gsl/select-gsl.h"
 
 #if defined(ATFRAMEWORK_UTILS_CRYPTO_USE_OPENSSL) || defined(ATFRAMEWORK_UTILS_CRYPTO_USE_LIBRESSL) || \
@@ -38,6 +40,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <unordered_set>
 #include <utility>
@@ -717,7 +720,7 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
   bool hold_timeout_timer = setup_timeout_timer(conf_.origin.timer().initialize_timeout());
   auto timeout_timer_guard = gsl::finally([hold_timeout_timer, this]() {
     if (hold_timeout_timer) {
-      this->close_timer(this->tick_timer_.timeout_timer);
+      close_timer(this->tick_timer_.timeout_timer);
     }
   });
 
@@ -785,12 +788,14 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
 
   // all modules init
   size_t inited_mod_idx = 0;
+  size_t init_failed_mod_idx = std::numeric_limits<size_t>::max();
   int mod_init_res = 0;
   for (; mod_init_res >= 0 && inited_mod_idx < modules_.size(); ++inited_mod_idx) {
     if (modules_[inited_mod_idx]->is_enabled()) {
       mod_init_res = modules_[inited_mod_idx]->init();
       if (mod_init_res < 0) {
         FWLOGERROR("initialze {} failed", modules_[inited_mod_idx]->name());
+        init_failed_mod_idx = inited_mod_idx;
         break;
       }
 
@@ -819,61 +824,13 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
 
   // cleanup all inited modules if failed
   if (mod_init_res < 0) {
-    // Trigger stop once and then force cleanup
-    stop();
-    for (size_t i = 0; i < inited_mod_idx && i < modules_.size(); ++i) {
-      if (!modules_[i]) {
-        continue;
-      }
-
-      if (!modules_[i]->is_enabled()) {
-        continue;
-      }
-
-      if (modules_[i]->check_suspend_stop() && !check_flag(flag_t::kTimeout)) {
-        continue;
-      }
-
-      if (modules_[i]->is_enabled()) {
-        if (modules_[i]->stop() <= 0) {
-          modules_[i]->disable();
-        }
-      }
-    }
-    while (!check_flag(flag_t::kTimeout)) {
-      bool more_event = false;
-      for (size_t i = 0; i < inited_mod_idx && i < modules_.size(); ++i) {
-        if (!modules_[i]) {
-          continue;
-        }
-
-        if (modules_[i]->is_enabled()) {
-          more_event = true;
-          break;
-        }
-      }
-
-      if (!more_event) {
-        break;
-      }
-
-      run_ev_loop(UV_RUN_ONCE);
+    size_t inited_mod_end_idx = inited_mod_idx;
+    if (std::numeric_limits<size_t>::max() == init_failed_mod_idx && inited_mod_idx < modules_.size() &&
+        modules_[inited_mod_idx] && modules_[inited_mod_idx]->is_actived()) {
+      ++inited_mod_end_idx;
     }
 
-    for (; inited_mod_idx < modules_.size(); --inited_mod_idx) {
-      if (modules_[inited_mod_idx]) {
-        modules_[inited_mod_idx]->cleanup();
-      }
-
-      if (0 == inited_mod_idx) {
-        break;
-      }
-    }
-
-    if (evt_on_all_module_cleaned_) {
-      evt_on_all_module_cleaned_(*this);
-    }
-
+    init_failed_cleanup(inited_mod_end_idx, init_failed_mod_idx);
     write_startup_error_file(mod_init_res);
     return setup_result_ = mod_init_res;
   }
@@ -1335,11 +1292,8 @@ LIBATAPP_MACRO_API int app::tick() {
   // if is stoping, quit loop every tick
   if (nullptr != loop) {
     if (check_flag(flag_t::kStoping)) {
-      std::chrono::system_clock::duration stop_interval =
-          std::chrono::duration_cast<std::chrono::system_clock::duration>(
-              std::chrono::seconds{conf_.origin.timer().stop_interval().seconds()});
-      stop_interval += std::chrono::duration_cast<std::chrono::system_clock::duration>(
-          std::chrono::nanoseconds{conf_.origin.timer().stop_interval().nanos()});
+      std::chrono::system_clock::duration stop_interval;
+      protobuf_to_chrono_set_duration(stop_interval, conf_.origin.timer().stop_interval());
       std::chrono::system_clock::duration stop_offset =
           tick_timer_.last_tick_timepoint - tick_timer_.last_stop_timepoint;
       if ((stop_offset.count() > 0 && stop_offset > stop_interval) ||
@@ -5302,6 +5256,111 @@ int app::bus_evt_callback_on_custom_command_response(const atbus::node &, const 
   }
 
   return 0;
+}
+
+void app::init_failed_cleanup(size_t inited_mod_idx, size_t init_failed_mod_idx) {
+  if (inited_mod_idx > modules_.size()) {
+    inited_mod_idx = modules_.size();
+  }
+
+  bool init_failed_need_stop = init_failed_mod_idx < modules_.size() && modules_[init_failed_mod_idx];
+
+  auto stop_inited_modules = [this, inited_mod_idx, init_failed_mod_idx]() {
+    bool more_event = false;
+    for (size_t i = 0; i < inited_mod_idx && i < modules_.size(); ++i) {
+      if (i == init_failed_mod_idx || !modules_[i] || !modules_[i]->is_enabled()) {
+        continue;
+      }
+
+      if (modules_[i]->check_suspend_stop() && !check_flag(flag_t::kTimeout)) {
+        more_event = true;
+        continue;
+      }
+
+      int res = modules_[i]->stop();
+      if (0 == res) {
+        modules_[i]->disable();
+      } else if (res < 0) {
+        modules_[i]->disable();
+        FWLOGERROR("try to stop module {} after init failed but failed and return {}", modules_[i]->name(), res);
+      } else {
+        more_event = true;
+      }
+    }
+
+    return more_event;
+  };
+
+  auto run_loop_once_without_module_stop = [this]() {
+    atfw::util::time::time_utility::update();
+    process_custom_timers();
+
+    ev_loop_t *loop = get_evloop();
+    if (nullptr != loop) {
+      flag_guard_t in_callback_guard(*this, flag_t::kInCallback);
+      uv_run(loop, UV_RUN_ONCE);
+    }
+
+    if (0 != pending_signals_[0]) {
+      process_signals();
+    }
+  };
+
+  // Mark app as stopping, but keep failed/uninitialized modules out of normal stop().
+  stop();
+
+  while (!check_flag(flag_t::kTimeout)) {
+    bool more_event = stop_inited_modules();
+
+    if (init_failed_need_stop) {
+      if (modules_[init_failed_mod_idx]->init_failed_stop() <= 0) {
+        init_failed_need_stop = false;
+      } else {
+        more_event = true;
+      }
+    }
+
+    if (!more_event) {
+      break;
+    }
+
+    run_loop_once_without_module_stop();
+  }
+
+  if (check_flag(flag_t::kTimeout)) {
+    for (size_t i = 0; i < inited_mod_idx && i < modules_.size(); ++i) {
+      if (i == init_failed_mod_idx || !modules_[i] || !modules_[i]->is_enabled()) {
+        continue;
+      }
+
+      FWLOGERROR("try to stop module {} after init failed but timeout", modules_[i]->name());
+      modules_[i]->timeout();
+      modules_[i]->disable();
+    }
+  }
+
+  if (init_failed_mod_idx < modules_.size() && modules_[init_failed_mod_idx]) {
+    if (init_failed_need_stop && check_flag(flag_t::kTimeout)) {
+      modules_[init_failed_mod_idx]->init_failed_timeout();
+    }
+
+    modules_[init_failed_mod_idx]->init_failed_cleanup();
+  }
+
+  for (size_t cleanup_idx = inited_mod_idx; cleanup_idx > 0; --cleanup_idx) {
+    size_t module_idx = cleanup_idx - 1;
+    if (module_idx == init_failed_mod_idx) {
+      continue;
+    }
+
+    if (modules_[module_idx]) {
+      modules_[module_idx]->cleanup();
+    }
+  }
+
+  if (evt_on_all_module_cleaned_) {
+    evt_on_all_module_cleaned_(*this);
+  }
 }
 
 void app::app_evt_on_finally() {
