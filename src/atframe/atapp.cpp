@@ -9,7 +9,6 @@
 
 #include <algorithm/crypto_cipher.h>
 #include <algorithm/murmur_hash.h>
-#include <iterator>
 #include "atframe/atapp_conf.h"
 #include "gsl/select-gsl.h"
 
