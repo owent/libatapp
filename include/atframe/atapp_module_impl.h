@@ -196,9 +196,8 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE module_impl {
   LIBATAPP_MACRO_API virtual int init_failed_timeout();
 
   /**
-   * @brief Just like cleanup, but it only be called after init failed because cleanup() will not be called if init
-   * failed, so this function is used to cleanup resource after init failed
-   * @note This callback only will be call once after all module stopped
+   * @brief Like cleanup(), but only called after init() fails (because cleanup() is not called for the failing module).
+   * @note This callback is called once after all modules have stopped.
    */
   LIBATAPP_MACRO_API virtual void init_failed_cleanup();
 
