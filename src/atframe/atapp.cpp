@@ -5249,7 +5249,12 @@ void app::init_failed_cleanup(size_t inited_mod_idx, size_t init_failed_mod_idx)
     bool more_event = stop_inited_modules();
 
     if (init_failed_need_stop) {
-      if (modules_[init_failed_mod_idx]->init_failed_stop() <= 0) {
+      int res = modules_[init_failed_mod_idx]->init_failed_stop();
+      if (res <= 0) {
+        if (res < 0) {
+          FWLOGERROR("try to stop module {} after init failed but failed and return {}",
+                     modules_[init_failed_mod_idx]->name(), res);
+        }
         init_failed_need_stop = false;
       } else {
         more_event = true;
