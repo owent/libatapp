@@ -185,7 +185,8 @@ class service_discovery_module : public ::atframework::atapp::module_impl {
 
   LIBATAPP_MACRO_API void reset_context_internal_watchers_and_keepalives();
   LIBATAPP_MACRO_API int init_service_discovery_keepalives_watchers(
-      const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &context, bool check_keepalive_actor_start_success = true);
+      const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &context,
+      bool check_keepalive_actor_start_success = true);
 
   LIBATAPP_MACRO_API static int init_discovery_watcher_by_id(
       atframework::atapp::app &app,
@@ -237,15 +238,13 @@ class service_discovery_module : public ::atframework::atapp::module_impl {
       atframework::atapp::app &app,
       const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &context, std::string &val,
       const std::string &node_path);
-  LIBATAPP_MACRO_API atapp::etcd_keepalive::ptr_t add_keepalive_actor(atframework::atapp::app &app, std::string &val,
-                                                                      const std::string &node_path);
+  LIBATAPP_MACRO_API atapp::etcd_keepalive::ptr_t add_keepalive_actor(std::string &val, const std::string &node_path);
 
   LIBATAPP_MACRO_API static bool remove_keepalive_actor(
       atframework::atapp::app &app,
       const ::atfw::util::nostd::nonnull<std::shared_ptr<service_discovery_cluster_context>> &context,
       const atapp::etcd_keepalive::ptr_t &keepalive);
-  LIBATAPP_MACRO_API bool remove_keepalive_actor(atframework::atapp::app &app,
-                                                 const atapp::etcd_keepalive::ptr_t &keepalive);
+  LIBATAPP_MACRO_API bool remove_keepalive_actor(const atapp::etcd_keepalive::ptr_t &keepalive);
 
   LIBATAPP_MACRO_API node_event_callback_handle_t add_on_node_discovery_event(const node_event_callback_t &fn);
   LIBATAPP_MACRO_API void remove_on_node_event(node_event_callback_handle_t &handle);

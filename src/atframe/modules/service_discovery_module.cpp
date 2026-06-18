@@ -389,7 +389,7 @@ LIBATAPP_MACRO_API void service_discovery_module::disable_discovery() {
 }
 
 void service_discovery_module::update_keepalive_topology_value() {
-  if (!maybe_update_internal_keepalive_topology_value_ || nullptr == get_app()) {
+  if (!maybe_update_internal_keepalive_topology_value_) {
     return;
   }
   maybe_update_internal_keepalive_topology_value_ = false;
@@ -429,8 +429,7 @@ void service_discovery_module::update_keepalive_topology_value() {
 
 void service_discovery_module::update_keepalive_discovery_value() {
   if (!(maybe_update_internal_keepalive_discovery_value_ || maybe_update_internal_keepalive_discovery_area_ ||
-        maybe_update_internal_keepalive_discovery_metadata_) ||
-      nullptr == get_app()) {
+        maybe_update_internal_keepalive_discovery_metadata_)) {
     return;
   }
 
@@ -875,8 +874,8 @@ LIBATAPP_MACRO_API atapp::etcd_keepalive::ptr_t service_discovery_module::add_ke
 }
 
 LIBATAPP_MACRO_API atapp::etcd_keepalive::ptr_t service_discovery_module::add_keepalive_actor(
-    atframework::atapp::app &app, std::string &val, const std::string &node_path) {
-  return add_keepalive_actor(app, cluster_context_, val, node_path);
+    std::string &val, const std::string &node_path) {
+  return add_keepalive_actor(*get_app(), cluster_context_, val, node_path);
 }
 
 LIBATAPP_MACRO_API bool service_discovery_module::remove_keepalive_actor(
@@ -891,7 +890,7 @@ LIBATAPP_MACRO_API bool service_discovery_module::remove_keepalive_actor(
 }
 
 LIBATAPP_MACRO_API bool service_discovery_module::remove_keepalive_actor(
-    atframework::atapp::app &app, const atapp::etcd_keepalive::ptr_t &keepalive) {
+    const atapp::etcd_keepalive::ptr_t &keepalive) {
   std::list<etcd_keepalive::ptr_t> *keepalive_actors[] = {
       &cluster_context_->data_->internal_discovery_keepalive_actors_,
       &cluster_context_->data_->internal_topology_keepalive_actors_};
@@ -903,7 +902,7 @@ LIBATAPP_MACRO_API bool service_discovery_module::remove_keepalive_actor(
       keepalive_actor_list->erase(internal_iter);
     }
   }
-  return remove_keepalive_actor(app, cluster_context_, keepalive);
+  return remove_keepalive_actor(*get_app(), cluster_context_, keepalive);
 }
 
 LIBATAPP_MACRO_API service_discovery_module::node_event_callback_handle_t
@@ -1654,22 +1653,21 @@ bool service_discovery_module::update_internal_watcher_event(node_info_t &node,
 
   // remove endpoint if got DELETE event
   if (has_event) {
-    app *owner = get_app();
-    if (node_action_t::kDelete == node.action && nullptr != owner) {
+    if (node_action_t::kDelete == node.action) {
       if (0 != node.node_discovery.id()) {
-        owner->remove_endpoint(node.node_discovery.id());
+        get_app()->remove_endpoint(node.node_discovery.id());
       }
       if (!node.node_discovery.name().empty()) {
-        owner->remove_endpoint(node.node_discovery.name());
+        get_app()->remove_endpoint(node.node_discovery.name());
       }
     }
 
-    if (nullptr != owner) {
+    {
       std::lock_guard<std::recursive_mutex> lock_guard{node_event_lock_};
 
       // notify all connector discovery event
       if (new_inst) {
-        owner->trigger_event_on_discovery_event(node.action, new_inst);
+        get_app()->trigger_event_on_discovery_event(node.action, new_inst);
         for (node_event_callback_list_t::iterator iter = node_event_callbacks_.begin();
              iter != node_event_callbacks_.end(); ++iter) {
           if (*iter) {
@@ -1677,7 +1675,7 @@ bool service_discovery_module::update_internal_watcher_event(node_info_t &node,
           }
         }
       } else if (local_cache_by_name) {
-        owner->trigger_event_on_discovery_event(node.action, local_cache_by_name);
+        get_app()->trigger_event_on_discovery_event(node.action, local_cache_by_name);
         for (node_event_callback_list_t::iterator iter = node_event_callbacks_.begin();
              iter != node_event_callbacks_.end(); ++iter) {
           if (*iter) {
@@ -1685,7 +1683,7 @@ bool service_discovery_module::update_internal_watcher_event(node_info_t &node,
           }
         }
       } else {
-        owner->trigger_event_on_discovery_event(node.action, local_cache_by_id);
+        get_app()->trigger_event_on_discovery_event(node.action, local_cache_by_id);
         for (node_event_callback_list_t::iterator iter = node_event_callbacks_.begin();
              iter != node_event_callbacks_.end(); ++iter) {
           if (*iter) {
@@ -1753,10 +1751,9 @@ bool service_discovery_module::update_internal_watcher_event(topology_info_t &to
     }
   }
 
-  app *owner = get_app();
-  if (owner != nullptr) {
+  {
     std::lock_guard<std::recursive_mutex> lock_guard{topology_info_event_lock_};
-    owner->trigger_event_on_topology_event(topology_info.action, info_ptr, topology_info.storage.version);
+    get_app()->trigger_event_on_topology_event(topology_info.action, info_ptr, topology_info.storage.version);
 
     for (topology_info_event_callback_list_t::iterator iter = topology_info_event_callbacks_.begin();
          iter != topology_info_event_callbacks_.end(); ++iter) {
@@ -1765,6 +1762,7 @@ bool service_discovery_module::update_internal_watcher_event(topology_info_t &to
       }
     }
   }
+
   return true;
 }
 
