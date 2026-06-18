@@ -793,7 +793,7 @@ LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv
     if (modules_[inited_mod_idx]->is_enabled()) {
       mod_init_res = modules_[inited_mod_idx]->init();
       if (mod_init_res < 0) {
-        FWLOGERROR("initialze {} failed", modules_[inited_mod_idx]->name());
+        FWLOGERROR("initialize {} failed", modules_[inited_mod_idx]->name());
         init_failed_mod_idx = inited_mod_idx;
         break;
       }
