@@ -68,10 +68,214 @@ CASE_TEST(atapp_setup, timeout) {
 }
 
 namespace {
+static std::string get_atapp_setup_test_conf_path() {
+  std::string conf_path_base;
+  atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
+  return conf_path_base + "/atapp_test_0.yaml";
+}
+
+class atapp_setup_test_init_success_module : public ::atframework::atapp::module_impl {
+ public:
+  int init_calls = 0;
+  int stop_calls = 0;
+  int timeout_calls = 0;
+  int cleanup_calls = 0;
+
+  const char *name() const override { return "atapp_setup_test_init_success_module"; }
+
+  int init() override {
+    ++init_calls;
+    return 0;
+  }
+
+  int stop() override {
+    ++stop_calls;
+    return 0;
+  }
+
+  int timeout() override {
+    ++timeout_calls;
+    return 0;
+  }
+
+  void cleanup() override { ++cleanup_calls; }
+};
+
+class atapp_setup_test_never_init_module : public ::atframework::atapp::module_impl {
+ public:
+  int init_calls = 0;
+  int stop_calls = 0;
+  int cleanup_calls = 0;
+
+  const char *name() const override { return "atapp_setup_test_never_init_module"; }
+
+  int init() override {
+    ++init_calls;
+    return 0;
+  }
+
+  int stop() override {
+    ++stop_calls;
+    return 0;
+  }
+
+  void cleanup() override { ++cleanup_calls; }
+};
+
+class atapp_setup_test_init_failed_module : public ::atframework::atapp::module_impl {
+ public:
+  int init_calls = 0;
+  int stop_calls = 0;
+  int cleanup_calls = 0;
+  int init_failed_stop_calls = 0;
+  int init_failed_timeout_calls = 0;
+  int init_failed_cleanup_calls = 0;
+
+  atapp_setup_test_init_failed_module(int init_result, int stop_complete_after, int initialize_timeout_ms)
+      : init_result_(init_result),
+        stop_complete_after_(stop_complete_after),
+        initialize_timeout_ms_(initialize_timeout_ms) {}
+
+  const char *name() const override { return "atapp_setup_test_init_failed_module"; }
+
+  int setup(::atframework::atapp::app_conf &conf) override {
+    conf.origin.mutable_bus()->clear_listen();
+    if (initialize_timeout_ms_ > 0) {
+      conf.origin.mutable_timer()->mutable_initialize_timeout()->set_seconds(0);
+      conf.origin.mutable_timer()->mutable_initialize_timeout()->set_nanos(initialize_timeout_ms_ * 1000000);
+    }
+    return 0;
+  }
+
+  int init() override {
+    ++init_calls;
+    return init_result_;
+  }
+
+  int stop() override {
+    ++stop_calls;
+    return 0;
+  }
+
+  void cleanup() override { ++cleanup_calls; }
+
+  int init_failed_stop() override {
+    ++init_failed_stop_calls;
+    if (stop_complete_after_ <= 0) {
+      return 1;
+    }
+
+    return init_failed_stop_calls >= stop_complete_after_ ? 0 : 1;
+  }
+
+  int init_failed_timeout() override {
+    ++init_failed_timeout_calls;
+    return 0;
+  }
+
+  void init_failed_cleanup() override { ++init_failed_cleanup_calls; }
+
+ private:
+  int init_result_;
+  int stop_complete_after_;
+  int initialize_timeout_ms_;
+};
+
 static atfw::util::log::log_level print_log_level = atfw::util::log::log_level::kDisabled;
 }  // namespace
 
 void atapp_unit_test_set_print_log_level(atfw::util::log::log_level level) { print_log_level = level; }
+
+CASE_TEST(atapp_setup, init_failed_stop_cleanup_immediate) {
+  std::string conf_path_1 = get_atapp_setup_test_conf_path();
+  if (!atfw::util::file_system::is_exist(conf_path_1.c_str())) {
+    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path_1 << " not found, skip this test" << std::endl;
+    return;
+  }
+
+  atframework::atapp::app app1;
+  const char *args1[] = {"app1", "-c", conf_path_1.c_str(), "start"};
+
+  auto failed_module = std::make_shared<atapp_setup_test_init_failed_module>(-12345, 1, 0);
+  auto later_module = std::make_shared<atapp_setup_test_never_init_module>();
+  app1.add_module(failed_module);
+  app1.add_module(later_module);
+
+  CASE_EXPECT_EQ(-12345, app1.init(nullptr, 4, args1, nullptr));
+  CASE_EXPECT_EQ(1, failed_module->init_calls);
+  CASE_EXPECT_EQ(1, failed_module->init_failed_stop_calls);
+  CASE_EXPECT_EQ(0, failed_module->init_failed_timeout_calls);
+  CASE_EXPECT_EQ(1, failed_module->init_failed_cleanup_calls);
+  CASE_EXPECT_EQ(0, failed_module->stop_calls);
+  CASE_EXPECT_EQ(0, failed_module->cleanup_calls);
+
+  CASE_EXPECT_EQ(0, later_module->init_calls);
+  CASE_EXPECT_EQ(0, later_module->stop_calls);
+  CASE_EXPECT_EQ(0, later_module->cleanup_calls);
+}
+
+CASE_TEST(atapp_setup, init_failed_stop_cleanup_async_done) {
+  std::string conf_path_1 = get_atapp_setup_test_conf_path();
+  if (!atfw::util::file_system::is_exist(conf_path_1.c_str())) {
+    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path_1 << " not found, skip this test" << std::endl;
+    return;
+  }
+
+  atframework::atapp::app app1;
+  const char *args1[] = {"app1", "-c", conf_path_1.c_str(), "start"};
+
+  auto success_module = std::make_shared<atapp_setup_test_init_success_module>();
+  auto failed_module = std::make_shared<atapp_setup_test_init_failed_module>(-12346, 3, 0);
+  auto later_module = std::make_shared<atapp_setup_test_never_init_module>();
+  app1.add_module(success_module);
+  app1.add_module(failed_module);
+  app1.add_module(later_module);
+
+  CASE_EXPECT_EQ(-12346, app1.init(nullptr, 4, args1, nullptr));
+  CASE_EXPECT_EQ(1, success_module->init_calls);
+  CASE_EXPECT_EQ(1, success_module->stop_calls);
+  CASE_EXPECT_EQ(0, success_module->timeout_calls);
+  CASE_EXPECT_EQ(1, success_module->cleanup_calls);
+
+  CASE_EXPECT_EQ(1, failed_module->init_calls);
+  CASE_EXPECT_EQ(3, failed_module->init_failed_stop_calls);
+  CASE_EXPECT_EQ(0, failed_module->init_failed_timeout_calls);
+  CASE_EXPECT_EQ(1, failed_module->init_failed_cleanup_calls);
+  CASE_EXPECT_EQ(0, failed_module->stop_calls);
+  CASE_EXPECT_EQ(0, failed_module->cleanup_calls);
+
+  CASE_EXPECT_EQ(0, later_module->init_calls);
+  CASE_EXPECT_EQ(0, later_module->stop_calls);
+  CASE_EXPECT_EQ(0, later_module->cleanup_calls);
+}
+
+CASE_TEST(atapp_setup, init_failed_stop_cleanup_timeout) {
+  std::string conf_path_1 = get_atapp_setup_test_conf_path();
+  if (!atfw::util::file_system::is_exist(conf_path_1.c_str())) {
+    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path_1 << " not found, skip this test" << std::endl;
+    return;
+  }
+
+  atframework::atapp::app app1;
+  const char *args1[] = {"app1", "-c", conf_path_1.c_str(), "start"};
+
+  auto failed_module = std::make_shared<atapp_setup_test_init_failed_module>(-12347, 0, 100);
+  auto later_module = std::make_shared<atapp_setup_test_never_init_module>();
+  app1.add_module(failed_module);
+  app1.add_module(later_module);
+
+  CASE_EXPECT_EQ(-12347, app1.init(nullptr, 4, args1, nullptr));
+  CASE_EXPECT_EQ(1, failed_module->init_calls);
+  CASE_EXPECT_GE(failed_module->init_failed_stop_calls, 1);
+  CASE_EXPECT_EQ(1, failed_module->init_failed_timeout_calls);
+  CASE_EXPECT_EQ(1, failed_module->init_failed_cleanup_calls);
+  CASE_EXPECT_EQ(0, failed_module->stop_calls);
+  CASE_EXPECT_EQ(0, failed_module->cleanup_calls);
+
+  CASE_EXPECT_EQ(0, later_module->init_calls);
+  CASE_EXPECT_EQ(0, later_module->stop_calls);
+  CASE_EXPECT_EQ(0, later_module->cleanup_calls);
+}
 
 #if defined(_WIN32)
 static int test_setenv(const char *name, const char *value, int) { return _putenv_s(name, value); }
