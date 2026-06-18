@@ -190,10 +190,8 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE module_impl {
   LIBATAPP_MACRO_API virtual int init_failed_stop();
 
   /**
-   * @brief Just like timeout, but it only be called after init failed because timeout() will not be called if init
-   * failed, so this function is used to check if the module is in timeout state after init failed
-   * @note This callback be called if the module can not be stopped even in a long time.
-   *       After this event, all module and atapp will be forced stopped.
+   * @brief Like timeout(), but only called after init() fails (because timeout() is not called for the failing module).
+   * @note This callback is called if the module cannot be stopped before the initialize timeout expires.
    */
   LIBATAPP_MACRO_API virtual int init_failed_timeout();
 
