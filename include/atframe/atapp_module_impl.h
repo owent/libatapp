@@ -182,11 +182,10 @@ class LIBATAPP_MACRO_API_SYMBOL_VISIBLE module_impl {
   LIBATAPP_MACRO_API bool check_suspend_stop();
 
   /**
-   * @brief Just like stop, but it only be called after init failed because stop() will not be called if init failed, so
-   * this function is used to check if the module is in stop suspend state after init failed
-   * @return if can't be stoped immadiately, return > 0, if there is a error, return < 0, otherwise 0
-   * @note This callback may be called more than once, when the first return <= 0, this function will not be called
-   * again.
+   * @brief Like stop(), but only called after init() fails (because stop() is not called for the failing module).
+   *        Used to drive the module's stop sequence after an init failure.
+   * @return > 0 if it cannot be stopped immediately, 0 if stopped, < 0 on error.
+   * @note This callback may be called more than once; after it returns <= 0, it will not be called again.
    */
   LIBATAPP_MACRO_API virtual int init_failed_stop();
 
