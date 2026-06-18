@@ -5258,24 +5258,41 @@ int app::bus_evt_callback_on_custom_command_response(const atbus::node &, const 
 }
 
 void app::init_failed_cleanup(size_t inited_mod_idx, size_t init_failed_mod_idx) {
+  // Roll back module lifecycle after initialization failure.
+  // Strategy:
+  // 1) stop already-initialized modules in order (except the failed one in normal pass),
+  // 2) respect suspend-stop modules until timeout is reached,
+  // 3) disable modules once stop is completed or irrecoverably failed.
+  // This keeps shutdown deterministic while still allowing async stop paths to finish.
+
+  // Clamp initialized-module upper bound to the current module container size.
   if (inited_mod_idx > modules_.size()) {
     inited_mod_idx = modules_.size();
   }
 
+  // The failed module may still need explicit stop/disable handling later.
   bool init_failed_need_stop = init_failed_mod_idx < modules_.size() && modules_[init_failed_mod_idx];
 
+  // Try to stop modules that were already initialized before failure.
+  // Return true when additional events/time are required to finish stopping.
   auto stop_inited_modules = [this, inited_mod_idx, init_failed_mod_idx]() {
     bool more_event = false;
     for (size_t i = 0; i < inited_mod_idx && i < modules_.size(); ++i) {
+      // Skip the failed module here and any invalid/disabled module entry.
       if (i == init_failed_mod_idx || !modules_[i] || !modules_[i]->is_enabled()) {
         continue;
       }
 
+      // Module requests deferred stop; keep event loop running unless timeout fired.
       if (modules_[i]->check_suspend_stop() && !check_flag(flag_t::kTimeout)) {
         more_event = true;
         continue;
       }
 
+      // stop() result convention:
+      //   0  => stopped successfully, disable now.
+      //   <0 => stop failed permanently, disable and log error.
+      //   >0 => stop pending, wait for more events.
       int res = modules_[i]->stop();
       if (0 == res) {
         modules_[i]->disable();
