@@ -7,7 +7,7 @@ commands, caveats, and examples here.
 
 | Skill | Description |
 | --- | --- |
-| `build/` | Configure and build libatapp with CMake |
+| `build/` | Configure/build libatapp and edit or review CMake generation rules |
 | `testing/` | Run and write private-framework unit tests |
 | `configure-expression/` | Edit environment-expression-enabled config fields and syntax |
 | `libatapp-module-connector/` | Work on modules, connectors, endpoints, routing, and lifecycle hooks |
@@ -16,7 +16,7 @@ commands, caveats, and examples here.
 
 ## When to read what
 
-- If you want to **build**: start with `build/SKILL.md`.
+- If you want to **build or edit/review CMake generation rules**: start with `build/SKILL.md`.
 - If you want to **run or write unit tests**: start with `testing/SKILL.md`.
 - If you are editing config expression behavior: see `configure-expression/SKILL.md`.
 - If you are working on modules, connectors, endpoints, or routing: see `libatapp-module-connector/SKILL.md`.

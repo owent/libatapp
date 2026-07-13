@@ -99,6 +99,13 @@ Diagnostics:
 
 说明：只有在 MSVC 下 clangd 不识别 `-std:c++latest` 和 `/std:c++latest` 时，才需要使用以上方式固定标准。使用 `CMAKE_CXX_STANDARD` 通常兼容性更好；`--query-driver` 不影响单独打开的 `.h` 文件，仅影响带编译命令的翻译单元。两者可二选一使用。
 
+## 增量构建稳定性
+
+不得无条件 `touch` 或同内容覆盖 `add_custom_command`、`add_custom_target`、`add_executable`、`add_library`、
+`target_sources` 所依赖的代码和资源，包括生成、复制及其他非手写文件。生成规则应准确声明
+`OUTPUT`/`BYPRODUCTS` 与 `DEPENDS`/`DEPFILE`，并使用内容稳定的生成方式，或写临时文件后通过
+`cmake -E copy_if_different` 发布。确需 witness 时使用不参与编译、链接、打包或安装的独立 stamp 文件。
+
 ## GET START
 
 ### 最小化服务器

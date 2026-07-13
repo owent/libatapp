@@ -1,6 +1,6 @@
 ---
 name: build
-description: "Use when: configuring or building libatapp with CMake, changing shared/static builds, or adjusting build type options."
+description: "Use when: configuring or building libatapp with CMake, editing or reviewing CMake generation/dependency rules, changing shared/static builds, or adjusting build type options."
 ---
 
 # Build (libatapp)
@@ -20,6 +20,16 @@ asks for a different configuration.
 - Build:
   - Linux/macOS: `cmake --build .`
   - Windows (MSVC): `cmake --build . --config RelWithDebInfo`
+
+## Incremental build stability
+
+- Treat unconditional `touch` or same-content overwrites of code/resources consumed by `add_custom_command`,
+  `add_custom_target`, `add_executable`, `add_library`, or `target_sources` as a blocking defect, including generated,
+  copied, and other non-handwritten files.
+- Declare real `OUTPUT`/`BYPRODUCTS` and accurate `DEPENDS`/`DEPFILE`; publish content-stably with
+  `configure_file`, `file(CONFIGURE)`, `file(GENERATE)`, or a temporary file plus `cmake -E copy_if_different`.
+- Use a dedicated stamp/witness only when it is not itself compiled, linked, packaged, installed, or substituted for a
+  real output/byproduct.
 
 ## Run tests via CTest
 

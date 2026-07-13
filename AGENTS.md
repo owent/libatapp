@@ -22,6 +22,10 @@ discovery, connector-based routing, worker pools, and libatbus integration.
 ## Always-On Rules
 
 - Respect the user's dirty workspace: inspect current file contents before editing and avoid unrelated reformatting.
+- Never unconditionally `touch` or overwrite code/resources consumed by `add_custom_command`, `add_custom_target`,
+  `add_executable`, `add_library`, or `target_sources`, including generated, copied, and other non-handwritten files.
+  Preserve timestamps when content is unchanged; declare real `OUTPUT`/`BYPRODUCTS` and accurate `DEPENDS`/`DEPFILE`,
+  and use content-stable generation or a temporary file plus `cmake -E copy_if_different`.
 - When creating AI scratch files or asking scripts to emit temporary data/logs, use a subdirectory inside an ignored
    build tree (prefer `build/_agent_tmp/` or an existing `build_jobs_*/_agent_tmp/`) so `.gitignore` covers it; never
    write temporary artifacts to the repository root.
