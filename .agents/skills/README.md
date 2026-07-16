@@ -7,6 +7,8 @@ commands, caveats, and examples here.
 
 | Skill | Description |
 | --- | --- |
+| `engineering-guidelines/` | C++ header template visibility, exported API ABI, and review checks |
+| `change-workflow/` | Risk-scaled design, change contracts, debugging, TDD, review, and completion evidence |
 | `build/` | Configure/build libatapp and edit or review CMake generation rules |
 | `testing/` | Run and write private-framework unit tests |
 | `configure-expression/` | Edit environment-expression-enabled config fields and syntax |
@@ -16,6 +18,8 @@ commands, caveats, and examples here.
 
 ## When to read what
 
+- If you are writing/reviewing C++ or changing a public header: start with `engineering-guidelines/SKILL.md`.
+- If you are diagnosing a defect or planning a nontrivial/high-risk change: see `change-workflow/SKILL.md`.
 - If you want to **build or edit/review CMake generation rules**: start with `build/SKILL.md`.
 - If you want to **run or write unit tests**: start with `testing/SKILL.md`.
 - If you are editing config expression behavior: see `configure-expression/SKILL.md`.
@@ -27,6 +31,7 @@ commands, caveats, and examples here.
 
 - Folder name and frontmatter `name` must match.
 - `description` is the discovery surface: start with `Use when:` and include concrete trigger words.
-- Keep each `SKILL.md` focused and procedural. Use progressive disclosure: put only core steps, gotchas, and validation
-  in `SKILL.md`, and move bulky examples or reference material into sibling files with clear load conditions.
+- For a new or materially changed description, check representative should-trigger and near-miss should-not-trigger
+  requests; narrow false positives instead of adding keyword lists.
+- Keep each `SKILL.md` focused; move bulky examples or reference material into sibling files when needed.
 - This index is local to `libatapp`; do not require parent or sibling repository skills for this repo's workflows.
