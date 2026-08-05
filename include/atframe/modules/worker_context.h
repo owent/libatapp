@@ -22,10 +22,11 @@ struct UTIL_SYMBOL_VISIBLE worker_context {
   uint32_t worker_id = 0;
 
   // worker_unique_id 指示当前worker的唯一标识，不会随着线程转移而变化
+  // 注意: 在foreach接口中，如果对于stable的worker尚未分配完成，这个值可能传0
   uint64_t worker_unique_id = 0;
 
   inline worker_context() noexcept : worker_id(0), worker_unique_id(0) {}
-  explicit inline worker_context(uint32_t id, uint64_t unique_id = 0) noexcept
+  explicit inline worker_context(uint32_t id, uint64_t unique_id) noexcept
       : worker_id(id), worker_unique_id(unique_id) {}
 };
 

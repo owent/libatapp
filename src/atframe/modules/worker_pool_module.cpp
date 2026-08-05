@@ -1244,21 +1244,8 @@ LIBATAPP_MACRO_API void worker_pool_module::foreach_worker_quickly(
   size_t except_count = get_configure_worker_except_count();
   size_t min_count = get_configure_worker_min_count();
 
-  // stable workers always available
+  uint32_t last_worker_id = 0;
   bool should_continue = true;
-  for (uint32_t worker_id = 1; worker_id <= min_count; ++worker_id) {
-    worker_meta meta = {};
-    meta.scaling_mode = worker_scaling_mode::kStable;
-    should_continue = fn(worker_context{worker_id}, meta);
-    if (!should_continue) {
-      break;
-    }
-  }
-
-  if (!should_continue) {
-    return;
-  }
-
   std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
   for (auto& worker_ptr : worker_set_->workers) {
     if (!worker_ptr) {
@@ -1271,15 +1258,30 @@ LIBATAPP_MACRO_API void worker_pool_module::foreach_worker_quickly(
 
     worker_meta meta = {};
     if (worker_ptr->get_context().worker_id <= min_count) {
-      continue;
-    }
-    if (worker_ptr->get_context().worker_id <= except_count) {
+      meta.scaling_mode = worker_scaling_mode::kStable;
+    } else if (worker_ptr->get_context().worker_id <= except_count) {
       meta.scaling_mode = worker_scaling_mode::kDynamic;
     } else {
       meta.scaling_mode = worker_scaling_mode::kPendingToDestroy;
     }
+    last_worker_id = worker_ptr->get_context().worker_id;
 
     if (!fn(worker_ptr->get_context(), meta)) {
+      should_continue = false;
+      break;
+    }
+  }
+
+  if (!should_continue) {
+    return;
+  }
+
+  // stable workers always available
+  for (uint32_t worker_id = last_worker_id + 1; worker_id <= min_count; ++worker_id) {
+    worker_meta meta = {};
+    meta.scaling_mode = worker_scaling_mode::kStable;
+    should_continue = fn(worker_context{worker_id, 0}, meta);
+    if (!should_continue) {
       break;
     }
   }
@@ -1305,7 +1307,11 @@ LIBATAPP_MACRO_API void worker_pool_module::foreach_worker(
   for (uint32_t worker_id = 1; worker_id <= min_count; ++worker_id) {
     worker_meta meta = {};
     meta.scaling_mode = worker_scaling_mode::kStable;
-    should_continue = fn(worker_context{worker_id}, meta);
+    uint64_t worker_unique_id = 0;
+    if (worker_id <= workers.size() && workers[worker_id - 1]) {
+      worker_unique_id = workers[worker_id - 1]->get_context().worker_unique_id;
+    }
+    should_continue = fn(worker_context{worker_id, worker_unique_id}, meta);
     if (!should_continue) {
       break;
     }
@@ -1468,29 +1474,36 @@ void worker_pool_module::do_scaling_up() {
     return;
   }
   worker_set_->need_scaling_up = false;
-  std::list<worker_event_callback_internal_data_pointer>* event_on_worker_created_ptr = nullptr;
-  std::list<worker_event_callback_internal_data_pointer> event_on_worker_created_data;
 
   uint32_t expect_workers = worker_set_->current_expect_workers.load(std::memory_order_acquire);
+
+  std::list<std::shared_ptr<worker>> new_workers;
   std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
   for (size_t i = worker_set_->workers.size(); i < expect_workers; ++i) {
     auto worker_ptr =
         std::make_shared<worker>(*worker_set_, static_cast<uint32_t>(i + 1),
                                  get_worker_unique_id_generator().fetch_add(1, std::memory_order_acq_rel));
     worker_set_->workers.emplace_back(worker_ptr);
+    new_workers.emplace_back(std::move(worker_ptr));
+  }
 
-    if (event_on_worker_created_ptr == nullptr) {
-      event_on_worker_created_data = collect_event_callback(worker_set_->event_lock_on_worker_created,
-                                                            worker_set_->event_callback_on_worker_created);
-      event_on_worker_created_ptr = &event_on_worker_created_data;
-    }
+  if (!new_workers.empty()) {
+    auto event_on_worker_created_data = collect_event_callback(worker_set_->event_lock_on_worker_created,
+                                                               worker_set_->event_callback_on_worker_created);
 
-    for (auto& fn : *event_on_worker_created_ptr) {
-      if (fn && fn->callback) {
-        fn->callback(worker_ptr->get_context());
+    for (auto& worker_ptr : new_workers) {
+      if (!worker_ptr) {
+        continue;
       }
+
+      for (auto& fn : event_on_worker_created_data) {
+        if (fn && fn->callback) {
+          fn->callback(worker_ptr->get_context());
+        }
+      }
+
+      worker::start(worker_ptr, worker_set_);
     }
-    worker::start(worker_set_->workers.back(), worker_set_);
   }
 }
 
@@ -1504,34 +1517,39 @@ bool worker_pool_module::internal_reduce_workers() {
     expect_workers = worker_set_->current_expect_workers.load(std::memory_order_acquire);
   }
 
-  std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
+  std::list<std::shared_ptr<worker>> remove_workers;
 
-  std::list<worker_event_callback_internal_data_pointer>* event_on_worker_removed_ptr = nullptr;
-  std::list<worker_event_callback_internal_data_pointer> event_on_worker_removed_data;
-  while (worker_set_->workers.size() > expect_workers) {
-    std::shared_ptr<worker> last_worker = worker_set_->workers.back();
-    if (last_worker) {
-      if (!last_worker->is_exited()) {
-        last_worker->wakeup();
-        break;
+  {
+    std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
+    while (worker_set_->workers.size() > expect_workers) {
+      std::shared_ptr<worker> last_worker = worker_set_->workers.back();
+      if (last_worker) {
+        if (!last_worker->is_exited()) {
+          last_worker->wakeup();
+          break;
+        }
+
+        worker_set_->cpu_time_collect_scaling_up_us_for_removed_workers += last_worker->collect_scaling_up_cpu_time();
+        worker_set_->cpu_time_collect_scaling_down_us_for_removed_workers +=
+            last_worker->collect_scaling_down_cpu_time();
+        remove_workers.emplace_back(std::move(last_worker));
       }
 
-      worker_set_->cpu_time_collect_scaling_up_us_for_removed_workers += last_worker->collect_scaling_up_cpu_time();
-      worker_set_->cpu_time_collect_scaling_down_us_for_removed_workers += last_worker->collect_scaling_down_cpu_time();
+      worker_set_->workers.pop_back();
     }
+  }
 
-    worker_set_->workers.pop_back();
-
-    if (last_worker) {
-      if (event_on_worker_removed_ptr == nullptr) {
-        event_on_worker_removed_data = collect_event_callback(worker_set_->event_lock_on_worker_removed,
-                                                              worker_set_->event_callback_on_worker_removed);
-        event_on_worker_removed_ptr = &event_on_worker_removed_data;
+  if (!remove_workers.empty()) {
+    auto event_on_worker_removed_data = collect_event_callback(worker_set_->event_lock_on_worker_removed,
+                                                               worker_set_->event_callback_on_worker_removed);
+    for (auto& worker_ptr : remove_workers) {
+      if (!worker_ptr) {
+        continue;
       }
 
-      for (auto& fn : *event_on_worker_removed_ptr) {
+      for (auto& fn : event_on_worker_removed_data) {
         if (fn && fn->callback) {
-          fn->callback(last_worker->get_context());
+          fn->callback(worker_ptr->get_context());
         }
       }
     }
