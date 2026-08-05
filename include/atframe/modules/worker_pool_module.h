@@ -25,7 +25,7 @@ class worker_pool_module : public ::atframework::atapp::module_impl {
 
  public:
   LIBATAPP_MACRO_API worker_pool_module();
-  LIBATAPP_MACRO_API virtual ~worker_pool_module();
+  LIBATAPP_MACRO_API ~worker_pool_module() override;
 
  private:
   class worker;
@@ -77,6 +77,34 @@ class worker_pool_module : public ::atframework::atapp::module_impl {
 
   // thread-safe
   LIBATAPP_MACRO_API std::chrono::microseconds get_tick_interval(const worker_context& context) const;
+
+  // thread-safe
+  LIBATAPP_MACRO_API worker_event_callback_handle_type
+  add_event_callback_on_worker_created(worker_event_callback_type action);
+
+  // thread-safe
+  LIBATAPP_MACRO_API void remove_event_callback_on_worker_created(const worker_event_callback_handle_type& handle);
+
+  // thread-safe
+  LIBATAPP_MACRO_API worker_event_callback_handle_type
+  add_event_callback_on_worker_removed(worker_event_callback_type action);
+
+  // thread-safe
+  LIBATAPP_MACRO_API void remove_event_callback_on_worker_removed(const worker_event_callback_handle_type& handle);
+
+  // thread-safe
+  LIBATAPP_MACRO_API worker_event_callback_handle_type
+  add_event_callback_on_worker_started(worker_event_callback_type action);
+
+  // thread-safe
+  LIBATAPP_MACRO_API void remove_event_callback_on_worker_started(const worker_event_callback_handle_type& handle);
+
+  // thread-safe
+  LIBATAPP_MACRO_API worker_event_callback_handle_type
+  add_event_callback_on_worker_exiting(worker_event_callback_type action);
+
+  // thread-safe
+  LIBATAPP_MACRO_API void remove_event_callback_on_worker_exiting(const worker_event_callback_handle_type& handle);
 
   // thread-safe
   LIBATAPP_MACRO_API size_t get_current_worker_count() const noexcept;

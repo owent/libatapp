@@ -16,7 +16,9 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <list>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <thread>
 
@@ -30,7 +32,14 @@
 
 LIBATAPP_MACRO_NAMESPACE_BEGIN
 
-struct UTIL_SYMBOL_VISIBLE worker_tick_action_handle_data {
+struct ATFW_UTIL_SYMBOL_LOCAL worker_event_callback_internal_data {
+  worker_event_callback_type callback;
+  std::weak_ptr<worker_event_callback_handle_data> handle;
+};
+
+using worker_event_callback_internal_data_pointer = std::shared_ptr<worker_event_callback_internal_data>;
+
+struct ATFW_UTIL_SYMBOL_VISIBLE worker_tick_action_handle_data {
   worker_tick_handle_type type = worker_tick_handle_type::kWorkerTickHandleAny;
   worker_context specify_worker;
   size_t version = 0;
@@ -38,9 +47,14 @@ struct UTIL_SYMBOL_VISIBLE worker_tick_action_handle_data {
   const std::list<worker_tick_action_pointer>* owner = nullptr;
 };
 
+struct ATFW_UTIL_SYMBOL_VISIBLE worker_event_callback_handle_data {
+  std::list<worker_event_callback_internal_data_pointer>::iterator iter;
+  std::list<worker_event_callback_internal_data_pointer>* owner = nullptr;
+};
+
 namespace {
 
-struct UTIL_SYMBOL_LOCAL worker_tick_action_container_type {
+struct ATFW_UTIL_SYMBOL_LOCAL worker_tick_action_container_type {
   size_t version = 0;
   std::list<worker_tick_action_pointer> data;
 };
@@ -53,7 +67,7 @@ enum class worker_status : uint8_t {
   kExited = 5,
 };
 
-struct UTIL_SYMBOL_LOCAL worker_compare_key {
+struct ATFW_UTIL_SYMBOL_LOCAL worker_compare_key {
   size_t pending_job_size;
   std::chrono::microseconds::rep cpu_time_last_second_busy_us;
   std::chrono::microseconds::rep cpu_time_last_minute_busy_us;
@@ -104,16 +118,64 @@ struct UTIL_SYMBOL_LOCAL worker_compare_key {
   }
 };
 
+static std::atomic<uint64_t>& get_worker_unique_id_generator() noexcept {
+  static std::atomic<uint64_t> generator{1};
+  return generator;
+}
+
+static worker_event_callback_handle_type internal_add_event_callback(
+    std::recursive_mutex& lock, std::list<worker_event_callback_internal_data_pointer>& callback_list,
+    worker_event_callback_type&& action) {
+  worker_event_callback_handle_type ret = std::make_shared<worker_event_callback_handle_data>();
+
+  std::shared_ptr<worker_event_callback_internal_data> handle_data =
+      std::make_shared<worker_event_callback_internal_data>();
+  handle_data->callback = std::move(action);
+  handle_data->handle = ret;
+
+  std::lock_guard<std::recursive_mutex> lg{lock};
+  ret->iter = callback_list.insert(callback_list.end(), std::move(handle_data));
+  ret->owner = &callback_list;
+
+  return ret;
+}
+
+static void internal_remove_event_callback(std::recursive_mutex& lock,
+                                           std::list<worker_event_callback_internal_data_pointer>& callback_list,
+                                           const worker_event_callback_handle_type& handle) {
+  // 加锁后再检查状态，handle->owner 可能被其他线程的 remove/cleanup 并发修改
+  std::lock_guard<std::recursive_mutex> lg{lock};
+  if (handle->owner != &callback_list) {
+    return;
+  }
+
+  if (handle->owner->end() == handle->iter) {
+    handle->owner = nullptr;
+    return;
+  }
+
+  handle->owner->erase(handle->iter);
+  handle->iter = handle->owner->end();
+  handle->owner = nullptr;
+}
+
+static std::list<worker_event_callback_internal_data_pointer> collect_event_callback(
+    std::recursive_mutex& lock, std::list<worker_event_callback_internal_data_pointer>& callback_list) {
+  std::lock_guard<std::recursive_mutex> lg{lock};
+  return callback_list;
+}
+
 }  // namespace
 
-class UTIL_SYMBOL_LOCAL worker_pool_module::worker : public std::enable_shared_from_this<worker_pool_module::worker> {
+class ATFW_UTIL_SYMBOL_LOCAL worker_pool_module::worker
+    : public std::enable_shared_from_this<worker_pool_module::worker> {
   UTIL_DESIGN_PATTERN_NOCOPYABLE(worker);
   UTIL_DESIGN_PATTERN_NOMOVABLE(worker);
 
   friend class worker_pool_module;
 
  public:
-  worker(worker_pool_module::worker_set& owner, uint32_t worker_id);
+  worker(worker_pool_module::worker_set& owner, uint32_t worker_id, uint64_t worker_unique_id);
   ~worker();
 
   worker_pool_module::worker_set& get_owner() noexcept { return *owner_; }
@@ -214,6 +276,7 @@ class UTIL_SYMBOL_LOCAL worker_pool_module::worker : public std::enable_shared_f
       ret->specify_worker = get_context();
     } else {
       ret->specify_worker.worker_id = 0;
+      ret->specify_worker.worker_unique_id = 0;
     }
 
     std::lock_guard<std::recursive_mutex> lg{tick_handle_lock_};
@@ -293,7 +356,7 @@ class UTIL_SYMBOL_LOCAL worker_pool_module::worker : public std::enable_shared_f
   std::atomic<std::chrono::microseconds::rep> cpu_time_collect_scaling_down_us_;
 };
 
-struct UTIL_SYMBOL_LOCAL worker_pool_module::worker_set {
+struct ATFW_UTIL_SYMBOL_LOCAL worker_pool_module::worker_set {
   bool need_scaling_up;
   std::atomic<bool> closing;
   std::atomic<bool> cleaning;
@@ -310,13 +373,22 @@ struct UTIL_SYMBOL_LOCAL worker_pool_module::worker_set {
 
   ::tbb::concurrent_queue<worker_job_data> shared_jobs;
 
+  std::recursive_mutex event_lock_on_worker_created;
+  std::list<worker_event_callback_internal_data_pointer> event_callback_on_worker_created;
+  std::recursive_mutex event_lock_on_worker_removed;
+  std::list<worker_event_callback_internal_data_pointer> event_callback_on_worker_removed;
+  std::recursive_mutex event_lock_on_worker_started;
+  std::list<worker_event_callback_internal_data_pointer> event_callback_on_worker_started;
+  std::recursive_mutex event_lock_on_worker_exiting;
+  std::list<worker_event_callback_internal_data_pointer> event_callback_on_worker_exiting;
+
   worker_set();
 
   UTIL_DESIGN_PATTERN_NOCOPYABLE(worker_set);
   UTIL_DESIGN_PATTERN_NOMOVABLE(worker_set);
 };
 
-struct UTIL_SYMBOL_LOCAL worker_pool_module::scaling_configure {
+struct ATFW_UTIL_SYMBOL_LOCAL worker_pool_module::scaling_configure {
   uint32_t queue_size_limit = 20480;
   uint32_t max_workers = 4;
   uint32_t min_workers = 2;
@@ -332,7 +404,7 @@ struct UTIL_SYMBOL_LOCAL worker_pool_module::scaling_configure {
   inline scaling_configure() noexcept {}
 };
 
-struct UTIL_SYMBOL_LOCAL worker_pool_module::scaling_statistics {
+struct ATFW_UTIL_SYMBOL_LOCAL worker_pool_module::scaling_statistics {
   std::chrono::system_clock::time_point last_scaling_up_checkpoint;
   std::chrono::system_clock::time_point last_scaling_down_checkpoint;
 
@@ -344,8 +416,10 @@ struct UTIL_SYMBOL_LOCAL worker_pool_module::scaling_statistics {
         leak_scan_checkpoint(last_scaling_up_checkpoint) {}
 };
 
-worker_pool_module::worker::worker(worker_pool_module::worker_set& owner, uint32_t worker_id) : owner_(&owner) {
+worker_pool_module::worker::worker(worker_pool_module::worker_set& owner, uint32_t worker_id, uint64_t worker_unique_id)
+    : owner_(&owner) {
   context_.worker_id = worker_id;
+  context_.worker_unique_id = worker_unique_id;
   status_.store(static_cast<uint8_t>(worker_status::kCreated), std::memory_order_release);
   created_time_.store(std::chrono::system_clock::now().time_since_epoch().count(), std::memory_order_release);
 
@@ -401,6 +475,16 @@ void worker_pool_module::worker::start(const std::shared_ptr<worker>& self, cons
 
   self->background_job_thread_ = std::make_shared<std::thread>([self, owner]() {
     self->status_.store(static_cast<uint8_t>(worker_status::kRunning), std::memory_order_release);
+
+    {
+      auto event_on_worker_start = collect_event_callback(self->get_owner().event_lock_on_worker_started,
+                                                          self->get_owner().event_callback_on_worker_started);
+      for (auto& fn : event_on_worker_start) {
+        if (fn && fn->callback) {
+          fn->callback(self->get_context());
+        }
+      }
+    }
 
     // loop util end
     while (!owner->cleaning.load(std::memory_order_acquire)) {
@@ -513,6 +597,16 @@ void worker_pool_module::worker::start(const std::shared_ptr<worker>& self, cons
       worker_job_data job_data;
       while (self->private_jobs.try_pop(job_data)) {
         owner->shared_jobs.emplace(std::move(job_data));
+      }
+    }
+
+    {
+      auto event_on_worker_exiting = collect_event_callback(self->get_owner().event_lock_on_worker_exiting,
+                                                            self->get_owner().event_callback_on_worker_exiting);
+      for (auto& fn : event_on_worker_exiting) {
+        if (fn && fn->callback) {
+          fn->callback(self->get_context());
+        }
       }
     }
 
@@ -937,6 +1031,7 @@ LIBATAPP_MACRO_API int worker_pool_module::spawn(const worker_job_action_pointer
       *selected_context = worker_ptr->get_context();
     } else {
       selected_context->worker_id = static_cast<uint32_t>(worker_type::kMain);
+      selected_context->worker_unique_id = 0;
     }
   }
 
@@ -1052,6 +1147,83 @@ LIBATAPP_MACRO_API std::chrono::microseconds worker_pool_module::get_tick_interv
   }
 
   return worker_ptr->get_current_tick_interval();
+}
+
+LIBATAPP_MACRO_API worker_event_callback_handle_type
+worker_pool_module::add_event_callback_on_worker_created(worker_event_callback_type action) {
+  if (!worker_set_ || !action) {
+    return nullptr;
+  }
+  return internal_add_event_callback(worker_set_->event_lock_on_worker_created,
+                                     worker_set_->event_callback_on_worker_created, std::move(action));
+}
+
+LIBATAPP_MACRO_API void worker_pool_module::remove_event_callback_on_worker_created(
+    const worker_event_callback_handle_type& handle) {
+  if (!handle || !worker_set_) {
+    return;
+  }
+
+  internal_remove_event_callback(worker_set_->event_lock_on_worker_created,
+                                 worker_set_->event_callback_on_worker_created, handle);
+}
+
+LIBATAPP_MACRO_API worker_event_callback_handle_type
+worker_pool_module::add_event_callback_on_worker_removed(worker_event_callback_type action) {
+  if (!worker_set_ || !action) {
+    return nullptr;
+  }
+  return internal_add_event_callback(worker_set_->event_lock_on_worker_removed,
+                                     worker_set_->event_callback_on_worker_removed, std::move(action));
+}
+
+LIBATAPP_MACRO_API void worker_pool_module::remove_event_callback_on_worker_removed(
+    const worker_event_callback_handle_type& handle) {
+  if (!handle || !worker_set_) {
+    return;
+  }
+
+  internal_remove_event_callback(worker_set_->event_lock_on_worker_removed,
+                                 worker_set_->event_callback_on_worker_removed, handle);
+}
+
+LIBATAPP_MACRO_API worker_event_callback_handle_type
+worker_pool_module::add_event_callback_on_worker_started(worker_event_callback_type action) {
+  if (!worker_set_ || !action) {
+    return nullptr;
+  }
+
+  return internal_add_event_callback(worker_set_->event_lock_on_worker_started,
+                                     worker_set_->event_callback_on_worker_started, std::move(action));
+}
+
+LIBATAPP_MACRO_API void worker_pool_module::remove_event_callback_on_worker_started(
+    const worker_event_callback_handle_type& handle) {
+  if (!handle || !worker_set_) {
+    return;
+  }
+
+  internal_remove_event_callback(worker_set_->event_lock_on_worker_started,
+                                 worker_set_->event_callback_on_worker_started, handle);
+}
+
+LIBATAPP_MACRO_API worker_event_callback_handle_type
+worker_pool_module::add_event_callback_on_worker_exiting(worker_event_callback_type action) {
+  if (!worker_set_ || !action) {
+    return nullptr;
+  }
+  return internal_add_event_callback(worker_set_->event_lock_on_worker_exiting,
+                                     worker_set_->event_callback_on_worker_exiting, std::move(action));
+}
+
+LIBATAPP_MACRO_API void worker_pool_module::remove_event_callback_on_worker_exiting(
+    const worker_event_callback_handle_type& handle) {
+  if (!handle || !worker_set_) {
+    return;
+  }
+
+  internal_remove_event_callback(worker_set_->event_lock_on_worker_exiting,
+                                 worker_set_->event_callback_on_worker_exiting, handle);
 }
 
 LIBATAPP_MACRO_API size_t worker_pool_module::get_current_worker_count() const noexcept {
@@ -1264,6 +1436,7 @@ void worker_pool_module::do_shared_job_on_main_thread() {
   worker_job_data job_data;
   worker_context context;
   context.worker_id = 0;
+  context.worker_unique_id = 0;
 
   std::chrono::system_clock::time_point start_time = std::chrono::system_clock::now();
   int32_t no_action_counter = 256;
@@ -1295,11 +1468,28 @@ void worker_pool_module::do_scaling_up() {
     return;
   }
   worker_set_->need_scaling_up = false;
+  std::list<worker_event_callback_internal_data_pointer>* event_on_worker_created_ptr = nullptr;
+  std::list<worker_event_callback_internal_data_pointer> event_on_worker_created_data;
 
   uint32_t expect_workers = worker_set_->current_expect_workers.load(std::memory_order_acquire);
   std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
   for (size_t i = worker_set_->workers.size(); i < expect_workers; ++i) {
-    worker_set_->workers.emplace_back(std::make_shared<worker>(*worker_set_, static_cast<uint32_t>(i + 1)));
+    auto worker_ptr =
+        std::make_shared<worker>(*worker_set_, static_cast<uint32_t>(i + 1),
+                                 get_worker_unique_id_generator().fetch_add(1, std::memory_order_acq_rel));
+    worker_set_->workers.emplace_back(worker_ptr);
+
+    if (event_on_worker_created_ptr == nullptr) {
+      event_on_worker_created_data = collect_event_callback(worker_set_->event_lock_on_worker_created,
+                                                            worker_set_->event_callback_on_worker_created);
+      event_on_worker_created_ptr = &event_on_worker_created_data;
+    }
+
+    for (auto& fn : *event_on_worker_created_ptr) {
+      if (fn && fn->callback) {
+        fn->callback(worker_ptr->get_context());
+      }
+    }
     worker::start(worker_set_->workers.back(), worker_set_);
   }
 }
@@ -1315,8 +1505,11 @@ bool worker_pool_module::internal_reduce_workers() {
   }
 
   std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
+
+  std::list<worker_event_callback_internal_data_pointer>* event_on_worker_removed_ptr = nullptr;
+  std::list<worker_event_callback_internal_data_pointer> event_on_worker_removed_data;
   while (worker_set_->workers.size() > expect_workers) {
-    auto& last_worker = *worker_set_->workers.rbegin();
+    std::shared_ptr<worker> last_worker = worker_set_->workers.back();
     if (last_worker) {
       if (!last_worker->is_exited()) {
         last_worker->wakeup();
@@ -1328,6 +1521,20 @@ bool worker_pool_module::internal_reduce_workers() {
     }
 
     worker_set_->workers.pop_back();
+
+    if (last_worker) {
+      if (event_on_worker_removed_ptr == nullptr) {
+        event_on_worker_removed_data = collect_event_callback(worker_set_->event_lock_on_worker_removed,
+                                                              worker_set_->event_callback_on_worker_removed);
+        event_on_worker_removed_ptr = &event_on_worker_removed_data;
+      }
+
+      for (auto& fn : *event_on_worker_removed_ptr) {
+        if (fn && fn->callback) {
+          fn->callback(last_worker->get_context());
+        }
+      }
+    }
   }
 
   return !worker_set_->workers.empty();
@@ -1362,6 +1569,7 @@ void worker_pool_module::internal_autofix_workers() {
   }
 
   std::vector<std::shared_ptr<worker>> new_workers;
+  std::vector<std::shared_ptr<worker>> remove_workers;
   new_workers.reserve(worker_set_->workers.size());
   for (auto& worker_ptr : worker_set_->workers) {
     if (!worker_ptr) {
@@ -1371,6 +1579,7 @@ void worker_pool_module::internal_autofix_workers() {
     if (worker_ptr->is_exited()) {
       worker_set_->cpu_time_collect_scaling_up_us_for_removed_workers += worker_ptr->collect_scaling_up_cpu_time();
       worker_set_->cpu_time_collect_scaling_down_us_for_removed_workers += worker_ptr->collect_scaling_down_cpu_time();
+      remove_workers.push_back(worker_ptr);
       continue;
     }
 
@@ -1382,6 +1591,24 @@ void worker_pool_module::internal_autofix_workers() {
   }
 
   worker_set_->workers.swap(new_workers);
+
+  // Trigger event callback for removed workers
+  auto event_on_worker_removed =
+      collect_event_callback(worker_set_->event_lock_on_worker_removed, worker_set_->event_callback_on_worker_removed);
+
+  if (!event_on_worker_removed.empty()) {
+    for (auto& worker_ptr : remove_workers) {
+      if (!worker_ptr) {
+        continue;
+      }
+
+      for (auto& fn : event_on_worker_removed) {
+        if (fn && fn->callback) {
+          fn->callback(worker_ptr->get_context());
+        }
+      }
+    }
+  }
 }
 
 void worker_pool_module::internal_cleanup() {
@@ -1410,6 +1637,39 @@ void worker_pool_module::internal_cleanup() {
       sleep_interval = std::chrono::microseconds{
           worker_set_->configure_tick_max_interval_microseconds.load(std::memory_order_acquire)};
     }
+  }
+
+  // cleanup callbacks
+  std::pair<std::recursive_mutex*, std::list<worker_event_callback_internal_data_pointer>*> callback_list_pair[] = {
+      {&worker_set_->event_lock_on_worker_created, &worker_set_->event_callback_on_worker_created},
+      {&worker_set_->event_lock_on_worker_removed, &worker_set_->event_callback_on_worker_removed},
+      {&worker_set_->event_lock_on_worker_started, &worker_set_->event_callback_on_worker_started},
+      {&worker_set_->event_lock_on_worker_exiting, &worker_set_->event_callback_on_worker_exiting}};
+
+  for (auto& callback_lock_and_list : callback_list_pair) {
+    std::lock_guard<std::recursive_mutex> lg{*callback_lock_and_list.first};
+
+    // 先重置所有的handle，以防外部调用remove时访问无效数据
+    for (auto& callback_ptr : *callback_lock_and_list.second) {
+      if (!callback_ptr) {
+        continue;
+      }
+
+      if (callback_ptr->handle.expired()) {
+        continue;
+      }
+
+      auto handle_ptr = callback_ptr->handle.lock();
+      if (!handle_ptr) {
+        continue;
+      }
+
+      handle_ptr->owner = nullptr;
+      handle_ptr->iter = callback_lock_and_list.second->end();
+    }
+
+    // 再实际清空数据
+    callback_lock_and_list.second->clear();
   }
 }
 

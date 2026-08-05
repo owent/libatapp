@@ -12,15 +12,21 @@
 
 #include <cstdint>
 #include <functional>
-#include <list>
+#include <memory>
 
 LIBATAPP_MACRO_NAMESPACE_BEGIN
 
 struct UTIL_SYMBOL_VISIBLE worker_context {
+  // worker id 指示当前是第几个worker，0表示主线程，1表示第一个工作线程，依次类推。
+  // worker id 可能被复用或转移工作线程，但同时每个 worker id 指向唯一一个线程
   uint32_t worker_id = 0;
 
-  inline worker_context() noexcept : worker_id(0) {}
-  explicit inline worker_context(uint32_t id) noexcept : worker_id(id) {}
+  // worker_unique_id 指示当前worker的唯一标识，不会随着线程转移而变化
+  uint64_t worker_unique_id = 0;
+
+  inline worker_context() noexcept : worker_id(0), worker_unique_id(0) {}
+  explicit inline worker_context(uint32_t id, uint64_t unique_id = 0) noexcept
+      : worker_id(id), worker_unique_id(unique_id) {}
 };
 
 enum class worker_job_event_type : uint32_t {
@@ -43,6 +49,11 @@ struct UTIL_SYMBOL_VISIBLE worker_meta {
 };
 
 using worker_job_action_type = std::function<void(const worker_context&)>;
+
+using worker_event_callback_type = std::function<void(const worker_context&)>;
+
+struct UTIL_SYMBOL_VISIBLE worker_event_callback_handle_data;
+using worker_event_callback_handle_type = std::shared_ptr<worker_event_callback_handle_data>;
 
 using worker_job_action_pointer = ::atfw::util::memory::strong_rc_ptr<worker_job_action_type>;
 
@@ -74,4 +85,3 @@ enum class worker_type : int32_t {
 };
 
 LIBATAPP_MACRO_NAMESPACE_END
-

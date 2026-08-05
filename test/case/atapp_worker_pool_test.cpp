@@ -9,8 +9,10 @@
 #include <atomic>
 #include <chrono>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "frame/test_macros.h"
 
@@ -263,6 +265,206 @@ CASE_TEST(atapp_worker_pool, foreach_stable_workers) {
       });
 
   CASE_EXPECT_EQ(min_count + min_count, foreach_counter);
+}
+
+// event callback
+CASE_TEST(atapp_worker_pool, event_callback) {
+  std::string conf_path_base;
+  atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
+  std::string conf_path = conf_path_base + "/atapp_test_1.yaml";
+
+  if (!atfw::util::file_system::is_exist(conf_path.c_str())) {
+    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path << " not found, skip this test" << std::endl;
+    return;
+  }
+
+  atframework::atapp::app app;
+  const char* args[] = {"app", "-c", conf_path.c_str(), "start"};
+  CASE_EXPECT_EQ(0, app.init(nullptr, 4, args, nullptr));
+
+  auto worker_pool_module = app.get_worker_pool_module();
+  CASE_EXPECT_TRUE(!!worker_pool_module);
+
+  if (!worker_pool_module) {
+    return;
+  }
+
+  // Invalid input should return empty handle
+  CASE_EXPECT_FALSE(!!worker_pool_module->add_event_callback_on_worker_created(atapp::worker_event_callback_type{}));
+  CASE_EXPECT_FALSE(!!worker_pool_module->add_event_callback_on_worker_started(atapp::worker_event_callback_type{}));
+  CASE_EXPECT_FALSE(!!worker_pool_module->add_event_callback_on_worker_exiting(atapp::worker_event_callback_type{}));
+  CASE_EXPECT_FALSE(!!worker_pool_module->add_event_callback_on_worker_removed(atapp::worker_event_callback_type{}));
+
+  // Remove an empty handle should be safe
+  worker_pool_module->remove_event_callback_on_worker_created(atapp::worker_event_callback_handle_type{});
+  worker_pool_module->remove_event_callback_on_worker_started(atapp::worker_event_callback_handle_type{});
+  worker_pool_module->remove_event_callback_on_worker_exiting(atapp::worker_event_callback_handle_type{});
+  worker_pool_module->remove_event_callback_on_worker_removed(atapp::worker_event_callback_handle_type{});
+
+  // Register and remove before worker created, the removed callback should never be called
+  std::atomic<size_t> removed_created_times{0};
+  auto removed_created_handle = worker_pool_module->add_event_callback_on_worker_created(
+      [&removed_created_times](const atapp::worker_context&) { removed_created_times.fetch_add(1); });
+  CASE_EXPECT_TRUE(!!removed_created_handle);
+  worker_pool_module->remove_event_callback_on_worker_created(removed_created_handle);
+  // Remove an already removed handle should be safe
+  worker_pool_module->remove_event_callback_on_worker_created(removed_created_handle);
+
+  // Remove a handle by a mismatched event type should be ignored
+  std::atomic<size_t> mismatched_created_times{0};
+  auto mismatched_created_handle = worker_pool_module->add_event_callback_on_worker_created(
+      [&mismatched_created_times](const atapp::worker_context&) { mismatched_created_times.fetch_add(1); });
+  CASE_EXPECT_TRUE(!!mismatched_created_handle);
+  worker_pool_module->remove_event_callback_on_worker_started(mismatched_created_handle);
+
+  std::shared_ptr<std::mutex> created_lock = std::make_shared<std::mutex>();
+  std::shared_ptr<std::vector<atapp::worker_context>> created_contexts =
+      std::make_shared<std::vector<atapp::worker_context>>();
+  std::shared_ptr<std::vector<atapp::worker_context>> started_contexts =
+      std::make_shared<std::vector<atapp::worker_context>>();
+  std::shared_ptr<std::vector<atapp::worker_context>> exiting_contexts =
+      std::make_shared<std::vector<atapp::worker_context>>();
+  std::shared_ptr<std::vector<atapp::worker_context>> removed_contexts =
+      std::make_shared<std::vector<atapp::worker_context>>();
+
+  auto created_handle = worker_pool_module->add_event_callback_on_worker_created(
+      [created_lock, created_contexts](const atapp::worker_context& context) {
+        std::lock_guard<std::mutex> lg{*created_lock};
+        created_contexts->push_back(context);
+      });
+  auto started_handle = worker_pool_module->add_event_callback_on_worker_started(
+      [created_lock, started_contexts](const atapp::worker_context& context) {
+        std::lock_guard<std::mutex> lg{*created_lock};
+        started_contexts->push_back(context);
+      });
+  auto exiting_handle = worker_pool_module->add_event_callback_on_worker_exiting(
+      [created_lock, exiting_contexts](const atapp::worker_context& context) {
+        std::lock_guard<std::mutex> lg{*created_lock};
+        exiting_contexts->push_back(context);
+      });
+  auto removed_handle = worker_pool_module->add_event_callback_on_worker_removed(
+      [created_lock, removed_contexts](const atapp::worker_context& context) {
+        std::lock_guard<std::mutex> lg{*created_lock};
+        removed_contexts->push_back(context);
+      });
+
+  CASE_EXPECT_TRUE(!!created_handle);
+  CASE_EXPECT_TRUE(!!started_handle);
+  CASE_EXPECT_TRUE(!!exiting_handle);
+  CASE_EXPECT_TRUE(!!removed_handle);
+
+  // Workers are created on demand, spawn a job to trigger scaling up
+  CASE_EXPECT_EQ(0, worker_pool_module->spawn([](const atapp::worker_context&) {}));
+
+  auto min_count = worker_pool_module->get_configure_worker_min_count();
+  int32_t sleep_ms = 10000;
+  while (sleep_ms > 0) {
+    worker_pool_module->tick(std::chrono::system_clock::now());
+    {
+      std::lock_guard<std::mutex> lg{*created_lock};
+      if (created_contexts->size() >= min_count && started_contexts->size() >= created_contexts->size()) {
+        break;
+      }
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    sleep_ms -= 20;
+  }
+
+  std::vector<atapp::worker_context> created_snapshot;
+  std::vector<atapp::worker_context> started_snapshot;
+  {
+    std::lock_guard<std::mutex> lg{*created_lock};
+    created_snapshot = *created_contexts;
+    started_snapshot = *started_contexts;
+  }
+
+  // The removed callback should never be called
+  CASE_EXPECT_EQ(0, removed_created_times.load());
+  // The handle removed by a mismatched event type should still be called
+  CASE_EXPECT_EQ(created_snapshot.size(), mismatched_created_times.load());
+
+  CASE_EXPECT_GE(created_snapshot.size(), min_count);
+  CASE_EXPECT_EQ(created_snapshot.size(), started_snapshot.size());
+  for (auto& context : created_snapshot) {
+    CASE_EXPECT_TRUE(atapp::worker_pool_module::is_valid(context));
+    CASE_EXPECT_NE(0, context.worker_unique_id);
+  }
+
+  // worker_unique_id should be unique
+  for (size_t i = 0; i < created_snapshot.size(); ++i) {
+    for (size_t j = i + 1; j < created_snapshot.size(); ++j) {
+      CASE_EXPECT_NE(created_snapshot[i].worker_unique_id, created_snapshot[j].worker_unique_id);
+    }
+  }
+
+  // Every created worker should also fire started event with the same worker_unique_id
+  for (auto& created_context : created_snapshot) {
+    bool found_started = false;
+    for (auto& started_context : started_snapshot) {
+      if (started_context.worker_unique_id == created_context.worker_unique_id) {
+        found_started = true;
+        break;
+      }
+    }
+    CASE_EXPECT_TRUE(found_started);
+  }
+
+  // Stop all workers, exiting and removed events should be fired
+  worker_pool_module->stop();
+  sleep_ms = 10000;
+  while (sleep_ms > 0) {
+    worker_pool_module->tick(std::chrono::system_clock::now());
+    {
+      std::lock_guard<std::mutex> lg{*created_lock};
+      if (removed_contexts->size() >= created_snapshot.size() && exiting_contexts->size() >= created_snapshot.size()) {
+        break;
+      }
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    sleep_ms -= 20;
+  }
+
+  std::vector<atapp::worker_context> exiting_snapshot;
+  std::vector<atapp::worker_context> removed_snapshot;
+  {
+    std::lock_guard<std::mutex> lg{*created_lock};
+    exiting_snapshot = *exiting_contexts;
+    removed_snapshot = *removed_contexts;
+  }
+
+  CASE_EXPECT_GE(exiting_snapshot.size(), created_snapshot.size());
+  CASE_EXPECT_GE(removed_snapshot.size(), created_snapshot.size());
+
+  // Every created worker should also fire exiting and removed events with the same worker_unique_id
+  for (auto& created_context : created_snapshot) {
+    bool found_exiting = false;
+    for (auto& exiting_context : exiting_snapshot) {
+      if (exiting_context.worker_unique_id == created_context.worker_unique_id) {
+        found_exiting = true;
+        break;
+      }
+    }
+    CASE_EXPECT_TRUE(found_exiting);
+
+    bool found_removed = false;
+    for (auto& removed_context : removed_snapshot) {
+      if (removed_context.worker_unique_id == created_context.worker_unique_id) {
+        found_removed = true;
+        break;
+      }
+    }
+    CASE_EXPECT_TRUE(found_removed);
+  }
+
+  // Remove callbacks after cleanup should be safe
+  worker_pool_module->cleanup();
+  worker_pool_module->remove_event_callback_on_worker_created(created_handle);
+  worker_pool_module->remove_event_callback_on_worker_started(started_handle);
+  worker_pool_module->remove_event_callback_on_worker_exiting(exiting_handle);
+  worker_pool_module->remove_event_callback_on_worker_removed(removed_handle);
+  worker_pool_module->remove_event_callback_on_worker_created(mismatched_created_handle);
+
+  CASE_EXPECT_EQ(0, worker_pool_module->stop());
 }
 
 // TODO: spawn with context and ignore the load balance
