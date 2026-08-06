@@ -1478,13 +1478,15 @@ void worker_pool_module::do_scaling_up() {
   uint32_t expect_workers = worker_set_->current_expect_workers.load(std::memory_order_acquire);
 
   std::list<std::shared_ptr<worker>> new_workers;
-  std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
-  for (size_t i = worker_set_->workers.size(); i < expect_workers; ++i) {
-    auto worker_ptr =
-        std::make_shared<worker>(*worker_set_, static_cast<uint32_t>(i + 1),
-                                 get_worker_unique_id_generator().fetch_add(1, std::memory_order_acq_rel));
-    worker_set_->workers.emplace_back(worker_ptr);
-    new_workers.emplace_back(std::move(worker_ptr));
+  {
+    std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
+    for (size_t i = worker_set_->workers.size(); i < expect_workers; ++i) {
+      auto worker_ptr =
+          std::make_shared<worker>(*worker_set_, static_cast<uint32_t>(i + 1),
+                                   get_worker_unique_id_generator().fetch_add(1, std::memory_order_acq_rel));
+      worker_set_->workers.emplace_back(worker_ptr);
+      new_workers.emplace_back(std::move(worker_ptr));
+    }
   }
 
   if (!new_workers.empty()) {
@@ -1568,61 +1570,66 @@ void worker_pool_module::internal_autofix_workers() {
     expect_workers = worker_set_->current_expect_workers.load(std::memory_order_acquire);
   }
 
-  std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
-  bool need_autofix = false;
-  for (size_t i = 0; !need_autofix && i < worker_set_->workers.size() && i < expect_workers; ++i) {
-    if (!worker_set_->workers[i]) {
-      continue;
-    }
-
-    if (!worker_set_->workers[i]->is_exited()) {
-      continue;
-    }
-
-    need_autofix = true;
-  }
-
-  if (!need_autofix) {
-    return;
-  }
-
-  std::vector<std::shared_ptr<worker>> new_workers;
   std::vector<std::shared_ptr<worker>> remove_workers;
-  new_workers.reserve(worker_set_->workers.size());
-  for (auto& worker_ptr : worker_set_->workers) {
-    if (!worker_ptr) {
-      continue;
+  {
+    std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
+    bool need_autofix = false;
+    for (size_t i = 0; !need_autofix && i < worker_set_->workers.size() && i < expect_workers; ++i) {
+      if (!worker_set_->workers[i]) {
+        continue;
+      }
+
+      if (!worker_set_->workers[i]->is_exited()) {
+        continue;
+      }
+
+      need_autofix = true;
     }
 
-    if (worker_ptr->is_exited()) {
-      worker_set_->cpu_time_collect_scaling_up_us_for_removed_workers += worker_ptr->collect_scaling_up_cpu_time();
-      worker_set_->cpu_time_collect_scaling_down_us_for_removed_workers += worker_ptr->collect_scaling_down_cpu_time();
-      remove_workers.push_back(worker_ptr);
-      continue;
+    if (!need_autofix) {
+      return;
     }
 
-    new_workers.push_back(worker_ptr);
-  }
-
-  for (size_t i = 0; i < new_workers.size(); ++i) {
-    new_workers[i]->get_context().worker_id = static_cast<uint32_t>(i + 1);
-  }
-
-  worker_set_->workers.swap(new_workers);
-
-  // Trigger event callback for removed workers
-  auto event_on_worker_removed =
-      collect_event_callback(worker_set_->event_lock_on_worker_removed, worker_set_->event_callback_on_worker_removed);
-
-  if (!event_on_worker_removed.empty()) {
-    for (auto& worker_ptr : remove_workers) {
+    std::vector<std::shared_ptr<worker>> new_workers;
+    new_workers.reserve(worker_set_->workers.size());
+    for (auto& worker_ptr : worker_set_->workers) {
       if (!worker_ptr) {
         continue;
       }
 
-      for (auto& fn : event_on_worker_removed) {
-        if (fn && fn->callback) {
-          fn->callback(worker_ptr->get_context());
+      if (worker_ptr->is_exited()) {
+        worker_set_->cpu_time_collect_scaling_up_us_for_removed_workers += worker_ptr->collect_scaling_up_cpu_time();
+        worker_set_->cpu_time_collect_scaling_down_us_for_removed_workers +=
+            worker_ptr->collect_scaling_down_cpu_time();
+        remove_workers.push_back(worker_ptr);
+        continue;
+      }
+
+      new_workers.push_back(worker_ptr);
+    }
+
+    for (size_t i = 0; i < new_workers.size(); ++i) {
+      new_workers[i]->get_context().worker_id = static_cast<uint32_t>(i + 1);
+    }
+
+    worker_set_->workers.swap(new_workers);
+  }
+
+  // Trigger event callback for removed workers
+  if (!remove_workers.empty()) {
+    auto event_on_worker_removed = collect_event_callback(worker_set_->event_lock_on_worker_removed,
+                                                          worker_set_->event_callback_on_worker_removed);
+
+    if (!event_on_worker_removed.empty()) {
+      for (auto& worker_ptr : remove_workers) {
+        if (!worker_ptr) {
+          continue;
+        }
+
+        for (auto& fn : event_on_worker_removed) {
+          if (fn && fn->callback) {
+            fn->callback(worker_ptr->get_context());
+          }
         }
       }
     }
