@@ -16,11 +16,14 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <limits>
 #include <list>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <thread>
+#include <utility>
+#include <vector>
 
 #ifdef max
 #  undef max
@@ -32,10 +35,12 @@
 
 LIBATAPP_MACRO_NAMESPACE_BEGIN
 
+namespace {
 struct ATFW_UTIL_SYMBOL_LOCAL worker_event_callback_internal_data {
   worker_event_callback_type callback;
   std::weak_ptr<worker_event_callback_handle_data> handle;
 };
+}  // namespace
 
 using worker_event_callback_internal_data_pointer = std::shared_ptr<worker_event_callback_internal_data>;
 
@@ -475,8 +480,13 @@ void worker_pool_module::worker::start(const std::shared_ptr<worker>& self, cons
 
   self->background_job_thread_ = std::make_shared<std::thread>([self, owner]() {
     self->status_.store(static_cast<uint8_t>(worker_status::kRunning), std::memory_order_release);
+    FWLOGINFO("[Worker Pool] Worker {}:{} start running.", self->get_context().worker_id,
+              self->get_context().worker_unique_id);
 
     {
+      FWLOGDEBUG("[Worker Pool] Worker {}:{} trigger start event", self->get_context().worker_id,
+                 self->get_context().worker_unique_id);
+
       auto event_on_worker_start = collect_event_callback(self->get_owner().event_lock_on_worker_started,
                                                           self->get_owner().event_callback_on_worker_started);
       for (auto& fn : event_on_worker_start) {
@@ -591,6 +601,8 @@ void worker_pool_module::worker::start(const std::shared_ptr<worker>& self, cons
     }
 
     self->status_.store(static_cast<uint8_t>(worker_status::kExiting), std::memory_order_release);
+    FWLOGDEBUG("[Worker Pool] Worker {}:{} is exiting, pending jobs: {}", self->get_context().worker_id,
+               self->get_context().worker_unique_id, self->private_jobs.unsafe_size());
 
     // Move unfinished jobs into shared jobs
     {
@@ -601,6 +613,9 @@ void worker_pool_module::worker::start(const std::shared_ptr<worker>& self, cons
     }
 
     {
+      FWLOGDEBUG("[Worker Pool] Worker {}:{} trigger exiting event", self->get_context().worker_id,
+                 self->get_context().worker_unique_id);
+
       auto event_on_worker_exiting = collect_event_callback(self->get_owner().event_lock_on_worker_exiting,
                                                             self->get_owner().event_callback_on_worker_exiting);
       for (auto& fn : event_on_worker_exiting) {
@@ -620,6 +635,9 @@ void worker_pool_module::worker::start(const std::shared_ptr<worker>& self, cons
     }
 
     self->status_.store(static_cast<uint8_t>(worker_status::kExited), std::memory_order_release);
+
+    FWLOGINFO("[Worker Pool] Worker {}:{} is exited.", self->get_context().worker_id,
+              self->get_context().worker_unique_id);
   });
 }
 
@@ -944,7 +962,7 @@ LIBATAPP_MACRO_API int worker_pool_module::tick(std::chrono::system_clock::time_
   }
 
   if (now >= scaling_statistics_->leak_scan_checkpoint -
-                 std::chrono::seconds{scaling_configure_->leak_scan_interval_seconds} &&
+                 std::chrono::seconds(scaling_configure_->leak_scan_interval_seconds) &&
       now < scaling_statistics_->leak_scan_checkpoint +
                 std::chrono::seconds{scaling_configure_->leak_scan_interval_seconds}) {
     internal_reduce_workers();
@@ -1272,7 +1290,7 @@ LIBATAPP_MACRO_API void worker_pool_module::foreach_worker_quickly(
     }
   }
 
-  if (!should_continue) {
+  if (!should_continue || worker_set_->closing.load(std::memory_order_acquire)) {
     return;
   }
 
@@ -1304,16 +1322,18 @@ LIBATAPP_MACRO_API void worker_pool_module::foreach_worker(
 
   // stable workers always available
   bool should_continue = true;
-  for (uint32_t worker_id = 1; worker_id <= min_count; ++worker_id) {
-    worker_meta meta = {};
-    meta.scaling_mode = worker_scaling_mode::kStable;
-    uint64_t worker_unique_id = 0;
-    if (worker_id <= workers.size() && workers[worker_id - 1]) {
-      worker_unique_id = workers[worker_id - 1]->get_context().worker_unique_id;
-    }
-    should_continue = fn(worker_context{worker_id, worker_unique_id}, meta);
-    if (!should_continue) {
-      break;
+  if (!worker_set_->closing.load(std::memory_order_acquire)) {
+    for (uint32_t worker_id = 1; worker_id <= min_count; ++worker_id) {
+      worker_meta meta = {};
+      meta.scaling_mode = worker_scaling_mode::kStable;
+      uint64_t worker_unique_id = 0;
+      if (worker_id <= workers.size() && workers[worker_id - 1]) {
+        worker_unique_id = workers[worker_id - 1]->get_context().worker_unique_id;
+      }
+      should_continue = fn(worker_context{worker_id, worker_unique_id}, meta);
+      if (!should_continue) {
+        break;
+      }
     }
   }
 
@@ -1498,6 +1518,9 @@ void worker_pool_module::do_scaling_up() {
         continue;
       }
 
+      FWLOGDEBUG("[Worker Pool] Worker {}:{} trigger created event", worker_ptr->get_context().worker_id,
+                 worker_ptr->get_context().worker_unique_id);
+
       for (auto& fn : event_on_worker_created_data) {
         if (fn && fn->callback) {
           fn->callback(worker_ptr->get_context());
@@ -1525,19 +1548,28 @@ bool worker_pool_module::internal_reduce_workers() {
     std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
     while (worker_set_->workers.size() > expect_workers) {
       std::shared_ptr<worker> last_worker = worker_set_->workers.back();
-      if (last_worker) {
-        if (!last_worker->is_exited()) {
-          last_worker->wakeup();
-          break;
-        }
 
-        worker_set_->cpu_time_collect_scaling_up_us_for_removed_workers += last_worker->collect_scaling_up_cpu_time();
-        worker_set_->cpu_time_collect_scaling_down_us_for_removed_workers +=
-            last_worker->collect_scaling_down_cpu_time();
-        remove_workers.emplace_back(std::move(last_worker));
+      if (!last_worker) {
+        worker_set_->workers.pop_back();
+        continue;
       }
 
+      if (!last_worker->is_exited()) {
+        break;
+      }
+
+      worker_set_->cpu_time_collect_scaling_up_us_for_removed_workers += last_worker->collect_scaling_up_cpu_time();
+      worker_set_->cpu_time_collect_scaling_down_us_for_removed_workers += last_worker->collect_scaling_down_cpu_time();
+      remove_workers.emplace_back(std::move(last_worker));
       worker_set_->workers.pop_back();
+    }
+
+    for (size_t i = expect_workers; i < worker_set_->workers.size(); ++i) {
+      if (!worker_set_->workers[i]) {
+        continue;
+      }
+
+      worker_set_->workers[i]->wakeup();
     }
   }
 
@@ -1548,6 +1580,9 @@ bool worker_pool_module::internal_reduce_workers() {
       if (!worker_ptr) {
         continue;
       }
+
+      FWLOGDEBUG("[Worker Pool] Worker {}:{} trigger removed event", worker_ptr->get_context().worker_id,
+                 worker_ptr->get_context().worker_unique_id);
 
       for (auto& fn : event_on_worker_removed_data) {
         if (fn && fn->callback) {
@@ -1625,6 +1660,9 @@ void worker_pool_module::internal_autofix_workers() {
         if (!worker_ptr) {
           continue;
         }
+
+        FWLOGDEBUG("[Worker Pool] Worker {}:{} trigger removed event", worker_ptr->get_context().worker_id,
+                   worker_ptr->get_context().worker_unique_id);
 
         for (auto& fn : event_on_worker_removed) {
           if (fn && fn->callback) {

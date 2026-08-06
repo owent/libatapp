@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <utility>
 
 LIBATAPP_MACRO_NAMESPACE_BEGIN
 
