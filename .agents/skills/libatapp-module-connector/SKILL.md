@@ -303,72 +303,24 @@ struct pending_message_t {
 - `get_pending_message_count()` / `get_pending_message_size()` — inspect queue
 - Messages expire based on `expired_timepoint`; expired messages are discarded
 
-## Multi-Node Test Patterns
+## Testing Modules and Connectors
 
-### Three-Node Setup (Direct Connect)
+Read `../testing/references/test-design-and-acceptance.md` before designing or reviewing cases. Use the exact nearest
+test source for fixtures/helpers; do not copy the former schematic structs or invent a generic event-loop helper.
 
-```cpp
-// From atapp_direct_connect_test.cpp
-struct direct_three_node_apps {
-    app node1;      // 0x201
-    app node2;      // 0x202
-    app upstream;   // 0x203
-
-    void full_setup_and_connect() {
-        // 1. Init upstream first
-        // 2. Init node1 and node2
-        // 3. Inject discovery nodes
-        // 4. Pump until all connected
-    }
-};
-```
-
-### Three-Node Setup (Upstream Proxy)
-
-```cpp
-// From atapp_upstream_forward_test.cpp
-struct three_node_apps {
-    app node1;      // 0x101 (allow_direct_connection: false)
-    app upstream;   // 0x102
-    app node3;      // 0x103
-
-    // node1 and node3 communicate via upstream proxy
-};
-```
-
-### Event Loop Helpers
-
-```cpp
-// Pump event loop until condition or timeout
-void pump_until(std::function<bool()> condition, std::chrono::milliseconds timeout) {
-    auto deadline = std::chrono::steady_clock::now() + timeout;
-    while (!condition() && std::chrono::steady_clock::now() < deadline) {
-        for (auto &a : apps) {
-            a.run_noblock();
-        }
-        CASE_THREAD_SLEEP_MS(8);
-    }
-}
-
-// Debug-only: virtual time control for timer tests
-app::set_sys_now(future_time_point);  // Jump clock forward
-app.tick();                            // Process timers (no I/O)
-```
-
-### Testing Caveats
-
-1. **Shared uv_default_loop()**: When multiple apps use `init(nullptr, ...)`, they share the default libuv loop. `run_noblock()` fires timers for ALL apps. Use `tick()` in time-advance sections.
-
-2. **set_sys_now() is static**: Affects ALL app instances. Set large bus timeouts (e.g., `first_idle_timeout: 3600`) in test configs to prevent atbus idle disconnect.
-
-3. **Jiffies timer + set_sys_now()**: Only one timer callback fires per `tick()` call when time is jumped. Use multiple `set_sys_now()` + `tick()` rounds for multi-timer scenarios.
-
-4. **Discovery injection**: Mock discovery by injecting nodes directly:
-   ```cpp
-   auto node = std::make_shared<etcd_discovery_node>();
-   node->copy_from(discovery_info);
-   etcd_module->get_global_discovery().add_node(node);
-   ```
+- Exercise module lifecycle, connector routing, pending messages, retries, and cleanup through real in-process app,
+  connector, endpoint, and discovery objects. Use multi-app/atbus setup only when cross-node behavior is the subject.
+- For asynchronous I/O, pump the existing fixture until a named observable condition, then assert that condition and the
+  business result. A short yield and wall timeout may help libuv progress/prevent a hang, but neither is the oracle.
+- Use `app::set_sys_now(...)` only when the current build exposes mock time and timer behavior is the subject. It is
+  process-global: keep affected cases serial, avoid cross-app interference, and restore the project clock on every exit.
+- Do not enlarge idle timeouts, retry budgets, expiry, discovery labels, or readiness data merely to keep a connection
+  alive until green. Change such configuration only when source-backed isolation is required and the value is outside the
+  behavior being asserted; document that boundary in the case.
+- Build discovery/config inputs from current generated protobuf types and a nearby contract-valid fixture. Vary one
+  behavior-relevant field and assert messages, endpoint/handle state, callbacks, errors, pending queues, and cleanup.
+- `CASE_EXPECT_*` is non-fatal. Guard dependent operations after setup failure, and clean shared libuv/module/discovery
+  state so case order cannot change results.
 
 ## Common Pitfalls
 

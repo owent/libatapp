@@ -10,7 +10,7 @@ commands, caveats, and examples here.
 | `engineering-guidelines/` | C++ header template visibility, exported API ABI, and review checks |
 | `change-workflow/` | Risk-scaled design, change contracts, debugging, TDD, review, and completion evidence |
 | `build/` | Configure/build libatapp and edit or review CMake generation rules |
-| `testing/` | Run and write private-framework unit tests |
+| `testing/` | Design, review, and run private-framework unit tests |
 | `configure-expression/` | Edit environment-expression-enabled config fields and syntax |
 | `libatapp-module-connector/` | Work on modules, connectors, endpoints, routing, and lifecycle hooks |
 | `libatapp-etcd-discovery/` | Work on etcd client, discovery sets, topology, keepalive, and watchers |

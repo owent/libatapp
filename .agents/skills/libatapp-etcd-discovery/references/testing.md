@@ -1,7 +1,7 @@
 # etcd Test Reference
 
-Read this file when changing etcd-specific behavior or selecting tests. Re-check the setup scripts and test source
-before relying on ports, environment variables, filters, or skip behavior.
+Read this file when changing etcd-specific behavior or selecting tests. Re-check the setup scripts and exact test source
+before relying on versions, ports, environment variables, filters, fallback endpoints, or skip behavior.
 
 ## Testing etcd Integration
 
@@ -11,7 +11,8 @@ Tests in `atapp_etcd_cluster_test.cpp` and `atapp_etcd_module_test.cpp` require 
 
 #### Quick Start with setup-etcd Scripts
 
-Use the `ci/etcd/setup-etcd` scripts to download and start a local etcd:
+Use the `ci/etcd/setup-etcd` scripts to download and start a local etcd. Pin `--etcd-version` to the user/CI requirement
+when reproducibility matters; do not assume the script's mutable default is part of the test contract.
 
 ```bash
 # Linux / macOS
@@ -44,7 +45,9 @@ export ATAPP_UNIT_TEST_ETCD_HOST="http://127.0.0.1:2379"
 ./atapp_unit_test -r atapp_etcd_module
 ```
 
-If `ATAPP_UNIT_TEST_ETCD_HOST` is not set, these tests are skipped (not failed).
+The current tests use `ATAPP_UNIT_TEST_ETCD_HOST` when set and otherwise probe `http://127.0.0.1:12379`. If the selected
+endpoint is unavailable, the case path reports the missing prerequisite and returns without exercising etcd. Confirm the
+actual output/case result and report this as unavailable/skipped integration coverage, not a passing unit substitute.
 
 ### Tests Not Requiring etcd
 
@@ -55,39 +58,18 @@ Discovery set and packer tests work without etcd:
 ./atapp_unit_test -r atapp_etcd_packer
 ```
 
-### Mock Discovery in Tests
+### In-process discovery tests
 
-For tests that don't use a real etcd, inject discovery nodes directly:
+For behavior that does not require real etcd, follow the closest current discovery/module-unit test and inject a real
+generated discovery object through the production discovery/module API. Build one contract-valid baseline from the
+current protobuf and fixture, then vary only the behavior-relevant field. Do not copy placeholder fields, invent a mock
+API, or configure an address/label merely to force the current implementation down a passing branch.
 
-```cpp
-// Create a discovery node from protobuf
-atapp::protocol::atapp_discovery node_info;
-node_info.set_id(0x201);
-node_info.set_name("test_node");
-node_info.set_hostname("localhost");
-// ... set listen addresses, metadata, etc.
-
-auto node = std::make_shared<etcd_discovery_node>();
-node->copy_from(node_info);
-
-// Inject into the global discovery set
-etcd_module->get_global_discovery().add_node(node);
-
-// Trigger connection via connector
-// The app's message routing will find the node and attempt connection
-```
-
-### Discovery Set Unit Tests
+### Discovery set unit tests
 
 ```bash
-# Key test cases:
-#   metadata_filter           — filter nodes by metadata
-#   get_discovery_by_metadata — select with metadata
-#   round_robin               — sequential rotation
-#   lower_bound_*             — hash ring queries (normal, unique, compact)
-#   discovery_node_version_update  — version ordering
-#   add_remove_stress         — 200-node add/remove
-#   ingress_round_robin       — ingress path rotation
-#   empty_set_operations      — edge cases on empty set
 ./atapp_unit_test -r atapp_discovery
 ```
+
+Use `atapp_unit_test -l` and current source to discover cases; do not maintain a hand-counted or hand-copied inventory in
+this reference.

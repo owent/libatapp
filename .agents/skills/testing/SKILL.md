@@ -1,211 +1,74 @@
 ---
 name: testing
-description: "Use when: running or writing libatapp unit tests, filtering private test cases, using multi-node/debug-time patterns, testing etcd, or fixing Windows DLL/PATH startup issues."
+description: "Use when: designing, writing, reviewing, or running libatapp unit tests, filtering private-framework cases, testing multi-app/synthetic-time behavior, selecting etcd integration tests, or diagnosing Windows test startup/PATH."
 ---
 
 # Unit testing (libatapp)
 
-This repo uses a **private unit testing framework** (not GoogleTest).
+The test executable is `atapp_unit_test`; current cases and their real fixtures/helpers live under `test/case/`.
+
+Read [test design and acceptance](references/test-design-and-acceptance.md) when planning, writing, or reviewing cases.
+It is not needed merely to run a known test command. For etcd/discovery-specific behavior and setup, also use
+`libatapp-etcd-discovery` and its [test reference](../libatapp-etcd-discovery/references/testing.md).
+
+## Choose the narrowest real path
+
+- Inspect the closest current test source and reuse its actual fixture/helper; do not invent a generic `pump_until`,
+  mock API, config field, discovery field, or cleanup method in guidance or code.
+- Test configuration loading, packers, discovery selection/versioning, module helpers, connectors, and other in-process
+  logic through real public/generated types without starting etcd or a network when those dependencies are not the
+  behavior under test.
+- For multi-app routing/topology/lifecycle behavior, use the existing in-process app/atbus setup and assert externally
+  observable messages, endpoint/connector state, callbacks, errors, and cleanup. Do not bypass the layer named by the
+  case or assert only that a fake was called.
+- Build protobuf and YAML/config data from current schemas plus a nearby contract-valid fixture. Keep only verified
+  prerequisites and behavior-relevant fields; do not inflate idle timeouts, retries, labels, or readiness values merely
+  to prevent the current flow from failing.
+
+## Drive time and I/O deterministically
+
+- Use `atframework::atapp::app::set_sys_now(...)` only in Debug builds (`!NDEBUG`), where the current header exposes it,
+  and only when timer behavior is the subject. It changes process-global app time: keep affected cases serial, avoid
+  cross-app interference, and restore the real project clock on every exit path.
+- Advance mock time and call the relevant `tick()`/event pump until a named state transition occurs. Do not use a fixed
+  sleep, real elapsed time, CPU/network jitter, or a precise number of pump iterations as the oracle.
+- When real loopback I/O is the subject, use the nearest predicate-driven event-loop helper. A short yield/sleep may let
+  libuv progress, and a wall timeout may prevent a hang, but correctness must be proved by an explicit final predicate
+  and business-result assertion.
+- Keep process-global callbacks, discovery/module state, app instances, sockets, and temporary config isolated and
+  cleaned up. `CASE_EXPECT_*` is non-fatal, so guard dependent operations after a failed setup assertion.
+
+## Etcd boundary
+
+`atapp_etcd_cluster` and `atapp_etcd_module` are integration groups. The current source uses
+`ATAPP_UNIT_TEST_ETCD_HOST` when set and otherwise probes `http://127.0.0.1:12379`; lack of an available endpoint causes
+the case path to return without exercising etcd. Confirm output/case behavior and report it as unavailable/skipped
+integration coverage, never as a passing unit substitute. Prefer the in-process discovery/packer/module-unit groups when
+real etcd is not the subject.
 
 ## Run tests
 
-The test executable is `atapp_unit_test`.
-
-Common commands:
-
-- Run all tests: `./atapp_unit_test`
-- List tests: `./atapp_unit_test -l` / `./atapp_unit_test --list-tests`
-- Run a group/case: `./atapp_unit_test -r <group>` or `./atapp_unit_test -r <group>.<case>`
-- Filter: `./atapp_unit_test -f "pattern*"` / `./atapp_unit_test --filter "pattern*"`
-- Help/version: `./atapp_unit_test -h`, `./atapp_unit_test -v`
-
-## Windows: DLL lookup via PATH
-
-On Windows, executables built in this repo commonly depend on DLLs placed under the build output tree (for example `publish/bin/<Config>`). If you run a unit test or sample directly from the build folder and see the process fail to start, Windows likely cannot find dependent DLLs.
-
-Preferred approach: **prepend DLL directories to `PATH`** for the current run/debug session.
-
-Typical DLL directories in the monorepo/toolset layout:
-
-- `<BUILD_DIR>\\publish\\bin\\<Config>`
-- `<REPO_ROOT>\\third_party\\install\\windows-amd64-msvc-19\\bin`
-
-Example (PowerShell):
-
-- `$buildDir = "<BUILD_DIR>"`
-- `$cfg = "Debug"`
-- `$env:PATH = "$buildDir\\publish\\bin\\$cfg;$buildDir\\publish\\bin;${PWD}\\third_party\\install\\windows-amd64-msvc-19\\bin;" + $env:PATH`
-- `Set-Location "$buildDir\\_deps\\atapp\\test\\$cfg"`
-- `./atapp_unit_test.exe -l`
-
-## Test groups
-
-| Group                       | File                                 | Tests | Requirements  | Description                             |
-| --------------------------- | ------------------------------------ | ----- | ------------- | --------------------------------------- |
-| `atapp_setup`               | `atapp_setup_test.cpp`               | 1     | —             | Init timeout handling                   |
-| `atapp_message`             | `atapp_message_test.cpp`             | 2     | —             | Remote send + loopback                  |
-| `atapp_connector`           | `atapp_connector_test.cpp`           | 1     | —             | Address type classification             |
-| `atapp_upstream_forward`    | `atapp_upstream_forward_test.cpp`    | 8     | Debug build\* | Upstream proxy forwarding (A.1–A.8)     |
-| `atapp_direct_connect`      | `atapp_direct_connect_test.cpp`      | 8     | Debug build\* | Direct peer topology (B.1–B.8)          |
-| `atapp_downstream_send`     | `atapp_downstream_send_test.cpp`     | 4     | Debug build\* | Downstream send/pending (C.1–C.4)       |
-| `atapp_topology_change`     | `atapp_topology_change_test.cpp`     | 9     | Debug build\* | Topology change/recovery (D.1–D.9)      |
-| `atapp_discovery_reconnect` | `atapp_discovery_reconnect_test.cpp` | 5     | Debug build\* | Discovery reconnect logic (E.1–E.5)     |
-| `atapp_error_recovery`      | `atapp_error_recovery_test.cpp`      | 5     | Debug build\* | Error recovery + cascade (F.1–F.5)      |
-| `atapp_discovery`           | `atapp_discovery_test.cpp`           | 12    | —             | Metadata, hash, round_robin, stress     |
-| `atapp_etcd_cluster`        | `atapp_etcd_cluster_test.cpp`        | 18    | etcd running  | etcd client operations                  |
-| `atapp_etcd_module`         | `atapp_etcd_module_test.cpp`         | 20    | etcd running  | etcd module integration                 |
-| `atapp_etcd_packer`         | `atapp_etcd_packer_test.cpp`         | 7     | —             | KV pack/unpack, base64, key range       |
-| `atapp_configure`           | `atapp_configure_loader_test.cpp`    | 6     | —             | YAML/INI/env load, expression expansion |
-| `atapp_worker_pool`         | `atapp_worker_pool_test.cpp`         | 5     | —             | Spawn, stop, foreach, tick              |
-
-\* Many multi-node tests (A–F groups) use `set_sys_now()` for virtual time control, which is only available in Debug builds.
-
-### etcd Tests
-
-Tests in `atapp_etcd_cluster` and `atapp_etcd_module` groups require a running etcd instance.
-
-#### Quick Start with setup-etcd Scripts
-
-The `ci/etcd/` directory provides scripts to automatically download, start, and manage a local etcd for testing:
-
-**Windows (PowerShell):**
-
-```powershell
-# Download and start etcd (auto-downloads latest if not present)
-.\ci\etcd\setup-etcd.ps1 -Command start
-
-# Set env var for test discovery (default port is 12379)
-$env:ATAPP_UNIT_TEST_ETCD_HOST = "http://127.0.0.1:12379"
-
-# Run etcd tests
-./atapp_unit_test.exe -r atapp_etcd_cluster
-./atapp_unit_test.exe -r atapp_etcd_module
-
-# Stop etcd when done
-.\ci\etcd\setup-etcd.ps1 -Command stop
-```
-
-**Linux / macOS (Bash):**
+Resolve `<BUILD_DIR>` as required by `AGENTS.md`, then prefer the registered CTest:
 
 ```bash
-# Download and start etcd
-bash ci/etcd/setup-etcd.sh start
-
-# Set env var
-export ATAPP_UNIT_TEST_ETCD_HOST="http://127.0.0.1:12379"
-
-# Run etcd tests
-./atapp_unit_test -r atapp_etcd_cluster
-./atapp_unit_test -r atapp_etcd_module
-
-# Stop etcd when done
-bash ci/etcd/setup-etcd.sh stop
+ctest --test-dir <BUILD_DIR> -R "^libatapp\.unit_test$" --output-on-failure
 ```
 
-**Available commands:** `download`, `start`, `stop`, `cleanup` (stop + delete all), `status`
+Add `-C <CONFIG>` for a verified multi-config generator.
 
-**Options:** `--work-dir DIR`, `--client-port PORT` (default: 12379), `--peer-port PORT` (default: 12380), `--etcd-version VER` (default: latest)
+The executable supports:
 
-#### Manual etcd Setup
+- List: `atapp_unit_test -l` / `--list-tests`
+- Run a group/case: `atapp_unit_test -r <group>` or `-r <group>.<case>`
+- Filter: `atapp_unit_test -f "pattern*"` / `--filter "pattern*"`
+- Help/version: `-h`, `-v`
 
-If you already have an etcd instance running, just set the environment variable:
+Run the exact case first and confirm it was selected, then the registered CTest and broader coverage in proportion to
+risk. Discover current groups with `-l` and source search; do not maintain hand-counted test tables in this Skill.
 
-```bash
-export ATAPP_UNIT_TEST_ETCD_HOST="http://127.0.0.1:2379"
-```
+## Windows startup
 
-If `ATAPP_UNIT_TEST_ETCD_HOST` is not set, etcd-dependent tests are skipped (not failed).
-
-## Writing tests
-
-Test files are under `test/case/`.
-
-### Minimal example
-
-```cpp
-#include <frame/test_macros.h>
-
-CASE_TEST(my_group, my_case) {
-    int result = do_something();
-    CASE_EXPECT_EQ(0, result);
-    CASE_EXPECT_TRUE(some_condition());
-}
-```
-
-### Multi-node test pattern
-
-For tests involving multiple app instances communicating over atbus:
-
-```cpp
-#include <frame/test_macros.h>
-#include <atframe/atapp.h>
-
-// 1. Define test YAML config files (test/case/*.yaml)
-//    Each node needs unique id, name, and listen address
-
-// 2. Init apps (upstream first for proxy tests)
-static std::string get_test_dir() {
-    std::string dir = __FILE__;
-    // ... resolve to test/case/ directory
-    return dir;
-}
-
-// 3. Helper: pump event loop until condition
-static void pump_until(std::vector<atframework::atapp::app*> &apps,
-                       std::function<bool()> cond,
-                       std::chrono::milliseconds timeout) {
-    auto deadline = std::chrono::steady_clock::now() + timeout;
-    while (!cond() && std::chrono::steady_clock::now() < deadline) {
-        for (auto *a : apps) {
-            a->run_noblock();
-        }
-        CASE_THREAD_SLEEP_MS(8);
-    }
-}
-
-// 4. Inject discovery nodes for peer awareness
-auto node_info = std::make_shared<etcd_discovery_node>();
-node_info->copy_from(protobuf_discovery_info);
-etcd_module->get_global_discovery().add_node(node_info);
-```
-
-### Debug-only time control
-
-For testing timers, reconnect logic, and timeouts:
-
-```cpp
-#if defined(ATFRAMEWORK_ATAPP_ENABLE_MOCK_TIME) || !defined(NDEBUG)
-// Jump virtual time forward
-auto future = std::chrono::system_clock::now() + std::chrono::seconds(60);
-atframework::atapp::app::set_sys_now(future);
-
-// Process timers (no I/O)
-app.tick();
-#endif
-```
-
-**Caveats:**
-
-- `set_sys_now()` is static — affects ALL app instances in the process
-- Use `tick()` instead of `run_noblock()` during time-advance to avoid cross-app timer interference
-- Set large bus timeouts in test YAML configs (e.g., `first_idle_timeout: 3600`) to prevent atbus idle disconnect
-- Only one jiffies timer callback fires per `tick()` when time is jumped; use multiple `set_sys_now()+tick()` rounds for multi-timer scenarios
-
-### Config file resolution
-
-Tests locate their YAML config files relative to `__FILE__`:
-
-```cpp
-static std::string get_test_case_dir() {
-    std::string ret = __FILE__;
-    // Strip filename, keep directory
-    auto pos = ret.find_last_of("/\\");
-    if (pos != std::string::npos) {
-        ret = ret.substr(0, pos);
-    }
-    return ret;
-}
-
-// Use in test:
-std::string conf_path = get_test_case_dir() + "/atapp_test_0.yaml";
-```
+Prefer the registered CTest command so the target and working directory match current CMake configuration. If CTest or a
+direct run reports missing DLLs, locate the actual executable/DLL outputs in the current build tree and prepend only
+those verified directories to the current process `PATH`. Do not hardcode a parent checkout's `_deps` layout or a
+third-party install triplet the current build did not produce.
