@@ -19,9 +19,6 @@ source_group_by_dir(PROJECT_TEST_SRC_LIST)
 
 # ============ test - coroutine test frame ============
 set(CMAKE_BUILD_RPATH "$ORIGIN/../lib" "$ORIGIN/../lib64")
-if(NOT (WIN32 AND BUILD_SHARED_LIBS))
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/test")
-endif()
 
 atframe_add_test_executable(atapp_unit_test ${PROJECT_TEST_SRC_LIST})
 target_compile_options(atapp_unit_test PRIVATE ${PROJECT_LIBATAPP_PRIVATE_COMPILE_OPTIONS})
@@ -29,4 +26,4 @@ target_link_libraries(atapp_unit_test atapp)
 
 add_test(NAME "libatapp.unit_test" COMMAND "$<TARGET_FILE:atapp_unit_test>")
 set_tests_properties("libatapp.unit_test" PROPERTIES LABELS "libatapp;libatapp.unit_test")
-
+atframe_test_setup_run_environment("libatapp.unit_test" "${PROJECT_TEST_RUNTIME_OUTPUT_DIRECTORY}")

@@ -471,16 +471,20 @@ CASE_TEST(atapp_etcd_module, discovery_event_callback) {
   }
 
   // Register discovery event callback on node1
+  // Record events per node id: later events of an unrelated node (e.g. node1's own re-registration after the
+  // snapshot baseline) must not overwrite node2's join event.
   int discovery_callback_count = 0;
-  atapp::etcd_discovery_node::ptr_t last_discovery_node;
-  atapp::service_discovery_module::node_action_t last_action = atapp::service_discovery_module::node_action_t::kUnknown;
+  std::unordered_map<uint64_t, atapp::etcd_discovery_node::ptr_t> discovery_nodes;
+  std::unordered_map<uint64_t, atapp::service_discovery_module::node_action_t> discovery_actions;
 
   auto handle = discovery_module1->add_on_node_discovery_event(
-      [&discovery_callback_count, &last_discovery_node, &last_action](
+      [&discovery_callback_count, &discovery_nodes, &discovery_actions](
           atapp::service_discovery_module::node_action_t action, const atapp::etcd_discovery_node::ptr_t &node) {
         ++discovery_callback_count;
-        last_action = action;
-        last_discovery_node = node;
+        if (node) {
+          discovery_nodes[node->get_discovery_info().id()] = node;
+          discovery_actions[node->get_discovery_info().id()] = action;
+        }
       });
 
   // Wait for snapshot to complete first
@@ -489,8 +493,8 @@ CASE_TEST(atapp_etcd_module, discovery_event_callback) {
 
   // Reset after snapshot to ignore self-registration events
   int baseline_discovery = discovery_callback_count;
-  last_discovery_node.reset();
-  last_action = atapp::service_discovery_module::node_action_t::kUnknown;
+  discovery_nodes.clear();
+  discovery_actions.clear();
 
   // Now start node2
   atframework::atapp::app app2;
@@ -499,26 +503,29 @@ CASE_TEST(atapp_etcd_module, discovery_event_callback) {
 
   std::vector<atframework::atapp::app *> apps = {&app1, &app2};
 
-  // Wait for discovery callback to fire with kPut action for node2
-  bool callback_fired = run_apps_until(apps, [&discovery_callback_count, baseline_discovery]() {
-    return discovery_callback_count > baseline_discovery;
-  });
+  // Wait for a new discovery callback carrying node2's join event
+  bool callback_fired =
+      run_apps_until(apps, [&discovery_callback_count, baseline_discovery, &discovery_nodes, &app2]() {
+        return discovery_callback_count > baseline_discovery && discovery_nodes.count(app2.get_id()) > 0;
+      });
 
   CASE_EXPECT_TRUE(callback_fired);
   CASE_EXPECT_GT(discovery_callback_count, baseline_discovery);
-  CASE_EXPECT_TRUE(!!last_discovery_node);
-  // Verify action is kPut (new node registration), not kDelete
-  CASE_EXPECT_EQ(static_cast<int>(atapp::service_discovery_module::node_action_t::kPut), static_cast<int>(last_action));
 
-  if (last_discovery_node) {
+  auto discovered_node_it = discovery_nodes.find(app2.get_id());
+  CASE_EXPECT_TRUE(discovered_node_it != discovery_nodes.end());
+  if (discovered_node_it != discovery_nodes.end() && discovered_node_it->second) {
+    // Verify action is kPut (new node registration), not kDelete
+    CASE_EXPECT_EQ(static_cast<int>(atapp::service_discovery_module::node_action_t::kPut),
+                   static_cast<int>(discovery_actions[app2.get_id()]));
     // Verify the discovered node's data matches app2
-    CASE_EXPECT_EQ(app2.get_id(), last_discovery_node->get_discovery_info().id());
-    CASE_EXPECT_EQ(app2.get_app_name(), last_discovery_node->get_discovery_info().name());
-    CASE_EXPECT_GT(last_discovery_node->get_discovery_info().type_id(), static_cast<uint64_t>(0));
-    CASE_MSG_INFO() << "discovery callback: action=" << static_cast<int>(last_action)
-                    << " node_id=" << last_discovery_node->get_discovery_info().id()
-                    << " name=" << last_discovery_node->get_discovery_info().name()
-                    << " type_id=" << last_discovery_node->get_discovery_info().type_id() << '\n';
+    CASE_EXPECT_EQ(app2.get_id(), discovered_node_it->second->get_discovery_info().id());
+    CASE_EXPECT_EQ(app2.get_app_name(), discovered_node_it->second->get_discovery_info().name());
+    CASE_EXPECT_GT(discovered_node_it->second->get_discovery_info().type_id(), static_cast<uint64_t>(0));
+    CASE_MSG_INFO() << "discovery callback: action=" << static_cast<int>(discovery_actions[app2.get_id()])
+                    << " node_id=" << discovered_node_it->second->get_discovery_info().id()
+                    << " name=" << discovered_node_it->second->get_discovery_info().name()
+                    << " type_id=" << discovered_node_it->second->get_discovery_info().type_id() << '\n';
   }
 
   // Cleanup

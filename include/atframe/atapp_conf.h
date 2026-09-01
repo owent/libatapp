@@ -27,9 +27,7 @@
 #include <cstddef>
 #include <cstring>
 #include <list>
-#include <memory>
 #include <string>
-#include <type_traits>
 #include <unordered_set>
 #include <vector>
 
@@ -188,6 +186,21 @@ LIBATAPP_MACRO_API void default_loader_dump_to(ATBUS_MACRO_PROTOBUF_NAMESPACE_ID
 
 LIBATAPP_MACRO_API bool protobuf_equal(const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &l,
                                        const ATBUS_MACRO_PROTOBUF_NAMESPACE_ID::Message &r);
+
+template <class KeyType, class ValueType>
+ATFW_UTIL_SYMBOL_VISIBLE inline bool protobuf_equal(const google::protobuf::Map<KeyType, ValueType> &l,
+                                                    const google::protobuf::Map<KeyType, ValueType> &r) {
+  if (l.size() != r.size()) {
+    return false;
+  }
+  for (const auto &kv : l) {
+    auto it = r.find(kv.first);
+    if (it == r.end() || !protobuf_equal(kv.second, it->second)) {
+      return false;
+    }
+  }
+  return true;
+}
 
 /**
  * @brief Expand environment variable expressions in a string.

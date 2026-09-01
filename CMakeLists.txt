@@ -107,7 +107,7 @@ if(PROJECT_ENABLE_SAMPLE)
   add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/sample")
 endif()
 
-if(PROJECT_ENABLE_UNITTEST OR BUILD_TESTING)
+if(PROJECT_ENABLE_UNITTEST)
   include("${ATFRAMEWORK_ATFRAME_UTILS_REPO_DIR}/test/test.utils-macro.cmake")
   add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/test")
 endif()
@@ -146,4 +146,3 @@ install(
   EXPORT ${PROJECT_LIBATAPP_EXPORT_NAME}
   NAMESPACE "atframework::"
   DESTINATION "${ATFRAMEWORK_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}")
-

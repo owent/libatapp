@@ -11,12 +11,14 @@ file(
   ${PROJECT_SAMPLE_SRC_DIR}/*.cpp ${PROJECT_SAMPLE_SRC_DIR}/*.cc ${PROJECT_SAMPLE_SRC_DIR}/*.c
   ${PROJECT_SAMPLE_SRC_DIR}/*.cxx)
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/sample")
-
 foreach(SAMPLE_SRC_FILE IN LISTS SAMPLE_SRC_LIST)
-  get_filename_component(SAMPLE_SRC_BIN_NAME "${SAMPLE_SRC_FILE}" NAME_WE)
+  get_filename_component(SAMPLE_SRC_BIN_NAME ${SAMPLE_SRC_FILE} NAME_WE)
 
   add_executable(atapp_${SAMPLE_SRC_BIN_NAME} ${SAMPLE_SRC_FILE})
+  if(PROJECT_SAMPLE_RUNTIME_OUTPUT_DIRECTORY)
+    atframe_target_set_runtime_output_directory(atapp_${SAMPLE_SRC_BIN_NAME}
+                                                "${PROJECT_SAMPLE_RUNTIME_OUTPUT_DIRECTORY}")
+  endif()
   target_link_libraries(atapp_${SAMPLE_SRC_BIN_NAME} atapp)
 
   set_target_properties(
