@@ -15,6 +15,7 @@ commands, caveats, and examples here.
 | `libatapp-module-connector/` | Work on modules, connectors, endpoints, routing, and lifecycle hooks |
 | `libatapp-etcd-discovery/` | Work on etcd client, discovery sets, topology, keepalive, and watchers |
 | `ai-agent-maintenance/` | Audit and optimize AI agent prompts, bridge files, and skills |
+| `shell-tooling/` | Modern CLI tool inventory, shell selection, and PowerShell authoring rules |
 
 ## When to read what
 
@@ -26,6 +27,7 @@ commands, caveats, and examples here.
 - If you are working on modules, connectors, endpoints, or routing: see `libatapp-module-connector/SKILL.md`.
 - If you are working on etcd discovery, topology, keepalive, or watchers: see `libatapp-etcd-discovery/SKILL.md`.
 - If you are updating AI agent prompts or skills: see `ai-agent-maintenance/SKILL.md`.
+- If you are running terminal commands or writing/debugging PowerShell: see `shell-tooling/SKILL.md`.
 
 ## Maintenance rules
 
