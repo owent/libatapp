@@ -118,6 +118,10 @@ class atapp_endpoint {
   // 上次成功应用到 bus endpoint 的 discovery 版本, 同版本跳过重复刷新(发送热路径)。
   // etcd 保证同键同版本三元组内容相同, 无需再比较实例
   etcd_data_version discovery_applied_version_;
+  // 上次应用时的 app::get_bus_inherited_labels_hash() 值。inherited_labels 运行期可经 reload
+  // 改变, 且会影响写入 bus endpoint 的 labels/gateway match_labels 过滤结果; 指纹变化时即使
+  // discovery 版本不变也必须重新刷新, 否则旧过滤结果会被无限期保留
+  uint64_t discovery_applied_inherited_labels_hash_;
 
   std::list<pending_message_t> pending_message_;
   size_t pending_message_size_;

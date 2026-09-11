@@ -266,6 +266,21 @@ static atbus::protocol::ATBUS_COMPRESSION_LEVEL convert_atbus_configure(protocol
   }
 }
 
+// 计算 bus.inherited_labels 的指纹, 供服务发现刷新端点时的同版本跳过判断使用。
+// 调用前必须先排序, 使配置顺序不影响指纹
+static uint64_t hash_inherited_labels(const ::google::protobuf::RepeatedPtrField<std::string> &labels) noexcept {
+  uint64_t ret = 0;
+  for (const auto &label : labels) {
+    uint64_t label_hash[2];
+    ::atfw::util::hash::murmur_hash3_x64_128(reinterpret_cast<const void *>(label.data()),
+                                             static_cast<int>(label.size()), LIBATAPP_MACRO_HASH_MAGIC_NUMBER,
+                                             label_hash);
+    // boost::hash_combine 合并每个标签的散列, 使指纹覆盖标签边界
+    ret ^= (label_hash[0] ^ label_hash[1]) + 0x9e3779b97f4a7c15ULL + (ret << 6) + (ret >> 2);
+  }
+  return ret;
+}
+
 static void apply_atbus_configure(atbus::node::conf_t &to, const protocol::atbus_configure &from,
                                   const protocol::atapp_metadata &metadata) {
   atbus::node::default_conf(&to);
@@ -1689,6 +1704,8 @@ LIBATAPP_MACRO_API const atapp::protocol::atapp_log &app::get_log_configure() co
 
 LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata &app::get_metadata() const noexcept { return conf_.metadata; }
 
+LIBATAPP_MACRO_API uint64_t app::get_bus_inherited_labels_hash() const noexcept { return bus_inherited_labels_hash_; }
+
 LIBATAPP_MACRO_API const atapp::protocol::atapp_runtime &app::get_runtime_configure() const noexcept {
   return conf_.runtime;
 }
@@ -3025,6 +3042,14 @@ int app::apply_configure() {
       }
     }
   }
+
+  // inherited_labels 只用于过滤节点/gateway 标签, 与配置顺序无关。统一排序并缓存指纹:
+  // 排序使顺序调整不会改变指纹, 缓存使发送路径上的同版本跳过判断无需重复计算
+  if (conf_.origin.has_bus() && conf_.origin.bus().inherited_labels_size() > 1) {
+    auto *inherited_labels = conf_.origin.mutable_bus()->mutable_inherited_labels();
+    std::sort(inherited_labels->begin(), inherited_labels->end());
+  }
+  bus_inherited_labels_hash_ = hash_inherited_labels(conf_.origin.bus().inherited_labels());
 
   // atbus configure
   apply_atbus_configure(conf_.bus_conf, conf_.origin.bus(), conf_.metadata);

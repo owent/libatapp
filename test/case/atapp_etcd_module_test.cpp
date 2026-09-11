@@ -30,7 +30,7 @@ static std::string get_etcd_host() {
   return env ? env : "http://127.0.0.1:12379";
 }
 
-static bool is_etcd_available() {
+static bool probe_etcd_available() {
   std::string host = get_etcd_host();
   if (host.empty()) {
     return false;
@@ -54,13 +54,12 @@ static bool is_etcd_available() {
   return req->get_response_code() == 200;
 }
 
-// Helper: run apps in noblock mode for a number of iterations
-static void run_apps_noblock(std::vector<atframework::atapp::app *> &apps, int iterations) {
-  for (int i = 0; i < iterations; ++i) {
-    for (auto *app_ptr : apps) {
-      app_ptr->run_noblock();
-    }
-  }
+static bool is_etcd_available() {
+  // When etcd is unreachable a single probe waits out the full connect timeout; probing once
+  // per case would multiply the whole group's runtime by the case count. Availability does
+  // not change within a test process, so probe only once.
+  static const bool available = probe_etcd_available();
+  return available;
 }
 
 // Helper: run apps until a condition is met or timeout
@@ -114,9 +113,11 @@ CASE_TEST(atapp_etcd_module, init_and_ready) {
 
   CASE_EXPECT_TRUE(discovery_module->get_raw_etcd_ctx().is_available());
 
-  // Tick a few times to ensure stable state
+  // Lease grant is an async etcd round-trip: wait for the event, not a fixed number of ticks
   std::vector<atframework::atapp::app *> apps = {&app1};
-  run_apps_noblock(apps, 32);
+  bool lease_ready =
+      run_apps_until(apps, [&discovery_module]() { return 0 != discovery_module->get_raw_etcd_ctx().get_lease(); });
+  CASE_EXPECT_TRUE(lease_ready);
 
   CASE_EXPECT_TRUE(discovery_module->get_raw_etcd_ctx().is_available());
   CASE_EXPECT_NE(0, static_cast<int64_t>(discovery_module->get_raw_etcd_ctx().get_lease()));
@@ -1126,8 +1127,9 @@ CASE_TEST(atapp_etcd_module, discovery_event_delete) {
     // Now stop node2's etcd module to revoke its lease, triggering kDelete
     discovery_module2->stop();
 
-    // Tick both apps to process the close/revoke HTTP request
-    run_apps_noblock(apps, 30);
+    // Wait until the close/revoke request is fully processed: the module's cluster context
+    // becomes unavailable. Event-driven; the timeout is only a hang guard.
+    run_apps_until(apps, [&discovery_module2]() { return !discovery_module2->get_raw_etcd_ctx().is_available(); });
   }
   // app2 is destroyed here
 
@@ -1238,7 +1240,8 @@ CASE_TEST(atapp_etcd_module, topology_event_delete) {
 
     // Stop node2's etcd module to revoke its lease
     discovery_module2->stop();
-    run_apps_noblock(apps, 30);
+    // Wait until the close/revoke request is fully processed (cluster context unavailable)
+    run_apps_until(apps, [&discovery_module2]() { return !discovery_module2->get_raw_etcd_ctx().is_available(); });
   }
 
   // Continue ticking app1 to receive the kDelete watcher event
@@ -1455,7 +1458,8 @@ CASE_TEST(atapp_etcd_module, multi_node_discovery_delete_event) {
 
     // Stop node2's etcd module to revoke lease
     discovery_module2->stop();
-    run_apps_noblock(apps, 30);
+    // Wait until the close/revoke request is fully processed (cluster context unavailable)
+    run_apps_until(apps, [&discovery_module2]() { return !discovery_module2->get_raw_etcd_ctx().is_available(); });
   }
 
   // Continue ticking app1 - node2 should disappear from global_discovery
@@ -1528,8 +1532,9 @@ CASE_TEST(atapp_etcd_module, multi_node_custom_data) {
   // Trigger the keepalive discovery value update flag
   discovery1->set_maybe_update_keepalive_discovery_value();
 
-  // Tick to process the update
-  run_apps_noblock(apps, 10);
+  // The packed discovery value is deterministic for a stable app, so the refresh produces no
+  // etcd write and there is no event to wait for; the assertion below does not depend on when
+  // the flag is consumed.
 
   // Verify the discovery value was refreshed (node2 should still see node1 - the update
   // triggers a keepalive value regeneration, though custom_data is not packed into it
@@ -1990,8 +1995,12 @@ CASE_TEST(atapp_etcd_module, external_discovery_cross_only) {
   });
   CASE_EXPECT_TRUE(cross_discovery);
 
-  // Give extra ticks to ensure snapshots are fully processed
-  run_apps_noblock(apps, 32);
+  // The negative assertions below require that both watchers have fully applied their
+  // snapshots; wait for the snapshot events instead of a fixed number of ticks.
+  bool snapshots_ready = run_apps_until(apps, [&discovery1, &discovery2]() {
+    return discovery1->has_discovery_snapshot() && discovery2->has_discovery_snapshot();
+  });
+  CASE_EXPECT_TRUE(snapshots_ready);
 
   // app1 should NOT see itself (keepalives on pathA, but watches pathB)
   auto app1_self = discovery1->get_global_discovery().get_node_by_id(app1.get_id());

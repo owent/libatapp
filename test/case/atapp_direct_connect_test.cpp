@@ -17,6 +17,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <fstream>
 #include <gsl/util>
 #include <memory>
 #include <string>
@@ -58,6 +59,16 @@ static bool check_direct_and_skip_if_missing(const std::string &path) {
   return false;
 }
 
+// Removes a case-owned temporary configure file on all exit paths
+struct temp_conf_file_guard {
+  std::string path;
+  ~temp_conf_file_guard() {
+    if (!path.empty()) {
+      atfw::util::file_system::remove(path.c_str());
+    }
+  }
+};
+
 struct direct_three_node_apps {
   atframework::atapp::app node1;
   atframework::atapp::app node2;
@@ -67,8 +78,8 @@ struct direct_three_node_apps {
   atfw::util::memory::strong_rc_ptr<atapp::etcd_discovery_node> node2_discovery;
   atfw::util::memory::strong_rc_ptr<atapp::etcd_discovery_node> upstream_discovery;
 
-  bool init_all() {
-    std::string conf1 = get_direct_test_conf_path("atapp_test_direct_1.yaml");
+  bool init_all(const std::string &conf1_override = std::string()) {
+    std::string conf1 = conf1_override.empty() ? get_direct_test_conf_path("atapp_test_direct_1.yaml") : conf1_override;
     std::string conf2 = get_direct_test_conf_path("atapp_test_direct_2.yaml");
     std::string conf3 = get_direct_test_conf_path("atapp_test_direct_3.yaml");
 
@@ -1298,4 +1309,192 @@ CASE_TEST(atapp_direct_connect, direct_discovery_update_refresh_bus_endpoint) {
     const auto versioned_gateways = bus_ep->get_gateway();
     CASE_EXPECT_EQ(std::string("ipv4://127.0.0.1:29998"), versioned_gateways[0].address);
   }
+}
+
+// ============================================================
+// B.12: direct_discovery_update_refresh_after_inherited_labels_reload
+// update_discovery 的同版本跳过必须由 discovery 版本和本端 bus.inherited_labels 指纹联合判定:
+// 同版本(内容被原地改写)必须跳过, 版本推进必须刷新, reload 变更 inherited_labels 后同版本
+// 也必须按新继承集重新过滤(回归: 只看版本会无限期保留旧过滤结果)
+// ============================================================
+CASE_TEST(atapp_direct_connect, direct_discovery_update_refresh_after_inherited_labels_reload) {
+  reset_direct_test_context();
+
+  // node1 的配置必须能被用例改写: 复制 atapp_test_direct_1.yaml 到临时文件, 从副本初始化,
+  // reload 前改写副本中的 bus.inherited_labels
+  std::string conf1_src = get_direct_test_conf_path("atapp_test_direct_1.yaml");
+  std::string conf1_content;
+  if (!atfw::util::file_system::get_file_content(conf1_content, conf1_src.c_str())) {
+    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf1_src << " not readable, skip this test" << '\n';
+    return;
+  }
+
+  const std::string inherited_zone_line = "- \"zone\"";
+  if (conf1_content.find(inherited_zone_line) == std::string::npos) {
+    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << "inherited label zone not found in " << conf1_src
+                    << ", skip this test" << '\n';
+    return;
+  }
+
+  temp_conf_file_guard conf1_tmp;
+  conf1_tmp.path = "atapp_test_direct_1_runtime_labels.tmp.yaml";
+  {
+    std::ofstream out(conf1_tmp.path.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
+    out << conf1_content;
+    if (!out.good()) {
+      CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << "failed to write " << conf1_tmp.path << ", skip this test" << '\n';
+      return;
+    }
+  }
+
+  direct_three_node_apps apps;
+  if (!apps.init_all(conf1_tmp.path)) {
+    return;
+  }
+  apps.full_setup_and_connect();
+
+  auto bus1 = apps.node1.get_bus_node();
+  CASE_EXPECT_TRUE(bus1 != nullptr);
+  auto *atapp_ep = apps.node1.get_endpoint(apps.node2.get_app_id());
+  CASE_EXPECT_TRUE(atapp_ep != nullptr);
+  if (!bus1 || nullptr == atapp_ep) {
+    return;
+  }
+
+  atapp::etcd_discovery_node::node_version version;
+  version.create_revision = 100;
+  version.modify_revision = 100;
+  version.version = 1;
+
+  // v1: zone=west + extra=skip, gateway match_labels 相同集合
+  auto updated = atfw::util::memory::make_strong_rc<atapp::etcd_discovery_node>();
+  {
+    atapp::protocol::atapp_discovery info;
+    apps.node2.pack(info);
+    info.mutable_metadata()->set_scope("scope-x");
+    info.mutable_metadata()->set_namespace_name("ns-x");
+    (*info.mutable_metadata()->mutable_labels())["zone"] = "west";
+    (*info.mutable_metadata()->mutable_labels())["extra"] = "skip";
+    auto *gw = info.add_gateways();
+    gw->set_address("ipv4://127.0.0.1:29999");
+    gw->set_match_scope("scope-x");
+    (*gw->mutable_match_labels())["zone"] = "west";
+    (*gw->mutable_match_labels())["extra"] = "skip";
+    updated->copy_from(info, version, 0);
+  }
+  atapp_ep->update_discovery(updated);
+
+  const auto *bus_ep = bus1->get_endpoint(apps.node2.get_app_id());
+  CASE_EXPECT_TRUE(bus_ep != nullptr);
+  if (nullptr == bus_ep) {
+    return;
+  }
+
+  // 初始 inherited_labels=[zone]: 只保留 zone
+  CASE_EXPECT_EQ(std::string("scope-x"), bus_ep->get_scope());
+  CASE_EXPECT_EQ(static_cast<size_t>(1), bus_ep->get_labels().size());
+  CASE_EXPECT_TRUE(bus_ep->get_labels().end() == bus_ep->get_labels().find("extra"));
+
+  // 同版本调用(内容已原地改写为 scope-skip/zone=changed)必须跳过: 保持 v1 的过滤结果
+  atapp::protocol::atapp_discovery skip_info;
+  apps.node2.pack(skip_info);
+  skip_info.mutable_metadata()->set_scope("scope-skip");
+  skip_info.mutable_metadata()->set_namespace_name("ns-skip");
+  (*skip_info.mutable_metadata()->mutable_labels())["zone"] = "changed";
+  (*skip_info.mutable_metadata()->mutable_labels())["extra"] = "skip";
+  {
+    auto *gw = skip_info.add_gateways();
+    gw->set_address("ipv4://127.0.0.1:29997");
+    gw->set_match_scope("scope-skip");
+    (*gw->mutable_match_labels())["zone"] = "changed";
+    (*gw->mutable_match_labels())["extra"] = "skip";
+  }
+  updated->copy_from(skip_info, version, 0);
+  atapp_ep->update_discovery(updated);
+  CASE_EXPECT_EQ(std::string("scope-x"), bus_ep->get_scope());
+  {
+    auto label_iter = bus_ep->get_labels().find("zone");
+    CASE_EXPECT_TRUE(label_iter != bus_ep->get_labels().end() && label_iter->second == "west");
+  }
+
+  // 版本推进必须刷新为 v2 内容, 此时仍按 inherited_labels=[zone] 过滤。
+  // copy_from 才会更新节点内记录的版本, 只改本地 version 变量不会生效
+  ++version.modify_revision;
+  ++version.version;
+  updated->copy_from(skip_info, version, 0);
+  atapp_ep->update_discovery(updated);
+  CASE_EXPECT_EQ(std::string("scope-skip"), bus_ep->get_scope());
+  CASE_EXPECT_EQ(static_cast<size_t>(1), bus_ep->get_labels().size());
+  {
+    auto label_iter = bus_ep->get_labels().find("zone");
+    CASE_EXPECT_TRUE(label_iter != bus_ep->get_labels().end() && label_iter->second == "changed");
+  }
+  CASE_EXPECT_EQ(static_cast<size_t>(1), bus_ep->get_gateway().size());
+  if (!bus_ep->get_gateway().empty()) {
+    CASE_EXPECT_EQ(static_cast<size_t>(1), bus_ep->get_gateway()[0].match_labels.size());
+  }
+
+  // reload 变更 inherited_labels 为 [zone, extra]: 即使 discovery 版本不变, 下一次
+  // update_discovery 也必须按新继承集重新过滤
+  {
+    std::string reloaded_content = conf1_content;
+    size_t insert_pos = reloaded_content.find(inherited_zone_line);
+    reloaded_content.insert(insert_pos + inherited_zone_line.size(), "\n      - \"extra\"");
+    std::ofstream out(conf1_tmp.path.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
+    out << reloaded_content;
+    if (!out.good()) {
+      CASE_MSG_INFO() << CASE_MSG_FCOLOR(RED) << "failed to rewrite " << conf1_tmp.path << '\n';
+      return;
+    }
+  }
+  CASE_EXPECT_EQ(0, apps.node1.reload());
+
+  atapp_ep->update_discovery(updated);
+  bus_ep = bus1->get_endpoint(apps.node2.get_app_id());
+  CASE_EXPECT_TRUE(bus_ep != nullptr);
+  if (nullptr == bus_ep) {
+    return;
+  }
+  CASE_EXPECT_EQ(static_cast<size_t>(2), bus_ep->get_labels().size());
+  {
+    auto label_iter = bus_ep->get_labels().find("zone");
+    CASE_EXPECT_TRUE(label_iter != bus_ep->get_labels().end() && label_iter->second == "changed");
+    label_iter = bus_ep->get_labels().find("extra");
+    CASE_EXPECT_TRUE(label_iter != bus_ep->get_labels().end() && label_iter->second == "skip");
+  }
+  const auto final_gateways = bus_ep->get_gateway();
+  CASE_EXPECT_EQ(static_cast<size_t>(1), final_gateways.size());
+  if (!final_gateways.empty()) {
+    CASE_EXPECT_EQ(static_cast<size_t>(2), final_gateways[0].match_labels.size());
+    CASE_EXPECT_TRUE(final_gateways[0].match_labels.end() != final_gateways[0].match_labels.find("extra"));
+  }
+
+  // 再次 reload, 仅把 inherited_labels 换成 [extra, zone](同一集合, 顺序不同):
+  // apply_configure 排序后指纹不变, 同版本跳过必须继续生效, 探测内容不得被应用
+  {
+    std::string reordered_content = conf1_content;
+    size_t insert_pos = reordered_content.find(inherited_zone_line);
+    size_t line_begin = reordered_content.rfind('\n', insert_pos);
+    reordered_content.insert(line_begin == std::string::npos ? 0 : line_begin + 1, "      - \"extra\"\n");
+    std::ofstream out(conf1_tmp.path.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
+    out << reordered_content;
+    if (!out.good()) {
+      CASE_MSG_INFO() << CASE_MSG_FCOLOR(RED) << "failed to rewrite " << conf1_tmp.path << '\n';
+      return;
+    }
+  }
+  CASE_EXPECT_EQ(0, apps.node1.reload());
+
+  atapp::protocol::atapp_discovery reorder_probe_info;
+  apps.node2.pack(reorder_probe_info);
+  reorder_probe_info.mutable_metadata()->set_scope("scope-reorder-probe");
+  updated->copy_from(reorder_probe_info, version, 0);
+  atapp_ep->update_discovery(updated);
+
+  bus_ep = bus1->get_endpoint(apps.node2.get_app_id());
+  CASE_EXPECT_TRUE(bus_ep != nullptr);
+  if (nullptr == bus_ep) {
+    return;
+  }
+  CASE_EXPECT_EQ(std::string("scope-skip"), bus_ep->get_scope());
 }

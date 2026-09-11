@@ -365,6 +365,13 @@ class app {
   LIBATAPP_MACRO_API const atapp::protocol::atapp_configure &get_origin_configure() const noexcept;
   LIBATAPP_MACRO_API const atapp::protocol::atapp_log &get_log_configure() const noexcept;
   LIBATAPP_MACRO_API const atapp::protocol::atapp_metadata &get_metadata() const noexcept;
+
+  /**
+   * @brief Get the fingerprint of sorted bus.inherited_labels, recomputed only when the configure is applied
+   * @note Service discovery compares it to decide whether an unchanged discovery version still needs an
+   * endpoint refresh after reload; reading it is O(1) on the send path
+   */
+  LIBATAPP_MACRO_API uint64_t get_bus_inherited_labels_hash() const noexcept;
   LIBATAPP_MACRO_API const atapp::protocol::atapp_runtime &get_runtime_configure() const noexcept;
   LIBATAPP_MACRO_API atapp::protocol::atapp_runtime &mutable_runtime_configure();
 
@@ -749,6 +756,9 @@ class app {
   int pending_signals_[static_cast<size_t>(internal_options_t::kMaxSignalCount)];
 
   app_conf conf_;
+  // conf_.origin.bus().inherited_labels 排序后的指纹, 仅在 apply_configure 时重算
+  uint64_t bus_inherited_labels_hash_ = 0;
+
   mutable std::string build_version_;
 
   ev_loop_t *ev_loop_;

@@ -36,7 +36,7 @@ static std::string get_etcd_host() {
   return env ? env : "http://127.0.0.1:12379";
 }
 
-static bool is_etcd_available() {
+static bool probe_etcd_available() {
   std::string host = get_etcd_host();
   if (host.empty()) {
     return false;
@@ -59,12 +59,12 @@ static bool is_etcd_available() {
   return req->get_response_code() == 200;
 }
 
-static void run_apps_noblock(std::vector<atframework::atapp::app *> &apps, int iterations) {
-  for (int i = 0; i < iterations; ++i) {
-    for (auto *app_ptr : apps) {
-      app_ptr->run_noblock();
-    }
-  }
+static bool is_etcd_available() {
+  // When etcd is unreachable a single probe waits out the full connect timeout; probing once
+  // per case would multiply the whole group's runtime by the case count. Availability does
+  // not change within a test process, so probe only once.
+  static const bool available = probe_etcd_available();
+  return available;
 }
 
 template <typename CondFn>
@@ -81,6 +81,16 @@ static bool run_apps_until(std::vector<atframework::atapp::app *> &apps, CondFn 
   }
 
   return cond();
+}
+
+// Wait until the cluster is ready and the lease is granted. Completion is driven by the
+// readiness/lease events; the timeout is only a hang guard, never part of the assertions.
+static bool wait_etcd_cluster_ready(std::vector<atframework::atapp::app *> &apps, atapp::etcd_cluster &cluster,
+                                    std::chrono::seconds timeout_sec = std::chrono::seconds(15)) {
+  return run_apps_until(
+      apps,
+      [&cluster]() { return cluster.check_flag(atapp::etcd_cluster::flag_t::kReady) && 0 != cluster.get_lease(); },
+      timeout_sec);
 }
 
 // Direct synchronous KV get to etcd (bypasses cluster curl_multi)
@@ -230,9 +240,9 @@ CASE_TEST(atapp_etcd_cluster, cluster_init_and_connect) {  // NOLINT
   CASE_EXPECT_TRUE(cluster.check_flag(atapp::etcd_cluster::flag_t::kRunning));
   CASE_EXPECT_TRUE(cluster.check_flag(atapp::etcd_cluster::flag_t::kReady));
 
-  // Lease should be granted
+  // Lease grant is an async etcd round-trip: wait for the event, not a fixed number of ticks
   std::vector<atframework::atapp::app *> apps = {&app1};
-  run_apps_noblock(apps, 16);
+  CASE_EXPECT_TRUE(wait_etcd_cluster_ready(apps, cluster));
 
   CASE_EXPECT_NE(0, static_cast<int64_t>(cluster.get_lease()));
   CASE_MSG_INFO() << "cluster lease: " << cluster.get_lease() << '\n';
@@ -254,8 +264,11 @@ CASE_TEST(atapp_etcd_cluster, cluster_member_list_discovery) {
 
   auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
+  // Member list and host selection complete asynchronously: wait for the event
   std::vector<atframework::atapp::app *> apps = {&app1};
-  run_apps_noblock(apps, 16);
+  bool members_ready = run_apps_until(
+      apps, [&cluster]() { return !cluster.get_available_hosts().empty() && !cluster.get_selected_host().empty(); });
+  CASE_EXPECT_TRUE(members_ready);
 
   // Available hosts should contain at least one member
   const auto &hosts = cluster.get_available_hosts();
@@ -287,13 +300,17 @@ CASE_TEST(atapp_etcd_cluster, cluster_lease_grant_and_keepalive) {
   auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
-  run_apps_noblock(apps, 16);
+  CASE_EXPECT_TRUE(wait_etcd_cluster_ready(apps, cluster));
 
   int64_t lease_before = cluster.get_lease();
   CASE_EXPECT_NE(0, lease_before);
 
-  // Tick more to allow keepalive renewal
-  run_apps_noblock(apps, 32);
+  // Wait until a keepalive renewal actually completes (the success counter grows), instead of
+  // hoping a fixed number of ticks covers the renewal interval
+  size_t success_before = cluster.get_stats().sum_success_requests;
+  bool renewed = run_apps_until(
+      apps, [&cluster, success_before]() { return cluster.get_stats().sum_success_requests > success_before; });
+  CASE_EXPECT_TRUE(renewed);
 
   int64_t lease_after = cluster.get_lease();
   // Lease should remain the same (successfully renewed, not re-granted)
@@ -318,7 +335,7 @@ CASE_TEST(atapp_etcd_cluster, cluster_close_revoke_lease) {
   auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
-  run_apps_noblock(apps, 16);
+  CASE_EXPECT_TRUE(wait_etcd_cluster_ready(apps, cluster));
 
   // Write a key with lease binding
   std::string test_key = "/atapp/unit-test/atapp_etcd_cluster/close-revoke/" + std::to_string(cluster.get_lease());
@@ -370,7 +387,12 @@ CASE_TEST(atapp_etcd_cluster, cluster_stats_tracking) {
   auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
-  run_apps_noblock(apps, 32);
+  // Requests (member list, lease grant, keepalive) complete asynchronously: wait for the counters
+  bool stats_ready = run_apps_until(apps, [&cluster]() {
+    const auto &s = cluster.get_stats();
+    return s.sum_create_requests > 0 && s.sum_success_requests > 0;
+  });
+  CASE_EXPECT_TRUE(stats_ready);
 
   const auto &stats = cluster.get_stats();
   // After init and ticks, there should have been requests (member list, lease grant, keepalive, etc.)
@@ -410,7 +432,7 @@ CASE_TEST(atapp_etcd_cluster, cluster_event_up_down_callbacks) {
   );
 
   std::vector<atframework::atapp::app *> apps = {&app1};
-  run_apps_noblock(apps, 16);
+  CASE_EXPECT_TRUE(wait_etcd_cluster_ready(apps, cluster));
 
   // Up callback should have been triggered (cluster is running)
   CASE_EXPECT_GT(up_count, 0);
@@ -440,7 +462,7 @@ CASE_TEST(atapp_etcd_cluster, keepalive_set_value_and_read) {
   auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
-  run_apps_noblock(apps, 16);
+  CASE_EXPECT_TRUE(wait_etcd_cluster_ready(apps, cluster));
 
   // Clean up test key first
   std::string test_path = "/atapp/unit-test/atapp_etcd_cluster/keepalive/ka1";
@@ -486,7 +508,7 @@ CASE_TEST(atapp_etcd_cluster, keepalive_update_value) {
   auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
-  run_apps_noblock(apps, 16);
+  CASE_EXPECT_TRUE(wait_etcd_cluster_ready(apps, cluster));
 
   std::string test_path = "/atapp/unit-test/atapp_etcd_cluster/keepalive/ka2";
   direct_etcd_kv_del(test_path, "+1");
@@ -539,7 +561,7 @@ CASE_TEST(atapp_etcd_cluster, keepalive_lease_binding) {
   auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
-  run_apps_noblock(apps, 16);
+  CASE_EXPECT_TRUE(wait_etcd_cluster_ready(apps, cluster));
 
   std::string test_path = "/atapp/unit-test/atapp_etcd_cluster/keepalive/ka3-lease";
   direct_etcd_kv_del(test_path, "+1");
@@ -590,7 +612,7 @@ CASE_TEST(atapp_etcd_cluster, keepalive_checker_conflict) {
   auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
-  run_apps_noblock(apps, 16);
+  CASE_EXPECT_TRUE(wait_etcd_cluster_ready(apps, cluster));
 
   std::string test_path = "/atapp/unit-test/atapp_etcd_cluster/keepalive/ka4-conflict";
   direct_etcd_kv_del(test_path, "+1");
@@ -644,7 +666,7 @@ CASE_TEST(atapp_etcd_cluster, keepalive_checker_same_identity) {
   auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
-  run_apps_noblock(apps, 16);
+  CASE_EXPECT_TRUE(wait_etcd_cluster_ready(apps, cluster));
 
   std::string test_path = "/atapp/unit-test/atapp_etcd_cluster/keepalive/ka5-same";
   direct_etcd_kv_del(test_path, "+1");
@@ -695,7 +717,7 @@ CASE_TEST(atapp_etcd_cluster, keepalive_remove_and_readd) {
   auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
-  run_apps_noblock(apps, 16);
+  CASE_EXPECT_TRUE(wait_etcd_cluster_ready(apps, cluster));
 
   std::string test_path = "/atapp/unit-test/atapp_etcd_cluster/keepalive/ka6-readd";
   direct_etcd_kv_del(test_path, "+1");
@@ -756,7 +778,7 @@ CASE_TEST(atapp_etcd_cluster, watcher_initial_snapshot) {
   auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
-  run_apps_noblock(apps, 16);
+  CASE_EXPECT_TRUE(wait_etcd_cluster_ready(apps, cluster));
 
   // Pre-write keys
   std::string prefix = "/atapp/unit-test/atapp_etcd_cluster/watcher/snapshot/";
@@ -819,7 +841,7 @@ CASE_TEST(atapp_etcd_cluster, watcher_put_event) {
   auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
-  run_apps_noblock(apps, 16);
+  CASE_EXPECT_TRUE(wait_etcd_cluster_ready(apps, cluster));
 
   std::string prefix = "/atapp/unit-test/atapp_etcd_cluster/watcher/put/";
   direct_etcd_kv_del(prefix, "+1");
@@ -890,7 +912,7 @@ CASE_TEST(atapp_etcd_cluster, watcher_delete_event) {
   auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
-  run_apps_noblock(apps, 16);
+  CASE_EXPECT_TRUE(wait_etcd_cluster_ready(apps, cluster));
 
   std::string prefix = "/atapp/unit-test/atapp_etcd_cluster/watcher/delete/";
   direct_etcd_kv_del(prefix, "+1");
@@ -962,7 +984,7 @@ CASE_TEST(atapp_etcd_cluster, watcher_prefix_range) {
   auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
-  run_apps_noblock(apps, 16);
+  CASE_EXPECT_TRUE(wait_etcd_cluster_ready(apps, cluster));
 
   std::string watched_prefix = "/atapp/unit-test/atapp_etcd_cluster/watcher/prefix/match/";
   std::string other_prefix = "/atapp/unit-test/atapp_etcd_cluster/watcher/prefix/other/";
@@ -1042,7 +1064,7 @@ CASE_TEST(atapp_etcd_cluster, watcher_reconnect_after_timeout) {
   auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
-  run_apps_noblock(apps, 16);
+  CASE_EXPECT_TRUE(wait_etcd_cluster_ready(apps, cluster));
 
   std::string prefix = "/atapp/unit-test/atapp_etcd_cluster/watcher/reconnect/";
   direct_etcd_kv_del(prefix, "+1");
@@ -1084,18 +1106,20 @@ CASE_TEST(atapp_etcd_cluster, watcher_reconnect_after_timeout) {
   bool got_put = run_apps_until(apps, [&put_count]() { return put_count >= 1; });
   CASE_EXPECT_TRUE(got_put);
 
-  // Wait for the short timeout to trigger reconnection
-  // The watcher should automatically re-establish the watch
-  CASE_MSG_INFO() << "waiting for watcher timeout and reconnect (2s+ timeout)..." << '\n';
+  // Wait until the short request timeout actually triggers the reconnect. A re-established
+  // watcher does not re-fire the snapshot callback (the retry-mode range response goes
+  // straight back to a watch request), so observe the retry cycle through the cluster's
+  // request-create counter: +1 for the retry range request, +1 for the new watch request.
+  // This is the event the case depends on; the timeout is only a hang guard.
+  CASE_MSG_INFO() << "waiting for watcher timeout and reconnect..." << '\n';
 
-  // Sleep briefly then write another key - if reconnect works, we should see it
   int put_before = put_count;
-  // Wait 3 seconds for timeout to expire
-  auto wait_start = atfw::util::time::time_utility::sys_now();
-  run_apps_until(
+  size_t create_before = cluster.get_stats().sum_create_requests;
+  bool reconnected = run_apps_until(
       apps,
-      [&wait_start]() { return (atfw::util::time::time_utility::sys_now() - wait_start) > std::chrono::seconds(3); },
-      std::chrono::seconds(5));
+      [&cluster, create_before]() { return cluster.get_stats().sum_create_requests >= create_before + 2; },
+      std::chrono::seconds(20));
+  CASE_EXPECT_TRUE(reconnected);
 
   // Write after timeout - the reconnected watcher should pick this up
   direct_etcd_kv_set(prefix + "post-timeout", "v2");
@@ -1127,7 +1151,7 @@ CASE_TEST(atapp_etcd_cluster, watcher_revision_continuity) {
   auto &cluster = app1.get_service_discovery_module()->get_raw_etcd_ctx();
 
   std::vector<atframework::atapp::app *> apps = {&app1};
-  run_apps_noblock(apps, 16);
+  CASE_EXPECT_TRUE(wait_etcd_cluster_ready(apps, cluster));
 
   std::string prefix = "/atapp/unit-test/atapp_etcd_cluster/watcher/revision/";
   direct_etcd_kv_del(prefix, "+1");

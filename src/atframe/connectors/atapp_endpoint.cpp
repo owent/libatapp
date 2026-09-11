@@ -24,6 +24,7 @@ void atapp_endpoint::internal_accessor::close(atapp_endpoint &endpoint) { endpoi
 LIBATAPP_MACRO_API atapp_endpoint::atapp_endpoint(app &owner, construct_helper_t &)
     : closing_(false),
       owner_(&owner),
+      discovery_applied_inherited_labels_hash_(0),
       pending_message_size_(0)
 #if defined(LIBATAPP_ENABLE_CUSTOM_COUNT_FOR_STD_LIST) && LIBATAPP_ENABLE_CUSTOM_COUNT_FOR_STD_LIST
       ,
@@ -131,23 +132,30 @@ LIBATAPP_MACRO_API void atapp_endpoint::update_discovery(const etcd_discovery_no
 
   if (!discovery) {
     discovery_applied_version_ = etcd_data_version();
+    discovery_applied_inherited_labels_hash_ = 0;
     return;
   }
 
   // 服务发现对已有节点的内容变更会原地复用同一实例, 不能按指针相等提前返回;
   // 但 mutable_endpoint 的发送路径每条消息都会走到这里, 稳态下同版本必须 O(1) 跳过。
   // 数据来自 etcd, 内容变化必然推进 revision, 同键的版本三元组不变即内容不变(与实例无关);
-  // 无版本(本地构造)的节点保守起见不跳过, 因为无法区分内容是否已变
+  // 无版本(本地构造)的节点保守起见不跳过, 因为无法区分内容是否已变。
+  // 跳过条件还必须纳入本端 bus.inherited_labels 的指纹: 下面的刷新结果按它过滤对端
+  // labels/gateway match_labels, 而该配置运行期可经 reload 改变; 对端内容不变时 etcd 版本
+  // 不再推进, 若只看版本三元组, 旧过滤结果会被无限期保留。指纹由 app 在 apply_configure 时
+  // 排序后重算, 这里直接读取缓存值, 每条消息的判断保持 O(1)
+  const uint64_t current_inherited_labels_hash = owner_->get_bus_inherited_labels_hash();
   const etcd_data_version &current_version = discovery->get_version();
-  if ((0 != current_version.create_revision || 0 != current_version.modify_revision ||
-       0 != current_version.version) &&
+  if ((0 != current_version.create_revision || 0 != current_version.modify_revision || 0 != current_version.version) &&
       discovery_applied_version_.create_revision == current_version.create_revision &&
       discovery_applied_version_.modify_revision == current_version.modify_revision &&
-      discovery_applied_version_.version == current_version.version) {
+      discovery_applied_version_.version == current_version.version &&
+      discovery_applied_inherited_labels_hash_ == current_inherited_labels_hash) {
     return;
   }
 
   discovery_applied_version_ = current_version;
+  discovery_applied_inherited_labels_hash_ = current_inherited_labels_hash;
 
   FWLOGINFO("update atapp endpoint {} with {}({})", reinterpret_cast<const void *>(this),
             discovery->get_discovery_info().id(), discovery->get_discovery_info().name());
