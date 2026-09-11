@@ -50,7 +50,7 @@ CASE_TEST(atapp_discovery, metadata_filter) {
   metadata.set_api_version("v1");
   metadata.set_kind("unit test");
   metadata.set_group("atapp_discovery");
-  metadata.set_service_subset("next");
+  metadata.set_scope("next");
 
   (*metadata.mutable_labels())["label1"] = "value1";
   (*metadata.mutable_labels())["label2"] = "value2";
@@ -92,12 +92,12 @@ CASE_TEST(atapp_discovery, metadata_filter) {
   CASE_EXPECT_FALSE(etcd_discovery_set::metadata_equal_type::filter(rule, metadata));
   rule.set_group(metadata.group());
 
-  // partly match - service_subset
-  rule.clear_service_subset();
+  // partly match - scope
+  rule.clear_scope();
   CASE_EXPECT_TRUE(etcd_discovery_set::metadata_equal_type::filter(rule, metadata));
-  rule.set_service_subset("mismatch value");
+  rule.set_scope("mismatch value");
   CASE_EXPECT_FALSE(etcd_discovery_set::metadata_equal_type::filter(rule, metadata));
-  rule.set_service_subset(metadata.service_subset());
+  rule.set_scope(metadata.scope());
 
   // labels
   {
@@ -129,7 +129,7 @@ CASE_TEST(atapp_discovery, get_discovery_by_metadata) {
   discovery_data.mutable_metadata()->set_api_version("v1");
   discovery_data.mutable_metadata()->set_kind("unit test");
   discovery_data.mutable_metadata()->set_group("atapp_discovery");
-  discovery_data.mutable_metadata()->set_service_subset("next");
+  discovery_data.mutable_metadata()->set_scope("next");
   (*discovery_data.mutable_metadata()->mutable_labels())["label1"] = "value1";
   (*discovery_data.mutable_metadata()->mutable_labels())["label2"] = "value2";
 
@@ -602,6 +602,73 @@ CASE_TEST(atapp_discovery, discovery_node_ingress_round_robin) {
   CASE_EXPECT_EQ(1, node2->get_ingress_size());
   const auto &ingress = node2->next_ingress_gateway();
   CASE_EXPECT_EQ("ipv6://[::1]:9000", ingress.address());
+}
+
+// H.2.6 next_ingress_gateway() listen fallback carries the publisher's scope/namespace isolation rules
+CASE_TEST(atapp_discovery, discovery_node_ingress_listen_fallback_scope_rules) {
+  atapp::etcd_discovery_node::node_version fake_version;
+  fake_version.create_revision = 1;
+  fake_version.modify_revision = 1;
+  fake_version.version = 1;
+
+  // 未配置 gateway 时, listen 回退地址必须带上发布方的 scope/namespace 隔离规则,
+  // 与 libatbus 注册时通告的规则一致, 调用方据此跳过不可达地址
+  auto node = atfw::util::memory::make_strong_rc<atapp::etcd_discovery_node>();
+  atapp::protocol::atapp_discovery fake_info;
+  fake_info.set_id(302);
+  fake_info.set_name("listen-isolated-node");
+  fake_info.mutable_metadata()->set_scope("prod");
+  fake_info.mutable_metadata()->set_namespace_name("game");
+  fake_info.add_listen("ipv4://10.0.0.1:8001");
+  fake_info.add_listen("ipv4://10.0.0.2:8002");
+  node->copy_from(fake_info, fake_version, 0);
+
+  CASE_EXPECT_EQ(2, node->get_ingress_size());
+
+  const auto &first = node->next_ingress_gateway();
+  CASE_EXPECT_EQ("ipv4://10.0.0.1:8001", first.address());
+  CASE_EXPECT_EQ("prod", first.match_scope());
+  CASE_EXPECT_EQ(1, first.match_namespaces_size());
+  if (first.match_namespaces_size() > 0) {
+    CASE_EXPECT_EQ("game", first.match_namespaces(0));
+  }
+
+  // 轮询到下一个 listen 地址时不得累积上一次的匹配规则
+  const auto &second = node->next_ingress_gateway();
+  CASE_EXPECT_EQ("ipv4://10.0.0.2:8002", second.address());
+  CASE_EXPECT_EQ("prod", second.match_scope());
+  CASE_EXPECT_EQ(1, second.match_namespaces_size());
+
+  // 无元数据的节点回退地址保持通配
+  auto wildcard_node = atfw::util::memory::make_strong_rc<atapp::etcd_discovery_node>();
+  atapp::protocol::atapp_discovery wildcard_info;
+  wildcard_info.set_id(303);
+  wildcard_info.set_name("listen-wildcard-node");
+  wildcard_info.add_listen("ipv4://10.0.0.3:8003");
+  wildcard_node->copy_from(wildcard_info, fake_version, 0);
+
+  const auto &wildcard_ingress = wildcard_node->next_ingress_gateway();
+  CASE_EXPECT_EQ("ipv4://10.0.0.3:8003", wildcard_ingress.address());
+  CASE_EXPECT_TRUE(wildcard_ingress.match_scope().empty());
+  CASE_EXPECT_EQ(0, wildcard_ingress.match_namespaces_size());
+
+  // 配置了 gateway 的节点原样返回配置的 gateway, 不附加 listen 隔离规则
+  auto gateway_node = atfw::util::memory::make_strong_rc<atapp::etcd_discovery_node>();
+  atapp::protocol::atapp_discovery gateway_info;
+  gateway_info.set_id(304);
+  gateway_info.set_name("gateway-node");
+  gateway_info.mutable_metadata()->set_scope("prod");
+  gateway_info.mutable_metadata()->set_namespace_name("game");
+  auto *gw = gateway_info.add_gateways();
+  gw->set_address("ipv4://10.0.0.4:8004");
+  gateway_info.add_listen("ipv4://10.0.0.5:8005");
+  gateway_node->copy_from(gateway_info, fake_version, 0);
+
+  CASE_EXPECT_EQ(1, gateway_node->get_ingress_size());
+  const auto &configured_ingress = gateway_node->next_ingress_gateway();
+  CASE_EXPECT_EQ("ipv4://10.0.0.4:8004", configured_ingress.address());
+  CASE_EXPECT_TRUE(configured_ingress.match_scope().empty());
+  CASE_EXPECT_EQ(0, configured_ingress.match_namespaces_size());
 }
 
 // H.2.5 All query operations on empty set return nullptr/empty without crash

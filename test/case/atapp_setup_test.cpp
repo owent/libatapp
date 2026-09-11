@@ -3,6 +3,8 @@
 #include <atframe/atapp.h>
 #include <atframe/atapp_module_impl.h>
 
+#include <atbus_node.h>
+
 #include <common/file_system.h>
 #include <log/log_wrapper.h>
 #include <time/time_utility.h>
@@ -486,5 +488,140 @@ CASE_TEST_EVENT_ON_START(unit_test_event_on_start_setup_logger) {
             std::cout << '\n';
           }
         });
+  }
+}
+
+CASE_TEST(atapp_setup, match_gateway_scope_namespace_labels) {
+  atframework::atapp::app app;
+  app.set_metadata_scope("prod");
+  app.set_metadata_namespace_name("game");
+  app.set_metadata_label("zone", "east");
+
+  // 空地址不可用
+  {
+    atapp::protocol::atapp_gateway gw;
+    CASE_EXPECT_FALSE(app.match_gateway(gw));
+  }
+
+  // scope: Equal 语义, 空规则为通配
+  {
+    atapp::protocol::atapp_gateway gw;
+    gw.set_address("ipv4://127.0.0.1:8001");
+    CASE_EXPECT_TRUE(app.match_gateway(gw));
+    gw.set_match_scope("prod");
+    CASE_EXPECT_TRUE(app.match_gateway(gw));
+    gw.set_match_scope("other");
+    CASE_EXPECT_FALSE(app.match_gateway(gw));
+  }
+
+  // 应用未配置 scope 时, 带 scope 规则的地址不可达
+  {
+    atframework::atapp::app no_scope_app;
+    atapp::protocol::atapp_gateway gw;
+    gw.set_address("ipv4://127.0.0.1:8001");
+    gw.set_match_scope("prod");
+    CASE_EXPECT_FALSE(no_scope_app.match_gateway(gw));
+    gw.set_match_scope("");
+    CASE_EXPECT_TRUE(no_scope_app.match_gateway(gw));
+  }
+
+  // namespace: In 语义, 空项跳过
+  {
+    atapp::protocol::atapp_gateway gw;
+    gw.set_address("ipv4://127.0.0.1:8001");
+    gw.add_match_namespaces("");
+    CASE_EXPECT_TRUE(app.match_gateway(gw));
+    gw.add_match_namespaces("lobby");
+    CASE_EXPECT_FALSE(app.match_gateway(gw));
+    gw.add_match_namespaces("game");
+    CASE_EXPECT_TRUE(app.match_gateway(gw));
+  }
+
+  // hosts: In 语义
+  {
+    atapp::protocol::atapp_gateway gw;
+    gw.set_address("ipv4://127.0.0.1:8001");
+    gw.add_match_hosts("atapp-test-no-such-host");
+    CASE_EXPECT_FALSE(app.match_gateway(gw));
+    gw.add_match_hosts(atbus::node::get_hostname());
+    CASE_EXPECT_TRUE(app.match_gateway(gw));
+  }
+
+  // labels: Contains 语义, 缺失或不等都不可达
+  {
+    atapp::protocol::atapp_gateway gw;
+    gw.set_address("ipv4://127.0.0.1:8001");
+    (*gw.mutable_match_labels())["zone"] = "east";
+    CASE_EXPECT_TRUE(app.match_gateway(gw));
+    (*gw.mutable_match_labels())["zone"] = "west";
+    CASE_EXPECT_FALSE(app.match_gateway(gw));
+    (*gw.mutable_match_labels())["missing_key"] = "any";
+    CASE_EXPECT_FALSE(app.match_gateway(gw));
+  }
+
+  // 组合规则: scope 匹配但 namespace 不匹配仍不可达
+  {
+    atapp::protocol::atapp_gateway gw;
+    gw.set_address("ipv4://127.0.0.1:8001");
+    gw.set_match_scope("prod");
+    gw.add_match_namespaces("lobby");
+    CASE_EXPECT_FALSE(app.match_gateway(gw));
+  }
+}
+
+CASE_TEST(atapp_setup, atbus_isolation_configure_mapping) {
+  std::string conf_path_base;
+  atfw::util::file_system::dirname(__FILE__, 0, conf_path_base);
+  std::string conf_path = conf_path_base + "/atapp_test_isolation_1.yaml";
+
+  if (!atfw::util::file_system::is_exist(conf_path.c_str())) {
+    CASE_MSG_INFO() << CASE_MSG_FCOLOR(YELLOW) << conf_path << " not found, skip this test" << std::endl;
+    return;
+  }
+
+  atframework::atapp::app app;
+  const char *args[] = {"app", "-c", conf_path.c_str(), "start"};
+  CASE_EXPECT_EQ(0, app.init(nullptr, 4, args, nullptr));
+
+  auto bus_node = app.get_bus_node();
+  CASE_EXPECT_TRUE(bus_node != nullptr);
+  if (!bus_node) {
+    return;
+  }
+
+  // metadata 的 scope/namespace 必须下发到 atbus 节点配置
+  const auto &bus_conf = bus_node->get_conf();
+  CASE_EXPECT_EQ(std::string("prod"), bus_conf.scope);
+  CASE_EXPECT_EQ(std::string("game"), bus_conf.namespace_name);
+
+  // node_labels 只包含 inherited_labels 声明的标签
+  CASE_EXPECT_EQ(static_cast<size_t>(2), bus_conf.node_labels.size());
+  auto zone_iter = bus_conf.node_labels.find("zone");
+  CASE_EXPECT_TRUE(zone_iter != bus_conf.node_labels.end() && zone_iter->second == "cn-east");
+  auto env_iter = bus_conf.node_labels.find("deployment.environment");
+  CASE_EXPECT_TRUE(env_iter != bus_conf.node_labels.end() && env_iter->second == "prod");
+  CASE_EXPECT_TRUE(bus_conf.node_labels.end() == bus_conf.node_labels.find("not_inherited"));
+
+  // bus.gateways 必须完整映射到 atbus gateway 配置
+  CASE_EXPECT_EQ(static_cast<size_t>(2), bus_conf.gateway.size());
+  if (bus_conf.gateway.size() >= 2) {
+    const auto &gw0 = bus_conf.gateway[0];
+    CASE_EXPECT_EQ(std::string("ipv4://10.0.0.1:21711"), gw0.address);
+    CASE_EXPECT_EQ(std::string("prod"), gw0.match_scope);
+    CASE_EXPECT_TRUE(gw0.match_hosts.end() != gw0.match_hosts.find("host-a"));
+    CASE_EXPECT_TRUE(gw0.match_hosts.end() != gw0.match_hosts.find("host-b"));
+    CASE_EXPECT_TRUE(gw0.match_namespaces.end() != gw0.match_namespaces.find("game"));
+    // match_labels 同样只保留 inherited_labels 声明的标签
+    CASE_EXPECT_EQ(static_cast<size_t>(1), gw0.match_labels.size());
+    auto gw_label_iter = gw0.match_labels.find("zone");
+    CASE_EXPECT_TRUE(gw_label_iter != gw0.match_labels.end() && gw_label_iter->second == "cn-east");
+    CASE_EXPECT_TRUE(gw0.match_labels.end() == gw0.match_labels.find("not_inherited"));
+
+    const auto &gw1 = bus_conf.gateway[1];
+    CASE_EXPECT_EQ(std::string("ipv4://10.0.0.2:21711"), gw1.address);
+    CASE_EXPECT_TRUE(gw1.match_scope.empty());
+    CASE_EXPECT_TRUE(gw1.match_hosts.empty());
+    CASE_EXPECT_TRUE(gw1.match_namespaces.empty());
+    CASE_EXPECT_TRUE(gw1.match_labels.empty());
   }
 }

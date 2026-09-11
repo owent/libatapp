@@ -54,17 +54,21 @@ message atapp_area {
 message atapp_gateway {
   string address = 1 [(atframework.atapp.protocol.CONFIGURE) = { enable_expression: true }];
 
-  repeated string match_hosts = 11;  // match atapp_configure.hostname with "In" operator
+  // match atapp_metadata.scope with "Equal" operator
+  string match_scope = 10 [(atframework.atapp.protocol.CONFIGURE) = { enable_expression: true }];
+
+  // match atapp_configure.hostname with "In" operator
+  repeated string match_hosts = 11 [(atframework.atapp.protocol.CONFIGURE) = { enable_expression: true }];
 
   // Just like NetworkPolicyPeer in
   // https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/api/networking/v1/generated.proto
   // See also LabelSelector in
   // https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto
-  repeated string match_namespaces = 21 [
-    (atframework.atapp.protocol.CONFIGURE) = { enable_expression: true }
-  ];  // match atapp_metadata.namespace_name with "In" operator
-  map<string, string> match_labels = 22
-      [(atframework.atapp.protocol.CONFIGURE) = { enable_expression: true }];  // match all labels
+  // match atapp_metadata.namespace_name with "In" operator
+  repeated string match_namespaces = 21 [(atframework.atapp.protocol.CONFIGURE) = { enable_expression: true }];
+
+  // match atapp_metadata.labels with "Contains" operator
+  map<string, string> match_labels = 22 [(atframework.atapp.protocol.CONFIGURE) = { enable_expression: true }];
 }
 
 enum ATAPP_ACCESS_DATA_ALGORITHM_TYPE {
@@ -226,7 +230,11 @@ message atbus_configure {
   uint64 access_token_max_number = 107;
   repeated string access_tokens = 108;
   repeated atapp_gateway gateways = 110;
+
   bool overwrite_listen_path = 111 [(atapp.protocol.CONFIGURE) = { default_value: "false" }];
+
+  // Which labels will be inherited by atbus from atapp_metadata.labels
+  repeated string inherited_labels = 113 [(atframework.atapp.protocol.CONFIGURE) = { enable_expression: true }];
 
   atbus_topology topology = 120;
 
@@ -504,16 +512,13 @@ message atapp_metadata {
   string kind = 2 [(atframework.atapp.protocol.CONFIGURE) = { enable_expression: true }];
   string group = 3 [(atframework.atapp.protocol.CONFIGURE) = { enable_expression: true }];
 
+  // Scope of listen addresses, usually set to cluster.metadata.uid or cluster name of Kubernetes cluster
+  string scope = 4 [(atframework.atapp.protocol.CONFIGURE) = { enable_expression: true }];
+
   // kubernetes ENV: ATAPP_METADATA_NAME: valueFrom: fieldRef: fieldPath: metadata.name
   string name = 11 [(atframework.atapp.protocol.CONFIGURE) = { enable_expression: true }];
   // kubernetes ENV: ATAPP_METADATA_NAMESPACE_NAME: valueFrom: fieldRef: fieldPath: metadata.namespace
   string namespace_name = 12 [(atframework.atapp.protocol.CONFIGURE) = { enable_expression: true }];
-  // kubernetes ENV: ATAPP_METADATA_UID: valueFrom: fieldRef: fieldPath: metadata.uid
-  string uid = 13 [(atframework.atapp.protocol.CONFIGURE) = { enable_expression: true }];
-
-  // `service_subset` is similar to Destination in
-  // https://istio.io/latest/docs/reference/config/networking/virtual-service/#Destination
-  string service_subset = 23 [(atframework.atapp.protocol.CONFIGURE) = { enable_expression: true }];
 
   // https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#syntax-and-character-set
   // https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/cri-api/pkg/apis/runtime/v1/api.proto

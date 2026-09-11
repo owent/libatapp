@@ -40,10 +40,10 @@
 #include <iomanip>
 #include <iostream>
 #include <limits>
+#include <list>
 #include <sstream>
 #include <unordered_set>
 #include <utility>
-#include <list>
 #if !(defined(ATFRAMEWORK_UTILS_THREAD_TLS_USE_PTHREAD) && ATFRAMEWORK_UTILS_THREAD_TLS_USE_PTHREAD) && \
     __cplusplus >= 201103L
 #  include <mutex>
@@ -266,7 +266,8 @@ static atbus::protocol::ATBUS_COMPRESSION_LEVEL convert_atbus_configure(protocol
   }
 }
 
-static void apply_atbus_configure(atbus::node::conf_t &to, const protocol::atbus_configure &from) {
+static void apply_atbus_configure(atbus::node::conf_t &to, const protocol::atbus_configure &from,
+                                  const protocol::atapp_metadata &metadata) {
   atbus::node::default_conf(&to);
 
   to.upstream_address = from.proxy();
@@ -289,6 +290,46 @@ static void apply_atbus_configure(atbus::node::conf_t &to, const protocol::atbus
   protobuf_to_chrono_set_duration(to.first_idle_timeout, from.first_idle_timeout());
   protobuf_to_chrono_set_duration(to.ping_interval, from.ping_interval());
   protobuf_to_chrono_set_duration(to.retry_interval, from.retry_interval());
+  protobuf_to_chrono_set_duration(to.max_retry_interval, from.reconnect_max_interval());
+
+  // network scope
+  to.scope = metadata.scope();
+  to.namespace_name = metadata.namespace_name();
+  to.node_labels.clear();
+  to.node_labels.reserve(
+      (std::min)(static_cast<size_t>(metadata.labels_size()), static_cast<size_t>(from.inherited_labels_size())));
+  std::unordered_set<std::string> inherited_labels_set;
+  inherited_labels_set.reserve(static_cast<size_t>(from.inherited_labels_size()));
+  for (const auto &label_k : from.inherited_labels()) {
+    inherited_labels_set.insert(label_k);
+  }
+  for (const auto &label_kv : metadata.labels()) {
+    if (inherited_labels_set.find(label_kv.first) != inherited_labels_set.end() && !label_kv.second.empty()) {
+      to.node_labels[label_kv.first] = label_kv.second;
+    }
+  }
+  to.gateway.clear();
+  to.gateway.reserve(static_cast<size_t>(from.gateways_size()));
+  for (const auto &gw : from.gateways()) {
+    if (gw.address().empty()) {
+      continue;
+    }
+    to.gateway.push_back(atbus::node::gateway_t());
+    auto &gw_cfg = to.gateway.back();
+    gw_cfg.address = gw.address();
+    gw_cfg.match_scope = gw.match_scope();
+    gw_cfg.match_hosts.reserve(static_cast<size_t>(gw.match_hosts().size()));
+    gw_cfg.match_hosts = {gw.match_hosts().begin(), gw.match_hosts().end()};
+    gw_cfg.match_namespaces.reserve(static_cast<size_t>(gw.match_namespaces().size()));
+    gw_cfg.match_namespaces = {gw.match_namespaces().begin(), gw.match_namespaces().end()};
+    gw_cfg.match_labels.reserve(
+        (std::min)(static_cast<size_t>(gw.match_labels().size()), static_cast<size_t>(from.inherited_labels_size())));
+    for (const auto &label_kv : gw.match_labels()) {
+      if (inherited_labels_set.find(label_kv.first) != inherited_labels_set.end() && !label_kv.second.empty()) {
+        gw_cfg.match_labels[label_kv.first] = label_kv.second;
+      }
+    }
+  }
 
   to.fault_tolerant = static_cast<size_t>(from.fault_tolerant());
   to.message_size = static_cast<size_t>(from.message_size());
@@ -1175,6 +1216,9 @@ LIBATAPP_MACRO_API int app::reload() {
       bus_node_->reload_compression(gsl::span<const atbus::protocol::ATBUS_COMPRESSION_ALGORITHM_TYPE>(
                                         conf_.bus_conf.compression_allow_algorithms),
                                     conf_.bus_conf.compression_level);
+      bus_node_->reload_self_endpoint(
+          conf_.bus_conf.scope, conf_.bus_conf.namespace_name, conf_.bus_conf.node_labels,
+          gsl::span<const atbus::node::gateway_t>{conf_.bus_conf.gateway.data(), conf_.bus_conf.gateway.size()});
     }
     if (atbus_connector_) {
       atbus_connector_->reload();
@@ -1687,6 +1731,18 @@ LIBATAPP_MACRO_API void app::set_group(gsl::string_view value) {
   conf_.metadata.set_group(value.data(), value.size());
 }
 
+LIBATAPP_MACRO_API void app::set_metadata_scope(gsl::string_view value) {
+  if (gsl::string_view(conf_.metadata.scope().c_str(), conf_.metadata.scope().size()) == value) {
+    return;
+  }
+
+  if (internal_module_service_discovery_) {
+    internal_module_service_discovery_->set_maybe_update_keepalive_discovery_metadata();
+  }
+
+  conf_.metadata.set_scope(value.data(), value.size());
+}
+
 LIBATAPP_MACRO_API void app::set_metadata_name(gsl::string_view value) {
   if (gsl::string_view(conf_.metadata.name().data(), conf_.metadata.name().size()) == value) {
     return;
@@ -1710,30 +1766,6 @@ LIBATAPP_MACRO_API void app::set_metadata_namespace_name(gsl::string_view value)
   }
 
   conf_.metadata.set_namespace_name(value.data(), value.size());
-}
-
-LIBATAPP_MACRO_API void app::set_metadata_uid(gsl::string_view value) {
-  if (gsl::string_view(conf_.metadata.uid().c_str(), conf_.metadata.uid().size()) == value) {
-    return;
-  }
-
-  if (internal_module_service_discovery_) {
-    internal_module_service_discovery_->set_maybe_update_keepalive_discovery_metadata();
-  }
-
-  conf_.metadata.set_uid(value.data(), value.size());
-}
-
-LIBATAPP_MACRO_API void app::set_metadata_service_subset(gsl::string_view value) {
-  if (gsl::string_view(conf_.metadata.service_subset().c_str(), conf_.metadata.service_subset().size()) == value) {
-    return;
-  }
-
-  if (internal_module_service_discovery_) {
-    internal_module_service_discovery_->set_maybe_update_keepalive_discovery_metadata();
-  }
-
-  conf_.metadata.set_service_subset(value.data(), value.size());
 }
 
 LIBATAPP_MACRO_API void app::set_metadata_label(gsl::string_view key, gsl::string_view value) {
@@ -2651,11 +2683,15 @@ LIBATAPP_MACRO_API bool app::match_gateway(const atapp::protocol::atapp_gateway 
     return false;
   }
 
+  if (!checked.match_scope().empty() && !match_gateway_scope(checked)) {
+    return false;
+  }
+
   if (checked.match_hosts_size() > 0 && !match_gateway_hosts(checked)) {
     return false;
   }
 
-  if (checked.match_namespaces_size() && !match_gateway_namespace(checked)) {
+  if (checked.match_namespaces_size() > 0 && !match_gateway_namespace(checked)) {
     return false;
   }
 
@@ -2991,7 +3027,7 @@ int app::apply_configure() {
   }
 
   // atbus configure
-  apply_atbus_configure(conf_.bus_conf, conf_.origin.bus());
+  apply_atbus_configure(conf_.bus_conf, conf_.origin.bus(), conf_.metadata);
 
   // windows minidump configure
   setup_windows_minidump(conf_.origin.debug(), conf_.origin.name());
@@ -3711,6 +3747,17 @@ LIBATAPP_MACRO_API void app::trigger_event_on_discovery_event(etcd_discovery_act
       FWLOGINFO("app {}({}, type={}:{}) got a PUT discovery event({}({}, type={}:{}))", get_app_name(), get_app_id(),
                 get_type_id(), get_type_name(), discovery_info.name(), discovery_info.id(), discovery_info.type_id(),
                 discovery_info.type_name());
+      if (0 != discovery_info.id()) {
+        auto *ep = get_endpoint(discovery_info.id());
+        if (ep != nullptr) {
+          ep->update_discovery(node);
+        }
+      } else {
+        auto *ep = get_endpoint(discovery_info.name());
+        if (ep != nullptr) {
+          ep->update_discovery(node);
+        }
+      }
     } else {
       FWLOGINFO("app {}({}, type={}:{}) got a DELETE discovery event({}({}, type={}:{})", get_app_name(), get_app_id(),
                 get_type_id(), get_type_name(), discovery_info.name(), discovery_info.id(), discovery_info.type_id(),
@@ -4324,6 +4371,14 @@ void app::print_help() {
            << atfw::util::cli::shell_font_style::SHELL_FONT_SPEC_BOLD << "Custom command help:" << '\n';
     shls() << get_command_manager()->get_help_msg() << '\n';
   }
+}
+
+bool app::match_gateway_scope(const atapp::protocol::atapp_gateway &checked) const noexcept {
+  if (checked.match_scope().empty()) {
+    return true;
+  }
+
+  return checked.match_scope() == get_metadata().scope();
 }
 
 bool app::match_gateway_hosts(const atapp::protocol::atapp_gateway &checked) noexcept {
@@ -5450,6 +5505,8 @@ int app::send_last_command(ev_loop_t *ev_loop) {
   bool is_sync_channel = false;
   atbus::channel::channel_address_t use_addr;
 
+  // 发送指令的节点必须加载和目标节点相同的配置，并且部署在同一机器上。所以scope、namespace、label等都是相同的
+  // 这里就不用再根据这些判定一次连接可达性
   for (int i = 0; i < conf_.origin.bus().listen_size(); ++i) {
     atbus::channel::channel_address_t parsed_addr;
     make_address(conf_.origin.bus().listen(i), parsed_addr);

@@ -372,11 +372,9 @@ class app {
   LIBATAPP_MACRO_API void set_kind(gsl::string_view value);
   LIBATAPP_MACRO_API void set_group(gsl::string_view value);
 
+  LIBATAPP_MACRO_API void set_metadata_scope(gsl::string_view value);
   LIBATAPP_MACRO_API void set_metadata_name(gsl::string_view value);
   LIBATAPP_MACRO_API void set_metadata_namespace_name(gsl::string_view value);
-  LIBATAPP_MACRO_API void set_metadata_uid(gsl::string_view value);
-
-  LIBATAPP_MACRO_API void set_metadata_service_subset(gsl::string_view value);
 
   LIBATAPP_MACRO_API void set_metadata_label(gsl::string_view key, gsl::string_view value);
 
@@ -625,6 +623,7 @@ class app {
   void print_help();
 
   static bool match_gateway_hosts(const atapp::protocol::atapp_gateway &checked) noexcept;
+  bool match_gateway_scope(const atapp::protocol::atapp_gateway &checked) const noexcept;
   bool match_gateway_namespace(const atapp::protocol::atapp_gateway &checked) const noexcept;
   bool match_gateway_labels(const atapp::protocol::atapp_gateway &checked) const noexcept;
 

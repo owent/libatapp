@@ -235,8 +235,8 @@ static bool is_empty(const etcd_discovery_set::metadata_type &metadata) noexcept
   }
 
   return metadata.api_version().empty() && metadata.kind().empty() && metadata.group().empty() &&
-         metadata.namespace_name().empty() && metadata.name().empty() && metadata.uid().empty() &&
-         metadata.service_subset().empty() && 0 == metadata.labels_size();
+         metadata.namespace_name().empty() && metadata.name().empty() && metadata.scope().empty() &&
+         0 == metadata.labels_size();
 }
 
 static bool node_equal(const etcd_discovery_node::ptr_t &l, const etcd_discovery_node::ptr_t &r) noexcept {
@@ -271,6 +271,16 @@ LIBATAPP_MACRO_API etcd_discovery_node::~etcd_discovery_node() {
 LIBATAPP_MACRO_API void etcd_discovery_node::copy_from(const atapp::protocol::atapp_discovery &input,
                                                        const node_version &version, uintptr_t context_addr) {
   node_info_.CopyFrom(input);
+
+  // listen 回退地址的隔离规则与 libatbus 注册时通告的一致: 隔离 scope 和 namespace
+  // node_info_ 只会在这里整体替换, 匹配规则只需设置一次
+  ingress_for_listen_.Clear();
+  if (!node_info_.metadata().scope().empty()) {
+    ingress_for_listen_.set_match_scope(node_info_.metadata().scope());
+  }
+  if (!node_info_.metadata().namespace_name().empty()) {
+    ingress_for_listen_.add_match_namespaces(node_info_.metadata().namespace_name());
+  }
 
   name_hash_ = consistent_hash_calc(
       gsl::span<const unsigned char>{reinterpret_cast<const unsigned char *>(input.name().data()), input.name().size()},
@@ -347,11 +357,12 @@ LIBATAPP_MACRO_API const atapp::protocol::atapp_gateway &etcd_discovery_node::ne
     if (ingress_index_ >= node_info_.listen_size()) {
       ingress_index_ %= node_info_.listen_size();
     }
+    // 匹配规则已在 copy_from 中设置, 这里只需轮询替换地址
     ingress_for_listen_.set_address(node_info_.listen(ingress_index_++));
     return ingress_for_listen_;
   }
 
-  // if none of gateways or listen found, ingress_for_listen_ will always be empty
+  // 未配置 gateways 和 listen 时返回不带地址的对象, 调用方按 get_ingress_size 守卫, 不会走到这里
   return ingress_for_listen_;
 }
 
@@ -379,20 +390,16 @@ etcd_discovery_set::metadata_hash_type::operator()(const metadata_type &metadata
     consistent_hash_combine(consistent_hash_to_span(metadata.group()), hash_value);
   }
 
+  if (!metadata.scope().empty()) {
+    consistent_hash_combine(consistent_hash_to_span(metadata.scope()), hash_value);
+  }
+
   if (!metadata.name().empty()) {
     consistent_hash_combine(consistent_hash_to_span(metadata.name()), hash_value);
   }
 
   if (!metadata.namespace_name().empty()) {
     consistent_hash_combine(consistent_hash_to_span(metadata.namespace_name()), hash_value);
-  }
-
-  if (!metadata.uid().empty()) {
-    consistent_hash_combine(consistent_hash_to_span(metadata.uid()), hash_value);
-  }
-
-  if (!metadata.service_subset().empty()) {
-    consistent_hash_combine(consistent_hash_to_span(metadata.service_subset()), hash_value);
   }
 
   std::vector<std::pair<gsl::string_view, gsl::string_view>> kvs;
@@ -424,19 +431,15 @@ LIBATAPP_MACRO_API bool etcd_discovery_set::metadata_equal_type::operator()(cons
     return false;
   }
 
+  if (l.scope().size() != r.scope().size()) {
+    return false;
+  }
+
   if (l.namespace_name().size() != r.namespace_name().size()) {
     return false;
   }
 
   if (l.name().size() != r.name().size()) {
-    return false;
-  }
-
-  if (l.uid().size() != r.uid().size()) {
-    return false;
-  }
-
-  if (l.service_subset().size() != r.service_subset().size()) {
     return false;
   }
 
@@ -456,19 +459,15 @@ LIBATAPP_MACRO_API bool etcd_discovery_set::metadata_equal_type::operator()(cons
     return false;
   }
 
+  if (l.scope() != r.scope()) {
+    return false;
+  }
+
   if (l.namespace_name() != r.namespace_name()) {
     return false;
   }
 
   if (l.name() != r.name()) {
-    return false;
-  }
-
-  if (l.uid() != r.uid()) {
-    return false;
-  }
-
-  if (l.service_subset() != r.service_subset()) {
     return false;
   }
 
@@ -503,19 +502,15 @@ LIBATAPP_MACRO_API bool etcd_discovery_set::metadata_equal_type::filter(const me
     return false;
   }
 
+  if (!rule.scope().empty() && rule.scope() != metadata.scope()) {
+    return false;
+  }
+
   if (!rule.namespace_name().empty() && rule.namespace_name() != metadata.namespace_name()) {
     return false;
   }
 
   if (!rule.name().empty() && rule.name() != metadata.name()) {
-    return false;
-  }
-
-  if (!rule.uid().empty() && rule.uid() != metadata.uid()) {
-    return false;
-  }
-
-  if (!rule.service_subset().empty() && rule.service_subset() != metadata.service_subset()) {
     return false;
   }
 

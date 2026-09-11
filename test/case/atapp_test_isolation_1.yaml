@@ -1,37 +1,41 @@
 # Copyright 2026 atframework
-# B group - direct connection test: peer node 1
-# Topology: node1(0x201) --proxy--> upstream(0x203) <--proxy-- node2(0x202)
-# allow_direct_connection: true, so node1 and node2 are kSameUpstreamPeer
+# 集群隔离配置映射测试: metadata/bus.inherited_labels/bus.gateways -> atbus conf
 atapp:
-  id: 0x00000201
+  id: 0x00000211
   id_mask: 8.8.8.8
-  name: "direct-test-node1"
+  name: "isolation-test-node"
   type_id: 1
-  type_name: "direct-test"
+  type_name: "isolation-test"
 
   metadata:
+    scope: "prod"
+    namespace_name: "game"
     labels:
-      zone: "east"
+      zone: "cn-east"
+      deployment.environment: "prod"
+      not_inherited: "skip-me"
 
   bus:
-    listen: "ipv4://127.0.0.1:21701"
-    proxy: "ipv4://127.0.0.1:21703"
+    listen: "ipv4://127.0.0.1:21711"
     backlog: 256
     inherited_labels:
       - "zone"
-    access_token_max_number: 5
-    overwrite_listen_path: false
-    topology:
-      rule:
-        allow_direct_connection: true
-        require_same_upstream: false
+      - "deployment.environment"
+    gateways:
+      - address: "ipv4://10.0.0.1:21711"
+        match_scope: "prod"
+        match_hosts:
+          - "host-a"
+          - "host-b"
+        match_namespaces:
+          - "game"
+        match_labels:
+          zone: "cn-east"
+          not_inherited: "skip-me"
+      - address: "ipv4://10.0.0.2:21711"
     first_idle_timeout: 3600s
     ping_interval: 3600s
     retry_interval: 3s
-    reconnect_start_interval: 2s
-    reconnect_max_interval: 16s
-    reconnect_max_try_times: 3
-    lost_topology_timeout: 32s
     fault_tolerant: 3
     message_size: 64KB
     receive_buffer_size: 1MB

@@ -586,12 +586,12 @@ CASE_TEST(atapp_configure, expression_yaml) {
   CASE_EXPECT_EQ("ns_override", app_cfg.metadata().namespace_name());
   CASE_MSG_INFO() << "metadata.namespace_name = " << app_cfg.metadata().namespace_name() << '\n';
 
-  // metadata.uid: "${ATAPP_EXPR_TEST_MISSING_VAR:+should_not_appear}" -> ""
-  CASE_EXPECT_EQ("", app_cfg.metadata().uid());
+  // metadata.kind: "${ATAPP_EXPR_TEST_MISSING_VAR:+should_not_appear}" -> ""
+  CASE_EXPECT_EQ("", app_cfg.metadata().kind());
 
-  // metadata.service_subset: "${...:-${...:-multi_level_default}}" -> "multi_level_default" (multi-level nested)
-  CASE_EXPECT_EQ("multi_level_default", app_cfg.metadata().service_subset());
-  CASE_MSG_INFO() << "metadata.service_subset = " << app_cfg.metadata().service_subset() << '\n';
+  // metadata.scope: "${...:-${...:-multi_level_default}}" -> "multi_level_default" (multi-level nested)
+  CASE_EXPECT_EQ("multi_level_default", app_cfg.metadata().scope());
+  CASE_MSG_INFO() << "metadata.scope = " << app_cfg.metadata().scope() << '\n';
 
   // metadata.name: "${ATAPP_EXPR_TEST_NESTED_${ATAPP_EXPR_TEST_SUFFIX}}" -> "alpha_nested_value"
   CASE_EXPECT_EQ("alpha_nested_value", app_cfg.metadata().name());
@@ -672,11 +672,11 @@ CASE_TEST(atapp_configure, expression_conf) {
   // metadata.namespace_name: "${ATAPP_EXPR_TEST_NAME:+ns_override}" -> "ns_override"
   CASE_EXPECT_EQ("ns_override", app_cfg.metadata().namespace_name());
 
-  // metadata.uid: "${ATAPP_EXPR_TEST_MISSING_VAR:+should_not_appear}" -> ""
-  CASE_EXPECT_EQ("", app_cfg.metadata().uid());
+  // metadata.kind: "${ATAPP_EXPR_TEST_MISSING_VAR:+should_not_appear}" -> ""
+  CASE_EXPECT_EQ("", app_cfg.metadata().kind());
 
-  // metadata.service_subset: "${...:-${...:-multi_level_default}}" -> "multi_level_default"
-  CASE_EXPECT_EQ("multi_level_default", app_cfg.metadata().service_subset());
+  // metadata.scope: "${...:-${...:-multi_level_default}}" -> "multi_level_default"
+  CASE_EXPECT_EQ("multi_level_default", app_cfg.metadata().scope());
 
   // metadata.name: "${ATAPP_EXPR_TEST_NESTED_${ATAPP_EXPR_TEST_SUFFIX}}" -> "beta_nested_value"
   CASE_EXPECT_EQ("beta_nested_value", app_cfg.metadata().name());

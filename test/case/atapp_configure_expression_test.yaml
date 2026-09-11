@@ -18,11 +18,11 @@ atapp:
     # Test ${VAR:+word} with existing variable — should use word
     namespace_name: "${ATAPP_EXPR_TEST_NAME:+ns_override}"
     # Test ${VAR:+word} with missing variable — should be empty
-    uid: "${ATAPP_EXPR_TEST_MISSING_VAR:+should_not_appear}"
+    kind: "${ATAPP_EXPR_TEST_MISSING_VAR:+should_not_appear}"
     # Test nested expression: ${OUTER_${INNER}}
     name: "${ATAPP_EXPR_TEST_NESTED_${ATAPP_EXPR_TEST_SUFFIX}}"
     # Test multi-level nested default: ${A:-${B:-default}}
-    service_subset: "${ATAPP_EXPR_TEST_MISSING1:-${ATAPP_EXPR_TEST_MISSING2:-multi_level_default}}"
+    scope: "${ATAPP_EXPR_TEST_MISSING1:-${ATAPP_EXPR_TEST_MISSING2:-multi_level_default}}"
     labels:
       # Map keys and values should also support expressions
       "${ATAPP_EXPR_TEST_LABEL_KEY}": "${ATAPP_EXPR_TEST_LABEL_VALUE}"

@@ -1094,3 +1094,181 @@ CASE_TEST(atapp_direct_connect, direct_prefer_direct_wait_discovery) {
   }
 #endif
 }
+
+// ============================================================
+// B.9: direct_scope_mismatch_skip_connect
+// node1(prod) and node2(other) are in different scopes.
+// The scope mismatch must be detected before dialing: neither side may
+// establish any atbus connection to the other.
+// ============================================================
+CASE_TEST(atapp_direct_connect, direct_scope_mismatch_skip_connect) {
+  reset_direct_test_context();
+
+  direct_three_node_apps apps;
+  if (!apps.init_all()) {
+    return;
+  }
+
+  // 部署到不同 scope (等效于 yaml 中配置 metadata.scope)
+  apps.node1.set_metadata_scope("prod");
+  apps.node2.set_metadata_scope("other");
+
+  apps.wait_for_upstream_connections();
+  apps.inject_all_discovery();
+  apps.setup_topology();
+  apps.create_endpoints();
+
+  // 给错误实现留出拨号时间: 若未跳过不可达地址, loopback 上注册流程会立即完成
+  apps.pump_until([]() { return false; }, std::chrono::seconds(3));
+
+  // 不可达判定发生在发起连接之前: 双方的 atbus 层都不得存在对端的 endpoint
+  auto bus1 = apps.node1.get_bus_node();
+  auto bus2 = apps.node2.get_bus_node();
+  CASE_EXPECT_TRUE(bus1 != nullptr);
+  CASE_EXPECT_TRUE(bus2 != nullptr);
+  if (bus1) {
+    CASE_EXPECT_TRUE(bus1->get_endpoint(apps.node2.get_app_id()) == nullptr);
+  }
+  if (bus2) {
+    CASE_EXPECT_TRUE(bus2->get_endpoint(apps.node1.get_app_id()) == nullptr);
+  }
+}
+
+// ============================================================
+// B.10: direct_scope_match_connect
+// node1 and node2 share scope "prod". The direct connection must be
+// established with scope rules advertised and checked at every layer.
+// ============================================================
+CASE_TEST(atapp_direct_connect, direct_scope_match_connect) {
+  reset_direct_test_context();
+
+  direct_three_node_apps apps;
+  if (!apps.init_all()) {
+    return;
+  }
+
+  // 等效于 yaml 中配置 metadata.scope="prod" 并生效到 atbus 配置
+  apps.node1.set_metadata_scope("prod");
+  apps.node2.set_metadata_scope("prod");
+  for (auto *app : {&apps.node1, &apps.node2}) {
+    auto bus = app->get_bus_node();
+    CASE_EXPECT_TRUE(bus != nullptr);
+    if (bus) {
+      const auto &bus_conf = bus->get_conf();
+      bus->reload_self_endpoint(app->get_metadata().scope(), bus_conf.namespace_name, bus_conf.node_labels,
+                                gsl::span<const atbus::node::gateway_t>{bus_conf.gateway.data(),
+                                                                        bus_conf.gateway.size()});
+    }
+  }
+
+  apps.full_setup_and_connect();
+
+  // scope 匹配时直连必须成功: 双方 atbus 层都存在对端的 endpoint
+  auto bus1 = apps.node1.get_bus_node();
+  auto bus2 = apps.node2.get_bus_node();
+  CASE_EXPECT_TRUE(bus1 != nullptr);
+  CASE_EXPECT_TRUE(bus2 != nullptr);
+  if (bus1) {
+    CASE_EXPECT_TRUE(bus1->get_endpoint(apps.node2.get_app_id()) != nullptr);
+  }
+  if (bus2) {
+    CASE_EXPECT_TRUE(bus2->get_endpoint(apps.node1.get_app_id()) != nullptr);
+  }
+}
+
+// ============================================================
+// B.11: direct_discovery_update_refresh_bus_endpoint
+// A discovery update must refresh the atbus endpoint's scope/namespace/
+// labels/gateways. Labels and gateway match_labels keep only inherited
+// labels; a peer without configured gateways gets listen-derived rules.
+// ============================================================
+CASE_TEST(atapp_direct_connect, direct_discovery_update_refresh_bus_endpoint) {
+  reset_direct_test_context();
+
+  direct_three_node_apps apps;
+  if (!apps.init_all()) {
+    return;
+  }
+  apps.full_setup_and_connect();
+
+  auto bus1 = apps.node1.get_bus_node();
+  CASE_EXPECT_TRUE(bus1 != nullptr);
+  auto *atapp_ep = apps.node1.get_endpoint(apps.node2.get_app_id());
+  CASE_EXPECT_TRUE(atapp_ep != nullptr);
+  if (!bus1 || nullptr == atapp_ep) {
+    return;
+  }
+
+  // 基线: 直连建立后 atbus endpoint 已存在, 身份信息来自注册包(direct 配置无 scope)
+  CASE_EXPECT_TRUE(bus1->get_endpoint(apps.node2.get_app_id()) != nullptr);
+
+  // discovery 更新: 对端上报新的身份信息和 gateway 配置
+  auto updated = atfw::util::memory::make_strong_rc<atapp::etcd_discovery_node>();
+  {
+    atapp::protocol::atapp_discovery info;
+    apps.node2.pack(info);
+    info.mutable_metadata()->set_scope("scope-x");
+    info.mutable_metadata()->set_namespace_name("ns-x");
+    (*info.mutable_metadata()->mutable_labels())["zone"] = "west";
+    (*info.mutable_metadata()->mutable_labels())["extra"] = "skip";
+    auto *gw = info.add_gateways();
+    gw->set_address("ipv4://127.0.0.1:29999");
+    gw->set_match_scope("scope-x");
+    (*gw->mutable_match_labels())["zone"] = "west";
+    (*gw->mutable_match_labels())["extra"] = "skip";
+    updated->copy_from(info, atapp::etcd_discovery_node::node_version(), 0);
+  }
+  atapp_ep->update_discovery(updated);
+
+  const auto *bus_ep = bus1->get_endpoint(apps.node2.get_app_id());
+  CASE_EXPECT_TRUE(bus_ep != nullptr);
+  if (nullptr == bus_ep) {
+    return;
+  }
+
+  // 身份信息以 discovery 为准刷新
+  CASE_EXPECT_EQ(std::string("scope-x"), bus_ep->get_scope());
+  CASE_EXPECT_EQ(std::string("ns-x"), bus_ep->get_namespace());
+
+  // labels 只保留本端 inherited_labels 声明的 zone
+  CASE_EXPECT_EQ(static_cast<size_t>(1), bus_ep->get_labels().size());
+  {
+    auto label_iter = bus_ep->get_labels().find("zone");
+    CASE_EXPECT_TRUE(label_iter != bus_ep->get_labels().end() && label_iter->second == "west");
+  }
+
+  // gateway 同步刷新, match_labels 同样只保留继承标签
+  CASE_EXPECT_EQ(static_cast<size_t>(1), bus_ep->get_gateway().size());
+  if (!bus_ep->get_gateway().empty()) {
+    const auto &gw = bus_ep->get_gateway()[0];
+    CASE_EXPECT_EQ(std::string("ipv4://127.0.0.1:29999"), gw.address);
+    CASE_EXPECT_EQ(std::string("scope-x"), gw.match_scope);
+    CASE_EXPECT_EQ(static_cast<size_t>(1), gw.match_labels.size());
+    auto label_iter = gw.match_labels.find("zone");
+    CASE_EXPECT_TRUE(label_iter != gw.match_labels.end() && label_iter->second == "west");
+    CASE_EXPECT_TRUE(gw.match_labels.end() == gw.match_labels.find("extra"));
+  }
+
+  // discovery 更新: 对端不再配置 gateway, 必须按 listen 地址合成隔离规则
+  auto listen_only = atfw::util::memory::make_strong_rc<atapp::etcd_discovery_node>();
+  atapp::protocol::atapp_discovery listen_info;
+  apps.node2.pack(listen_info);
+  listen_info.mutable_metadata()->set_scope("scope-y");
+  listen_info.mutable_metadata()->set_namespace_name("ns-y");
+  listen_only->copy_from(listen_info, atapp::etcd_discovery_node::node_version(), 0);
+  atapp_ep->update_discovery(listen_only);
+
+  bus_ep = bus1->get_endpoint(apps.node2.get_app_id());
+  CASE_EXPECT_TRUE(bus_ep != nullptr);
+  if (nullptr == bus_ep) {
+    return;
+  }
+  CASE_EXPECT_EQ(std::string("scope-y"), bus_ep->get_scope());
+  CASE_EXPECT_EQ(static_cast<size_t>(listen_info.listen_size()), bus_ep->get_gateway().size());
+  for (int i = 0; i < listen_info.listen_size() && static_cast<size_t>(i) < bus_ep->get_gateway().size(); ++i) {
+    const auto &gw = bus_ep->get_gateway()[static_cast<size_t>(i)];
+    CASE_EXPECT_EQ(listen_info.listen(i), gw.address);
+    CASE_EXPECT_EQ(std::string("scope-y"), gw.match_scope);
+    CASE_EXPECT_TRUE(gw.match_namespaces.end() != gw.match_namespaces.find("ns-y"));
+  }
+}

@@ -76,6 +76,11 @@ add_custom_command(
     "Generate ${PROJECT_LIBATAPP_GENERATED_DIR}/include/atframe/atapp_conf.pb.h and ${PROJECT_LIBATAPP_GENERATED_DIR}/src/atapp_conf.pb.cc"
 )
 
+set_property(
+  SOURCE ${PROJECT_LIBATAPP_SRC_LIST}
+  APPEND
+  PROPERTY OBJECT_DEPENDS "${PROJECT_LIBATAPP_GENERATED_DIR}/include/atframe/atapp_conf.pb.h")
+
 if(NOT DEFINED LIBATAPP_MACRO_PROTOCOL_USE_DYNAMIC_LIBRARY)
   if(BUILD_SHARED_LIBS OR ATFRAMEWORK_USE_DYNAMIC_LIBRARY)
     if(DEFINED ATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_PROTOBUF_ALLOW_SHARED_LIBS)
@@ -207,4 +212,3 @@ install(
 install(FILES "${PROJECT_LIBATAPP_GENERATED_DIR}/include/atframe/atapp_conf.pb.h"
               "${PROJECT_LIBATAPP_GENERATED_DIR}/include/atframe/atapp_config.h"
         DESTINATION "${ATFRAMEWORK_INSTALL_INCLUDEDIR}/atframe/")
-

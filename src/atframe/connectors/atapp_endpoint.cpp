@@ -133,9 +133,84 @@ LIBATAPP_MACRO_API void atapp_endpoint::update_discovery(const etcd_discovery_no
 
   discovery_ = discovery;
 
-  if (discovery) {
-    FWLOGINFO("update atapp endpoint {} with {}({})", reinterpret_cast<const void *>(this),
-              discovery->get_discovery_info().id(), discovery->get_discovery_info().name());
+  if (!discovery) {
+    return;
+  }
+
+  FWLOGINFO("update atapp endpoint {} with {}({})", reinterpret_cast<const void *>(this),
+            discovery->get_discovery_info().id(), discovery->get_discovery_info().name());
+
+  if (owner_->get_bus_node() && discovery->get_discovery_info().id() != 0) {
+    auto *bus_ep = owner_->get_bus_node()->get_endpoint(discovery->get_discovery_info().id());
+    if (bus_ep != nullptr) {
+      std::unordered_map<std::string, std::string> labels;
+      std::vector<atbus::node::gateway_t> gateways;
+      const auto &metadata = discovery->get_discovery_info().metadata();
+      std::unordered_set<std::string> inherited_labels_set;
+      inherited_labels_set.reserve(static_cast<size_t>(owner_->get_origin_configure().bus().inherited_labels().size()));
+      for (const auto &label_k : owner_->get_origin_configure().bus().inherited_labels()) {
+        inherited_labels_set.insert(label_k);
+        auto iter = metadata.labels().find(label_k);
+        if (iter != metadata.labels().end() && !iter->second.empty()) {
+          labels[label_k] = iter->second;
+        }
+      }
+
+      gateways.reserve(static_cast<size_t>(discovery->get_discovery_info().gateways_size()));
+      for (const auto &gateway : discovery->get_discovery_info().gateways()) {
+        if (gateway.address().empty()) {
+          continue;
+        }
+        gateways.push_back(atbus::node::gateway_t());
+        auto &gw = gateways.back();
+
+        gw.address = gateway.address();
+        gw.match_scope = gateway.match_scope();
+        if (gateway.match_namespaces_size() > 0) {
+          gw.match_namespaces.reserve(static_cast<size_t>(gateway.match_namespaces_size()));
+          for (const auto &ns : gateway.match_namespaces()) {
+            gw.match_namespaces.insert(ns);
+          }
+        }
+        if (gateway.match_hosts_size() > 0) {
+          gw.match_hosts.reserve(static_cast<size_t>(gateway.match_hosts_size()));
+          for (const auto &host : gateway.match_hosts()) {
+            gw.match_hosts.insert(host);
+          }
+        }
+        if (gateway.match_labels_size() > 0) {
+          // 与 apply_atbus_configure 保持一致: 只按继承标签过滤, 对端只会用继承标签来匹配
+          gw.match_labels.reserve(
+              (std::min)(static_cast<size_t>(gateway.match_labels_size()), inherited_labels_set.size()));
+          for (const auto &label_kv : gateway.match_labels()) {
+            if (inherited_labels_set.find(label_kv.first) != inherited_labels_set.end() && !label_kv.second.empty()) {
+              gw.match_labels.emplace(label_kv.first, label_kv.second);
+            }
+          }
+        }
+      }
+
+      if (gateways.empty()) {
+        // 未配置 gateway 的对端注册时通告的是 listen 地址, 这里按同样的规则合成匹配条件
+        gateways.reserve(static_cast<size_t>(discovery->get_discovery_info().listen_size()));
+        for (const auto &listen_address : discovery->get_discovery_info().listen()) {
+          if (listen_address.empty()) {
+            continue;
+          }
+          gateways.push_back(atbus::node::gateway_t());
+          auto &gw = gateways.back();
+
+          gw.address = listen_address;
+          gw.match_scope = metadata.scope();
+          if (!metadata.namespace_name().empty()) {
+            gw.match_namespaces.insert(metadata.namespace_name());
+          }
+        }
+      }
+
+      bus_ep->reload(metadata.scope(), metadata.namespace_name(), labels,
+                     gsl::span<const atbus::node::gateway_t>(gateways.data(), gateways.size()));
+    }
   }
 }
 
