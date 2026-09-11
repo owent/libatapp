@@ -127,13 +127,27 @@ LIBATAPP_MACRO_API const etcd_discovery_node::ptr_t &atapp_endpoint::get_discove
 }
 
 LIBATAPP_MACRO_API void atapp_endpoint::update_discovery(const etcd_discovery_node::ptr_t &discovery) noexcept {
-  // 服务发现对已有节点的内容变更会原地复用同一实例, 不能按指针相等提前返回;
-  // 调用方(watcher PUT 事件)已按内容变化过滤, 重复刷新只重做廉价的元数据赋值
   discovery_ = discovery;
 
   if (!discovery) {
+    discovery_applied_version_ = etcd_data_version();
     return;
   }
+
+  // 服务发现对已有节点的内容变更会原地复用同一实例, 不能按指针相等提前返回;
+  // 但 mutable_endpoint 的发送路径每条消息都会走到这里, 稳态下同版本必须 O(1) 跳过。
+  // 数据来自 etcd, 内容变化必然推进 revision, 同键的版本三元组不变即内容不变(与实例无关);
+  // 无版本(本地构造)的节点保守起见不跳过, 因为无法区分内容是否已变
+  const etcd_data_version &current_version = discovery->get_version();
+  if ((0 != current_version.create_revision || 0 != current_version.modify_revision ||
+       0 != current_version.version) &&
+      discovery_applied_version_.create_revision == current_version.create_revision &&
+      discovery_applied_version_.modify_revision == current_version.modify_revision &&
+      discovery_applied_version_.version == current_version.version) {
+    return;
+  }
+
+  discovery_applied_version_ = current_version;
 
   FWLOGINFO("update atapp endpoint {} with {}({})", reinterpret_cast<const void *>(this),
             discovery->get_discovery_info().id(), discovery->get_discovery_info().name());

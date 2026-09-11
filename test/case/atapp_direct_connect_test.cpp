@@ -1277,4 +1277,25 @@ CASE_TEST(atapp_direct_connect, direct_discovery_update_refresh_bus_endpoint) {
     CASE_EXPECT_EQ(std::string("scope-y"), gw.match_scope);
     CASE_EXPECT_TRUE(gw.match_namespaces.end() != gw.match_namespaces.find("ns-y"));
   }
+
+  // 生产路径完整形态: 同实例 + 版本推进 + 内容变更, 版本不同则必须刷新
+  {
+    atapp::protocol::atapp_discovery versioned_info;
+    apps.node2.pack(versioned_info);
+    versioned_info.mutable_metadata()->set_scope("scope-z");
+    auto *gw = versioned_info.add_gateways();
+    gw->set_address("ipv4://127.0.0.1:29998");
+    atapp::etcd_discovery_node::node_version bumped_version;
+    bumped_version.create_revision = 10;
+    bumped_version.modify_revision = 12;
+    bumped_version.version = 3;
+    updated->copy_from(versioned_info, bumped_version, 0);
+  }
+  atapp_ep->update_discovery(updated);
+  CASE_EXPECT_EQ(std::string("scope-z"), bus_ep->get_scope());
+  CASE_EXPECT_EQ(static_cast<size_t>(1), bus_ep->get_gateway().size());
+  if (!bus_ep->get_gateway().empty()) {
+    const auto versioned_gateways = bus_ep->get_gateway();
+    CASE_EXPECT_EQ(std::string("ipv4://127.0.0.1:29998"), versioned_gateways[0].address);
+  }
 }

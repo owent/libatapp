@@ -115,6 +115,9 @@ class atapp_endpoint {
   weak_ptr_t watcher_;
   handle_set_t refer_connections_;
   etcd_discovery_node::ptr_t discovery_;
+  // 上次成功应用到 bus endpoint 的 discovery 版本, 同版本跳过重复刷新(发送热路径)。
+  // etcd 保证同键同版本三元组内容相同, 无需再比较实例
+  etcd_data_version discovery_applied_version_;
 
   std::list<pending_message_t> pending_message_;
   size_t pending_message_size_;
