@@ -1240,7 +1240,8 @@ CASE_TEST(atapp_direct_connect, direct_discovery_update_refresh_bus_endpoint) {
   // gateway 同步刷新, match_labels 同样只保留继承标签
   CASE_EXPECT_EQ(static_cast<size_t>(1), bus_ep->get_gateway().size());
   if (!bus_ep->get_gateway().empty()) {
-    const auto &gw = bus_ep->get_gateway()[0];
+    const auto gateways = bus_ep->get_gateway();
+    const auto &gw = gateways[0];
     CASE_EXPECT_EQ(std::string("ipv4://127.0.0.1:29999"), gw.address);
     CASE_EXPECT_EQ(std::string("scope-x"), gw.match_scope);
     CASE_EXPECT_EQ(static_cast<size_t>(1), gw.match_labels.size());
@@ -1264,9 +1265,10 @@ CASE_TEST(atapp_direct_connect, direct_discovery_update_refresh_bus_endpoint) {
     return;
   }
   CASE_EXPECT_EQ(std::string("scope-y"), bus_ep->get_scope());
-  CASE_EXPECT_EQ(static_cast<size_t>(listen_info.listen_size()), bus_ep->get_gateway().size());
-  for (int i = 0; i < listen_info.listen_size() && static_cast<size_t>(i) < bus_ep->get_gateway().size(); ++i) {
-    const auto &gw = bus_ep->get_gateway()[static_cast<size_t>(i)];
+  const auto listen_gateways = bus_ep->get_gateway();
+  CASE_EXPECT_EQ(static_cast<size_t>(listen_info.listen_size()), listen_gateways.size());
+  for (int i = 0; i < listen_info.listen_size() && static_cast<size_t>(i) < listen_gateways.size(); ++i) {
+    const auto &gw = listen_gateways[static_cast<size_t>(i)];
     CASE_EXPECT_EQ(listen_info.listen(i), gw.address);
     CASE_EXPECT_EQ(std::string("scope-y"), gw.match_scope);
     CASE_EXPECT_TRUE(gw.match_namespaces.end() != gw.match_namespaces.find("ns-y"));
