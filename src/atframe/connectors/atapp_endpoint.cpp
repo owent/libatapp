@@ -127,10 +127,8 @@ LIBATAPP_MACRO_API const etcd_discovery_node::ptr_t &atapp_endpoint::get_discove
 }
 
 LIBATAPP_MACRO_API void atapp_endpoint::update_discovery(const etcd_discovery_node::ptr_t &discovery) noexcept {
-  if (discovery_ == discovery) {
-    return;
-  }
-
+  // 服务发现对已有节点的内容变更会原地复用同一实例, 不能按指针相等提前返回;
+  // 调用方(watcher PUT 事件)已按内容变化过滤, 重复刷新只重做廉价的元数据赋值
   discovery_ = discovery;
 
   if (!discovery) {

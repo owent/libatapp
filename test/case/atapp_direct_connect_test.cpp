@@ -1249,15 +1249,18 @@ CASE_TEST(atapp_direct_connect, direct_discovery_update_refresh_bus_endpoint) {
     CASE_EXPECT_TRUE(label_iter != gw.match_labels.end() && label_iter->second == "west");
     CASE_EXPECT_TRUE(gw.match_labels.end() == gw.match_labels.find("extra"));
   }
-
-  // discovery 更新: 对端不再配置 gateway, 必须按 listen 地址合成隔离规则
-  auto listen_only = atfw::util::memory::make_strong_rc<atapp::etcd_discovery_node>();
-  atapp::protocol::atapp_discovery listen_info;
-  apps.node2.pack(listen_info);
-  listen_info.mutable_metadata()->set_scope("scope-y");
-  listen_info.mutable_metadata()->set_namespace_name("ns-y");
-  listen_only->copy_from(listen_info, atapp::etcd_discovery_node::node_version(), 0);
-  atapp_ep->update_discovery(listen_only);
+  // discovery 再次更新: 对端不再配置 gateway, 必须按 listen 地址合成隔离规则。
+  // 生产路径上 watcher 对已有节点是原地复用同一实例做 copy_from(service_discovery_module 的
+  // update_internal_watcher_event), 这里必须复用同一对象, 否则指针变化会掩盖 update_discovery
+  // 对同实例更新的处理
+  {
+    atapp::protocol::atapp_discovery listen_info;
+    apps.node2.pack(listen_info);
+    listen_info.mutable_metadata()->set_scope("scope-y");
+    listen_info.mutable_metadata()->set_namespace_name("ns-y");
+    updated->copy_from(listen_info, atapp::etcd_discovery_node::node_version(), 0);
+  }
+  atapp_ep->update_discovery(updated);
 
   bus_ep = bus1->get_endpoint(apps.node2.get_app_id());
   CASE_EXPECT_TRUE(bus_ep != nullptr);
@@ -1265,6 +1268,7 @@ CASE_TEST(atapp_direct_connect, direct_discovery_update_refresh_bus_endpoint) {
     return;
   }
   CASE_EXPECT_EQ(std::string("scope-y"), bus_ep->get_scope());
+  const auto &listen_info = updated->get_discovery_info();
   const auto listen_gateways = bus_ep->get_gateway();
   CASE_EXPECT_EQ(static_cast<size_t>(listen_info.listen_size()), listen_gateways.size());
   for (int i = 0; i < listen_info.listen_size() && static_cast<size_t>(i) < listen_gateways.size(); ++i) {
