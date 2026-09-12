@@ -761,17 +761,19 @@ CASE_TEST(atapp_etcd_module, topology_event_callback) {
   std::vector<atframework::atapp::app *> apps1 = {&app1};
   run_apps_until(apps1, [&discovery_module1]() { return discovery_module1->has_topology_snapshot(); });
 
-  // Record baseline count (self-registration may fire)
-  int baseline_count = topology_callback_count;
-
   // Start node2
   atframework::atapp::app app2;
   const char *args2[] = {"app2", "-c", conf_path_2.c_str(), "start"};
   CASE_EXPECT_EQ(0, app2.init(nullptr, 4, args2, nullptr));
 
   std::vector<atframework::atapp::app *> apps = {&app1, &app2};
-  bool callback_fired = run_apps_until(
-      apps, [&topology_callback_count, baseline_count]() { return topology_callback_count > baseline_count; });
+  // Wait for app2's own registration event: app1's self-registration can still be delivered after
+  // the topology snapshot flag is set, so a plain counter increment may observe app1's late event
+  // instead of app2's join
+  bool callback_fired = run_apps_until(apps, [&last_topology_info, &last_topology_action, &app2]() {
+    return last_topology_info && last_topology_info->id() == app2.get_id() &&
+           atapp::etcd_watch_event::kPut == last_topology_action;
+  });
 
   CASE_EXPECT_TRUE(callback_fired);
   CASE_EXPECT_TRUE(!!last_topology_info);
@@ -1600,6 +1602,13 @@ CASE_TEST(atapp_etcd_module, tick_keepalive_updates) {
   // Phase 2: Verify topology data was published via keepalive
   // update_keepalive_topology_value() packs app topology and pushes it to etcd through keepalive actors.
   // The initial call happens in init, but tick() must continue calling it for runtime topology updates.
+  // Topology info propagates through its own keepalive/watcher channel, independently of the
+  // discovery nodes waited for above, so wait for app1's topology record explicitly.
+  bool topology_received = run_apps_until(apps, [&discovery2, &app1]() {
+    const auto &topo_set = discovery2->get_topology_info_set();
+    return topo_set.find(app1.get_id()) != topo_set.end();
+  });
+  CASE_EXPECT_TRUE(topology_received);
   {
     const auto &topo_set = discovery2->get_topology_info_set();
     auto topo_it = topo_set.find(app1.get_id());
@@ -1827,6 +1836,30 @@ CASE_TEST(atapp_etcd_module, diff_context_snapshot_isolation) {
     return;
   }
 
+  // Phase 5: 全局视图对不同 context 上报的同一节点 id 保留先到者（update_internal_watcher_event
+  // 会忽略来自其他 context 的冲突更新），因此必须先等 context_a 的快照写入全局视图，再创建
+  // context_b；否则两个 context 快照的到达顺序由调度决定，下面可能看到 app3 的地址。
+  std::vector<atframework::atapp::app *> apps = {&app1, &app2, &app3};
+
+  // app3 通过自身 watcher 看到自己，说明它的 keepalive 已落入 etcd，
+  // 之后创建的 context_b 的初始快照才会包含 app3 的冲突节点
+  bool app3_keepalive_in_etcd = run_apps_until(
+      apps, [&discovery3, &app3]() { return !!discovery3->get_global_discovery().get_node_by_id(app3.get_id()); });
+  CASE_EXPECT_TRUE(app3_keepalive_in_etcd);
+  if (!app3_keepalive_in_etcd) {
+    return;
+  }
+
+  bool mutual_discovery = run_apps_until(apps, [&discovery1, &app2]() {
+    auto node = discovery1->get_global_discovery().get_node_by_id(app2.get_id());
+    return node && !node->get_discovery_info().listen().empty() &&
+           *node->get_discovery_info().listen().begin() == "ipv4://127.0.0.1:22302";
+  });
+  CASE_EXPECT_TRUE(mutual_discovery);
+  if (!mutual_discovery) {
+    return;
+  }
+
   auto service_discovery_context_b =
       std::make_shared<atframework::atapp::service_discovery_module::service_discovery_cluster_context>();
   auto context_b_conf = discovery3->get_configure();
@@ -1837,20 +1870,26 @@ CASE_TEST(atapp_etcd_module, diff_context_snapshot_isolation) {
     return;
   }
 
+  // 回调在每个事件的合并（update_internal_watcher_event）之后触发，看到 app3 的节点即说明
+  // context_b 的冲突更新已经被合并流程处理过
+  bool app3_conflict_processed = false;
+  service_discovery_context_b->add_discovery_watcher_by_id_callback(
+      [&app3_conflict_processed, &app3](atapp::service_discovery_module::discovery_watcher_sender_list_t &sender) {
+        if (sender.node.get().node_discovery.id() == app3.get_id()) {
+          app3_conflict_processed = true;
+        }
+      });
+
   ret = discovery1->init_service_discovery_keepalives_watchers(service_discovery_context_b);
   CASE_EXPECT_TRUE(ret == 0);
   if (ret != 0) {
     return;
   }
 
-  // Phase 5: 等待发现并检查是否为app2的listener地址（如果app3覆盖了app2的snapshot，则会看到app3的地址）
-  std::vector<atframework::atapp::app *> apps = {&app1, &app2, &app3};
-  bool mutual_discovery = run_apps_until(
-      apps, [&discovery1, &app2]() { return !!discovery1->get_global_discovery().get_node_by_id(app2.get_id()); });
-  CASE_EXPECT_TRUE(mutual_discovery);
-  if (!mutual_discovery) {
-    return;
-  }
+  bool conflict_processed = run_apps_until(apps, [&app3_conflict_processed]() { return app3_conflict_processed; });
+  CASE_EXPECT_TRUE(conflict_processed);
+
+  // context_b 的冲突更新必须被忽略：如果 app3 覆盖了 app2 的 snapshot，这里会看到 app3 的地址
   auto node = discovery1->get_global_discovery().get_node_by_id(app2.get_id());
   CASE_EXPECT_TRUE(!!node);
   if (!node) {
@@ -1995,12 +2034,11 @@ CASE_TEST(atapp_etcd_module, external_discovery_cross_only) {
   });
   CASE_EXPECT_TRUE(cross_discovery);
 
-  // The negative assertions below require that both watchers have fully applied their
-  // snapshots; wait for the snapshot events instead of a fixed number of ticks.
-  bool snapshots_ready = run_apps_until(apps, [&discovery1, &discovery2]() {
-    return discovery1->has_discovery_snapshot() && discovery2->has_discovery_snapshot();
-  });
-  CASE_EXPECT_TRUE(snapshots_ready);
+  // The negative assertions below need no extra wait: has_discovery_snapshot() only reflects the
+  // default cluster context, whose watcher is disabled in this scenario (the snapshots live on the
+  // external cluster context, which the status API does not expose yet). They hold by construction:
+  // app1 watches pathB only, and pathB never carries app1's keepalive (symmetric for app2 on pathA).
+  // The cross_discovery wait above already proves both external watchers applied their data.
 
   // app1 should NOT see itself (keepalives on pathA, but watches pathB)
   auto app1_self = discovery1->get_global_discovery().get_node_by_id(app1.get_id());

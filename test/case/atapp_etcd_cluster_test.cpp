@@ -478,9 +478,10 @@ CASE_TEST(atapp_etcd_cluster, keepalive_set_value_and_read) {
   ka->set_value("keepalive-value-1");
   CASE_EXPECT_TRUE(cluster.add_keepalive(ka));
 
-  // Drive the loop until has_data
-  bool has_data = run_apps_until(apps, [&ka]() { return ka->has_data(); });
-  CASE_EXPECT_TRUE(has_data);
+  // Drive the loop until the value is actually visible in etcd (has_data only means the actor
+  // holds a value locally, it does not prove the write landed)
+  bool written = run_apps_until(apps, [&test_path]() { return direct_etcd_kv_get(test_path) == "keepalive-value-1"; });
+  CASE_EXPECT_TRUE(written);
 
   // Read back via direct HTTP
   std::string read_val = direct_etcd_kv_get(test_path);
@@ -522,9 +523,9 @@ CASE_TEST(atapp_etcd_cluster, keepalive_update_value) {
   ka->set_value("initial-value");
   CASE_EXPECT_TRUE(cluster.add_keepalive(ka));
 
-  // Wait for initial value to be set
-  bool has_data = run_apps_until(apps, [&ka]() { return ka->has_data(); });
-  CASE_EXPECT_TRUE(has_data);
+  // Wait for initial value to be visible in etcd (has_data alone does not prove the write landed)
+  bool written = run_apps_until(apps, [&test_path]() { return direct_etcd_kv_get(test_path) == "initial-value"; });
+  CASE_EXPECT_TRUE(written);
 
   std::string read_val = direct_etcd_kv_get(test_path);
   CASE_EXPECT_EQ("initial-value", read_val);
@@ -575,8 +576,8 @@ CASE_TEST(atapp_etcd_cluster, keepalive_lease_binding) {
   ka->set_value("lease-bound");
   CASE_EXPECT_TRUE(cluster.add_keepalive(ka));
 
-  bool has_data = run_apps_until(apps, [&ka]() { return ka->has_data(); });
-  CASE_EXPECT_TRUE(has_data);
+  bool written = run_apps_until(apps, [&test_path]() { return direct_etcd_kv_get(test_path) == "lease-bound"; });
+  CASE_EXPECT_TRUE(written);
 
   // Value should exist
   std::string val = direct_etcd_kv_get(test_path);
@@ -732,8 +733,8 @@ CASE_TEST(atapp_etcd_cluster, keepalive_remove_and_readd) {
   ka->set_value("first-add");
   CASE_EXPECT_TRUE(cluster.add_keepalive(ka));
 
-  bool has_data = run_apps_until(apps, [&ka]() { return ka->has_data(); });
-  CASE_EXPECT_TRUE(has_data);
+  bool written = run_apps_until(apps, [&test_path]() { return direct_etcd_kv_get(test_path) == "first-add"; });
+  CASE_EXPECT_TRUE(written);
   CASE_EXPECT_EQ("first-add", direct_etcd_kv_get(test_path));
 
   // Remove keepalive
@@ -752,8 +753,8 @@ CASE_TEST(atapp_etcd_cluster, keepalive_remove_and_readd) {
   ka2->set_value("second-add");
   CASE_EXPECT_TRUE(cluster.add_keepalive(ka2));
 
-  bool has_data2 = run_apps_until(apps, [&ka2]() { return ka2->has_data(); });
-  CASE_EXPECT_TRUE(has_data2);
+  bool written2 = run_apps_until(apps, [&test_path]() { return direct_etcd_kv_get(test_path) == "second-add"; });
+  CASE_EXPECT_TRUE(written2);
   CASE_EXPECT_EQ("second-add", direct_etcd_kv_get(test_path));
 
   // Clean up
@@ -1116,8 +1117,7 @@ CASE_TEST(atapp_etcd_cluster, watcher_reconnect_after_timeout) {
   int put_before = put_count;
   size_t create_before = cluster.get_stats().sum_create_requests;
   bool reconnected = run_apps_until(
-      apps,
-      [&cluster, create_before]() { return cluster.get_stats().sum_create_requests >= create_before + 2; },
+      apps, [&cluster, create_before]() { return cluster.get_stats().sum_create_requests >= create_before + 2; },
       std::chrono::seconds(20));
   CASE_EXPECT_TRUE(reconnected);
 

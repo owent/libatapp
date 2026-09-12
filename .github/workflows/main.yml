@@ -61,7 +61,9 @@ jobs:
         with:
           path: |
             third_party/install
-          key: ${{ matrix.os }}-${{ matrix.cc }}-${{ hashFiles('.github/.cache-key') }}
+          # Include the CI script in the key: it selects third-party build flags (e.g. protobuf
+          # shared/static), so flag changes must not reuse a prefix cached with different flags
+          key: ${{ matrix.os }}-${{ matrix.cc }}-${{ hashFiles('.github/.cache-key', 'ci/do_ci.sh') }}
       - name: Build${{ matrix.run_tests && ' & Test' || '' }}
         shell: bash
         env:
@@ -127,7 +129,9 @@ jobs:
         with:
           path: |
             third_party/install
-          key: ${{ matrix.os }}-shared-${{ matrix.build_shared_libs }}-${{ hashFiles('.github/.cache-key') }}
+          # Include the CI script in the key: it selects third-party build flags (e.g. protobuf
+          # shared/static), so flag changes must not reuse a prefix cached with different flags
+          key: ${{ matrix.os }}-shared-${{ matrix.build_shared_libs }}-${{ hashFiles('.github/.cache-key', 'ci/do_ci.ps1') }}
       - name: Build${{ matrix.run_tests && ' & Test' || '' }}
         shell: pwsh
         env:
@@ -190,7 +194,9 @@ jobs:
         with:
           path: |
             third_party/install
-          key: ${{ runner.os }}-coverage-${{ hashFiles('.github/.cache-key') }}
+          # Include the CI script in the key: it selects third-party build flags (e.g. protobuf
+          # shared/static), so flag changes must not reuse a prefix cached with different flags
+          key: ${{ runner.os }}-coverage-${{ hashFiles('.github/.cache-key', 'ci/do_ci.sh') }}
       - name: Generate coverage
         shell: bash
         env:
