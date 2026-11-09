@@ -2177,16 +2177,7 @@ LIBATAPP_MACRO_API void etcd_cluster::setup_http_request(atfw::util::network::ht
       req->set_opt_string(CURLOPT_CAINFO, conf_.ssl_ca_cert.data());
     }
 
-#if LIBCURL_VERSION_NUM >= 0x071504
-    if (!conf_.ssl_client_tlsauth_username.empty()) {
-      req->set_opt_string(CURLOPT_TLSAUTH_TYPE,
-                          "SRP");  // @see https://curl.haxx.se/libcurl/c/CURLOPT_TLSAUTH_TYPE.html
-      req->set_opt_string(CURLOPT_TLSAUTH_USERNAME, conf_.ssl_client_tlsauth_username.data());
-      req->set_opt_string(CURLOPT_TLSAUTH_PASSWORD, conf_.ssl_client_tlsauth_password.data());
-    }
-#endif
     // proxy cert and key
-
 #if LIBCURL_VERSION_NUM >= 0x072400
     req->set_opt_bool(CURLOPT_SSL_ENABLE_ALPN, conf_.ssl_enable_alpn);
 #endif
@@ -2214,13 +2205,6 @@ LIBATAPP_MACRO_API void etcd_cluster::setup_http_request(atfw::util::network::ht
 
     if (!conf_.ssl_proxy_ca_cert.empty()) {
       req->set_opt_string(CURLOPT_PROXY_CAINFO, conf_.ssl_proxy_ca_cert.data());
-    }
-
-    if (!conf_.ssl_proxy_tlsauth_username.empty()) {
-      req->set_opt_string(CURLOPT_PROXY_TLSAUTH_TYPE,
-                          "SRP");  // @see https://curl.haxx.se/libcurl/c/CURLOPT_PROXY_TLSAUTH_TYPE.html
-      req->set_opt_string(CURLOPT_PROXY_TLSAUTH_USERNAME, conf_.ssl_proxy_tlsauth_username.data());
-      req->set_opt_string(CURLOPT_PROXY_TLSAUTH_PASSWORD, conf_.ssl_proxy_tlsauth_password.data());
     }
 #endif
     // ssl cipher
