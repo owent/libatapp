@@ -1042,8 +1042,9 @@ LIBATAPP_MACRO_API int worker_pool_module::spawn(const worker_job_action_pointer
   return enqueue_job(action, &context, nullptr);
 }
 
-int worker_pool_module::enqueue_job(const worker_job_action_pointer& action, const worker_context* requested,
-                                    worker_context* selected_context) {
+int worker_pool_module::enqueue_job(const worker_job_action_pointer& action,
+                                    const worker_context* ATFW_UTIL_MACRO_NULLABLE requested,
+                                    worker_context* ATFW_UTIL_MACRO_NULLABLE selected_context) {
   if (!action) {
     return EN_ATBUS_ERR_PARAMS;
   }
@@ -1052,7 +1053,7 @@ int worker_pool_module::enqueue_job(const worker_job_action_pointer& action, con
   std::shared_ptr<worker> worker_ptr;
   // Keep selection and enqueue together so the worker cannot begin its exit drain between them.
   std::lock_guard<std::recursive_mutex> lock{worker_set_->worker_lock};
-  if (requested) {
+  if (requested != nullptr) {
     int result = select_worker_locked(*requested, worker_ptr);
     if (result < 0) {
       return result;

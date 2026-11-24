@@ -7,6 +7,7 @@
 #include <config/atframe_utils_build_feature.h>
 
 #include <nostd/function_ref.h>
+#include <nostd/nullability.h>
 
 #include <atframe/atapp_conf.h>
 #include <atframe/atapp_module_impl.h>
@@ -141,7 +142,8 @@ class worker_pool_module : public ::atframework::atapp::module_impl {
   LIBATAPP_MACRO_API static bool is_valid(const worker_context& context) noexcept;
 
  private:
-  int enqueue_job(const worker_job_action_pointer& action, const worker_context* requested, worker_context* selected);
+  int enqueue_job(const worker_job_action_pointer& action, const worker_context* ATFW_UTIL_MACRO_NULLABLE requested,
+                  worker_context* ATFW_UTIL_MACRO_NULLABLE selected);
   void do_shared_job_on_main_thread();
   void do_scaling_up();
   bool internal_reduce_workers();
