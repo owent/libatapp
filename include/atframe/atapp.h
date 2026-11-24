@@ -227,7 +227,7 @@ class app {
 
   /// Mark this app prepared for fork + exec. Actions and ticks continue running. An expired deadline returns a timeout.
   /// The child must exec or _exit before calling any app API.
-  LIBATAPP_MACRO_API int prepare_fork(fork_mode mode, std::chrono::steady_clock::time_point deadline);
+  LIBATAPP_MACRO_API int prepare_fork(fork_mode mode, std::chrono::system_clock::time_point deadline);
 
   /// Complete the matching prepare in the parent, including after a failed or cancelled fork.
   LIBATAPP_MACRO_API int finish_fork();
@@ -756,6 +756,8 @@ class app {
   atfw::util::cli::cmd_option_ci::ptr_type cmd_handler_;
   std::vector<std::string> last_command_;
   int setup_result_;
+  const int32_t owner_pid_;
+  bool is_fork_child() const noexcept;
 
   enum class internal_options_t : int32_t {
     // POSIX: _POSIX_SIGQUEUE_MAX on most platform is 32

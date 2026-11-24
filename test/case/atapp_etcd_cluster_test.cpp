@@ -737,11 +737,15 @@ CASE_TEST(atapp_etcd_cluster, keepalive_remove_and_readd) {
   CASE_EXPECT_TRUE(written);
   CASE_EXPECT_EQ("first-add", direct_etcd_kv_get(test_path));
 
-  // Remove keepalive
+  // The registration owns the range starting at the keepalive key.
+  const std::string sibling_path = test_path + "-sibling";
+  CASE_EXPECT_TRUE(direct_etcd_kv_set(sibling_path, "sibling"));
+  CASE_EXPECT_TRUE(run_apps_until(apps, [&ka]() { return ka->has_data(); }));
+  CASE_EXPECT_TRUE(direct_etcd_kv_set(test_path, "updated-registration"));
   CASE_EXPECT_TRUE(cluster.remove_keepalive(ka));
-
-  // Delete the key manually (since lease is still active, old KV may persist)
-  direct_etcd_kv_del(test_path, "+1");
+  CASE_EXPECT_TRUE(run_apps_until(apps, [&test_path, &sibling_path]() {
+    return direct_etcd_kv_get(test_path).empty() && direct_etcd_kv_get(sibling_path).empty();
+  }));
 
   // Create a new keepalive on the same path
   auto ka2 = atapp::etcd_keepalive::create(cluster, test_path);

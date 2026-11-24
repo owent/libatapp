@@ -108,12 +108,12 @@ class etcd_cluster {
     std::string proxy_user_name;    // curl 7.19.1 CURLOPT_PROXYUSERNAME
     std::string proxy_password;     // curl 7.19.1 CURLOPT_PROXYPASSWORD
 
-    std::string ssl_client_cert;              // CURLOPT_SSLCERT
-    std::string ssl_client_cert_type;         // curl 7.9.3 CURLOPT_SSLCERTTYPE, PEM or DER, PEM for default
-    std::string ssl_client_key;               // CURLOPT_SSLKEY
-    std::string ssl_client_key_type;          // CURLOPT_SSLKEYTYPE: PEM, DER or ENG
-    std::string ssl_client_key_passwd;        // curl 7.16.4 CURLOPT_SSLKEYPASSWD , curl 7.9.2 CURLOPT_SSLCERTPASSWD
-    std::string ssl_ca_cert;                  // CURLOPT_CAINFO
+    std::string ssl_client_cert;        // CURLOPT_SSLCERT
+    std::string ssl_client_cert_type;   // curl 7.9.3 CURLOPT_SSLCERTTYPE, PEM or DER, PEM for default
+    std::string ssl_client_key;         // CURLOPT_SSLKEY
+    std::string ssl_client_key_type;    // CURLOPT_SSLKEYTYPE: PEM, DER or ENG
+    std::string ssl_client_key_passwd;  // curl 7.16.4 CURLOPT_SSLKEYPASSWD , curl 7.9.2 CURLOPT_SSLCERTPASSWD
+    std::string ssl_ca_cert;            // CURLOPT_CAINFO
 
     std::string ssl_proxy_cert;        // CURLOPT_PROXY_SSLCERT
     std::string ssl_proxy_cert_type;   // curl 7.9.3 CURLOPT_PROXY_SSLCERTTYPE, PEM or DER, PEM for default
@@ -431,6 +431,8 @@ class etcd_cluster {
 
  private:
   void remove_keepalive_path(etcd_keepalive_deletor *keepalive_deletor, bool delay_delete);
+  bool has_local_transport() const noexcept;
+  bool is_fork_child() const noexcept;
   static int libcurl_callback_on_remove_keepalive_path(atfw::util::network::http_request &req);
 
   void retry_pending_actions();
@@ -478,6 +480,7 @@ class etcd_cluster {
  private:
   using etcd_keepalive_deletor_map_t = std::unordered_map<std::string, etcd_keepalive_deletor *>;
 
+  int32_t owner_pid_;
   uint32_t flags_;
   atfw::util::random::mt19937 random_generator_;
   conf_t conf_;

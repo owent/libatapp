@@ -1,6 +1,7 @@
 // Copyright 2026 atframework
 
 #include <atframe/atapp.h>
+#include <atframe/atapp_module_impl.h>
 
 #include <common/file_system.h>
 
@@ -16,6 +17,69 @@
 #include <vector>
 
 #include "frame/test_macros.h"
+
+CASE_TEST(atapp_worker_pool, graceful_stop_lifecycle) {
+  using namespace std::chrono_literals;
+  using clock = std::chrono::steady_clock;
+  struct lifecycle_module : atapp::module_impl {
+    int init() override { return 0; }
+
+    int stop() override {
+      if (++stop_calls == 1) {
+        timer_result = get_app()->add_custom_timer(16ms, [this](time_t, const auto&) { ++timer_calls; }, nullptr);
+      }
+
+      return timer_calls == 0 ? 1 : 0;
+    }
+
+    void cleanup() override { ++cleanup_calls; }
+
+    int stop_calls = 0;
+    int timer_calls = 0;
+    int cleanup_calls = 0;
+    int timer_result = -1;
+  };
+
+  std::string dir;
+  atfw::util::file_system::dirname(__FILE__, 0, dir);
+  const auto config = dir + "/atapp_test_0.yaml";
+  const char* args[] = {"app", "-c", config.c_str(), "start"};
+  auto mod = std::make_shared<lifecycle_module>();
+  int finally_calls = 0;
+  atapp::app app;
+  app.add_module(mod);
+
+  int result = app.init(nullptr, 4, args);
+  CASE_EXPECT_EQ(0, result);
+  if (result != 0) return;
+
+  app.add_evt_on_finally([&](atapp::app& instance) {
+    ++finally_calls;
+    CASE_EXPECT_FALSE(instance.is_running());
+    const auto& bus = instance.get_bus_node();
+    CASE_EXPECT_TRUE(bus && bus->get_state() == atbus::node::state_t::kCreated);
+  });
+
+  CASE_EXPECT_TRUE(app.is_running());
+  CASE_EXPECT_EQ(atbus::node::state_t::kRunning, app.get_bus_node()->get_state());
+
+  CASE_EXPECT_EQ(0, app.stop());
+  CASE_EXPECT_TRUE(app.is_closing());
+  const auto deadline = clock::now() + 5s;
+  while (!app.is_closed() && clock::now() < deadline) {
+    result = app.run_once(0, 100ms);
+    CASE_EXPECT_GE(result, 0);
+    if (result < 0) break;
+  }
+
+  CASE_EXPECT_TRUE(app.is_closed());
+  CASE_EXPECT_FALSE(app.is_inited());
+  CASE_EXPECT_GT(mod->stop_calls, 1);
+  CASE_EXPECT_EQ(0, mod->timer_result);
+  CASE_EXPECT_EQ(1, mod->timer_calls);
+  CASE_EXPECT_EQ(1, mod->cleanup_calls);
+  CASE_EXPECT_EQ(1, finally_calls);
+}
 
 #if defined(__unix__) || defined(__APPLE__)
 #  include <sys/wait.h>
@@ -38,7 +102,7 @@ CASE_TEST(atapp_worker_pool, fork_independent_apps) {
   CASE_EXPECT_EQ(0, result);
   if (result != 0) return;
   auto prepare = [](atapp::app& instance) {
-    return instance.prepare_fork(atapp::app::fork_mode::exec_child, std::chrono::steady_clock::now() + 2s);
+    return instance.prepare_fork(atapp::app::fork_mode::exec_child, std::chrono::system_clock::now() + 2s);
   };
   auto first_result = std::async(std::launch::async, [&]() { return prepare(first); }).get();
   CASE_EXPECT_EQ(0, first_result);
@@ -54,7 +118,7 @@ CASE_TEST(atapp_worker_pool, fork_independent_apps) {
 
 CASE_TEST(atapp_worker_pool, fork_exec_with_running_action) {
   using namespace std::chrono_literals;
-  using clock = std::chrono::steady_clock;
+  using clock = std::chrono::system_clock;
   using mode = atapp::app::fork_mode;
   std::string dir;
   atfw::util::file_system::dirname(__FILE__, 0, dir);
@@ -105,6 +169,13 @@ CASE_TEST(atapp_worker_pool, fork_exec_with_running_action) {
     const char* executable = expected_exit == 0 ? "/bin/true" : "/nonexistent/atapp-fork-test";
     pid_t pid = fork();
     if (pid == 0) {
+#  if defined(__linux__)
+      if (expected_exit == 0) {
+        execl("/proc/self/exe", "atapp_unit_test", "-r", "atapp_worker_pool.graceful_stop_lifecycle",
+              static_cast<char*>(nullptr));
+        _exit(127);
+      }
+#  endif
       execl(executable, executable, static_cast<char*>(nullptr));
       _exit(127);
     }
@@ -127,7 +198,7 @@ CASE_TEST(atapp_worker_pool, fork_exec_with_running_action) {
 CASE_TEST(atapp_worker_pool, fork_unsupported) {
   atapp::app app;
   CASE_EXPECT_EQ(atapp::EN_ATAPP_ERR_FORK_UNSUPPORTED,
-                 app.prepare_fork(atapp::app::fork_mode::exec_child, std::chrono::steady_clock::now()));
+                 app.prepare_fork(atapp::app::fork_mode::exec_child, std::chrono::system_clock::now()));
   CASE_EXPECT_EQ(atapp::EN_ATAPP_ERR_FORK_UNSUPPORTED, app.finish_fork());
 }
 #endif
@@ -167,7 +238,7 @@ CASE_TEST(atapp_worker_pool, finish_fork_preserves_bus_identity) {
   CASE_EXPECT_EQ(atapp::EN_ATAPP_ERR_FORK_STATE, app.finish_fork());
   check_identity();
   result =
-      app.prepare_fork(atapp::app::fork_mode::exec_child, std::chrono::steady_clock::now() + std::chrono::seconds(3));
+      app.prepare_fork(atapp::app::fork_mode::exec_child, std::chrono::system_clock::now() + std::chrono::seconds(3));
   CASE_EXPECT_EQ(0, result);
   if (result != 0) return;
   CASE_EXPECT_EQ(0, app.finish_fork());

@@ -190,7 +190,8 @@ EXPLICIT_UNUSED_ATTR static int etcd_cluster_verbose_callback(atfw::util::networ
 }  // namespace
 
 LIBATAPP_MACRO_API etcd_cluster::etcd_cluster()
-    : flags_(0),
+    : owner_pid_(atbus::node::get_pid()),
+      flags_(0),
       stats_{},
       startup_log_level_(atfw::util::log::log_level::kDisabled),
       runtime_log_level_(atfw::util::log::log_level::kDisabled) {
@@ -247,12 +248,12 @@ LIBATAPP_MACRO_API etcd_cluster::etcd_cluster()
   memset(&stats_, 0, sizeof(stats_));
 }
 
-LIBATAPP_MACRO_API etcd_cluster::~etcd_cluster() {
-  reset();
-  cleanup_keepalive_deletors();
-}
+LIBATAPP_MACRO_API etcd_cluster::~etcd_cluster() { reset(); }
 
 LIBATAPP_MACRO_API void etcd_cluster::init(const atfw::util::network::http_request::curl_m_bind_ptr_t &curl_mgr) {
+  if (is_fork_child()) {
+    return;
+  }
   curl_multi_ = curl_mgr;
   random_generator_.init_seed(std::random_device{}());
 
@@ -802,8 +803,6 @@ void etcd_cluster::remove_keepalive_path(etcd_keepalive_deletor *keepalive_delet
       rpc->set_on_complete(nullptr);
       rpc->set_priv_data(nullptr);
       keepalive_deletor->rpc.reset();
-
-      // insert and retry later
       keepalive_deletors_[keepalive_deletor->path] = keepalive_deletor;
     } else {
       LIBATAPP_MACRO_ETCD_CLUSTER_LOG_DEBUG(*this, "Etcd cluster start delete keepalive {} request to {} success",
@@ -817,6 +816,16 @@ void etcd_cluster::remove_keepalive_path(etcd_keepalive_deletor *keepalive_delet
   }
 }  // namespace atapp
 
+bool etcd_cluster::is_fork_child() const noexcept {
+#if defined(__unix__) || defined(__APPLE__)
+  return owner_pid_ != atbus::node::get_pid();
+#else
+  return false;
+#endif
+}
+
+bool etcd_cluster::has_local_transport() const noexcept { return !is_fork_child() && curl_multi_; }
+
 int etcd_cluster::libcurl_callback_on_remove_keepalive_path(atfw::util::network::http_request &req) {
   etcd_keepalive_deletor *self = reinterpret_cast<etcd_keepalive_deletor *>(req.get_priv_data());
   if (nullptr == self) {
@@ -825,18 +834,13 @@ int etcd_cluster::libcurl_callback_on_remove_keepalive_path(atfw::util::network:
   }
 
   assert(self->keepalive_addr);
+  if (self->owner) {
+    self->owner->keepalive_deletors_.erase(self->path);
+  }
+  auto keep_rpc = std::move(self->rpc);
+  req.set_priv_data(nullptr);
   do {
-    if (nullptr == self) {
-      FWLOGERROR("Etcd cluster delete keepalive path shouldn't has request without private data");
-      break;
-    }
-
-    if (self->rpc.get() == &req) {
-      self->rpc.reset();
-    }
-
-    // 服务器错误则忽略，正常流程path不存在也会返回200，然后没有 deleted=1 。如果删除成功会有 deleted=1
-    // 判定 404 只是是个防御性判定
+    // Deleting a range that is already empty also succeeds.
     if (0 != req.get_error_code() ||
         (atfw::util::network::http_request::status_code_t::EN_ECG_SUCCESS !=
              atfw::util::network::http_request::get_status_code_group(req.get_response_code()) &&
@@ -906,12 +910,16 @@ void etcd_cluster::retry_pending_actions() {
   }
 
   // retry keepalive deletors
-  if (!keepalive_deletors_.empty()) {
+  if (std::any_of(keepalive_deletors_.begin(), keepalive_deletors_.end(),
+                  [](const etcd_keepalive_deletor_map_t::value_type &entry) { return !entry.second->rpc; })) {
     etcd_keepalive_deletor_map_t pending_deletes;
     pending_deletes.swap(keepalive_deletors_);
-
-    for (etcd_keepalive_deletor_map_t::iterator iter = pending_deletes.begin(); iter != pending_deletes.end(); ++iter) {
-      remove_keepalive_path(iter->second, false);
+    for (const auto &entry : pending_deletes) {
+      if (entry.second->rpc) {
+        keepalive_deletors_.insert(entry);
+      } else {
+        remove_keepalive_path(entry.second, false);
+      }
     }
   }
 }
@@ -941,7 +949,7 @@ void etcd_cluster::set_lease(int64_t v, bool force_active_keepalives) {
 }
 
 bool etcd_cluster::create_request_auth_authenticate() {
-  if (!curl_multi_) {
+  if (!has_local_transport()) {
     return false;
   }
 
@@ -1088,7 +1096,7 @@ int etcd_cluster::libcurl_callback_on_auth_authenticate(atfw::util::network::htt
 }
 
 bool etcd_cluster::create_request_auth_user_get() {
-  if (!curl_multi_) {
+  if (!has_local_transport()) {
     return false;
   }
 
@@ -1295,7 +1303,7 @@ bool etcd_cluster::retry_request_member_update(const std::string &bad_url) {
 }
 
 bool etcd_cluster::create_request_member_update() {
-  if (!curl_multi_) {
+  if (!has_local_transport()) {
     return false;
   }
 
@@ -1459,7 +1467,7 @@ int etcd_cluster::libcurl_callback_on_member_update(atfw::util::network::http_re
 }
 
 bool etcd_cluster::create_request_lease_grant() {
-  if (!curl_multi_ || conf_.path_node.empty()) {
+  if (!has_local_transport() || conf_.path_node.empty()) {
     return false;
   }
 
@@ -1543,7 +1551,7 @@ bool etcd_cluster::create_request_lease_grant() {
 }
 
 bool etcd_cluster::create_request_lease_keepalive() {
-  if (!curl_multi_ || 0 == get_lease() || conf_.path_node.empty()) {
+  if (!has_local_transport() || 0 == get_lease() || conf_.path_node.empty()) {
     return false;
   }
 
@@ -1706,7 +1714,7 @@ int etcd_cluster::libcurl_callback_on_lease_keepalive(atfw::util::network::http_
 }
 
 atfw::util::network::http_request::ptr_t etcd_cluster::create_request_lease_revoke() {
-  if (!curl_multi_ || 0 == get_lease() || conf_.path_node.empty()) {
+  if (!has_local_transport() || 0 == get_lease() || conf_.path_node.empty()) {
     return atfw::util::network::http_request::ptr_t();
   }
 
@@ -1730,7 +1738,7 @@ atfw::util::network::http_request::ptr_t etcd_cluster::create_request_lease_revo
 
 LIBATAPP_MACRO_API atfw::util::network::http_request::ptr_t etcd_cluster::create_request_kv_get(
     const std::string &key, const std::string &range_end, int64_t limit, int64_t revision) {
-  if (!curl_multi_ || conf_.path_node.empty() || check_flag(flag_t::kClosing)) {
+  if (!has_local_transport() || conf_.path_node.empty() || check_flag(flag_t::kClosing)) {
     return atfw::util::network::http_request::ptr_t();
   }
 
@@ -1758,7 +1766,7 @@ LIBATAPP_MACRO_API atfw::util::network::http_request::ptr_t etcd_cluster::create
 LIBATAPP_MACRO_API atfw::util::network::http_request::ptr_t etcd_cluster::create_request_kv_set(
     const std::string &key, const std::string &value, bool assign_lease, bool prev_kv, bool ignore_value,
     bool ignore_lease) {
-  if (!curl_multi_ || conf_.path_node.empty() || check_flag(flag_t::kClosing)) {
+  if (!has_local_transport() || conf_.path_node.empty() || check_flag(flag_t::kClosing)) {
     return atfw::util::network::http_request::ptr_t();
   }
 
@@ -1795,7 +1803,7 @@ LIBATAPP_MACRO_API atfw::util::network::http_request::ptr_t etcd_cluster::create
 
 LIBATAPP_MACRO_API atfw::util::network::http_request::ptr_t etcd_cluster::create_request_kv_del(
     const std::string &key, const std::string &range_end, bool prev_kv) {
-  if (!curl_multi_ || conf_.path_node.empty() || check_flag(flag_t::kClosing)) {
+  if (!has_local_transport() || conf_.path_node.empty() || check_flag(flag_t::kClosing)) {
     return atfw::util::network::http_request::ptr_t();
   }
 
@@ -1821,7 +1829,7 @@ LIBATAPP_MACRO_API atfw::util::network::http_request::ptr_t etcd_cluster::create
 
 LIBATAPP_MACRO_API atfw::util::network::http_request::ptr_t etcd_cluster::create_request_watch(
     const std::string &key, const std::string &range_end, int64_t start_revision, bool prev_kv, bool progress_notify) {
-  if (!curl_multi_ || conf_.path_node.empty() || check_flag(flag_t::kClosing)) {
+  if (!has_local_transport() || conf_.path_node.empty() || check_flag(flag_t::kClosing)) {
     return atfw::util::network::http_request::ptr_t();
   }
 

@@ -468,6 +468,7 @@ LIBATAPP_MACRO_API app::flag_guard_t::~flag_guard_t() {
 
 LIBATAPP_MACRO_API app::app()
     : setup_result_(0),
+      owner_pid_(atbus::node::get_pid()),
       pending_signals_{},
       ev_loop_(nullptr),
       flags_(0),
@@ -532,6 +533,14 @@ LIBATAPP_MACRO_API app::app()
   add_module(internal_module_service_discovery_);
 
   atapp_global_init_once();
+}
+
+bool app::is_fork_child() const noexcept {
+#if defined(__unix__) || defined(__APPLE__)
+  return owner_pid_ != atbus::node::get_pid();
+#else
+  return false;
+#endif
 }
 
 LIBATAPP_MACRO_API app::~app() {
@@ -678,6 +687,10 @@ LIBATAPP_MACRO_API int app::run(ev_loop_t *ev_loop, int argc, const char **argv,
 }  // namespace atapp
 
 LIBATAPP_MACRO_API int app::init(ev_loop_t *ev_loop, int argc, const char **argv, void *priv_data) {
+  if (is_fork_child()) {
+    return EN_ATAPP_ERR_FORK_STATE;
+  }
+
   if (check_flag(flag_t::kInitialized)) {
     return EN_ATAPP_ERR_ALREADY_INITED;
   }
@@ -1155,6 +1168,10 @@ static bool reload_all_configure_files(app::yaml_conf_map_t &yaml_map, atfw::uti
 }  // namespace
 
 LIBATAPP_MACRO_API int app::reload() {
+  if (is_fork_child()) {
+    return EN_ATAPP_ERR_FORK_STATE;
+  }
+
   atbus::adapter::loop_t *old_loop = conf_.bus_conf.ev_loop;
 
   FWLOGWARNING("============ start to load configure ============");
@@ -1269,7 +1286,11 @@ LIBATAPP_MACRO_API int app::reload() {
   return 0;
 }
 
-LIBATAPP_MACRO_API int app::prepare_fork(fork_mode mode, std::chrono::steady_clock::time_point deadline) {
+LIBATAPP_MACRO_API int app::prepare_fork(fork_mode mode, std::chrono::system_clock::time_point deadline) {
+  if (is_fork_child()) {
+    return EN_ATAPP_ERR_FORK_STATE;
+  }
+
 #if defined(__unix__) || defined(__APPLE__)
   if (mode != fork_mode::exec_child) {
     return EN_ATAPP_ERR_FORK_UNSUPPORTED;
@@ -1277,7 +1298,7 @@ LIBATAPP_MACRO_API int app::prepare_fork(fork_mode mode, std::chrono::steady_clo
   if (!is_inited() || is_closing()) {
     return EN_ATAPP_ERR_FORK_STATE;
   }
-  if (std::chrono::steady_clock::now() >= deadline) {
+  if (std::chrono::system_clock::now() >= deadline) {
     return EN_ATAPP_ERR_OPERATION_TIMEOUT;
   }
   return set_flag(flag_t::kForkPrepared, true) ? EN_ATAPP_ERR_FORK_STATE : 0;
@@ -3196,6 +3217,13 @@ int app::run_inner(int run_mode) {
       evt_on_all_module_cleaned_(*this);
     }
 
+    // The app tick timer has stopped. Complete the node shutdown here so its
+    // listeners and pending close callbacks do not wait for app destruction.
+    if (bus_node_ && ::atbus::node::state_t::kCreated != bus_node_->get_state()) {
+      flag_guard_t in_callback_guard(*this, flag_t::kInCallback);
+      bus_node_->reset();
+    }
+
     // cleanup pid file
     cleanup_pidfile();
 
@@ -3216,7 +3244,7 @@ int app::run_inner(int run_mode) {
 void app::_app_setup_signal_handle(int signo) {
   // Signal handle has a limited stack can process signal on next proc to keep signal safety
   app *current = app::last_instance_;
-  if (nullptr == current) {
+  if (nullptr == current || current->is_fork_child()) {
     return;
   }
 

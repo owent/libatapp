@@ -733,8 +733,12 @@ LIBATAPP_MACRO_API int service_discovery_module::service_discovery_cluster_conte
 }
 
 LIBATAPP_MACRO_API int service_discovery_module::service_discovery_cluster_context::stop() {
-  reset_internal_watchers_and_keepalives();
-  return etcd_module_.stop();
+  // Close the cluster first. Normal shutdown revokes its lease; upgrade leaves the keys to the lease.
+  int result = etcd_module_.stop();
+  if (result >= 0) {
+    reset_internal_watchers_and_keepalives();
+  }
+  return result;
 }
 
 LIBATAPP_MACRO_API void service_discovery_module::service_discovery_cluster_context::tick() { etcd_module_.tick(); }

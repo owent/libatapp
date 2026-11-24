@@ -295,14 +295,21 @@ int main(int argc, char *argv[]) {
 使用新配置启动独立实例时，在父进程调用 `app.prepare_fork(atapp::app::fork_mode::exec_child, deadline)`。
 已初始化且未进入停机的 app 会立即标记为已准备。action 可以仍在执行，新提交的任务、worker tick 和待发消息继续由父进程正常调度。
 各 app 独立配对 prepare 和 finish，可由父进程的不同线程调用。重复 prepare 或无匹配 prepare 的 finish 返回
-`EN_ATAPP_ERR_FORK_STATE`。进入 prepare 时若已到达 `std::chrono::steady_clock` 截止时间，则返回 `EN_ATAPP_ERR_OPERATION_TIMEOUT`。
+`EN_ATAPP_ERR_FORK_STATE`。进入 prepare 时若已到达 `std::chrono::system_clock` 截止时间，则返回 `EN_ATAPP_ERR_OPERATION_TIMEOUT`。
 
 准备成功后立即 fork。父进程在 fork 成功、失败或取消时均须调用 `app.finish_fork()`。
 父进程继续使用原节点的 PID、身份 hash 和随机数序列。
-子进程只处理需要继承的 fd 和信号，然后 `execve()`，失败时使用 `_exit()`。
+如果 fork 时还有其他线程，子进程在 exec 前只能调用异步信号安全的函数。可在父进程准备好当前程序的路径、
+新配置的参数和环境；子进程处理 fd 和信号后直接 `execve()`，失败时使用 `_exit()`。
+exec 保留子进程 PID。新程序创建自己的 app 和定时器，旧 app 的待发消息和定时回调继续由父进程处理。
+新 app 正常停机时会继续推进定时器，直到模块停机完成或达到停机超时。
+模块清理完成后，框架回收本实例的 bus 监听和连接，并在调用 finally 回调前将 bus 重置为未启动状态。
+子分支应直接进入 exec 或 _exit，避免调用继承 app 的停机、事件循环和析构逻辑。
 启动方负责关闭白名单之外的 fd，并为新实例配置独立的 ID、监听地址、PID 文件、日志和轮转别名。
-子进程不能调用继承的 app、运行旧 loop 或走普通退出流程。`reinitialize_child` 模式以及 Windows 的
-fork 接口返回 `EN_ATAPP_ERR_FORK_UNSUPPORTED`。此模式无需注册 `pthread_atfork` 回调。
+`reinitialize_child` 模式和 Windows 的 fork 接口返回 `EN_ATAPP_ERR_FORK_UNSUPPORTED`。
+`exec_child` 模式无需注册 `pthread_atfork` 回调。
+
+主动移除 etcd keepalive 时，框架按原有键范围删除该注册分配的数据。正常停机撤销本实例的租约，升级停机时注册键由保留的租约管理。
 
 ## 本地 etcd 测试
 
