@@ -166,17 +166,18 @@ CASE_TEST(atapp_worker_pool, fork_exec_with_running_action) {
       CASE_EXPECT_EQ(0, result);
       CASE_EXPECT_TRUE(next_action.get_future().wait_for(2s) == std::future_status::ready);
     }
-    const char* executable = expected_exit == 0 ? "/bin/true" : "/nonexistent/atapp-fork-test";
     pid_t pid = fork();
     if (pid == 0) {
-#  if defined(__linux__)
       if (expected_exit == 0) {
+#  if defined(__linux__)
         execl("/proc/self/exe", "atapp_unit_test", "-r", "atapp_worker_pool.graceful_stop_lifecycle",
               static_cast<char*>(nullptr));
-        _exit(127);
-      }
+#  else
+        execl("/bin/sh", "sh", "-c", "exit 0", static_cast<char*>(nullptr));
 #  endif
-      execl(executable, executable, static_cast<char*>(nullptr));
+      } else {
+        execl("/nonexistent/atapp-fork-test", "atapp-fork-test", static_cast<char*>(nullptr));
+      }
       _exit(127);
     }
     CASE_EXPECT_GT(pid, 0);

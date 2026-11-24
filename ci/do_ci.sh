@@ -73,7 +73,9 @@ elif [[ "$1" == "coverage" ]]; then
   cd build_jobs_coverage
   cmake --build . -j2 --config $CONFIGURATION || cmake --build . --config $CONFIGURATION
   ctest -VV . -C $CONFIGURATION -L libatapp.unit_test
-  lcov --directory $PWD --capture --output-file coverage.info
+  # Exclude system headers during capture so their counters do not affect project coverage.
+  lcov --directory "$PWD" --base-directory "$(cd .. && pwd)" --no-external \
+    --capture --output-file coverage.info --rc geninfo_unexecuted_blocks=1
 elif [[ "$1" == "gcc.test" ]]; then
   bash cmake_dev.sh -lus -b $CONFIGURATION -r build_jobs_ci -c $USE_CC -- -DATBUS_MACRO_ABORT_ON_PROTECTED_ERROR=ON \
     "-DATFRAMEWORK_CMAKE_TOOLSET_THIRD_PARTY_LOW_MEMORY_MODE=ON"
