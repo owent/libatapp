@@ -77,6 +77,7 @@ class app {
     kDisableAtbusFallback,
     kInTick,
     kDestroying,
+    kForkPrepared,
     kFlagMax
   };
 
@@ -221,6 +222,15 @@ class app {
   LIBATAPP_MACRO_API int reload();
 
   LIBATAPP_MACRO_API int stop();
+
+  enum class fork_mode { exec_child, reinitialize_child };
+
+  /// Mark this app prepared for fork + exec. Actions and ticks continue running. An expired deadline returns a timeout.
+  /// The child must exec or _exit before calling any app API.
+  LIBATAPP_MACRO_API int prepare_fork(fork_mode mode, std::chrono::steady_clock::time_point deadline);
+
+  /// Complete the matching prepare in the parent, including after a failed or cancelled fork.
+  LIBATAPP_MACRO_API int finish_fork();
 
   LIBATAPP_MACRO_API int tick();
 

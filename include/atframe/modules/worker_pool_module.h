@@ -141,6 +141,7 @@ class worker_pool_module : public ::atframework::atapp::module_impl {
   LIBATAPP_MACRO_API static bool is_valid(const worker_context& context) noexcept;
 
  private:
+  int enqueue_job(const worker_job_action_pointer& action, const worker_context* requested, worker_context* selected);
   void do_shared_job_on_main_thread();
   void do_scaling_up();
   bool internal_reduce_workers();
@@ -149,7 +150,8 @@ class worker_pool_module : public ::atframework::atapp::module_impl {
   void apply_configure();
 
   int select_worker(const worker_context& context, std::shared_ptr<worker>& output);
-  std::shared_ptr<worker> select_worker();
+  int select_worker_locked(const worker_context& context, std::shared_ptr<worker>& output);
+  std::shared_ptr<worker> select_worker_locked();
   void rebalance_jobs();
 
  private:

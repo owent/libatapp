@@ -3,6 +3,7 @@
 // Created by owent
 
 #include <assert.h>
+#include <random>
 
 #include <libatbus.h>
 
@@ -253,8 +254,7 @@ LIBATAPP_MACRO_API etcd_cluster::~etcd_cluster() {
 
 LIBATAPP_MACRO_API void etcd_cluster::init(const atfw::util::network::http_request::curl_m_bind_ptr_t &curl_mgr) {
   curl_multi_ = curl_mgr;
-  random_generator_.init_seed(
-      static_cast<atfw::util::random::mt19937::result_type>(atfw::util::time::time_utility::get_now()));
+  random_generator_.init_seed(std::random_device{}());
 
   set_flag(flag_t::kClosing, false);
 }

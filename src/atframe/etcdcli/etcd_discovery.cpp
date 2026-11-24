@@ -11,6 +11,7 @@
 #include <atframe/etcdcli/etcd_discovery.h>
 
 #include <algorithm>
+#include <random>
 #include <unordered_set>
 #include <vector>
 
@@ -537,8 +538,7 @@ LIBATAPP_MACRO_API bool etcd_discovery_set::metadata_equal_type::filter(const me
 }
 
 LIBATAPP_MACRO_API etcd_discovery_set::etcd_discovery_set() {
-  random_generator_.init_seed(
-      static_cast<atfw::util::random::xoshiro256_starstar::result_type>(atfw::util::time::time_utility::get_now()));
+  random_generator_.init_seed(std::random_device{}());
   default_index_.round_robin_index = 0;
 }
 

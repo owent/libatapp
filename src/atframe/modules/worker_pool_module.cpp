@@ -362,7 +362,7 @@ class ATFW_UTIL_SYMBOL_LOCAL worker_pool_module::worker
 };
 
 struct ATFW_UTIL_SYMBOL_LOCAL worker_pool_module::worker_set {
-  bool need_scaling_up;
+  std::atomic<bool> need_scaling_up;
   std::atomic<bool> closing;
   std::atomic<bool> cleaning;
   std::atomic<uint32_t> current_expect_workers;
@@ -600,7 +600,10 @@ void worker_pool_module::worker::start(const std::shared_ptr<worker>& self, cons
       }
     }
 
-    self->status_.store(static_cast<uint8_t>(worker_status::kExiting), std::memory_order_release);
+    {
+      std::lock_guard<std::recursive_mutex> lock{owner->worker_lock};
+      self->status_.store(static_cast<uint8_t>(worker_status::kExiting), std::memory_order_release);
+    }
     FWLOGDEBUG("[Worker Pool] Worker {}:{} is exiting, pending jobs: {}", self->get_context().worker_id,
                self->get_context().worker_unique_id, self->private_jobs.unsafe_size());
 
@@ -678,8 +681,8 @@ void worker_pool_module::worker::background_job_tick(std::chrono::microseconds t
   }
 
   // Private tick handles
+  std::lock_guard<std::recursive_mutex> child_lg{tick_handle_lock_};
   if (!tick_handles_.data.empty()) {
-    std::lock_guard<std::recursive_mutex> child_lg{tick_handle_lock_};
     for (auto& tick_handle : tick_handles_.data) {
       if (!tick_handle) {
         continue;
@@ -816,7 +819,7 @@ LIBATAPP_MACRO_API int worker_pool_module::reload() {
   if (is_actived()) {
     apply_configure();
   } else if (worker_set_) {
-    worker_set_->need_scaling_up = true;
+    worker_set_->need_scaling_up.store(true, std::memory_order_release);
   }
   return 0;
 }
@@ -958,7 +961,7 @@ LIBATAPP_MACRO_API int worker_pool_module::tick(std::chrono::system_clock::time_
 
   // do scaling up
   if (expect_workers != worker_set_->current_expect_workers.exchange(expect_workers, std::memory_order_acq_rel)) {
-    worker_set_->need_scaling_up = true;
+    worker_set_->need_scaling_up.store(true, std::memory_order_release);
   }
 
   if (now >= scaling_statistics_->leak_scan_checkpoint -
@@ -1027,13 +1030,36 @@ LIBATAPP_MACRO_API int worker_pool_module::spawn(worker_job_action_type action,
 
 LIBATAPP_MACRO_API int worker_pool_module::spawn(const worker_job_action_pointer& action,
                                                  worker_context* ATFW_UTIL_MACRO_NULLABLE selected_context) {
+  return enqueue_job(action, nullptr, selected_context);
+}
+
+LIBATAPP_MACRO_API int worker_pool_module::spawn(worker_job_action_type action, const worker_context& context) {
+  return spawn(atfw::util::memory::make_strong_rc<worker_job_action_type>(std::move(action)), context);
+}
+
+LIBATAPP_MACRO_API int worker_pool_module::spawn(const worker_job_action_pointer& action,
+                                                 const worker_context& context) {
+  return enqueue_job(action, &context, nullptr);
+}
+
+int worker_pool_module::enqueue_job(const worker_job_action_pointer& action, const worker_context* requested,
+                                    worker_context* selected_context) {
   if (!action) {
     return EN_ATBUS_ERR_PARAMS;
   }
 
-  std::shared_ptr<worker> worker_ptr = select_worker();
-  if (!worker_ptr) {
-    if (!worker_set_ || worker_set_->cleaning.load(std::memory_order_acquire)) {
+  do_scaling_up();
+  std::shared_ptr<worker> worker_ptr;
+  // Keep selection and enqueue together so the worker cannot begin its exit drain between them.
+  std::lock_guard<std::recursive_mutex> lock{worker_set_->worker_lock};
+  if (requested) {
+    int result = select_worker_locked(*requested, worker_ptr);
+    if (result < 0) {
+      return result;
+    }
+  } else {
+    worker_ptr = select_worker_locked();
+    if (!worker_ptr && worker_set_->cleaning.load(std::memory_order_acquire)) {
       return EN_ATAPP_ERR_WORKER_POOL_CLOSED;
     }
   }
@@ -1062,35 +1088,6 @@ LIBATAPP_MACRO_API int worker_pool_module::spawn(const worker_job_action_pointer
     worker_set_->shared_jobs.emplace(std::move(new_job));
   }
 
-  return EN_ATAPP_ERR_SUCCESS;
-}
-
-LIBATAPP_MACRO_API int worker_pool_module::spawn(worker_job_action_type action, const worker_context& context) {
-  return spawn(atfw::util::memory::make_strong_rc<worker_job_action_type>(std::move(action)), context);
-}
-
-LIBATAPP_MACRO_API int worker_pool_module::spawn(const worker_job_action_pointer& action,
-                                                 const worker_context& context) {
-  if (!action) {
-    return EN_ATBUS_ERR_PARAMS;
-  }
-
-  std::shared_ptr<worker> worker_ptr;
-  int select_result = select_worker(context, worker_ptr);
-  if (select_result < 0 || !worker_ptr) {
-    return select_result;
-  }
-
-  if (scaling_configure_) {
-    if (worker_ptr->get_pending_job_size() >= scaling_configure_->queue_size_limit) {
-      return EN_ATAPP_ERR_WORKER_POOL_BUSY;
-    }
-  }
-
-  worker_job_data new_job;
-  new_job.event = worker_job_event_type::kWorkerJobEventAction;
-  new_job.action = action;
-  worker_ptr->emplace(std::move(new_job));
   return EN_ATAPP_ERR_SUCCESS;
 }
 
@@ -1490,16 +1487,18 @@ void worker_pool_module::do_scaling_up() {
     return;
   }
 
-  if (!worker_set_->need_scaling_up) {
+  if (!worker_set_->need_scaling_up.load(std::memory_order_relaxed)) {
     return;
   }
-  worker_set_->need_scaling_up = false;
 
   uint32_t expect_workers = worker_set_->current_expect_workers.load(std::memory_order_acquire);
 
   std::list<std::shared_ptr<worker>> new_workers;
   {
     std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
+    if (!worker_set_->need_scaling_up.exchange(false, std::memory_order_acq_rel)) {
+      return;
+    }
     for (size_t i = worker_set_->workers.size(); i < expect_workers; ++i) {
       auto worker_ptr =
           std::make_shared<worker>(*worker_set_, static_cast<uint32_t>(i + 1),
@@ -1746,12 +1745,17 @@ void worker_pool_module::apply_configure() {
 int worker_pool_module::select_worker(const worker_context& context, std::shared_ptr<worker>& output) {
   do_scaling_up();
 
-  if (context.worker_id <= 0) {
-    return EN_ATBUS_ERR_PARAMS;
-  }
-
   if (!worker_set_) {
     return EN_ATAPP_ERR_WORKER_POOL_CLOSED;
+  }
+
+  std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
+  return select_worker_locked(context, output);
+}
+
+int worker_pool_module::select_worker_locked(const worker_context& context, std::shared_ptr<worker>& output) {
+  if (context.worker_id <= 0) {
+    return EN_ATBUS_ERR_PARAMS;
   }
 
   uint32_t expect_workers = worker_set_->current_expect_workers.load(std::memory_order_acquire);
@@ -1762,7 +1766,6 @@ int worker_pool_module::select_worker(const worker_context& context, std::shared
     return EN_ATAPP_ERR_WORKER_POOL_NO_AVAILABLE_WORKER;
   }
 
-  std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
   // Find by index: O(1)
   if (context.worker_id <= worker_set_->workers.size()) {
     output = worker_set_->workers[context.worker_id - 1];
@@ -1797,15 +1800,8 @@ int worker_pool_module::select_worker(const worker_context& context, std::shared
   return EN_ATAPP_ERR_WORKER_POOL_NO_AVAILABLE_WORKER;
 }
 
-std::shared_ptr<worker_pool_module::worker> worker_pool_module::select_worker() {
-  do_scaling_up();
-
-  uint32_t expect_workers = 4;
-  if (worker_set_) {
-    expect_workers = worker_set_->current_expect_workers.load(std::memory_order_acquire);
-  }
-
-  std::lock_guard<std::recursive_mutex> lg{worker_set_->worker_lock};
+std::shared_ptr<worker_pool_module::worker> worker_pool_module::select_worker_locked() {
+  uint32_t expect_workers = worker_set_->current_expect_workers.load(std::memory_order_acquire);
   std::shared_ptr<worker_pool_module::worker> ret;
   worker_compare_key min_key = worker_compare_key::max();
   for (auto& worker_ptr : worker_set_->workers) {

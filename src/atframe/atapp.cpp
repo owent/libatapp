@@ -9,8 +9,8 @@
 
 #include <algorithm/crypto_cipher.h>
 #include <algorithm/murmur_hash.h>
-#include "atframe/atapp_conf.h"
-#include "gsl/select-gsl.h"
+#include <gsl/select-gsl.h>
+#include <std/explicit_declare.h>
 
 #if defined(ATFRAMEWORK_UTILS_CRYPTO_USE_OPENSSL) || defined(ATFRAMEWORK_UTILS_CRYPTO_USE_LIBRESSL) || \
     defined(ATFRAMEWORK_UTILS_CRYPTO_USE_BORINGSSL)
@@ -49,6 +49,7 @@
 #  include <mutex>
 #endif
 
+#include "atframe/atapp_conf.h"
 #include "atframe/atapp_conf_rapidjson.h"
 #include "atframe/atapp_windows_minidump.h"
 #include "atframe/modules/service_discovery_module.h"
@@ -1266,6 +1267,33 @@ LIBATAPP_MACRO_API int app::reload() {
 
   FWLOGWARNING("------------ load configure done ------------");
   return 0;
+}
+
+LIBATAPP_MACRO_API int app::prepare_fork(fork_mode mode, std::chrono::steady_clock::time_point deadline) {
+#if defined(__unix__) || defined(__APPLE__)
+  if (mode != fork_mode::exec_child) {
+    return EN_ATAPP_ERR_FORK_UNSUPPORTED;
+  }
+  if (!is_inited() || is_closing()) {
+    return EN_ATAPP_ERR_FORK_STATE;
+  }
+  if (std::chrono::steady_clock::now() >= deadline) {
+    return EN_ATAPP_ERR_OPERATION_TIMEOUT;
+  }
+  return set_flag(flag_t::kForkPrepared, true) ? EN_ATAPP_ERR_FORK_STATE : 0;
+#else
+  (void)mode;
+  (void)deadline;
+  return EN_ATAPP_ERR_FORK_UNSUPPORTED;
+#endif
+}
+
+LIBATAPP_MACRO_API int app::finish_fork() {
+#if defined(__unix__) || defined(__APPLE__)
+  return set_flag(flag_t::kForkPrepared, false) ? 0 : EN_ATAPP_ERR_FORK_STATE;
+#else
+  return EN_ATAPP_ERR_FORK_UNSUPPORTED;
+#endif
 }
 
 LIBATAPP_MACRO_API int app::stop() {

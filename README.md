@@ -290,6 +290,20 @@ int main(int argc, char *argv[]) {
 
 **更多的细节请参照 [sample](sample)**
 
+## Unix 子进程
+
+使用新配置启动独立实例时，在父进程调用 `app.prepare_fork(atapp::app::fork_mode::exec_child, deadline)`。
+已初始化且未进入停机的 app 会立即标记为已准备。action 可以仍在执行，新提交的任务、worker tick 和待发消息继续由父进程正常调度。
+各 app 独立配对 prepare 和 finish，可由父进程的不同线程调用。重复 prepare 或无匹配 prepare 的 finish 返回
+`EN_ATAPP_ERR_FORK_STATE`。进入 prepare 时若已到达 `std::chrono::steady_clock` 截止时间，则返回 `EN_ATAPP_ERR_OPERATION_TIMEOUT`。
+
+准备成功后立即 fork。父进程在 fork 成功、失败或取消时均须调用 `app.finish_fork()`。
+父进程继续使用原节点的 PID、身份 hash 和随机数序列。
+子进程只处理需要继承的 fd 和信号，然后 `execve()`，失败时使用 `_exit()`。
+启动方负责关闭白名单之外的 fd，并为新实例配置独立的 ID、监听地址、PID 文件、日志和轮转别名。
+子进程不能调用继承的 app、运行旧 loop 或走普通退出流程。`reinitialize_child` 模式以及 Windows 的
+fork 接口返回 `EN_ATAPP_ERR_FORK_UNSUPPORTED`。此模式无需注册 `pthread_atfork` 回调。
+
 ## 本地 etcd 测试
 
 部分单元测试（`atapp_etcd_cluster`、`atapp_etcd_module`）需要连接 etcd 服务。`ci/etcd/` 目录下提供了自动下载、启动和管理本地 etcd 的脚本。

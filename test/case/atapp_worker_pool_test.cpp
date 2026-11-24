@@ -8,6 +8,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <future>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -15,6 +16,166 @@
 #include <vector>
 
 #include "frame/test_macros.h"
+
+#if defined(__unix__) || defined(__APPLE__)
+#  include <sys/wait.h>
+#  include <unistd.h>
+
+CASE_TEST(atapp_worker_pool, fork_independent_apps) {
+  using namespace std::chrono_literals;
+  std::string dir;
+  atfw::util::file_system::dirname(__FILE__, 0, dir);
+  const auto first_config = dir + "/atapp_test_0.yaml";
+  const auto second_config = dir + "/atapp_test_1.yaml";
+  const char* first_args[] = {"app", "-c", first_config.c_str(), "start"};
+  const char* second_args[] = {"app", "-c", second_config.c_str(), "start"};
+  std::promise<void> ran;
+  atapp::app first, second;
+  int result = first.init(nullptr, 4, first_args);
+  CASE_EXPECT_EQ(0, result);
+  if (result != 0) return;
+  result = second.init(nullptr, 4, second_args);
+  CASE_EXPECT_EQ(0, result);
+  if (result != 0) return;
+  auto prepare = [](atapp::app& instance) {
+    return instance.prepare_fork(atapp::app::fork_mode::exec_child, std::chrono::steady_clock::now() + 2s);
+  };
+  auto first_result = std::async(std::launch::async, [&]() { return prepare(first); }).get();
+  CASE_EXPECT_EQ(0, first_result);
+  if (first_result != 0) return;
+  result = second.get_worker_pool_module()->spawn([&](const atapp::worker_context&) { ran.set_value(); });
+  CASE_EXPECT_EQ(0, result);
+  CASE_EXPECT_TRUE(ran.get_future().wait_for(2s) == std::future_status::ready);
+  result = prepare(second);
+  CASE_EXPECT_EQ(0, result);
+  CASE_EXPECT_EQ(0, first.finish_fork());
+  if (result == 0) CASE_EXPECT_EQ(0, second.finish_fork());
+}
+
+CASE_TEST(atapp_worker_pool, fork_exec_with_running_action) {
+  using namespace std::chrono_literals;
+  using clock = std::chrono::steady_clock;
+  using mode = atapp::app::fork_mode;
+  std::string dir;
+  atfw::util::file_system::dirname(__FILE__, 0, dir);
+  const auto config = dir + "/atapp_test_1.yaml";
+  const char* args[] = {"app", "-c", config.c_str(), "start"};
+  std::promise<void> started, release, finished, tick_seen, next_action;
+  auto released = release.get_future();
+  std::atomic<bool> prepared{false};
+  std::once_flag tick_once;
+  atapp::app app;
+  CASE_EXPECT_EQ(atapp::EN_ATAPP_ERR_FORK_STATE, app.prepare_fork(mode::exec_child, clock::now() + 2s));
+  const int initialized = app.init(nullptr, 4, args);
+  CASE_EXPECT_EQ(0, initialized);
+  if (initialized != 0) return;
+  auto pool = app.get_worker_pool_module();
+  const int submitted = pool->spawn(
+      [&](const atapp::worker_context&) {
+        started.set_value();
+        released.wait();
+        finished.set_value();
+      },
+      atapp::worker_context{1, 0});
+  CASE_EXPECT_EQ(0, submitted);
+  if (submitted != 0) return;
+  auto done = finished.get_future();
+  CASE_EXPECT_TRUE(started.get_future().wait_for(2s) == std::future_status::ready);
+  auto tick = pool->add_tick_callback(
+      [&](const atapp::worker_context&) {
+        if (prepared.load()) std::call_once(tick_once, [&]() { tick_seen.set_value(); });
+      },
+      atapp::worker_context{2, 0});
+  CASE_EXPECT_TRUE(tick != nullptr);
+  CASE_EXPECT_EQ(atapp::EN_ATAPP_ERR_FORK_UNSUPPORTED, app.prepare_fork(mode::reinitialize_child, clock::now() + 2s));
+  CASE_EXPECT_EQ(atapp::EN_ATAPP_ERR_OPERATION_TIMEOUT, app.prepare_fork(mode::exec_child, clock::now()));
+  CASE_EXPECT_EQ(atapp::EN_ATAPP_ERR_FORK_STATE, app.finish_fork());
+  for (int expected_exit : {0, 127}) {
+    int result = app.prepare_fork(mode::exec_child, clock::now() + 2s);
+    CASE_EXPECT_EQ(0, result);
+    if (result != 0) break;
+    CASE_EXPECT_EQ(atapp::EN_ATAPP_ERR_FORK_STATE, app.prepare_fork(mode::exec_child, clock::now() + 2s));
+    if (expected_exit == 0) {
+      prepared = true;
+      CASE_EXPECT_TRUE(tick_seen.get_future().wait_for(2s) == std::future_status::ready);
+      result = pool->spawn([&](const atapp::worker_context&) { next_action.set_value(); }, atapp::worker_context{2, 0});
+      CASE_EXPECT_EQ(0, result);
+      CASE_EXPECT_TRUE(next_action.get_future().wait_for(2s) == std::future_status::ready);
+    }
+    const char* executable = expected_exit == 0 ? "/bin/true" : "/nonexistent/atapp-fork-test";
+    pid_t pid = fork();
+    if (pid == 0) {
+      execl(executable, executable, static_cast<char*>(nullptr));
+      _exit(127);
+    }
+    CASE_EXPECT_GT(pid, 0);
+    if (pid > 0) {
+      int status = 0;
+      CASE_EXPECT_EQ(pid, waitpid(pid, &status, 0));
+      CASE_EXPECT_TRUE(WIFEXITED(status));
+      CASE_EXPECT_EQ(expected_exit, WEXITSTATUS(status));
+    }
+    CASE_EXPECT_EQ(0, app.finish_fork());
+    CASE_EXPECT_EQ(atapp::EN_ATAPP_ERR_FORK_STATE, app.finish_fork());
+    CASE_EXPECT_TRUE(done.wait_for(0s) == std::future_status::timeout);
+  }
+  if (tick) pool->remove_tick_callback(tick);
+  release.set_value();
+  CASE_EXPECT_TRUE(done.wait_for(2s) == std::future_status::ready);
+}
+#else
+CASE_TEST(atapp_worker_pool, fork_unsupported) {
+  atapp::app app;
+  CASE_EXPECT_EQ(atapp::EN_ATAPP_ERR_FORK_UNSUPPORTED,
+                 app.prepare_fork(atapp::app::fork_mode::exec_child, std::chrono::steady_clock::now()));
+  CASE_EXPECT_EQ(atapp::EN_ATAPP_ERR_FORK_UNSUPPORTED, app.finish_fork());
+}
+#endif
+
+CASE_TEST(atapp_worker_pool, finish_fork_preserves_bus_identity) {
+  std::string dir;
+  atfw::util::file_system::dirname(__FILE__, 0, dir);
+  std::string config = dir + "/atapp_test_1.yaml";
+  const char* args[] = {"app", "-c", config.c_str(), "start"};
+  atapp::app app;
+  int result = app.init(nullptr, 4, args);
+  CASE_EXPECT_EQ(0, result);
+  if (result != 0) return;
+
+  auto bus = app.get_bus_node();
+  const auto id = bus->get_id();
+  const auto conf = bus->get_conf();
+  // The node's PID override must be set before initializing its self endpoint.
+  const int32_t pid = atbus::node::get_pid() == 1 ? 2 : 1;
+  bus->reset();
+  bus->set_self_pid(pid);
+  result = bus->init(id, &conf);
+  CASE_EXPECT_EQ(0, result);
+  if (result != 0) return;
+  result = bus->start();
+  CASE_EXPECT_EQ(0, result);
+  if (result != 0) return;
+
+  const std::string hash = bus->get_hash_code();
+  auto check_identity = [&]() {
+    CASE_EXPECT_EQ(pid, bus->get_self_pid());
+    CASE_EXPECT_EQ(pid, bus->get_self_endpoint()->get_pid());
+    CASE_EXPECT_EQ(hash, bus->get_hash_code());
+    CASE_EXPECT_EQ(hash, bus->get_self_endpoint()->get_hash_code());
+  };
+#if defined(__unix__) || defined(__APPLE__)
+  CASE_EXPECT_EQ(atapp::EN_ATAPP_ERR_FORK_STATE, app.finish_fork());
+  check_identity();
+  result =
+      app.prepare_fork(atapp::app::fork_mode::exec_child, std::chrono::steady_clock::now() + std::chrono::seconds(3));
+  CASE_EXPECT_EQ(0, result);
+  if (result != 0) return;
+  CASE_EXPECT_EQ(0, app.finish_fork());
+#else
+  CASE_EXPECT_EQ(atapp::EN_ATAPP_ERR_FORK_UNSUPPORTED, app.finish_fork());
+#endif
+  check_identity();
+}
 
 CASE_TEST(atapp_worker_pool, basic_spawn) {
   std::string conf_path_base;
