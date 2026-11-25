@@ -1309,7 +1309,10 @@ LIBATAPP_MACRO_API int app::prepare_fork(fork_mode mode, std::chrono::system_clo
 #endif
 }
 
-LIBATAPP_MACRO_API int app::finish_fork() {
+LIBATAPP_MACRO_API int app::finish_fork(bool reinit_ev_loop) {
+  if (reinit_ev_loop && ev_loop_ != nullptr && is_fork_child()) {
+    uv_loop_fork(ev_loop_);
+  }
 #if defined(__unix__) || defined(__APPLE__)
   return set_flag(flag_t::kForkPrepared, false) ? 0 : EN_ATAPP_ERR_FORK_STATE;
 #else

@@ -230,7 +230,9 @@ class app {
   LIBATAPP_MACRO_API int prepare_fork(fork_mode mode, std::chrono::system_clock::time_point deadline);
 
   /// Complete the matching prepare in the parent, including after a failed or cancelled fork.
-  LIBATAPP_MACRO_API int finish_fork();
+  /// If user call uv_loop_fork() out of atapp::app, reinit_ev_loop can be set to false so it will not be reinitialized
+  /// twice.
+  LIBATAPP_MACRO_API int finish_fork(bool reinit_ev_loop = true);
 
   LIBATAPP_MACRO_API int tick();
 
